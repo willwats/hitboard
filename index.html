@@ -1,0 +1,795 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Hitboard</title>
+<meta name="theme-color" content="#0D1512">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Hitboard">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: sticky wordmark header, one content column (max 640px), fixed four-tab bar, bottom sheets for game deep dives and prop calculator */
+:root{
+  --bg:#EDF1EE; --surface:#FFFFFF; --surface2:#E2E9E5; --ink:#13211C; --muted:#586861; --line:#CBD5CF;
+  --hit:#0A7D58; --hit-bg:#D3EEE2; --miss:#B93A2A; --miss-bg:#F6D9D3; --amber:#9A6700; --amber-bg:#F7E8C4; --btn:#13211C; --btn-ink:#EDF1EE;
+  --font-display:'Barlow Condensed','Arial Narrow',sans-serif;
+  --font-body:'IBM Plex Sans',system-ui,-apple-system,sans-serif;
+  --font-data:'IBM Plex Mono',ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0D1512; --surface:#15211C; --surface2:#1E2D27; --ink:#E6EEE9; --muted:#92A59B; --line:#2A3C34;
+    --hit:#3DDC97; --hit-bg:#14392B; --miss:#FF7D69; --miss-bg:#3B1F1A; --amber:#F2B93B; --amber-bg:#3A2E10; --btn:#E6EEE9; --btn-ink:#0D1512;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0D1512; --surface:#15211C; --surface2:#1E2D27; --ink:#E6EEE9; --muted:#92A59B; --line:#2A3C34;
+  --hit:#3DDC97; --hit-bg:#14392B; --miss:#FF7D69; --miss-bg:#3B1F1A; --amber:#F2B93B; --amber-bg:#3A2E10; --btn:#E6EEE9; --btn-ink:#0D1512;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 96px}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+button,select,input{font:inherit;color:inherit}
+button{cursor:pointer}
+a{color:var(--hit)}
+:focus-visible{outline:2px solid var(--hit);outline-offset:2px}
+.wrap{max-width:640px;margin:0 auto}
+header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-block:12px 10px;display:flex;align-items:baseline;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line)}
+.logo{font-family:var(--font-display);font-weight:700;font-size:30px;letter-spacing:.01em;line-height:1;text-transform:uppercase}
+.logo span{color:var(--hit)}
+.stamp{font-family:var(--font-data);font-size:11px;color:var(--muted);text-align:right;line-height:1.3}
+h2{font-family:var(--font-display);font-size:26px;font-weight:700;text-transform:uppercase;letter-spacing:.02em;margin:18px 0 4px;line-height:1.05;text-wrap:balance}
+h3{font-family:var(--font-display);font-size:19px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;margin:18px 0 6px}
+.lede{color:var(--muted);margin:0 0 14px;max-width:60ch}
+.label{font-family:var(--font-data);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.feed{display:flex;flex-direction:column;gap:12px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:14px}
+.gtop{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.teams{display:flex;align-items:baseline;gap:10px;margin:6px 0 10px;font-family:var(--font-display);font-weight:700;font-size:34px;line-height:1;text-transform:uppercase}
+.teams i{font-style:normal;font-size:16px;color:var(--muted);font-family:var(--font-data);font-weight:400}
+.pbar{display:flex;height:10px;border-radius:3px;overflow:hidden;background:var(--surface2);gap:2px}
+.pbar i{display:block;background:var(--surface2);border:1px solid var(--line);height:100%}
+.pbar i.lead{background:var(--hit);border-color:var(--hit)}
+.plabels{display:flex;justify-content:space-between;font-family:var(--font-data);font-size:13px;margin-bottom:4px}
+.facts{display:flex;flex-wrap:wrap;gap:4px 14px;margin:10px 0 0;font-family:var(--font-data);font-size:12.5px;color:var(--muted)}
+.facts b{color:var(--ink);font-weight:500}
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.tag{font-family:var(--font-data);font-size:11px;padding:2px 8px;border-radius:3px;background:var(--surface2);color:var(--muted)}
+.tag.warn{background:var(--amber-bg);color:var(--amber)} .tag.good{background:var(--hit-bg);color:var(--hit)}
+.actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:5px;padding:9px 14px;font-weight:500;min-height:40px}
+.btn.primary{background:var(--btn);color:var(--btn-ink);border-color:var(--btn);flex:1}
+.btn.done{background:var(--hit-bg);color:var(--hit);border-color:var(--hit-bg)}
+.chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;margin-bottom:12px}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 13px;white-space:nowrap;font-size:14px}
+.chip[aria-pressed="true"]{background:var(--btn);color:var(--btn-ink);border-color:var(--btn)}
+.list{background:var(--surface);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.prow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;width:100%;text-align:left;background:none;border:0;border-top:1px solid var(--line);padding:11px 12px;min-height:58px}
+.prow:first-child{border-top:0}
+.prow:active{background:var(--surface2)}
+.pr-name{font-weight:600;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pr-sub{font-size:12.5px;color:var(--muted);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pr-r{text-align:right;font-family:var(--font-data)}
+.pr-r b{display:block;font-weight:500;font-size:17px}
+.pr-r span{font-size:11px;color:var(--muted)}
+nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);border-top:1px solid var(--line);
+  padding:6px max(10px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(10px,env(safe-area-inset-left,0px));display:flex;justify-content:center}
+nav .in{display:flex;width:100%;max-width:640px}
+nav button{flex:1;background:none;border:0;padding:8px 4px;display:flex;flex-direction:column;align-items:center;gap:2px;color:var(--muted);font-size:12px;font-weight:500;min-height:48px;position:relative}
+nav button svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+nav button[aria-current="page"]{color:var(--ink)}
+nav button[aria-current="page"]::before{content:"";position:absolute;top:-7px;left:25%;right:25%;height:3px;background:var(--hit);border-radius:0 0 3px 3px}
+.badge{position:absolute;top:2px;left:calc(50% + 8px);background:var(--hit);color:var(--btn-ink);font-family:var(--font-data);font-size:10px;min-width:16px;height:16px;border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0 4px}
+.foot{margin:22px 0 0;font-size:12px;color:var(--muted);max-width:60ch}
+.scrim{position:fixed;inset:0;background:rgba(5,12,9,.55);z-index:30;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--bg);width:100%;max-width:640px;max-height:92%;overflow:auto;border-radius:12px 12px 0 0;padding:14px max(16px,env(safe-area-inset-left,0px)) calc(20px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-right,0px))}
+.sh-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.sh-head h2{margin:2px 0 0;font-size:28px}
+.x{border:1px solid var(--line);background:var(--surface);border-radius:50%;width:36px;height:36px;flex:none;font-size:18px;line-height:1}
+.tblwrap{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:6px}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{padding:7px 10px;text-align:right;border-top:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left;white-space:normal}
+thead th{border-top:0;font-family:var(--font-data);font-size:11px;font-weight:500;letter-spacing:.06em;color:var(--muted);text-transform:uppercase}
+td{font-family:var(--font-data)}
+td:first-child{font-family:var(--font-body)}
+ul.pts{margin:0;padding-left:18px;display:grid;gap:6px}
+.src{font-size:12.5px;color:var(--muted)}
+.field{display:grid;grid-template-columns:1fr 110px;gap:10px;align-items:center;margin-bottom:8px}
+.field input{border:1px solid var(--line);background:var(--surface);border-radius:5px;padding:8px 10px;text-align:right;font-family:var(--font-data);width:100%;min-height:40px}
+.slider{display:flex;align-items:center;gap:10px;margin:6px 0 12px}
+.slider input{flex:1;accent-color:var(--hit);min-width:0}
+.slider b{font-family:var(--font-data);font-weight:500;min-width:44px;text-align:right}
+.out{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:10px 12px}
+.tile .v{font-family:var(--font-display);font-weight:700;font-size:34px;line-height:1.05}
+.tile .v.hi{color:var(--hit)} .tile .v.lo{color:var(--miss)}
+.tile .k{font-family:var(--font-data);font-size:11px;color:var(--muted)}
+.verdict{background:var(--surface2);border-radius:5px;padding:10px 12px;font-size:14px}
+.picked{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:10px;align-items:center;padding:12px;border-top:1px solid var(--line)}
+.picked:first-child{border-top:0}
+.rm{border:0;background:none;color:var(--muted);font-size:20px;width:36px;height:36px}
+.slip{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:14px;margin-top:12px;display:grid;gap:10px}
+.slip .r{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.slip .r b{font-family:var(--font-data);font-weight:500}
+.slip input{width:90px;border:1px solid var(--line);background:var(--bg);border-radius:5px;padding:6px 8px;text-align:right;font-family:var(--font-data)}
+.note{background:var(--amber-bg);border-radius:5px;padding:9px 12px;font-size:13px}
+.empty{padding:28px 16px;text-align:center;color:var(--muted)}
+.names{color:var(--muted);font-size:13px;margin:-4px 0 10px}
+.scoreline{display:flex;gap:18px;font-family:var(--font-data);font-size:15px;color:var(--muted);margin:0 0 10px}
+.scoreline b{font-size:22px;font-weight:500;color:var(--muted)} .scoreline .w,.scoreline .w b{color:var(--ink)}
+.pill{font-family:var(--font-data);font-size:11px;padding:2px 8px;border-radius:3px;background:var(--surface2);color:var(--muted)}
+.pill.live{background:var(--miss-bg);color:var(--miss)} .pill.final{background:var(--surface2);color:var(--ink)}
+.cap{font-family:var(--font-data);font-size:11px;color:var(--muted);margin-top:4px}
+.rbar{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:6px}
+.rbar .btn{min-width:150px}
+.msg{font-size:13px;margin-top:4px;max-width:34ch}
+.msg.warn{color:var(--amber)} .msg.good{color:var(--hit)}
+.btn:disabled{opacity:.6;cursor:default}
+.hrpill{font-family:var(--font-data);font-weight:500;font-size:14px;padding:2px 8px;border-radius:4px;display:inline-block}
+.hrpill.hi{background:var(--hit-bg);color:var(--hit)} .hrpill.lo{background:var(--miss-bg);color:var(--miss)} .hrpill.mid{background:var(--surface2)}
+td.lc{text-align:center} td.lc.hi{background:var(--hit-bg);color:var(--hit)} td.lc.lo{background:var(--miss-bg);color:var(--miss)} td.lc.mid{background:var(--surface2)}
+.srow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 12px;border-top:1px solid var(--line)}
+.srow:first-child{border-top:0}
+.bcard{padding:12px 14px}
+.bcard .facts{margin-top:6px}
+.seg2{margin:0 0 12px}
+details.bcard{margin-bottom:8px}
+details.bcard summary{cursor:pointer;min-height:32px;display:flex;align-items:center;gap:8px}
+@media (prefers-reduced-motion: no-preference){.sheet{animation:up .18s ease-out}@keyframes up{from{transform:translateY(24px);opacity:.6}to{transform:none;opacity:1}}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div class="logo">Hit<span>board</span></div>
+    <div class="stamp" id="stamp"></div>
+  </header>
+  <main id="view"></main>
+</div>
+<nav aria-label="Sections"><div class="in" id="nav"></div></nav>
+<div id="sheetRoot"></div>
+
+<script>
+(function(){
+"use strict";
+/* =====================================================================
+   DATA BLOCK. Replaced each week by the refresh task. Everything below
+   the "LOGIC" marker reads from this object and needs no changes.
+   ===================================================================== */
+var DATA={
+  week:7, sport:"NFL", asOf:"Sun, Oct 18, 2026", nextRefresh:"Wed, Oct 21, 2026",
+  marketAsOf:"Fri, Oct 16, 2:14 PM ET",
+  byes:["BUF","JAX","LAC","WAS"],
+  games:[
+   {id:"ne-chi",day:"Thu Oct 22",venue:"Soldier Field",a:"NE",h:"CHI",an:"Patriots",hn:"Bears",fav:"h",pts:2.5,total:49.5,ml:null,
+    src:"Covers snapshot, Oct 17",fresh:true,alt:"Oct 13 listing: CHI -1.5, total 47.5, ML NE +105 / CHI -125.",kal:[47,55],poly:[46,54],
+    dive:{
+     basis:"Team stats through Week 5.",
+     rows:[["Record","3-2","3-2"],["Points / game","22.0 (19th)","23.8 (13th)"],["Points allowed / game","18.8 (4th)","19.2 (5th)"],["Yards / game","372.4 (8th)","392.4 (7th)"],["Yards / play","5.8 (8th)","5.4 (15th)"],["3rd-down offense","37.5% (20th)","43.7% (10th)"],["3rd-down defense","38.3% (13th)","26.0% (2nd)"],["Red-zone TD rate","57.1% (18th)","42.9% (32nd)"],["Rush yards / game","127.2 (10th)","173.2 (1st)"],["Pass yards / game","245.2 (10th)","219.2 (18th)"],["Turnover margin / game","-1.0 (27th)","-0.8 (24th)"]],
+     inj:["New England: CBs Carlton Davis III and Karon Prunty were ruled out in Week 6. OT Will Campbell, RB TreVeyon Henderson, Channing Canada, Christian Elliss and Craig Woodson were questionable. WR A.J. Brown came off injured reserve after four games with a high ankle sprain.","Chicago: QB Caleb Williams is questionable (hamstring, missed three games). RB Kyle Monangai was out. CB Kyler Gordon came off Reserve/PUP. Dayo Odeyingbo went on injured reserve.","These are Week 6 designations. The official Week 7 report is not out yet."],
+     angles:["Chicago leads the league in rushing and allows only 96 rush yards a game. A ground-heavy plan can shorten the game and cut New England's possessions.","New England's defense allows 6.2 yards per play even with a low points-allowed rank, which gives Drake Maye room against Chicago's pass defense.","Chicago's third-down defense (2nd) is elite, but its red-zone offense converts a league-low 42.9% into touchdowns, so drives can end in field goals.","A.J. Brown's return could help Romeo Doubs and DeMario Douglas, but there is little time to build rapport on a short week.","If Williams cannot play, Tyson Bagent starts and the offense likely leans even more on the run.","Weather at Soldier Field is worth checking closer to kickoff."],
+     proj:"Football Nation projects Bears 26, Patriots 23."}},
+   {id:"pit-no",day:"Sun Oct 25",venue:"Stade de France, Paris",a:"PIT",h:"NO",an:"Steelers",hn:"Saints",fav:"a",pts:2.5,total:42.5,ml:{a:-140,h:120},src:"Sports Brackets listing, Oct 13",fresh:false,alt:"",kal:[57,43],poly:[57,44],dive:{"basis": "Team stats from Pro Football Reference through Week 5 (Denver and Seattle through Week 6, Kansas City and Carolina through Week 4), per-game figures. Rank 1 is best of 32.", "rows": [["Record", "3-2-0", "1-4-0"], ["Points / game", "22.2 (18th)", "23.6 (16th)"], ["Points allowed / game", "21.8 (11th)", "30.2 (31st)"], ["Pass yards / game", "223 (16th)", "240 (11th)"], ["Rush yards / game", "101 (19th)", "82 (29th)"], ["Yards / carry", "4.7 (9th)", "3.5 (28th)"], ["Pressure rate faced", "21.6% (14th)", "21.9% (15th)"], ["Yards allowed / play", "5.5 (18th)", "5.7 (26th)"], ["Pass yards allowed / game", "221 (16th)", "212 (11th)"], ["Rush yards allowed / game", "103 (13th)", "149 (30th)"], ["Takeaways / game", "1.6 (8th)", "1.0 (22nd)"]], "inj": ["PIT: no verified injury list. Check the official Week 7 report when it posts.", "NO: no verified injury list. Check the official Week 7 report when it posts.", "Injury lists were read from Covers (Oct 15 to Oct 18) and mostly describe this weekend’s games. The official Week 7 report is not out yet."], "angles": ["PIT’s scoring offense ranks 18th (22.2 a game). NO’s scoring defense ranks 31st and allows 30.2.", "PIT’s run game ranks 19th (101 a game). NO’s run defense ranks 30th and allows 149.", "NO’s pass offense ranks 11th (240 a game). PIT’s pass defense ranks 16th and allows 221.", "Records: PIT 3-2-0, NO 1-4-0. Scoring margin per game: PIT +0.4, NO -6.6."], "proj": "Matchup notes here are generated from the stat ranks above, not from film or full injury checks. The line and market probabilities are in the sections above."}},
+   {id:"cin-bal",day:"Sun Oct 25",venue:"M&T Bank Stadium",a:"CIN",h:"BAL",an:"Bengals",hn:"Ravens",fav:"h",pts:3.5,total:51.5,ml:{a:160,h:-190},src:"Sports Brackets listing, Oct 13",fresh:false,alt:"BetUS lists the total at 52.5.",kal:[37,64],poly:[38,63],dive:{"basis": "Team stats from Pro Football Reference through Week 5 (Denver and Seattle through Week 6, Kansas City and Carolina through Week 4), per-game figures. Rank 1 is best of 32.", "rows": [["Record", "3-2-0", "4-1-0"], ["Points / game", "25.6 (9th)", "29.2 (6th)"], ["Points allowed / game", "21.8 (11th)", "23.8 (19th)"], ["Pass yards / game", "260 (7th)", "230 (14th)"], ["Rush yards / game", "83 (26th)", "164 (3rd)"], ["Yards / carry", "3.6 (26th)", "5.1 (3rd)"], ["Pressure rate faced", "22.1% (16th)", "20.4% (8th)"], ["Yards allowed / play", "5.6 (24th)", "5.3 (15th)"], ["Pass yards allowed / game", "221 (17th)", "224 (18th)"], ["Rush yards allowed / game", "123 (22nd)", "102 (12th)"], ["Takeaways / game", "1.6 (8th)", "1.2 (17th)"]], "inj": ["Cincinnati: no injuries on the Covers list.", "Baltimore: Covers lists QB Lamar Jackson out (ankle), WR Zay Flowers (toe), TE Mark Andrews (hand) and WR Rashod Bateman (shoulder) as injured; TE M. Hibner and C Tyler Jurgens are out.", "Injury lists were read from Covers (Oct 15 to Oct 18) and mostly describe this weekend’s games. The official Week 7 report is not out yet."], "angles": ["BAL’s run game ranks 3rd (164 a game). CIN’s run defense ranks 22nd and allows 123.", "CIN’s pass offense ranks 7th (260 a game). BAL’s pass defense ranks 18th and allows 224.", "CIN’s scoring offense ranks 9th (25.6 a game). BAL’s scoring defense ranks 19th and allows 23.8.", "Records: CIN 3-2-0, BAL 4-1-0. Scoring margin per game: CIN +3.8, BAL +5.4."], "proj": "Matchup notes here are generated from the stat ranks above, not from film or full injury checks. The line and market probabilities are in the sections above."}},
+   {id:"cle-ten",day:"Sun Oct 25",venue:"Nissan Stadium",a:"CLE",h:"TEN",an:"Browns",hn:"Titans",fav:"h",pts:2.5,total:40.5,ml:{a:115,h:-135},src:"Sports Brackets listing, Oct 13",fresh:false,alt:"",kal:[53,47],poly:[52,48],dive:{"basis": "Team stats from Pro Football Reference through Week 5 (Denver and Seattle through Week 6, Kansas City and Carolina through Week 4), per-game figures. Rank 1 is best of 32.", "rows": [["Record", "3-2-0", "0-5-0"], ["Points / game", "18.6 (27th)", "11.6 (32nd)"], ["Points allowed / game", "22.4 (14th)", "21.8 (11th)"], ["Pass yards / game", "179 (25th)", "164 (31st)"], ["Rush yards / game", "94 (21st)", "83 (27th)"], ["Yards / carry", "3.7 (23rd)", "3.8 (18th)"], ["Pressure rate faced", "26.6% (27th)", "24.0% (20th)"], ["Yards allowed / play", "5.2 (13th)", "5.2 (14th)"], ["Pass yards allowed / game", "217 (13th)", "218 (14th)"], ["Rush yards allowed / game", "117 (18th)", "114 (17th)"], ["Takeaways / game", "1.2 (17th)", "0.4 (30th)"]], "inj": ["Cleveland: Covers lists QB Dillon Gabriel out (back), RB D. Sampson out (knee), RB Q. Judkins questionable (ankle), WR Denzel Boston (foot) and WR K. Concepcion (concussion).", "TEN: no verified injury list. Check the official Week 7 report when it posts.", "Injury lists were read from Covers (Oct 15 to Oct 18) and mostly describe this weekend’s games. The official Week 7 report is not out yet."], "angles": ["CLE face pressure on 26.6% of dropbacks, among the highest rates in the league (27th of 32, 1st is lowest). That raises the sack and turnover risk for their quarterback.", "TEN force only 0.4 turnovers a game (30th), so they rarely get a boost from takeaways.", "Records: CLE 3-2-0, TEN 0-5-0. Scoring margin per game: CLE -3.8, TEN -10.2."], "proj": "Matchup notes here are generated from the stat ranks above, not from film or full injury checks. The line and market probabilities are in the sections above."}},
+   {id:"ind-min",day:"Sun Oct 25",venue:"U.S. Bank Stadium",a:"IND",h:"MIN",an:"Colts",hn:"Vikings",fav:"h",pts:2.5,total:46.5,ml:{a:120,h:-140},src:"Sports Brackets listing, Oct 13",fresh:false,alt:"",kal:[33,69],poly:[32,68],dive:{"basis": "Team stats from Pro Football Reference through Week 5 (Denver and Seattle through Week 6, Kansas City and Carolina through Week 4), per-game figures. Rank 1 is best of 32.", "rows": [["Record", "2-3-0", "5-0-0"], ["Points / game", "24.8 (10th)", "21.8 (21st)"], ["Points allowed / game", "27.6 (27th)", "12.8 (1st)"], ["Pass yards / game", "193 (22nd)", "167 (29th)"], ["Rush yards / game", "101 (20th)", "116 (13th)"], ["Yards / carry", "3.7 (25th)", "3.8 (19th)"], ["Pressure rate faced", "18.0% (4th)", "19.9% (7th)"], ["Yards allowed / play", "6.2 (31st)", "4.6 (3rd)"], ["Pass yards allowed / game", "254 (28th)", "173 (3rd)"], ["Rush yards allowed / game", "130 (27th)", "87 (5th)"], ["Takeaways / game", "0.4 (30th)", "2.0 (1st)"]], "inj": ["IND: no verified injury list. Check the official Week 7 report when it posts.", "MIN: no verified injury list. Check the official Week 7 report when it posts.", "Injury lists were read from Covers (Oct 15 to Oct 18) and mostly describe this weekend’s games. The official Week 7 report is not out yet."], "angles": ["MIN’s run game ranks 13th (116 a game). IND’s run defense ranks 27th and allows 130.", "IND force only 0.4 turnovers a game (30th), so they rarely get a boost from takeaways.", "MIN force 2.0 turnovers a game (1st), a source of short fields for their offense.", "Records: IND 2-3-0, MIN 5-0-0. Scoring margin per game: IND -2.8, MIN +9.0."], "proj": "Matchup notes here are generated from the stat ranks above, not from film or full injury checks. The line and market probabilities are in the sections above."}},
+   {id:"mia-nyj",day:"Sun Oct 25",venue:"MetLife Stadium",a:"MIA",h:"NYJ",an:"Dolphins",hn:"Jets",fav:"h",pts:2.5,total:41.5,ml:{a:120,h:-140},src:"Sports Brackets listing, Oct 13",fresh:false,alt:"",kal:[34,67],poly:[34,67],dive:{"basis": "Team stats from Pro Football Reference through Week 5 (Denver and Seattle through Week 6, Kansas City and Carolina through Week 4), per-game figures. Rank 1 is best of 32.", "rows": [["Record", "0-5-0", "2-3-0"], ["Points / game", "14.0 (31st)", "18.6 (27th)"], ["Points allowed / game", "26.4 (24th)", "19.2 (5th)"], ["Pass yards / game", "154 (32nd)", "190 (23rd)"], ["Rush yards / game", "127 (11th)", "94 (22nd)"], ["Yards / carry", "4.9 (6th)", "3.6 (27th)"], ["Pressure rate faced", "27.2% (29th)", "23.3% (18th)"], ["Yards allowed / play", "5.5 (20th)", "4.6 (2nd)"], ["Pass yards allowed / game", "219 (15th)", "175 (4th)"], ["Rush yards allowed / game", "111 (16th)", "118 (19th)"], ["Takeaways / game", "0.8 (27th)", "1.2 (17th)"]], "inj": ["MIA: no verified injury list. Check the official Week 7 report when it posts.", "NYJ: no verified injury list. Check the official Week 7 report when it posts.", "Injury lists were read from Covers (Oct 15 to Oct 18) and mostly describe this weekend’s games. The official Week 7 report is not out yet."], "angles": ["MIA’s run game ranks 11th (127 a game). NYJ’s run defense ranks 19th and allows 118.", "MIA face pressure on 27.2% of dropbacks, among the highest rates in the league (29th of 32, 1st is lowest). That raises the sack and turnover risk for their quarterback.", "Records: MIA 0-5-0, NYJ 2-3-0. Scoring margin per game: MIA -12.4, NYJ -0.6."], "proj": "Matchup notes here are generated from the stat ranks above, not from film or full injury checks. The line and market probabilities are in the sections above."}},
+   {id:"nyg-hou",day:"Sun Oct 25",venue:"NRG Stadium",a:"NYG",h:"HOU",an:"Giants",hn:"Texans",fav:"h",pts:5.5,total:43.5,ml:{a:200,h:-245},src:"Sports Brackets listing, Oct 13",fresh:false,alt:"",kal:[22,79],poly:[22,78],dive:{"basis": "Team stats from Pro Football Reference through Week 5 (Denver and Seattle through Week 6, Kansas City and Carolina through Week 4), per-game figures. Rank 1 is best of 32.", "rows": [["Record", "3-1-1", "1-4-0"], ["Points / game", "21.8 (21st)", "22.0 (19th)"], ["Points allowed / game", "21.2 (10th)", "22.4 (14th)"], ["Pass yards / game", "199 (20th)", "262 (6th)"], ["Rush yards / game", "109 (16th)", "79 (31st)"], ["Yards / carry", "3.7 (24th)", "3.4 (30th)"], ["Pressure rate faced", "20.4% (8th)", "20.7% (11th)"], ["Yards allowed / play", "5.6 (23rd)", "5.0 (8th)"], ["Pass yards allowed / game", "199 (7th)", "234 (23rd)"], ["Rush yards allowed / game", "128 (24th)", "78 (3rd)"], ["Takeaways / game", "1.6 (8th)", "1.0 (22nd)"]], "inj": ["NYG: no verified injury list. Check the official Week 7 report when it posts.", "HOU: no verified injury list. Check the official Week 7 report when it posts.", "Injury lists were read from Covers (Oct 15 to Oct 18) and mostly describe this weekend’s games. The official Week 7 report is not out yet."], "angles": ["NYG’s pass offense ranks 20th (199 a game). HOU’s pass defense ranks 23rd and allows 234.", "Records: NYG 3-1-1, HOU 1-4-0. Scoring margin per game: NYG +0.6, HOU -0.4."], "proj": "Matchup notes here are generated from the stat ranks above, not from film or full injury checks. The line and market probabilities are in the sections above."}},
+   {id:"sf-atl",day:"Sun Oct 25",venue:"Mercedes-Benz Stadium",a:"SF",h:"ATL",an:"49ers",hn:"Falcons",fav:"a",pts:4.5,total:47.5,ml:{a:-225,h:185},src:"Sports Brackets listing, Oct 13",fresh:false,alt:"",kal:[68,32],poly:[68,33],dive:{"basis": "Team stats from Pro Football Reference through Week 5 (Denver and Seattle through Week 6, Kansas City and Carolina through Week 4), per-game figures. Rank 1 is best of 32.", "rows": [["Record", "5-0-0", "2-3-0"], ["Points / game", "30.8 (3rd)", "23.8 (13th)"], ["Points allowed / game", "18.6 (3rd)", "24.4 (21st)"], ["Pass yards / game", "236 (13th)", "195 (21st)"], ["Rush yards / game", "129 (8th)", "167 (2nd)"], ["Yards / carry", "4.6 (10th)", "5.1 (4th)"], ["Pressure rate faced", "17.8% (3rd)", "17.2% (2nd)"], ["Yards allowed / play", "4.7 (4th)", "5.0 (9th)"], ["Pass yards allowed / game", "200 (8th)", "248 (27th)"], ["Rush yards allowed / game", "98 (11th)", "80 (4th)"], ["Takeaways / game", "1.4 (13th)", "0.8 (27th)"]], "inj": ["SF: no verified injury list. Check the official Week 7 report when it posts.", "Atlanta: Covers lists QB Michael Penix Jr. (ribs) and WR Drake London (hip) as injured.", "Injury lists were read from Covers (Oct 15 to Oct 18) and mostly describe this weekend’s games. The official Week 7 report is not out yet."], "angles": ["SF’s scoring offense ranks 3rd (30.8 a game). ATL’s scoring defense ranks 21st and allows 24.4.", "SF’s pass offense ranks 13th (236 a game). ATL’s pass defense ranks 27th and allows 248.", "Records: SF 5-0-0, ATL 2-3-0. Scoring margin per game: SF +12.2, ATL -0.6."], "proj": "Matchup notes here are generated from the stat ranks above, not from film or full injury checks. The line and market probabilities are in the sections above."}},
+   {id:"tb-car",day:"Sun Oct 25",venue:"Bank of America Stadium",a:"TB",h:"CAR",an:"Buccaneers",hn:"Panthers",fav:"a",pts:1.5,total:45.5,ml:{a:-125,h:105},src:"Sports Brackets listing, Oct 13",fresh:false,alt:"",kal:[42,59],poly:[42,59],dive:{"basis": "Team stats from Pro Football Reference through Week 5 (Denver and Seattle through Week 6, Kansas City and Carolina through Week 4), per-game figures. Rank 1 is best of 32.", "rows": [["Record", "1-4-0", "2-2-0"], ["Points / game", "20.0 (25th)", "30.2 (4th)"], ["Points allowed / game", "22.4 (14th)", "27.2 (26th)"], ["Pass yards / game", "173 (26th)", "301 (2nd)"], ["Rush yards / game", "133 (7th)", "104 (18th)"], ["Yards / carry", "4.9 (5th)", "4.4 (12th)"], ["Pressure rate faced", "24.3% (22nd)", "33.7% (32nd)"], ["Yards allowed / play", "5.3 (16th)", "5.8 (27th)"], ["Pass yards allowed / game", "227 (20th)", "231 (22nd)"], ["Rush yards allowed / game", "73 (2nd)", "156 (31st)"], ["Takeaways / game", "1.4 (13th)", "1.8 (5th)"]], "inj": ["TB: no verified injury list. Check the official Week 7 report when it posts.", "Carolina: Covers lists QB Bryce Young (knee), WR Jalen Coker (quad), TE Darren Waller (toe), RB A. Dillon out (ankle) and RB T. Etienne questionable (ankle).", "Injury lists were read from Covers (Oct 15 to Oct 18) and mostly describe this weekend’s games. The official Week 7 report is not out yet."], "angles": ["TB’s run game ranks 7th (133 a game). CAR’s run defense ranks 31st and allows 156.", "CAR’s pass offense ranks 2nd (301 a game). TB’s pass defense ranks 20th and allows 227.", "CAR face pressure on 33.7% of dropbacks, among the highest rates in the league (32nd of 32, 1st is lowest). That raises the sack and turnover risk for their quarterback.", "CAR force 1.8 turnovers a game (5th), a source of short fields for their offense.", "Records: TB 1-4-0, CAR 2-2-0. Scoring margin per game: TB -2.4, CAR +3.0."], "proj": "Matchup notes here are generated from the stat ranks above, not from film or full injury checks. The line and market probabilities are in the sections above."}},
+   {id:"den-ari",day:"Sun Oct 25",venue:"State Farm Stadium, 4:05 PM ET",a:"DEN",h:"ARI",an:"Broncos",hn:"Cardinals",fav:"a",pts:5.5,total:45.5,ml:{a:-260,h:215},src:"Bleacher Report snapshot, Oct 18",fresh:true,alt:"Oct 13 listing: DEN -7.5, total 43.5, ML DEN -375 / ARI +295.",kal:[70,31],poly:[68,32],
+    dive:{
+     basis:"Denver through 6 games, Arizona through 5. Arizona's Week 6 game was not yet played when the source was written.",
+     rows:[["Points / game","19.0","21.6"],["Yards / game","252.2","301.2"],["Yards / play","4.4","4.5"],["Points allowed / game","20.8","32.4"],["Yards / play allowed","5.0","6.2"],["3rd-down offense","31.7%","40.5%"],["3rd-down defense (opp. conv.)","44.4%","42.1%"],["Red-zone TD rate (offense)","61.1%","61.1%"],["Red-zone TD rate allowed","52.9%","76.5%"],["Rush yards / game","84.2 (3.4/att)","91.6 (3.8/att)"],["Rush yards allowed / game","—","126.6 (4.4/att)"],["Sacks","18 made","12 allowed"],["Turnover margin","+4","+2"]],
+     inj:["Denver: CB Pat Surtain II and S Talanoa Hufanga were ruled out against Seattle with ankle injuries. CB Riley Moss (ribs) and WR Jaylen Waddle (shoulder) were listed but returned.","Arizona: RB Jeremiyah Love is out (ankle), so Tyler Allgeier is the expected lead back. Safeties Andrew Wingard and Wydett Williams Jr. are out. Budda Baker (groin), Kitan Crawford, Zaven Collins and Blake Gillikin were questionable. Crawford came off injured reserve.","Latest available, not official Week 7 reports."],
+     angles:["Arizona allows a league-worst 9.1 yards per pass attempt. That is the clearest soft spot for Denver.","Denver's offense is inefficient (4.4 yards per play, 5.6 per pass attempt) and needs explosive plays to cover a spread this size.","Denver has nine days of rest, 18 sacks and a +4 turnover margin. Arizona has allowed 12 sacks and Jacoby Brissett has five interceptions.","Arizona has the third-down edge and a McBride-led passing game that could keep drives alive if Denver's secondary is thin.","Arizona allows 126.6 rush yards a game, while Denver averages only 3.4 per carry."],
+     proj:"Football Nation projects Broncos 24, Cardinals 20, a margin under the current spread."}},
+   {id:"gb-det",day:"Sun Oct 25",venue:"Ford Field",a:"GB",h:"DET",an:"Packers",hn:"Lions",fav:"h",pts:3.5,total:51.5,ml:{a:180,h:-215},src:"FanDuel opening snapshot, Oct 18 (not executable odds)",fresh:true,alt:"Oct 13 listing: DET -2.5, total 50.5. BetUS: DET -1.5.",kal:[35,66],poly:[35,66],
+    dive:{
+     basis:"Team stats through five games. Detroit is coming off a bye.",
+     rows:[["Points / game","20.8","32.8 (1st)"],["Yards / play","5.6","5.9"],["Yards allowed / game","308.6","404.4 (worst)"],["Points allowed / game","—","29.6"],["3rd-down offense","27.6% (last)","—"],["3rd-down defense (opp. conv.)","44.3%","50.7%"],["Red-zone TD rate (offense)","50.0%","77.3%"],["Red-zone TD rate allowed","81.3%","81.0%"],["Pass yards / game","271 (4th)","—"],["Rush yards / game","60.4 (last)","—"],["Rush yards allowed / game","—","127.6"],["Turnover margin / game","+0.6","+0.8"],["Sack rate allowed","5.1%","5.5%"],["Sack rate generated","8.2%","8.6%"]],
+     inj:["Green Bay: DTs Jonathan Ford and Javon Hargrave and WR Skyy Moore were ruled out in Week 6 and later placed on injured reserve. G Aaron Banks, RB Anthony Campbell and OL Jacob Monk were questionable. Micah Parsons is rehabbing a torn ACL and his Week 7 status is unclear. Josh Jacobs is eligible to return but his role is unconfirmed.","Detroit: the official Week 7 report is not posted. Avonte Maddox, Devin White, Damone Clark, Payton Turner and Cade Mays are on injured reserve.","Week 6 designations, not official Week 7 reports."],
+     angles:["Detroit has the league's top scoring offense but also its worst defense by yards allowed, so the 51.5 total is the highest on the slate.","Green Bay's vertical passing game (4th in pass yards) targets Detroit's most exposed area. Its offense is last in third-down rate and rushing yards.","Detroit allows 127.6 rush yards a game, which favors Jahmyr Gibbs.","Green Bay's takeaway rate (1.8 a game) gives it a path to an upset, while Detroit gives the ball away about 0.2 times a game.","Both defenses allow touchdowns on about 81% of red-zone trips."],
+     proj:"Football Nation projects Lions 27, Packers 24, and calls it near a tossup if Green Bay's line is healthy and Jacobs has a confirmed role."}},
+   {id:"lar-lv",day:"Sun Oct 25",venue:"Allegiant Stadium",a:"LAR",h:"LV",an:"Rams",hn:"Raiders",fav:"a",pts:7.5,total:46.5,ml:{a:-340,h:270},src:"Sports Brackets listing, Oct 13",fresh:false,alt:"",kal:[76,26],poly:[74,26],dive:{"basis": "Team stats from Pro Football Reference through Week 5 (Denver and Seattle through Week 6, Kansas City and Carolina through Week 4), per-game figures. Rank 1 is best of 32.", "rows": [["Record", "2-3-0", "3-2-0"], ["Points / game", "23.8 (13th)", "26.4 (8th)"], ["Points allowed / game", "24.0 (20th)", "25.8 (22nd)"], ["Pass yards / game", "308 (1st)", "254 (8th)"], ["Rush yards / game", "117 (12th)", "82 (28th)"], ["Yards / carry", "4.6 (11th)", "3.0 (32nd)"], ["Pressure rate faced", "15.2% (1st)", "26.0% (25th)"], ["Yards allowed / play", "4.9 (6th)", "6.1 (28th)"], ["Pass yards allowed / game", "157 (2nd)", "236 (24th)"], ["Rush yards allowed / game", "128 (26th)", "141 (29th)"], ["Takeaways / game", "1.0 (22nd)", "2.0 (1st)"]], "inj": ["LAR: no verified injury list. Check the official Week 7 report when it posts.", "LV: no verified injury list. Check the official Week 7 report when it posts.", "Injury lists were read from Covers (Oct 15 to Oct 18) and mostly describe this weekend’s games. The official Week 7 report is not out yet."], "angles": ["LAR’s pass offense ranks 1st (308 a game). LV’s pass defense ranks 24th and allows 236.", "LAR’s run game ranks 12th (117 a game). LV’s run defense ranks 29th and allows 141.", "LV’s scoring offense ranks 8th (26.4 a game). LAR’s scoring defense ranks 20th and allows 24.0.", "LV force 2.0 turnovers a game (1st), a source of short fields for their offense.", "Records: LAR 2-3-0, LV 3-2-0. Scoring margin per game: LAR -0.2, LV +0.6."], "proj": "Matchup notes here are generated from the stat ranks above, not from film or full injury checks. The line and market probabilities are in the sections above."}},
+   {id:"kc-sea",day:"Sun Oct 25",venue:"Lumen Field, prime time",a:"KC",h:"SEA",an:"Chiefs",hn:"Seahawks",fav:"h",pts:3.5,total:45.5,ml:{a:140,h:-165},src:"Sports Brackets listing, Oct 13",fresh:false,alt:"BetUS lists a 3-point spread.",kal:[44,58],poly:[45,56],dive:{"basis": "Team stats from Pro Football Reference through Week 5 (Denver and Seattle through Week 6, Kansas City and Carolina through Week 4), per-game figures. Rank 1 is best of 32.", "rows": [["Record", "4-0-0", "3-3-0"], ["Points / game", "29.5 (5th)", "24.7 (11th)"], ["Points allowed / game", "19.2 (7th)", "20.3 (8th)"], ["Pass yards / game", "250 (9th)", "225 (15th)"], ["Rush yards / game", "162 (4th)", "107 (17th)"], ["Yards / carry", "5.5 (1st)", "3.9 (17th)"], ["Pressure rate faced", "21.1% (12th)", "30.9% (31st)"], ["Yards allowed / play", "5.0 (7th)", "4.0 (1st)"], ["Pass yards allowed / game", "225 (19th)", "141 (1st)"], ["Rush yards allowed / game", "93 (7th)", "96 (9th)"], ["Takeaways / game", "1.8 (5th)", "1.8 (3rd)"]], "inj": ["KC: no verified injury list. Check the official Week 7 report when it posts.", "SEA: no verified injury list. Check the official Week 7 report when it posts.", "Injury lists were read from Covers (Oct 15 to Oct 18) and mostly describe this weekend’s games. The official Week 7 report is not out yet."], "angles": ["SEA’s pass offense ranks 15th (225 a game). KC’s pass defense ranks 19th and allows 225.", "SEA face pressure on 30.9% of dropbacks, among the highest rates in the league (31st of 32, 1st is lowest). That raises the sack and turnover risk for their quarterback.", "KC force 1.8 turnovers a game (5th), a source of short fields for their offense.", "SEA force 1.8 turnovers a game (3rd), a source of short fields for their offense.", "Records: KC 4-0-0, SEA 3-3-0. Scoring margin per game: KC +10.2, SEA +4.3."], "proj": "Matchup notes here are generated from the stat ranks above, not from film or full injury checks. The line and market probabilities are in the sections above."},
+    note:"RB Zach Charbonnet (torn ACL last year) has a legitimate chance to make his season debut, per ESPN's Jeremy Fowler as reported by Newsweek."},
+   {id:"dal-phi",day:"Mon Oct 26",venue:"Lincoln Financial Field",a:"DAL",h:"PHI",an:"Cowboys",hn:"Eagles",fav:"h",pts:3.5,total:48.5,ml:{a:135,h:-160},src:"Sports Brackets listing, Oct 13",fresh:false,alt:"",kal:[51,51],poly:[50,51],dive:{"basis": "Team stats from Pro Football Reference through Week 5 (Denver and Seattle through Week 6, Kansas City and Carolina through Week 4), per-game figures. Rank 1 is best of 32.", "rows": [["Record", "2-3-0", "2-3-0"], ["Points / game", "27.6 (7th)", "18.4 (29th)"], ["Points allowed / game", "27.2 (25th)", "22.4 (14th)"], ["Pass yards / game", "270 (5th)", "171 (27th)"], ["Rush yards / game", "82 (30th)", "92 (23rd)"], ["Yards / carry", "3.8 (20th)", "3.8 (21st)"], ["Pressure rate faced", "24.9% (23rd)", "26.8% (28th)"], ["Yards allowed / play", "6.4 (32nd)", "5.4 (17th)"], ["Pass yards allowed / game", "227 (21st)", "239 (26th)"], ["Rush yards allowed / game", "168 (32nd)", "118 (19th)"], ["Takeaways / game", "0.4 (30th)", "0.6 (29th)"]], "inj": ["Dallas: Covers lists WR CeeDee Lamb (thigh) as injured and OT D. Shelton out (hamstring). The page was cut off partway through Dallas, so the list is incomplete.", "PHI: no verified injury list. Check the official Week 7 report when it posts.", "Injury lists were read from Covers (Oct 15 to Oct 18) and mostly describe this weekend’s games. The official Week 7 report is not out yet."], "angles": ["DAL’s pass offense ranks 5th (270 a game). PHI’s pass defense ranks 26th and allows 239.", "PHI face pressure on 26.8% of dropbacks, among the highest rates in the league (28th of 32, 1st is lowest). That raises the sack and turnover risk for their quarterback.", "DAL force only 0.4 turnovers a game (30th), so they rarely get a boost from takeaways.", "PHI force only 0.6 turnovers a game (29th), so they rarely get a boost from takeaways.", "Records: DAL 2-3-0, PHI 2-3-0. Scoring margin per game: DAL +0.4, PHI -4.0."], "proj": "Matchup notes here are generated from the stat ranks above, not from film or full injury checks. The line and market probabilities are in the sections above."}}
+  ],
+  /* kind: pass | rush | rec | recpt. total and g are season totals and games played (per the source). */
+  props:[
+   {id:"maye",game:"ne-chi",name:"Drake Maye",team:"NE",stat:"Pass Yds",kind:"pass",total:1228,g:5,note:"Chicago's defense ranks 5th in points allowed but is weak in yards per play. A Bears ground game that leads the league can limit New England's possessions."},
+   {id:"cwilliams",game:"ne-chi",name:"Caleb Williams",team:"CHI",stat:"Pass Yds",kind:"pass",total:407,g:2,note:"Questionable with a hamstring injury and only two games played, so the average is thin. If Tyson Bagent starts, expect a run-heavy plan."},
+   {id:"swift",game:"ne-chi",name:"D'Andre Swift",team:"CHI",stat:"Rush Yds",kind:"rush",total:354,g:5,note:"Chicago leads the league at 173.2 rush yards a game. RB Kyle Monangai was out in the Week 6 report, which could add carries. New England run-defense data was not gathered."},
+   {id:"stevenson",game:"ne-chi",name:"Rhamondre Stevenson",team:"NE",stat:"Rush Yds",kind:"rush",total:227,g:5,note:"Shares the backfield with TreVeyon Henderson (questionable), 57 carries to 42. Chicago allows only 96 rush yards a game."},
+   {id:"burden",game:"ne-chi",name:"Luther Burden III",team:"CHI",stat:"Rec Yds",kind:"rec",total:266,g:5,note:"23 catches for 266 yards. New England allows 6.2 yards per play overall."},
+   {id:"odunze",game:"ne-chi",name:"Rome Odunze",team:"CHI",stat:"Rec Yds",kind:"rec",total:273,g:5,note:"17 catches for 273 yards, so fewer catches but bigger gains than Burden."},
+   {id:"doubs",game:"ne-chi",name:"Romeo Doubs",team:"NE",stat:"Rec Yds",kind:"rec",total:219,g:5,note:"In New England's first receiving group. A.J. Brown's return could shift targets."},
+   {id:"love",game:"gb-det",name:"Jordan Love",team:"GB",stat:"Pass Yds",kind:"pass",total:1408,g:5,note:"The Packers rank 4th in pass yards a game and Detroit allows the most total yards (404.4). 10 TD and 3 INT so far."},
+   {id:"goff",game:"gb-det",name:"Jared Goff",team:"DET",stat:"Pass Yds",kind:"pass",total:1485,g:5,note:"12 TD and 0 INT. Detroit's offense leads the league in points and scores touchdowns on 77% of red-zone trips."},
+   {id:"gibbs",game:"gb-det",name:"Jahmyr Gibbs",team:"DET",stat:"Rush Yds",kind:"rush",total:504,g:5,note:"7 rushing TD. Green Bay's defense allows only 4.7 yards per play, a strength. Its own offense is last in rushing, which affects game script."},
+   {id:"watson",game:"gb-det",name:"Christian Watson",team:"GB",stat:"Rec Yds",kind:"rec",total:474,g:5,note:"Green Bay's top receiver with 6 TD. The source calls Detroit's coverage its most exposed area."},
+   {id:"golden",game:"gb-det",name:"Matthew Golden",team:"GB",stat:"Rec Yds",kind:"rec",total:397,g:5,note:"Second on Green Bay in receiving yards. WR Skyy Moore went on injured reserve, which can concentrate targets."},
+   {id:"stbrown",game:"gb-det",name:"Amon-Ra St. Brown",team:"DET",stat:"Rec Yds",kind:"rec",total:372,g:5,note:"Detroit's lead receiver by yards. Green Bay's defense allows 308.6 yards a game, strong overall."},
+   {id:"laporta",game:"gb-det",name:"Sam LaPorta",team:"DET",stat:"Rec Yds",kind:"rec",total:316,g:5,note:"Tight end with the second-most receiving yards on Detroit."},
+   {id:"jwilliams",game:"gb-det",name:"Jameson Williams",team:"DET",stat:"Rec Yds",kind:"rec",total:276,g:5,note:"Third on Detroit in receiving yards."},
+   {id:"nix",game:"den-ari",name:"Bo Nix",team:"DEN",stat:"Pass Yds",kind:"pass",total:1049,g:6,note:"Averages just 5.6 yards per attempt, but Arizona allows a league-worst 9.1. A 5.5-point favorite may lean on defense and the run."},
+   {id:"brissett",game:"den-ari",name:"Jacoby Brissett",team:"ARI",stat:"Pass Yds",kind:"pass",total:1110,g:5,note:"9 TD and 5 INT. Denver has 18 sacks and Arizona has allowed 12."},
+   {id:"dobbins",game:"den-ari",name:"J.K. Dobbins",team:"DEN",stat:"Rush Yds",kind:"rush",total:270,g:6,note:"81 carries. Denver averages only 3.4 per carry, but Arizona allows 126.6 rush yards a game (4.4 per carry)."},
+   {id:"waddle",game:"den-ari",name:"Jaylen Waddle",team:"DEN",stat:"Rec Yds",kind:"rec",total:228,g:6,note:"Leads Denver. A shoulder issue was listed but he returned. Arizona's pass defense is the weakest per attempt in the league."},
+   {id:"mcbride",game:"den-ari",name:"Trey McBride",team:"ARI",stat:"Rec Yds",kind:"rec",total:308,g:5,note:"Leads Arizona with 42 catches, 308 yards and 3 TD."},
+   {id:"mcbride-r",game:"den-ari",name:"Trey McBride",team:"ARI",stat:"Receptions",kind:"recpt",total:42,g:5,note:"42 catches in five games. Arizona's offense runs through him."},
+   {id:"wilson",game:"den-ari",name:"Michael Wilson",team:"ARI",stat:"Rec Yds",kind:"rec",total:288,g:5,note:"29 catches for 288 yards and 1 TD."}
+  ],
+  hit:{
+   nfl:{asOf:"Covers parlay cheat sheet, published Oct 11. Counts are games through Week 4.",
+    ladders:[
+     {pos:"Quarterbacks, passing yards",stat:"Pass Yds",thr:[175,200,225,250,275],rows:[["Joe Burrow","CIN",4,[4,4,3,3,2]],["Brock Purdy","SF",4,[4,4,2,2,2]],["Drake Maye","NE",4,[4,2,1,1,0]],["Aaron Rodgers","PIT",4,[4,3,2,2,2]],["Justin Herbert","LAC",4,[4,2,1,0,0]]]},
+     {pos:"Running backs, rushing yards",stat:"Rush Yds",thr:[40,50,60,70,80],rows:[["Jahmyr Gibbs","DET",4,[4,3,2,2,2]],["Bijan Robinson","ATL",4,[4,4,4,4,3]],["Christian McCaffrey","SF",4,[3,3,2,1,0]],["Jonathan Taylor","IND",4,[4,4,4,3,3]],["Derrick Henry","BAL",4,[4,4,4,3,2]]]},
+     {pos:"Wide receivers, receiving yards",stat:"Rec Yds",thr:[60,70,80,90,100],rows:[["Jaxon Smith-Njigba","SEA",4,[4,4,3,3,3]],["Amon-Ra St. Brown","DET",4,[3,2,1,1,1]],["Drake London","ATL",4,[2,2,2,2,1]],["Zay Flowers","BAL",3,[3,3,3,2,2]],["Chris Olave","NO",4,[4,4,4,3,3]]]},
+     {pos:"Tight ends, receiving yards",stat:"Rec Yds",thr:[30,40,50,60,70],rows:[["Trey McBride","ARI",4,[4,3,2,2,2]],["George Kittle","SF",4,[3,3,3,3,3]],["Tyler Warren","IND",4,[2,2,1,0,0]],["Brock Bowers","LV",2,[2,2,2,2,2]],["Sam LaPorta","DET",4,[4,4,2,1,1]]]}
+    ]},
+   nba:{asOf:"DangleData, Oct 18, 2:48 PM ET. Last 10 games of last season until the 2026-27 season starts Oct 20. Teams as listed by the source.",
+    tables:[
+     {stat:"Points",kind:"pts",line:19.5,unit:"PPG",rows:[["Shai Gilgeous-Alexander","OKC",10,10,31.1],["Jaylen Brown","PHI",10,10,27.7],["Kawhi Leonard","TOR",10,10,27.2],["Luka Doncic","LAL",9,10,33.0],["Kevin Durant","HOU",9,10,25.2],["Tyrese Maxey","PHI",9,10,27.3],["Jamal Murray","DEN",9,10,24.8],["Devin Booker","PHX",9,10,25.1],["Nikola Jokic","DEN",8,10,27.3],["Victor Wembanyama","SAS",8,10,24.6]]},
+     {stat:"Rebounds",kind:"reb",line:7.5,unit:"RPG",rows:[["Nikola Jokic","DEN",10,10,12.7],["Bam Adebayo","MIA",10,10,10.0],["Karl-Anthony Towns","NYK",9,10,11.6],["Rudy Gobert","MIN",9,10,11.5],["Victor Wembanyama","SAS",9,10,11.2],["Jalen Duren","DET",9,10,10.2],["Donovan Clingan","POR",8,10,11.6],["Jayson Tatum","BOS",8,10,10.0],["Jalen Johnson","ATL",7,10,9.9],["Neemias Queta","BOS",7,10,8.4]]},
+     {stat:"Assists",kind:"ast",line:5.5,unit:"APG",rows:[["Nikola Jokic","DEN",9,10,10.6],["Cade Cunningham","DET",9,10,9.6],["LaMelo Ball","MIN",9,10,7.1],["Stephon Castle","SAS",9,10,7.4],["LeBron James","PHI",9,10,6.9],["Trae Young","WAS",8,9,8.0],["Josh Giddey","CHI",8,10,9.1],["Andrew Nembhard","IND",8,10,7.7],["Devin Booker","PHX",8,10,5.9],["Draymond Green","GSW",8,10,5.5]]},
+     {stat:"Threes",kind:"tpm",line:1.5,unit:"3PM/G",rows:[["LaMelo Ball","MIN",10,10,3.8],["Nickeil Alexander-Walker","ATL",10,10,3.2],["Jamal Murray","DEN",10,10,3.2],["AJ Green","MIL",10,10,3.0],["Reed Sheppard","HOU",10,10,2.8],["Jayson Tatum","BOS",10,10,2.9],["Blake Hinson","UTA",10,10,2.6],["Luka Doncic","LAL",9,10,3.9],["Duncan Robinson","DET",9,10,2.9],["Toumani Camara","POR",9,10,2.7]]}
+    ]},
+   ncaafb:{asOf:"DangleData, Oct 18, 2:48 PM ET. Last 5 games. The source does not say whether its yards column is a season total or a per-game figure.",
+    tables:[
+     {stat:"Passing yards",line:249.5,rows:[["Braden Atkinson","ORST",5,5,2604],["Drew Mestemaker","OKST",5,5,1940],["Jayden Maiava","USC",4,5,2045],["Ethan Grunkemeyer","VT",4,5,1984],["Gio Lopez","WAKE",4,5,1947],["Tayven Jackson","UNT",4,5,1868],["Micah Alejado","HAW",4,5,1863],["Marcus Stokes","MEM",4,5,1841],["Noah Fifita","ARIZ",4,5,1756],["Jaden Craig","TCU",4,5,1694]]},
+     {stat:"Rushing yards",line:74.5,rows:[["Torrance Burgess Jr.","TXST",5,5,838],["Dylan Riley","BOIS",5,5,835],["Nate Sheppard","DUKE",5,5,820],["George Pettaway","JMU",5,5,767],["Ethan Shine","PITT",5,5,767],["James Jones","NMSU",5,5,599],["Ahmad Hardy","MIZ",4,5,1560],["Jamal Roberts","MIZ",4,5,867],["Cam Cook","WVU",4,5,833],["Jaylin Carter","MEM",4,5,780]]},
+     {stat:"Receiving yards",line:59.5,rows:[["Jesse Legree","ORST",5,5,1040],["Jeremiah Smith","OSU",5,5,984],["KJ Duff","RUTG",5,5,741],["Carlos Hernandez","WAKE",5,5,720],["Collin Dixon","ILL",5,5,608],["DeAree Rogers","NIU",5,5,422],["Jyziah Rockwell","WKU",4,5,1055],["James Tyre","UNT",4,5,832],["Alex Perry","ILL",4,5,816],["Umari Hatcher","SYR",4,5,784]]}
+    ]}
+  },
+  tds:{asOf:"JediBets anytime-TD page, Oct 18. Share of each player’s last 10 games with a touchdown, and TDs scored in those games where the source lists it. This is today’s slate. The source labels it Week 6.",
+   kal:{src:"Kalshi prediction-market prices for Bills at Raiders, from SportsBettingDime, Oct 18. A price in cents is the implied chance before fees. This is a market, not a sportsbook.",rows:[["Josh Allen","BUF",58],["James Cook III","BUF",58],["Ashton Jeanty","LV",54],["Brock Bowers","LV",49],["Dalton Kincaid","BUF",34],["Khalil Shakir","BUF",28],["Tre Tucker","LV",24],["Michael Mayer","LV",23],["Keon Coleman","BUF",20],["Jalen Nailor","LV",17]]},
+   g:[
+    ["HOU @ JAX","8:30 AM","HOU|Nico Collins|3|5;HOU|Jaylin Noel|3;HOU|Woody Marks|3;HOU|Foster Moreau|2|3;HOU|C.J. Stroud|2;JAX|Bhayshul Tuten|5|6;JAX|Parker Washington|5|6;JAX|Trevor Lawrence|3|4;JAX|Brenton Strange|3;JAX|Travis Etienne Jr.|2|4"],
+    ["TEN @ IND","12:00 PM","TEN|Tony Pollard|3|4;TEN|Elic Ayomanor|3;TEN|Cam Ward|2|3;TEN|Chig Okonkwo|2;TEN|Chimere Dike|2;IND|Jonathan Taylor|6|9;IND|Tyler Warren|3;IND|Alec Pierce|2|4;IND|Riley Leonard|2;IND|Daniel Jones|1"],
+    ["CAR @ PHI","12:00 PM","CAR|Chuba Hubbard|4|6;CAR|Jalen Coker|4|5;CAR|Tetairoa McMillan|4|5;CAR|Bryce Young|2;CAR|Darren Waller|1|2;PHI|Dallas Goedert|4|6;PHI|Darius Cooper|3|4;PHI|Saquon Barkley|3;PHI|Tank Bigsby|3;PHI|DeVonta Smith|2"],
+    ["PIT @ TB","12:00 PM","PIT|Jaylen Warren|3|5;PIT|Pat Freiermuth|3|4;PIT|Kenneth Gainwell|3;PIT|Connor Heyward|2;PIT|DK Metcalf|2;TB|Sean Tucker|4;TB|Bucky Irving|3|4;TB|Chris Godwin Jr.|2;TB|Emeka Egbuka|2;TB|Mike Evans|2"],
+    ["BAL @ CLE","12:00 PM","BAL|Derrick Henry|7|14;BAL|Zay Flowers|6|7;BAL|Devontez Walker|2;BAL|Lamar Jackson|2;BAL|Chris Moore|1;CLE|Harold Fannin Jr.|5|7;CLE|Denzel Boston|3;CLE|Blake Whiteheart|1;CLE|David Njoku|1;CLE|Devin Bush|1"],
+    ["NO @ NYG","12:00 PM","NO|Chris Olave|4|5;NO|Tyler Shough|3|4;NO|Juwan Johnson|2|3;NO|Noah Fant|2|3;NO|Devaughn Vele|2;NYG|Devin Singletary|4;NYG|Isaiah Likely|2|4;NYG|Tyrone Tracy Jr.|2|3;NYG|Deonte Banks|2;NYG|Malik Nabers|2"],
+    ["CHI @ ATL","12:00 PM","CHI|D'Andre Swift|4|8;CHI|Colston Loveland|3;CHI|Jahdae Walker|3;CHI|DJ Moore|2|3;CHI|Kyle Monangai|2|3;ATL|Bijan Robinson|6|9;ATL|Kyle Pitts Sr.|3|5;ATL|Brian Robinson Jr.|2|4;ATL|Jessie Bates III|2;ATL|Austin Hooper|1"],
+    ["NYJ @ NE","12:00 PM","NYJ|Garrett Wilson|3;NYJ|Braelon Allen|2;NYJ|Breece Hall|2;NYJ|Isaiah Williams|2;NYJ|Kenyon Sadiq|2;NE|Rhamondre Stevenson|5|8;NE|TreVeyon Henderson|3|5;NE|Hunter Henry|3;NE|Kyle Williams|3;NE|Drake Maye|2|3"],
+    ["ARI @ LAR","3:05 PM","ARI|Michael Wilson|6|7;ARI|Trey McBride|5|6;ARI|Jeremiyah Love|2;ARI|Teagan Quitoriano|1|2;ARI|Elijah Higgins|1;LAR|Kyren Williams|6|8;LAR|Puka Nacua|6|8;LAR|Blake Corum|4|5;LAR|Colby Parkinson|3|5;LAR|Terrance Ferguson|3"],
+    ["LAC @ KC","3:25 PM","LAC|Omarion Hampton|6;LAC|Kimani Vidal|2;LAC|Ladd McConkey|2;LAC|Oronde Gadsden|2;LAC|Hayden Rucci|1;KC|Kenneth Walker III|3|6;KC|Travis Kelce|3;KC|Rashee Rice|2|3;KC|Patrick Mahomes|2;KC|Tyquan Thornton|1|2"],
+    ["BUF @ LV","3:25 PM","BUF|Josh Allen|7|11;BUF|James Cook III|6|10;BUF|Dawson Knox|3|4;BUF|Ty Johnson|2|3;BUF|Dalton Kincaid|2;LV|Brock Bowers|5;LV|Ashton Jeanty|2|4;LV|Cody White|2|3;LV|Dylan Laube|1;LV|Ian Thomas|1"],
+    ["DAL @ GB","7:20 PM","DAL|Javonte Williams|7|10;DAL|CeeDee Lamb|3|4;DAL|Jake Ferguson|3|4;DAL|George Pickens|2;DAL|KaVontae Turpin|2;GB|Christian Watson|6|9;GB|Josh Jacobs|2|3;GB|MarShawn Lloyd|2|3;GB|Matthew Golden|2;GB|Malik Willis|1|2"]
+   ]},
+  trends:{asOf:"TeamRankings tables. The source does not date the window and shows 17 to 20 games per team, so this is roughly last season plus 2026.",
+   ats:{SEA:[14,5,0],NE:[13,6,1],JAX:[12,6,0],CHI:[12,7,0],SF:[11,7,1],CAR:[11,7,0],LAR:[12,8,0],PHI:[10,8,0],IND:[8,7,2],NO:[9,8,0],NYG:[9,8,0],HOU:[10,9,0],ATL:[8,8,1],DEN:[9,9,1],PIT:[9,9,0],BUF:[9,10,0],CIN:[8,9,0],CLE:[8,9,0],DET:[8,9,0],MIA:[8,9,0],MIN:[8,9,0],LAC:[8,9,1],TEN:[7,9,1],NYJ:[7,9,1],DAL:[7,10,0],LV:[7,10,0],WAS:[7,10,0],GB:[7,11,0],KC:[6,10,1],ARI:[6,11,0],BAL:[6,11,0],TB:[5,12,0]},
+   ou:{DAL:[12,4,1],TEN:[11,6,0],NYG:[11,6,0],NYJ:[11,6,0],BAL:[11,6,0],WAS:[10,6,1],SF:[11,7,1],LAR:[12,8,0],MIA:[9,6,2],DET:[10,7,0],ARI:[10,7,0],JAX:[10,7,1],NE:[12,9,0],BUF:[10,8,1],GB:[10,8,0],SEA:[11,9,0],CIN:[9,8,0],IND:[9,8,0],PIT:[9,8,1],ATL:[8,8,1],CHI:[9,9,1],CLE:[8,9,0],LV:[8,9,0],MIN:[8,9,0],TB:[8,9,0],CAR:[8,10,0],DEN:[8,11,0],PHI:[7,11,0],HOU:[7,11,1],LAC:[6,11,1],NO:[5,12,0],KC:[4,13,0]}},
+  nbaLines:{src:"Covers opening-night page, last updated Aug 11. Sportsbook not named, so these may have moved.",games:[
+   {a:"BOS",h:"DET",day:"Tue Oct 20, 3 PM ET",sp:"DET -2.5 (BOS +2.5 at -115)",tot:"222.5 (over -115, under -105)",ml:"BOS +105 / DET -125"},
+   {a:"PHI",h:"NYK",day:"Tue Oct 20, 7 PM ET",sp:"NYK -4.5 (-110 both sides)",tot:"230.5 (over -105, under -115)",ml:"PHI +145 / NYK -175"},
+   {a:"OKC",h:"SAS",day:"Tue Oct 20, 9:30 PM ET",sp:"SAS -1.5 (-110 both sides)",tot:"230.5 (-110 both sides)",ml:"OKC +100 / SAS -120"}]},
+  sources:[
+   ["JediBets, anytime touchdown hit rates (Oct 18)","https://jedibets.com/nfl-touchdowns/today"],
+   ["SportsBettingDime, Bills vs Raiders anytime TD prices (Oct 18)","https://www.sportsbettingdime.com/news/nfl/bills-vs-raiders-anytime-td-picks-props-to-bet-oct-18/"],
+   ["Covers, NFL parlay cheat sheet with prop hit rates (Oct 11)","https://www.covers.com/nfl/parlay-cheat-sheet-week-5"],
+   ["DangleData, NBA and college football prop hit rates (Oct 18)","https://dangledata.com/"],
+   ["TeamRankings, NFL ATS trends","https://www.teamrankings.com/nfl/trends/ats_trends/"],
+   ["TeamRankings, NFL over/under trends","https://www.teamrankings.com/nfl/trends/ou_trends/"],
+   ["Covers, NBA opening night odds","https://www.covers.com/nba/opening-night-odds-picks-predictions-2026"],
+   ["Sports Brackets, Week 7 odds (lines listed as of Oct 13)","https://sportsbrackets.net/2026/09/15/2026-nfl-week-7-pickem-odds/"],
+   ["Defirate, Kalshi and Polymarket Week 7 odds (Oct 16)","https://defirate.com/news/nfl-week-7-prediction-markets-latest-odds-2026/"],
+   ["BetUS, Week 7 odds","https://www.betus.com.pa/sportsbook/nfl/nfl-odds-week-7/"],
+   ["Football Nation, Patriots at Bears","https://www.footballnationusa.com/post/patriots-at-bears-week-7-guide-2026"],
+   ["Football Nation, Packers at Lions","https://www.footballnationusa.com/post/packers-at-lions-week-7-guide-2026"],
+   ["Football Nation, Broncos at Cardinals","https://www.footballnationusa.com/post/broncos-at-cardinals-week-7-guide-2026"],
+   ["Newsweek, Seahawks Week 7 backfield news","https://www.newsweek.com/sports/nfl/seahawks-could-get-major-offensive-boost-for-week-7-vs-chiefs-12569586"]
+  ]
+};
+
+/* ============================= LOGIC ============================= */
+var CV={pass:.22,rush:.55,rec:.6,recpt:.4}; // assumed game-to-game variation (std dev as a share of the mean)
+function imp(o){return o<0?-o/(-o+100):100/(o+100)}
+function nov(a,b){var x=imp(a),y=imp(b);return x/(x+y)}
+function erf(x){var s=x<0?-1:1;x=Math.abs(x);var t=1/(1+.3275911*x);var y=1-(((((1.061405429*t-1.453152027)*t)+1.421413741)*t-.284496736)*t+.254829592)*t*Math.exp(-x*x);return s*y}
+function Phi(z){return .5*(1+erf(z/Math.SQRT2))}
+function dec(o){return o>0?1+o/100:1+100/-o}
+function fo(o){return o>0?'+'+o:String(o)}
+function pc(x){return Math.round(x*100)}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+var GAMES=DATA.games,PROPS=DATA.props;
+function gameById(id){return GAMES.filter(function(g){return g.id===id})[0]}
+function propById(id){return PROPS.filter(function(p){return p.id===id})[0]}
+GAMES.forEach(function(g){
+  var m=[g.kal,g.poly].map(function(x){return x[0]/(x[0]+x[1])});
+  g.mkA=(m[0]+m[1])/2;
+  g.bkA=g.ml?nov(g.ml.a,g.ml.h):null;
+  g.gap=g.bkA==null?null:Math.abs(g.bkA-g.mkA);
+  var fs=(g.total+g.pts)/2,ds=(g.total-g.pts)/2;
+  g.favT=g.fav==='h'?g.h:g.a;g.dogT=g.fav==='h'?g.a:g.h;g.fs=fs;g.ds=ds;
+});
+PROPS.forEach(function(p){p.avg=p.total/p.g;p.gm=gameById(p.game)});
+function calc(p,line,oo,uo,adj){
+  var mu=p.avg*(1+adj/100),cv=CV[p.kind]*(p.g<3?1.3:1),sd=Math.max(cv*mu,.8),z=(line-mu)/sd;
+  var pu=Phi(z),po=1-pu,nvo=nov(oo,uo);
+  return {mu:mu,sd:sd,po:po,pu:pu,nvo:nvo,eo:po-nvo,eu:pu-(1-nvo)};
+}
+function defLine(p){return Math.floor(p.avg)+.5}
+
+/* ---------- live feed: snapshot baked in, replaced by Refresh ---------- */
+var LG=[['nfl','NFL'],['nba','NBA'],['ncaafb','NCAAF'],['ncaamb','NCAAB']];
+var FEED_SERVER="widgets",FEED_TOOL="fetch_sports_data";
+function row(lg,st,iso,a,h,an,hn,sa,sh,pa,ph,clk,q,title){
+  return {lg:lg,id:lg+':'+a+'@'+h+':'+iso,status:st,start:Date.parse(iso),a:a,h:h,an:an,hn:hn,sa:sa==null?null:sa,sh:sh==null?null:sh,pa:pa==null?null:pa,ph:ph==null?null:ph,clock:clk||null,q:q||null,title:title||''};
+}
+var SNAP={at:Date.UTC(2026,9,18,19,17),feed:{nfl:[],nba:[],ncaafb:[],ncaamb:[]}};
+(function(){
+  var F=SNAP.feed;
+  function nfl(){F.nfl.push(row.apply(null,['nfl'].concat([].slice.call(arguments))))}
+  function nba(){F.nba.push(row.apply(null,['nba'].concat([].slice.call(arguments))))}
+  function cf(){F.ncaafb.push(row.apply(null,['ncaafb'].concat([].slice.call(arguments))))}
+  // status, iso, away, home, awayName, homeName, awayScore, homeScore, awayProb, homeProb, clock, quarter, title
+  nfl('inprogress','2026-10-18T17:00:00Z','TEN','IND','Tennessee Titans','Indianapolis Colts',6,13,null,null,'15:00',4);
+  nfl('inprogress','2026-10-18T17:00:00Z','CAR','PHI','Carolina Panthers','Philadelphia Eagles',13,7,null,null,'9:04',3);
+  nfl('inprogress','2026-10-18T17:00:00Z','PIT','TB','Pittsburgh Steelers','Tampa Bay Buccaneers',3,16,null,null,'2:14',3);
+  nfl('inprogress','2026-10-18T17:00:00Z','BAL','CLE','Baltimore Ravens','Cleveland Browns',10,3,null,null,'12:45',4);
+  nfl('inprogress','2026-10-18T17:00:00Z','NO','NYG','New Orleans Saints','New York Giants',24,10,null,null,'4:23',3);
+  nfl('inprogress','2026-10-18T17:00:00Z','CHI','ATL','Chicago Bears','Atlanta Falcons',21,7,null,null,'4:43',3);
+  nfl('inprogress','2026-10-18T17:00:00Z','NYJ','NE','New York Jets','New England Patriots',13,17,null,null,'0:00',3);
+  nfl('closed','2026-10-18T13:30:00Z','HOU','JAC','Houston Texans','Jacksonville Jaguars',34,31);
+  nfl('closed','2026-10-16T00:15:00Z','SEA','DEN','Seattle Seahawks','Denver Broncos',14,17,null,null,null,null,'Thursday Night Football');
+  nfl('closed','2026-10-13T00:15:00Z','BUF','LA','Buffalo Bills','Los Angeles Rams',37,34,null,null,null,null,'Monday Night Football');
+  nfl('created','2026-10-18T20:05:00Z','ARI','LA','Arizona Cardinals','Los Angeles Rams',null,null,13.4,86.6);
+  nfl('created','2026-10-18T20:25:00Z','LAC','KC','Los Angeles Chargers','Kansas City Chiefs',null,null,22.3,77.7);
+  nfl('created','2026-10-18T20:25:00Z','BUF','LV','Buffalo Bills','Las Vegas Raiders',null,null,66.4,33.6);
+  nfl('created','2026-10-19T00:20:00Z','DAL','GB','Dallas Cowboys','Green Bay Packers',null,null,49.1,50.9,null,null,'Sunday Night Football');
+  nfl('scheduled','2026-10-20T00:15:00Z','WAS','SF','Washington Commanders','San Francisco 49ers',null,null,20.8,79.2,null,null,'Monday Night Football');
+  nfl('scheduled','2026-10-23T00:15:00Z','NE','CHI','New England Patriots','Chicago Bears',null,null,46.3,53.7,null,null,'Thursday Night Football');
+  nfl('scheduled','2026-10-25T13:30:00Z','PIT','NO','Pittsburgh Steelers','New Orleans Saints',null,null,55.1,44.9);
+  nfl('scheduled','2026-10-25T17:00:00Z','IND','MIN','Indianapolis Colts','Minnesota Vikings',null,null,32.5,67.5);
+  nfl('scheduled','2026-10-25T17:00:00Z','MIA','NYJ','Miami Dolphins','New York Jets',null,null,33.1,66.9);
+  nfl('scheduled','2026-10-25T17:00:00Z','CIN','BAL','Cincinnati Bengals','Baltimore Ravens',null,null,37.6,62.4);
+  nfl('scheduled','2026-10-25T17:00:00Z','CLE','TEN','Cleveland Browns','Tennessee Titans');
+  nfl('scheduled','2026-10-25T17:00:00Z','TB','CAR','Tampa Bay Buccaneers','Carolina Panthers');
+  nfl('scheduled','2026-10-25T17:00:00Z','SF','ATL','San Francisco 49ers','Atlanta Falcons');
+  nfl('scheduled','2026-10-25T17:00:00Z','NYG','HOU','New York Giants','Houston Texans');
+  nfl('scheduled','2026-10-25T20:05:00Z','DEN','ARI','Denver Broncos','Arizona Cardinals');
+  nba('scheduled','2026-10-20T19:00:00Z','BOS','DET','Boston Celtics','Detroit Pistons',null,null,48.7,51.3);
+  nba('scheduled','2026-10-20T23:00:00Z','PHI','NYK','Philadelphia 76ers','New York Knicks',null,null,37.5,62.5);
+  nba('scheduled','2026-10-21T01:30:00Z','OKC','SAS','Oklahoma City Thunder','San Antonio Spurs',null,null,45,55);
+  nba('scheduled','2026-10-21T23:00:00Z','ATL','ORL','Atlanta Hawks','Orlando Magic',null,null,44,56);
+  nba('scheduled','2026-10-21T23:00:00Z','MIL','WAS','Milwaukee Bucks','Washington Wizards',null,null,35.1,64.9);
+  nba('scheduled','2026-10-21T23:30:00Z','MIN','MIA','Minnesota Timberwolves','Miami Heat',null,null,47.5,52.5);
+  nba('scheduled','2026-10-21T23:30:00Z','CHI','TOR','Chicago Bulls','Toronto Raptors',null,null,24.6,75.4);
+  nba('scheduled','2026-10-21T23:30:00Z','CHA','BKN','Charlotte Hornets','Brooklyn Nets',null,null,54.4,45.6);
+  nba('scheduled','2026-10-22T00:00:00Z','UTA','MEM','Utah Jazz','Memphis Grizzlies',null,null,54.3,45.7);
+  nba('scheduled','2026-10-22T00:00:00Z','IND','NOP','Indiana Pacers','New Orleans Pelicans',null,null,58.8,41.2);
+  nba('scheduled','2026-10-22T00:30:00Z','DAL','HOU','Dallas Mavericks','Houston Rockets');
+  nba('scheduled','2026-10-22T02:00:00Z','GSW','LAL','Golden State Warriors','Los Angeles Lakers');
+  nba('scheduled','2026-10-22T02:00:00Z','PHX','POR','Phoenix Suns','Portland Trail Blazers');
+  nba('scheduled','2026-10-22T02:30:00Z','SAC','LAC','Sacramento Kings','LA Clippers');
+  nba('scheduled','2026-10-22T23:00:00Z','CLE','PHI','Cleveland Cavaliers','Philadelphia 76ers');
+  cf('closed','2026-10-18T03:00:00Z','NEB','ORE','Nebraska Cornhuskers','Oregon Ducks',14,17);
+  cf('closed','2026-10-18T02:30:00Z','WAKE','CAL','Wake Forest Demon Deacons','California Golden Bears',41,7);
+  cf('closed','2026-10-18T02:15:00Z','UTAH','COLO','Utah Utes','Colorado Buffaloes',27,24);
+  cf('closed','2026-10-17T23:30:00Z','ND','BYU','Notre Dame Fighting Irish','BYU Cougars',24,28);
+  cf('closed','2026-10-17T23:30:00Z','WIS','UCLA','Wisconsin Badgers','UCLA Bruins',7,17);
+  cf('closed','2026-10-17T23:30:00Z','UK','OKLA','Kentucky Wildcats','Oklahoma Sooners',21,13);
+  cf('scheduled','2026-10-20T23:00:00Z','MTU','FIU','Middle Tennessee Blue Raiders','Florida International Panthers',null,null,19.8,80.2);
+  cf('scheduled','2026-10-20T23:00:00Z','MOSU','DEL','Missouri State Bears',"Delaware Fightin' Blue Hens",null,null,43.5,56.5);
+  cf('scheduled','2026-10-20T23:30:00Z','USA','MRSH','South Alabama Jaguars','Marshall Thundering Herd',null,null,58.3,41.7);
+  cf('scheduled','2026-10-22T00:00:00Z','NMSU','SHSU','New Mexico State Aggies','Sam Houston Bearkats',null,null,54.8,45.2);
+  cf('scheduled','2026-10-22T23:00:00Z','LIB','KENN','Liberty Flames','Kennesaw State Owls',null,null,80.9,19.1);
+  cf('scheduled','2026-10-22T23:00:00Z','JMU','APP','James Madison Dukes','Appalachian State Mountaineers',null,null,78.7,21.3);
+  cf('scheduled','2026-10-22T23:30:00Z','ECU','MEM','East Carolina Pirates','Memphis Tigers',null,null,23,77);
+  cf('scheduled','2026-10-23T21:00:00Z','NCCU','DSU','North Carolina Central Eagles','Delaware State Hornets');
+  cf('scheduled','2026-10-23T23:00:00Z','DUKE','UVA','Duke Blue Devils','Virginia Cavaliers',null,null,45.8,54.2);
+  cf('scheduled','2026-10-23T23:00:00Z','YALE','PENN','Yale Bulldogs','Penn Quakers');
+  cf('scheduled','2026-10-23T23:00:00Z','MASS','CONN','UMass Minutemen','UConn Huskies');
+  cf('scheduled','2026-10-24T00:30:00Z','ARMY','TLSA','Army Black Knights','Tulsa Golden Hurricane');
+  cf('scheduled','2026-10-24T01:00:00Z','AFA','WYO','Air Force Falcons','Wyoming Cowboys');
+  cf('scheduled','2026-10-24T02:30:00Z','NCST','STAN','NC State Wolfpack','Stanford Cardinal');
+  cf('scheduled','2026-10-24T16:00:00Z','PITT','MIA','Pittsburgh Panthers','Miami (FL) Hurricanes');
+})();
+function normFeed(lg,games){
+  return games.map(function(g){
+    var a=g.away,h=g.home,t=g.teams||{},wp=g.win_probability||null,sc=g.score||null;
+    return row(lg,g.status,g.start_time,a,h,(t[a]&&t[a].name)||a,(t[h]&&t[h].name)||h,sc?sc[a]:null,sc?sc[h]:null,wp?wp[a]:null,wp?wp[h]:null,g.clock,g.quarter||g.period,g.title);
+  });
+}
+
+/* ---------- state ---------- */
+var S={cat:null,tab:'games',sport:'nfl',gf:'All',sheet:null,picks:[],stake:10,feed:SNAP.feed,feedAt:SNAP.at,live:false,src:'the data feed',busy:false,msg:'',msgKind:''};
+try{var raw=localStorage.getItem('hitboard.picks.v2');if(raw){var a=JSON.parse(raw);if(Array.isArray(a))S.picks=a.filter(function(x){return propById(x.pid)&&(x.side==='over'||x.side==='under')})}}catch(e){}
+function save(){try{localStorage.setItem('hitboard.picks.v2',JSON.stringify(S.picks))}catch(e){}}
+var $=function(s){return document.querySelector(s)};
+function nt(x){return x==='LA'?'LAR':x==='JAC'?'JAX':x==='WSH'?'WAS':x}
+function research(g){if(g.lg!=='nfl')return null;return GAMES.filter(function(r){return r.a===nt(g.a)&&r.h===nt(g.h)})[0]||null}
+function feedFor(r){return S.feed.nfl.filter(function(g){return nt(g.a)===r.a&&nt(g.h)===r.h})[0]||null}
+function kind(g){var s=g.status;if(s==='closed'||s==='complete'||s==='final')return 'final';if(s==='scheduled'||s==='created')return 'up';return 'live'}
+function fmtTime(ms){try{return new Date(ms).toLocaleString([],{weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}catch(e){return new Date(ms).toISOString()}}
+function fmtClock(ms){try{return new Date(ms).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}catch(e){return ''}}
+function find(id){var out=null;LG.forEach(function(l){S.feed[l[0]].forEach(function(g){if(g.id===id)out=g})});return out}
+
+/* ---------- views ---------- */
+function barHtml(a,h,pa,ph,cap){
+  var al=pa>=ph;
+  return '<div class="plabels"><span>'+esc(a)+' '+Math.round(pa)+'%</span><span>'+esc(h)+' '+Math.round(ph)+'%</span></div><div class="pbar" role="img" aria-label="Win probability: '+esc(a)+' '+Math.round(pa)+' percent, '+esc(h)+' '+Math.round(ph)+' percent"><i class="'+(al?'lead':'')+'" style="width:'+pa.toFixed(1)+'%"></i><i class="'+(al?'':'lead')+'" style="width:'+ph.toFixed(1)+'%"></i></div><div class="cap">'+esc(cap)+'</div>';
+}
+function mlText(g){return g.ml?g.a+' '+fo(g.ml.a)+' / '+g.h+' '+fo(g.ml.h):'not available'}
+function statusPill(g){
+  var k=kind(g);
+  if(k==='final')return '<span class="pill final">Final</span>';
+  if(k==='up')return '<span class="pill">'+esc(g.title||'Upcoming')+'</span>';
+  var stale=Date.now()-S.feedAt>20*60000;
+  return '<span class="pill live">'+(stale?'In progress at last refresh':'Live')+(g.q?' · Q'+g.q:'')+(g.clock&&!stale?' '+esc(g.clock):'')+'</span>';
+}
+function feedCard(g){
+  var r=research(g),k=kind(g),h='<article class="card"><div class="gtop"><span class="label">'+esc(fmtTime(g.start))+'</span>'+statusPill(g)+'</div>';
+  h+='<div class="teams">'+esc(g.a)+' <i>@</i> '+esc(g.h)+'</div><div class="names">'+esc(g.an)+' at '+esc(g.hn)+'</div>';
+  if(g.sa!=null&&g.sh!=null)h+='<div class="scoreline"><span class="'+(g.sa>g.sh?'w':'')+'">'+esc(g.a)+' <b>'+g.sa+'</b></span><span class="'+(g.sh>g.sa?'w':'')+'">'+esc(g.h)+' <b>'+g.sh+'</b></span></div>';
+  if(k!=='final'){
+    if(g.pa!=null&&g.ph!=null){var s=g.pa+g.ph;h+=barHtml(g.a,g.h,100*g.pa/s,100*g.ph/s,'Win probability from the data feed')}
+    else if(r){h+=barHtml(g.a,g.h,r.mkA*100,(1-r.mkA)*100,'Win probability from Kalshi and Polymarket, '+DATA.marketAsOf.replace(/, \d.*$/,''))}
+  }
+  var tags='';
+  if(r){
+    h+='<div class="facts"><span><b>'+r.favT+' -'+r.pts+'</b></span><span>O/U <b>'+r.total+'</b></span><span>Implied <b>'+r.favT+' '+r.fs.toFixed(1)+', '+r.dogT+' '+r.ds.toFixed(1)+'</b></span></div>';
+    tags+='<span class="tag '+(r.fresh?'good':'warn')+'">'+(r.fresh?'Line: ':'Older line: ')+esc(r.src.split(',').slice(-1)[0].trim())+'</span>';
+    if(r.gap!=null&&r.gap>=.08)tags+='<span class="tag warn">Sportsbook and market differ by '+pc(r.gap)+' pts</span>';
+    if(r.dive)tags+='<span class="tag good">Deep dive</span>';
+  }
+  if(tags)h+='<div class="tags">'+tags+'</div>';
+  h+='<div class="actions">';
+  if(r){
+    h+='<button class="btn primary" data-act="game" data-id="'+r.id+'">'+(r.dive?'Matchup deep dive':'Lines and odds')+'</button>';
+    if(PROPS.some(function(p){return p.game===r.id}))h+='<button class="btn" data-act="gprops" data-id="'+r.id+'">Player props</button>';
+  }else if(k==='up'){
+    h+='<button class="btn" data-act="fgame" data-id="'+esc(g.id)+'">Details</button>';
+  }
+  return h+'</div></article>';
+}
+function modeSwitch(cur){
+  return '<div class="chips" role="group" aria-label="Section">'+[['games','Games'],['props','Props']].map(function(m){return '<button class="chip" data-act="tab" data-t="'+m[0]+'" aria-pressed="'+(cur===m[0])+'">'+m[1]+'</button>'}).join('')+'</div>';
+}
+function sportChips(){
+  return '<div class="chips" role="group" aria-label="Sport">'+LG.map(function(l){return '<button class="chip" data-act="sport" data-v="'+l[0]+'" aria-pressed="'+(S.sport===l[0])+'">'+l[1]+'</button>'}).join('')+'</div>';
+}
+function refreshBar(){
+  var when='Updated '+fmtClock(S.feedAt)+' · '+(S.live?'live from '+S.src:'saved snapshot');
+  var stale=!S.live&&Date.now()-S.feedAt>600000?'<div class="msg warn" role="status">Scores below are from a saved snapshot and may be out of date.</div>':'';
+  return '<div class="rbar"><div><div class="label">'+when+'</div>'+(S.msg?'<div class="msg '+S.msgKind+'" role="status">'+S.msg+'</div>':stale)+'</div><button class="btn primary" style="flex:none" data-act="refresh"'+(S.busy?' disabled':'')+'>'+(S.busy?'Refreshing…':'Refresh scores')+'</button></div>';
+}
+function vGames(){
+  var lg=S.sport,name=LG.filter(function(l){return l[0]===lg})[0][1],all=S.feed[lg].slice();
+  var live=all.filter(function(g){return kind(g)==='live'}).sort(function(a,b){return a.start-b.start});
+  var up=all.filter(function(g){return kind(g)==='up'}).sort(function(a,b){return a.start-b.start});
+  var fin=all.filter(function(g){return kind(g)==='final'}).sort(function(a,b){return b.start-a.start}).slice(0,6);
+  var h='<h2>'+name+' board</h2>'+sportChips()+modeSwitch('games')+refreshBar();
+  if(!all.length){
+    h+='<div class="card empty">No '+name+' games in the data feed right now. '+(lg==='ncaamb'?'College basketball has not started its season in the feed yet. ':'')+'Tap Refresh to check again.</div>';
+  }
+  if(live.length)h+='<h3>Live</h3><div class="feed">'+live.map(feedCard).join('')+'</div>';
+  if(up.length){
+    h+='<h3>Upcoming</h3>';
+    if(lg==='nfl')h+='<p class="lede" style="margin-top:0">Week '+DATA.week+' cards show lines from the source and date listed. Byes: '+DATA.byes.join(', ')+'.</p>';
+    h+='<div class="feed">'+up.map(feedCard).join('')+'</div>';
+  }
+  if(fin.length)h+='<h3>Recent finals</h3><div class="feed">'+fin.map(feedCard).join('')+'</div>';
+  return h+foot();
+}
+function propRows(list){
+  if(!list.length)return '<div class="empty">No props for this game yet.</div>';
+  return list.map(function(p){
+    return '<button class="prow" data-act="prop" data-id="'+p.id+'"><span><span class="pr-name">'+esc(p.name)+(p.g<3?' · small sample':'')+'</span><span class="pr-sub">'+p.team+' in '+p.gm.a+' @ '+p.gm.h+' · '+p.stat+'</span></span><span class="pr-r"><b>'+p.avg.toFixed(1)+'</b><span>per game ('+p.g+' g)</span></span></button>';
+  }).join('');
+}
+function hcls(h,g){var r=h/g;return r>=.8?'hi':r<=.3?'lo':'mid'}
+function hrTable(t,i){
+  var tag=t.thr?'':'';
+  return '<h3>'+esc(t.stat)+(t.line!=null?' over '+t.line:'')+'</h3><div class="tblwrap"><table><thead><tr><th>Player</th><th>Hit rate</th><th>'+esc(t.unit||'Avg')+'</th></tr></thead><tbody>'+
+   t.rows.map(function(r){var rate=Math.round(100*r[2]/r[3]);return '<tr><td>'+esc(r[0])+' <span class="src">'+esc(r[1])+'</span></td><td><span class="hrpill '+hcls(r[2],r[3])+'">'+rate+'% ('+r[2]+'/'+r[3]+')</span></td><td>'+(t.unit?r[4].toFixed(1):r[4])+'</td></tr>'}).join('')+'</tbody></table></div>';
+}
+function nflHit(){
+  var d=DATA.hit.nfl;
+  return '<p class="lede">'+esc(d.asOf)+' Each cell shows games out of the games played that cleared the yard mark in the column header. These are fixed yardage marks, not sportsbook lines.</p>'+
+  d.ladders.map(function(L){
+    return '<h3>'+esc(L.pos)+'</h3><div class="tblwrap"><table><thead><tr><th>Player</th>'+L.thr.map(function(t){return '<th class="lc">'+t+'+</th>'}).join('')+'</tr></thead><tbody>'+
+     L.rows.map(function(r){return '<tr><td>'+esc(r[0])+' <span class="src">'+r[1]+' · '+r[2]+' g</span></td>'+r[3].map(function(h){return '<td class="lc '+hcls(h,r[2])+'">'+h+'/'+r[2]+'</td>'}).join('')+'</tr>'}).join('')+'</tbody></table></div>';
+  }).join('')+
+  '<p class="note" style="margin-top:12px">Four games is a small sample. Use the Calculator view to turn a season average and your book’s line into a probability.</p>';
+}
+function nflTrends(){
+  var T=DATA.trends,teams=Object.keys(T.ats);
+  var rows=teams.map(function(t){var a=T.ats[t],o=T.ou[t]||[0,0,0];return {t:t,a:a,o:o,ar:a[0]/(a[0]+a[1]),or:o[0]/Math.max(1,o[0]+o[1])}});
+  rows.sort(function(x,y){return y.ar-x.ar});
+  return '<p class="lede">'+esc(T.asof||T.asOf)+' ATS is against the spread, Over is the share of games that went over the total. Format is wins-losses-pushes.</p>'+
+  '<div class="tblwrap"><table><thead><tr><th>Team</th><th>ATS</th><th>Over / Under</th></tr></thead><tbody>'+
+  rows.map(function(r){var an=r.a[0]+r.a[1],on=r.o[0]+r.o[1];return '<tr><td>'+r.t+'</td><td><span class="hrpill '+hcls(r.a[0],an)+'">'+r.a.join('-')+'</span></td><td>'+(on?'<span class="hrpill '+hcls(r.o[0],on)+'">'+r.o.join('-')+'</span>':'—')+'</td></tr>'}).join('')+'</tbody></table></div>';
+}
+function nflCalc(){
+  var opts=['All'].concat(GAMES.filter(function(g){return PROPS.some(function(p){return p.game===g.id})}).map(function(g){return g.id}));
+  var list=PROPS.filter(function(p){return S.gf==='All'||p.game===S.gf});
+  return '<p class="lede">Season per-game averages from the sources. Tap a player, enter the line your book shows, and get a model probability and the edge against the price.</p>'+
+  '<div class="chips" role="group" aria-label="Game">'+opts.map(function(o){var g=o==='All'?null:gameById(o);return '<button class="chip" data-act="gf" data-v="'+o+'" aria-pressed="'+(S.gf===o)+'">'+(g?g.a+'@'+g.h:'All')+'</button>'}).join('')+'</div>'+
+  '<div class="list">'+propRows(list)+'</div>';
+}
+var CATS={
+  nfl:[['pass','Passing'],['rush','Rushing'],['rec','Receiving'],['td','Touchdowns'],['trend','Team trends'],['calc','Calculator']],
+  nba:[['Points','Points'],['Rebounds','Rebounds'],['Assists','Assists'],['Threes','Threes'],['lines','Game lines']],
+  ncaafb:[['Passing yards','Passing'],['Rushing yards','Rushing'],['Receiving yards','Receiving']],
+  ncaamb:[]
+};
+function curCat(){var l=CATS[S.sport];if(!l.length)return null;var ok=l.some(function(c){return c[0]===S.cat});return ok?S.cat:l[0][0]}
+function ladderHtml(L){
+  return '<h3>'+esc(L.pos)+'</h3><div class="tblwrap"><table><thead><tr><th>Player</th>'+L.thr.map(function(t){return '<th class="lc">'+t+'+</th>'}).join('')+'</tr></thead><tbody>'+
+   L.rows.map(function(r){return '<tr><td>'+esc(r[0])+' <span class="src">'+r[1]+' · '+r[2]+' g</span></td>'+r[3].map(function(h){return '<td class="lc '+hcls(h,r[2])+'">'+h+'/'+r[2]+'</td>'}).join('')+'</tr>'}).join('')+'</tbody></table></div>';
+}
+function nflLadders(idx,intro){
+  var d=DATA.hit.nfl;
+  return '<p class="lede">'+esc(d.asOf)+' Each cell is games cleared out of games played at the yard mark in the column header. These are fixed marks, not sportsbook lines.</p>'+idx.map(function(i){return ladderHtml(d.ladders[i])}).join('')+
+  '<p class="note" style="margin-top:12px">Four games is a small sample. Use Calculator to turn a season average and your book’s line into a probability. Receptions, completions, longest play and other stat props have no public hit-rate data in the sources used.</p>';
+}
+function tdParse(){
+  var out=[];
+  DATA.tds.g.forEach(function(g){g[2].split(';').forEach(function(x){var p=x.split('|');out.push({gm:g[0],t:p[0],n:p[1],h:+p[2],td:p[3]?+p[3]:null})})});
+  return out;
+}
+function tdRow(r,showGm){return '<tr><td>'+esc(r.n)+' <span class="src">'+r.t+(showGm?' · '+r.gm:'')+'</span></td><td><span class="hrpill '+(r.h>=6?'hi':r.h<=2?'lo':'mid')+'">'+r.h*10+'% ('+r.h+'/10)</span></td><td>'+(r.td==null?'—':r.td)+'</td></tr>'}
+function nflTD(){
+  var d=DATA.tds,all=tdParse();
+  var top=all.slice().sort(function(a,b){return b.h-a.h||(b.td||0)-(a.td||0)}).slice(0,15);
+  var head='<thead><tr><th>Player</th><th>TD in L10</th><th>TDs</th></tr></thead>';
+  var h='<p class="lede">'+esc(d.asOf)+' Compare a player’s rate with the price your book shows: +100 needs 50%, +200 needs 33%, +300 needs 25%.</p>';
+  h+='<h3>Top 15 anytime TD rates</h3><div class="tblwrap"><table>'+head+'<tbody>'+top.map(function(r){return tdRow(r,true)}).join('')+'</tbody></table></div>';
+  h+='<h3>Market prices, Bills at Raiders</h3><p class="src">'+esc(d.kal.src)+'</p><div class="tblwrap"><table><thead><tr><th>Player</th><th>Anytime TD</th><th>Last 10</th></tr></thead><tbody>'+
+   d.kal.rows.map(function(r){var m=all.filter(function(a){return a.n===r[0]})[0];return '<tr><td>'+esc(r[0])+' <span class="src">'+r[1]+'</span></td><td><span class="hrpill mid">'+r[2]+'%</span></td><td>'+(m?m.h*10+'%':'—')+'</td></tr>'}).join('')+'</tbody></table></div>';
+  h+='<h3>By game</h3>'+d.g.map(function(g){var rows=all.filter(function(a){return a.gm===g[0]});
+    return '<details class="card bcard"><summary><b>'+g[0]+'</b> <span class="src">'+g[1]+' ET</span></summary><div class="tblwrap" style="margin-top:8px"><table>'+head+'<tbody>'+rows.map(function(r){return tdRow(r,false)}).join('')+'</tbody></table></div></details>';
+  }).join('');
+  return h+'<p class="note" style="margin-top:12px">Last-10 rates ignore opponent and role changes. Check injuries before using them. Anytime TD prices from sportsbooks such as DraftKings were not readable.</p>';
+}
+function vProps(){
+  var lg=S.sport,name=LG.filter(function(l){return l[0]===lg})[0][1],cat=curCat();
+  var h='<h2>'+name+' props</h2>'+sportChips()+modeSwitch('props');
+  if(!cat){
+    return h+'<div class="card empty">No college basketball hit-rate data is available yet. The season has not started in the sources. Ask Claude to refresh Hitboard later.</div>'+foot();
+  }
+  h+='<div class="chips" role="group" aria-label="Prop type">'+CATS[lg].map(function(c){return '<button class="chip" data-act="cat" data-v="'+c[0]+'" aria-pressed="'+(cat===c[0])+'">'+c[1]+'</button>'}).join('')+'</div>';
+  h+='<div class="card empty" style="margin-bottom:12px;text-align:left">DraftKings and other sportsbook prop lines sit behind logins and could not be read. Every threshold here is the source’s own mark.</div>';
+  if(lg==='nfl'){
+    h+=cat==='pass'?nflLadders([0]):cat==='rush'?nflLadders([1]):cat==='rec'?nflLadders([2,3]):cat==='td'?nflTD():cat==='trend'?nflTrends():nflCalc();
+  }else if(lg==='nba'){
+    var d=DATA.hit.nba;
+    if(cat==='lines'){
+      h+='<h3>Opening night lines</h3><p class="src">'+esc(DATA.nbaLines.src)+'</p><div class="list">'+DATA.nbaLines.games.map(function(g){return '<div class="card bcard"><div class="label">'+g.day+'</div><div class="teams">'+g.a+' <i>@</i> '+g.h+'</div><div class="facts"><span>Spread <b>'+g.sp+'</b></span><span>Total <b>'+g.tot+'</b></span><span>ML <b>'+g.ml+'</b></span></div></div>'}).join('')+'</div>';
+    }else{
+      h+='<p class="lede">'+esc(d.asOf)+'</p>'+d.tables.filter(function(t){return t.stat===cat}).map(hrTable).join('')+'<p class="note" style="margin-top:12px">Points, rebounds, assists and threes are the only NBA stats the source tracks. No blocks, steals, combos or TD-style props.</p>';
+    }
+  }else{
+    var c=DATA.hit.ncaafb;
+    h+='<p class="lede">'+esc(c.asOf)+'</p>'+c.tables.filter(function(t){return t.stat===cat}).map(hrTable).join('')+'<p class="note" style="margin-top:12px">No college touchdown hit-rate data was available from the sources.</p>';
+  }
+  return h+foot();
+}
+function vPicks(){
+  var ps=S.picks;
+  if(!ps.length)return '<h2>My picks</h2><div class="card empty">No picks yet. Open a player in Props, enter your line and odds, then save the side you like.</div>'+foot();
+  var comb=1,prob=1;
+  ps.forEach(function(x){comb*=dec(x.odds);prob*=x.prob});
+  return '<h2>My picks</h2><div class="list">'+ps.map(function(x,i){var p=propById(x.pid);
+    return '<div class="picked"><span><span class="pr-name">'+esc(p.name)+'</span><span class="pr-sub">'+x.side.toUpperCase()+' '+x.line+' '+p.stat+' · '+fo(x.odds)+' · '+p.gm.a+' @ '+p.gm.h+'</span></span><span class="pr-r"><b>'+pc(x.prob)+'%</b><span>model</span></span><button class="rm" data-act="rm" data-i="'+i+'" aria-label="Remove pick">×</button></div>';}).join('')+'</div>'+
+  '<div class="slip"><div class="r"><span>Legs</span><b>'+ps.length+'</b></div><div class="r"><span>Chance all legs hit (model, independent)</span><b>'+(prob*100).toFixed(1)+'%</b></div><div class="r"><span>Break-even chance at combined odds</span><b>'+(100/comb).toFixed(1)+'%</b></div>'+
+  '<div class="r"><label for="stake">Stake ($)</label><input id="stake" type="number" min="0" step="1" value="'+S.stake+'" data-bind="stake"></div><div class="r"><span>Payout if every leg hits</span><b id="payout">$'+(S.stake*comb).toFixed(2)+'</b></div></div>'+
+  '<p class="note" style="margin-top:12px">Legs from the same game are usually correlated, so the independent estimate can be off. A parlay needs every leg to win.</p>'+foot();
+}
+function vAbout(){
+  return '<h2>About the data</h2><p class="lede">Scores, schedules and win probabilities refresh from a sports data feed. NFL Week '+DATA.week+' research (lines, injuries, matchups, player stats) was gathered '+esc(DATA.asOf)+'.</p>'+
+  '<h3>Refreshing</h3><ul class="pts"><li>Scores refresh when you open the page and when you tap <b>Refresh scores</b>. The installed phone app also refreshes every 30 seconds while open, using ESPN’s public scoreboard.</li><li>If your view cannot reach the feed, the button says so. Ask Claude to “refresh Hitboard” and it will re-research lines, injuries and stats and update the page.</li><li>Lines, injuries and player stats do not come from the feed, so they only change when Claude updates the page.</li></ul>'+
+  '<h3>What is real</h3><ul class="pts"><li>Schedules, scores and win probabilities from the data feed.</li><li>NFL spreads, totals and moneylines, each labeled with source and date. Older listings are marked, and where two sources differ both are shown.</li><li>Kalshi and Polymarket US prices (normalized so each pair sums to 100%).</li><li>A matchup deep dive for every NFL game this week: records, scoring, pass and run offense and defense, pressure and takeaways with league ranks from Pro Football Reference. Three games (NE-CHI, DEN-ARI, GB-DET) have hand-written angles. The others have angles generated from the stat ranks.</li></ul>'+
+  '<h3>What is modeled</h3><ul class="pts"><li><b>Prop probability.</b> Normal curve centered on the player’s per-game average, with spread set by stat type (passing 22%, rushing 55%, receiving yards 60%, receptions 40% of the mean, widened 30% for samples under 3 games). The matchup slider shifts the average.</li><li><b>Edge.</b> Model probability minus the price’s implied probability with the sportsbook margin removed.</li></ul>'+
+  '<h3>What is missing</h3><ul class="pts"><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
+  '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
+}
+function foot(){return '<p class="foot">For entertainment and research only, not betting advice. Probabilities are estimates and can be wrong. If gambling is a problem for you or someone you know, call 1-800-GAMBLER.</p>'}
+
+/* ---------- sheets ---------- */
+function gameSheet(g){
+  var d=g.dive,fg=feedFor(g);
+  var h='<div class="sh-head"><div><div class="label">'+g.day+' · '+esc(g.venue)+'</div><h2>'+g.an+' @ '+g.hn+'</h2></div><button class="x" data-act="close" aria-label="Close">×</button></div>';
+  h+='<h3>Win probability</h3><div class="tblwrap"><table><thead><tr><th>Source</th><th>'+g.a+'</th><th>'+g.h+'</th></tr></thead><tbody>'+
+   '<tr><td>Kalshi (Oct 16)</td><td>'+g.kal[0]+'%</td><td>'+g.kal[1]+'%</td></tr><tr><td>Polymarket US (Oct 16)</td><td>'+g.poly[0]+'%</td><td>'+g.poly[1]+'%</td></tr>'+
+   '<tr><td>Market blend, normalized</td><td><b>'+pc(g.mkA)+'%</b></td><td><b>'+pc(1-g.mkA)+'%</b></td></tr>'+
+   (fg&&fg.pa!=null?'<tr><td>Data feed model</td><td>'+Math.round(fg.pa)+'%</td><td>'+Math.round(fg.ph)+'%</td></tr>':'')+
+   (g.bkA!=null?'<tr><td>Sportsbook moneyline, margin removed</td><td>'+pc(g.bkA)+'%</td><td>'+pc(1-g.bkA)+'%</td></tr>':'')+'</tbody></table></div>';
+  if(g.gap!=null&&g.gap>=.08)h+='<p class="note" style="margin-top:8px">The sportsbook listing and the prediction markets disagree by '+pc(g.gap)+' points, and the listing is from Oct 13. Check a live book before relying on either.</p>';
+  h+='<h3>Line</h3><div class="facts" style="margin:0"><span><b>'+g.favT+' -'+g.pts+'</b></span><span>O/U <b>'+g.total+'</b></span><span>ML <b>'+mlText(g)+'</b></span></div><p class="src">Implied score: '+g.favT+' '+g.fs.toFixed(1)+', '+g.dogT+' '+g.ds.toFixed(1)+'. Source: '+esc(g.src)+'.'+(g.alt?' '+esc(g.alt):'')+'</p>';
+  if(g.note)h+='<p class="note">'+esc(g.note)+'</p>';
+  if(d){
+    h+='<h3>Team comparison</h3><div class="tblwrap"><table><thead><tr><th></th><th>'+g.a+'</th><th>'+g.h+'</th></tr></thead><tbody>'+d.rows.map(function(r){return '<tr><td>'+esc(r[0])+'</td><td>'+esc(r[1])+'</td><td>'+esc(r[2])+'</td></tr>'}).join('')+'</tbody></table></div><p class="src">'+esc(d.basis)+'</p>';
+    h+='<h3>Injuries and availability</h3><ul class="pts">'+d.inj.map(function(t){return '<li>'+esc(t)+'</li>'}).join('')+'</ul>';
+    h+='<h3>Matchup angles</h3><ul class="pts">'+d.angles.map(function(t){return '<li>'+esc(t)+'</li>'}).join('')+'</ul><p class="src">'+esc(d.proj)+'</p>';
+    var ps=PROPS.filter(function(p){return p.game===g.id});
+    if(ps.length)h+='<h3>Player props</h3><div class="list">'+propRows(ps)+'</div>';
+  }else{
+    h+='<p class="note" style="margin-top:14px">No matchup deep dive for this game yet. Only lines and market odds were verified from public sources. Ask Claude to build one.</p>';
+  }
+  return h;
+}
+function feedSheet(g){
+  var h='<div class="sh-head"><div><div class="label">'+esc(fmtTime(g.start))+(g.title?' · '+esc(g.title):'')+'</div><h2>'+esc(g.an)+' @ '+esc(g.hn)+'</h2></div><button class="x" data-act="close" aria-label="Close">×</button></div>';
+  if(g.pa!=null&&g.ph!=null){var s=g.pa+g.ph;h+='<h3>Win probability</h3>'+barHtml(g.a,g.h,100*g.pa/s,100*g.ph/s,'Data feed model, '+fmtClock(S.feedAt))}
+  else h+='<p class="note" style="margin-top:14px">The feed has no win probability for this game yet.</p>';
+  h+='<p class="note" style="margin-top:14px">Matchup deep dives are built for NFL games. For this game only the schedule, score and win probability are available. Ask Claude to add a deep dive.</p>';
+  return h;
+}
+function propOut(){
+  var s=S.sheet,p=propById(s.id),box=$('#pr-out');if(!box)return;
+  if(!(Math.abs(s.oo)>=100)||!(Math.abs(s.uo)>=100)||!isFinite(s.line)){box.innerHTML='<p class="note">Enter the line, and odds of -100 or lower or +100 or higher on both sides.</p>';return}
+  var c=calc(p,s.line,s.oo,s.uo,s.adj);
+  function cls(e){return e>=.03?'hi':e<=-.03?'lo':''}
+  var lean=Math.abs(c.eo)<.03?'No clear edge at these prices.':(c.eo>0?'Model leans Over by '+(c.eo*100).toFixed(1)+' pts versus the price.':'Model leans Under by '+(c.eu*100).toFixed(1)+' pts versus the price.');
+  box.innerHTML='<div class="out"><div class="tile"><div class="v '+cls(c.eo)+'">'+pc(c.po)+'%</div><div class="k">OVER '+s.line+' · price implies '+pc(c.nvo)+'% · edge '+(c.eo>=0?'+':'')+(c.eo*100).toFixed(1)+'</div></div>'+
+  '<div class="tile"><div class="v '+cls(c.eu)+'">'+pc(c.pu)+'%</div><div class="k">UNDER '+s.line+' · price implies '+pc(1-c.nvo)+'% · edge '+(c.eu>=0?'+':'')+(c.eu*100).toFixed(1)+'</div></div></div>'+
+  '<div class="verdict"><b>'+lean+'</b> Model average '+c.mu.toFixed(1)+' with a typical swing of ±'+c.sd.toFixed(0)+'.'+(p.g<3?' Only '+p.g+' games played, so treat this loosely.':'')+'</div>';
+  var ex=function(side){return S.picks.some(function(x){return x.pid===p.id&&x.side===side})};
+  var bo=$('#sv-over'),bu=$('#sv-under');
+  if(bo){bo.textContent=ex('over')?'Saved: Over':'Save Over';bo.classList.toggle('done',ex('over'))}
+  if(bu){bu.textContent=ex('under')?'Saved: Under':'Save Under';bu.classList.toggle('done',ex('under'))}
+}
+function propSheet(p){
+  var s=S.sheet;
+  return '<div class="sh-head"><div><div class="label">'+p.team+' in '+p.gm.a+' @ '+p.gm.h+' · '+p.gm.day+'</div><h2>'+esc(p.name)+'</h2><div class="src">'+p.stat+' · '+p.avg.toFixed(1)+' per game ('+p.total+' in '+p.g+' games)</div></div><button class="x" data-act="close" aria-label="Close">×</button></div>'+
+  '<p style="margin:12px 0 10px">'+esc(p.note)+'</p>'+
+  '<div class="field"><label for="pl">Line at your book</label><input id="pl" type="number" step="0.5" value="'+s.line+'" data-bind="pl"></div>'+
+  '<div class="field"><label for="po">Over odds</label><input id="po" type="number" step="5" value="'+s.oo+'" data-bind="po"></div>'+
+  '<div class="field"><label for="pu">Under odds</label><input id="pu" type="number" step="5" value="'+s.uo+'" data-bind="pu"></div>'+
+  '<div class="label">Matchup adjustment to the average</div><div class="slider"><input id="pa" type="range" min="-20" max="20" step="1" value="'+s.adj+'" data-bind="pa" aria-label="Matchup adjustment percent"><b id="pav">'+(s.adj>0?'+':'')+s.adj+'%</b></div>'+
+  '<div id="pr-out"></div>'+
+  '<div class="actions"><button class="btn primary" id="sv-over" data-act="save" data-side="over">Save Over</button><button class="btn primary" id="sv-under" data-act="save" data-side="under">Save Under</button></div>'+
+  '<p class="foot">The line field starts at the player’s average rounded to a half point. Replace it with the real line. The model uses the season average only, so injuries and matchup should move the slider.</p>';
+}
+function renderSheet(){
+  var s=S.sheet,root=$('#sheetRoot');
+  if(!s){root.innerHTML='';return}
+  var inner;
+  if(s.type==='game')inner=gameSheet(gameById(s.id));
+  else if(s.type==='fgame'){var fg=find(s.id);inner=fg?feedSheet(fg):'<p class="note">That game is no longer in the feed.</p>'}
+  else inner=propSheet(propById(s.id));
+  root.innerHTML='<div class="scrim" data-act="scrim"><div class="sheet" role="dialog" aria-modal="true">'+inner+'</div></div>';
+  if(s.type==='prop')propOut();
+}
+
+/* ---------- shell ---------- */
+var TABS=[['games','Games','<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>'],['props','Props','<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'],['picks','My picks','<path d="M5 4h14v17l-7-4-7 4z"/>'],['about','Data','<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/>']];
+function renderNav(){
+  $('#nav').innerHTML=TABS.map(function(t){return '<button data-act="tab" data-t="'+t[0]+'"'+(S.tab===t[0]?' aria-current="page"':'')+'><svg viewBox="0 0 24 24" aria-hidden="true">'+t[2]+'</svg>'+t[1]+(t[0]==='picks'&&S.picks.length?'<span class="badge">'+S.picks.length+'</span>':'')+'</button>'}).join('');
+}
+function render(){
+  $('#view').innerHTML={games:vGames,props:vProps,picks:vPicks,about:vAbout}[S.tab]();
+  $('#stamp').innerHTML='Feed '+esc(fmtClock(S.feedAt))+'<br>'+(S.live?'live':'snapshot');
+  renderNav();
+}
+function openProp(id){var p=propById(id);S.sheet={type:'prop',id:id,line:defLine(p),oo:-110,uo:-110,adj:0};renderSheet()}
+
+/* ---------- refresh ---------- */
+var MSG_NOCONN='This view cannot reach the sports data feed. Ask Claude to “refresh Hitboard”, then reload this page.';
+function errMsg(e){
+  var c=e&&e.code;
+  if(c==='server_not_connected'||c==='not_in_manifest'||c==='not_granted'||c==='capability_disabled'||c==='capability_removed'||c==='selection_required')return MSG_NOCONN;
+  if(c==='approval_required'||c==='consent_required')return 'The feed needs your approval. Allow it when asked, then tap Refresh again.';
+  if(c==='needs_reauth')return 'Reconnect the sports data connector in Settings, then tap Refresh again.';
+  if(c==='blocked_by_policy')return 'Your organization blocks the sports data feed.';
+  if(c==='server_unavailable'||c==='upstream_error'||c==='rate_limited')return 'The feed did not answer. Wait a moment and tap Refresh again.';
+  return 'The feed returned an error. Try again in a moment.';
+}
+var ESPN={nfl:'football/nfl',nba:'basketball/nba',ncaafb:'football/college-football',ncaamb:'basketball/mens-college-basketball'};
+function espnUrl(lg){
+  var q=lg==='ncaafb'?'?groups=80&limit=300':lg==='ncaamb'?'?groups=50&limit=300':'?limit=100';
+  return 'https://site.api.espn.com/apis/site/v2/sports/'+ESPN[lg]+'/scoreboard'+q;
+}
+function espnNorm(lg,events){
+  var out=[];
+  (events||[]).forEach(function(e){
+    var c=e.competitions&&e.competitions[0];if(!c||!c.competitors)return;
+    var aw=c.competitors.filter(function(x){return x.homeAway==='away'})[0],hm=c.competitors.filter(function(x){return x.homeAway==='home'})[0];
+    if(!aw||!hm)return;
+    var st=e.status&&e.status.type||{},state=st.state;
+    var status=state==='post'?'closed':state==='in'?'inprogress':'scheduled';
+    var hasScore=state!=='pre';
+    var sc=function(x){var n=parseInt(x.score,10);return hasScore&&isFinite(n)?n:null};
+    var title=(c.notes&&c.notes[0]&&c.notes[0].headline)||'';
+    var clk=state==='in'?(st.shortDetail&&/half|end/i.test(st.shortDetail)?st.shortDetail:(e.status.displayClock||null)):null;
+    out.push(row(lg,status,e.date,aw.team.abbreviation,hm.team.abbreviation,aw.team.displayName||aw.team.abbreviation,hm.team.displayName||hm.team.abbreviation,sc(aw),sc(hm),null,null,clk,state==='in'?e.status.period:null,title));
+  });
+  return out;
+}
+function fetchEspn(lg){
+  return fetch(espnUrl(lg),{cache:'no-store'}).then(function(r){if(!r.ok)throw {code:'upstream_error'};return r.json()}).then(function(j){return {lg:lg,games:espnNorm(lg,j.events)}},function(e){return {lg:lg,e:e&&e.code?e:{code:'upstream_error'}}});
+}
+var ESPN_MSG='Could not reach ESPN. Check your connection and tap Refresh again.';
+function doRefresh(silent){
+  if(S.busy)return;
+  silent=silent===true;
+  if(!silent){S.busy=true;S.msg='';S.msgKind='';render()}
+  else S.busy=true;
+  var done=function(msg,k){
+    S.busy=false;if(!silent||msg){S.msg=silent?'':msg;S.msgKind=k||''}
+    var ae=document.activeElement;
+    if(!(silent&&ae&&ae.tagName==='INPUT'))render();
+  };
+  var finish=function(out,srcName,failMsg){
+    var ok=out.filter(function(o){return o.games}),bad=out.filter(function(o){return o.e});
+    ok.forEach(function(o){S.feed[o.lg]=o.games});
+    if(ok.length){S.feedAt=Date.now();S.live=true;S.src=srcName}
+    if(!ok.length)done(failMsg||errMsg(bad[0].e),'warn');
+    else if(bad.length)done('Updated '+ok.length+' of 4 sports. '+(failMsg||errMsg(bad[0].e)),'warn');
+    else done(silent?'':'Updated all four sports.','good');
+  };
+  var cl=window.claude;
+  if(cl&&cl.use){
+    cl.use('mcp').then(function(mcp){
+      if(!mcp){done(MSG_NOCONN,'warn');return}
+      Promise.all(LG.map(function(l){
+        return mcp.callTool(FEED_SERVER,FEED_TOOL,{data_type:'scores',league:l[0]},{cache:false}).then(function(res){
+          var pl=res&&res.payload;if(typeof pl==='string'){try{pl=JSON.parse(pl)}catch(e){}}
+          if(!pl||!Array.isArray(pl.games))return {lg:l[0],e:{code:'bad_shape'}};
+          return {lg:l[0],games:normFeed(l[0],pl.games)};
+        },function(e){return {lg:l[0],e:e}});
+      })).then(function(out){finish(out,'the data feed')});
+    },function(){done(MSG_NOCONN,'warn')});
+  }else if(typeof fetch==='function'){
+    Promise.all(LG.map(function(l){return fetchEspn(l[0])})).then(function(out){finish(out,'ESPN',ESPN_MSG)});
+  }else done(MSG_NOCONN,'warn');
+}
+
+document.addEventListener('click',function(e){
+  var el=e.target.closest('[data-act]');if(!el)return;
+  var act=el.dataset.act;
+  if(act==='scrim'){if(e.target!==el)return;S.sheet=null;renderSheet();return}
+  if(act==='tab'){S.tab=el.dataset.t;render();window.scrollTo(0,0)}
+  else if(act==='sport'){S.sport=el.dataset.v;S.cat=null;render()}
+  else if(act==='refresh'){doRefresh()}
+  else if(act==='cat'){S.cat=el.dataset.v;render()}
+  else if(act==='gf'){S.gf=el.dataset.v;render()}
+  else if(act==='gprops'){S.gf=el.dataset.id;S.tab='props';S.sport='nfl';S.cat='calc';render();window.scrollTo(0,0)}
+  else if(act==='game'){S.sheet={type:'game',id:el.dataset.id};renderSheet()}
+  else if(act==='fgame'){S.sheet={type:'fgame',id:el.dataset.id};renderSheet()}
+  else if(act==='prop'){openProp(el.dataset.id)}
+  else if(act==='close'){S.sheet=null;renderSheet()}
+  else if(act==='save'){
+    var s=S.sheet,side=el.dataset.side;if(!s||!(Math.abs(s.oo)>=100)||!(Math.abs(s.uo)>=100))return;
+    var p=propById(s.id),c=calc(p,s.line,s.oo,s.uo,s.adj),ix=-1;
+    S.picks.forEach(function(x,i){if(x.pid===s.id&&x.side===side)ix=i});
+    if(ix>=0)S.picks.splice(ix,1);else S.picks.push({pid:s.id,side:side,line:s.line,odds:side==='over'?s.oo:s.uo,prob:side==='over'?c.po:c.pu});
+    save();renderNav();propOut();
+  }
+  else if(act==='rm'){S.picks.splice(+el.dataset.i,1);save();render()}
+});
+document.addEventListener('input',function(e){
+  var b=e.target.dataset&&e.target.dataset.bind;if(!b)return;
+  var v=parseFloat(e.target.value);
+  if(b==='stake'){S.stake=isFinite(v)&&v>=0?v:0;var c=1;S.picks.forEach(function(x){c*=dec(x.odds)});$('#payout').textContent='$'+(S.stake*c).toFixed(2);return}
+  var s=S.sheet;if(!s||s.type!=='prop')return;
+  if(b==='pl')s.line=v;else if(b==='po')s.oo=v;else if(b==='pu')s.uo=v;
+  else if(b==='pa'){s.adj=isFinite(v)?v:0;$('#pav').textContent=(s.adj>0?'+':'')+s.adj+'%'}
+  propOut();
+});
+document.addEventListener('keydown',function(e){if(e.key==='Escape'&&S.sheet){S.sheet=null;renderSheet()}});
+render();
+setTimeout(function(){doRefresh(true)},600);
+if(!(window.claude&&window.claude.use)){setInterval(function(){if(document.visibilityState==='visible')doRefresh(true)},30000);document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')doRefresh(true)})}
+})();
+</script>
+
+<script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){})})}</script>
+</body>
+</html>
