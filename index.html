@@ -694,12 +694,12 @@ function vProps(){
 }
 function vPicks(){
   var ps=S.picks;
-  if(!ps.length)return '<h2>My picks</h2><div class="card empty">No picks yet. Open a player in Props, enter your line and odds, then save the side you like.</div>'+foot();
+  if(!ps.length)return '<h2>My picks</h2><div class="card empty">No picks yet. Open a player in Props, enter your line and odds, then save the side you like.</div>'+trackHtml()+foot();
   var comb=1,prob=1;
   ps.forEach(function(x){comb*=dec(x.odds);prob*=x.prob});
   return '<h2>My picks</h2><div class="list">'+ps.map(function(x,i){var p=propById(x.pid);
     return '<div class="picked"><span><span class="pr-name">'+esc(p.name)+'</span><span class="pr-sub">'+x.side.toUpperCase()+' '+x.line+' '+p.stat+' · '+fo(x.odds)+' · '+p.gm.a+' @ '+p.gm.h+'</span></span><span class="pr-r"><b>'+pc(x.prob)+'%</b><span>model</span></span><button class="rm" data-act="rm" data-i="'+i+'" aria-label="Remove pick">×</button></div>';}).join('')+'</div>'+
-  '<div class="slip"><div class="r"><span>Legs</span><b>'+ps.length+'</b></div><div class="r"><span>Chance all legs hit (model, independent)</span><b>'+(prob*100).toFixed(1)+'%</b></div><div class="r"><span>Break-even chance at combined odds</span><b>'+(100/comb).toFixed(1)+'%</b></div>'+
+  trackHtml()+'<div class="slip"><div class="r"><span>Legs</span><b>'+ps.length+'</b></div><div class="r"><span>Chance all legs hit (model, independent)</span><b>'+(prob*100).toFixed(1)+'%</b></div><div class="r"><span>Break-even chance at combined odds</span><b>'+(100/comb).toFixed(1)+'%</b></div>'+
   '<div class="r"><label for="stake">Stake ($)</label><input id="stake" type="number" min="0" step="1" value="'+S.stake+'" data-bind="stake"></div><div class="r"><span>Payout if every leg hits</span><b id="payout">$'+(S.stake*comb).toFixed(2)+'</b></div></div>'+
   '<p class="note" style="margin-top:12px">Legs from the same game are usually correlated, so the independent estimate can be off. A parlay needs every leg to win.</p>'+foot();
 }
@@ -707,7 +707,7 @@ function vAbout(){
   return '<h2>About the data</h2><p class="lede">Scores, schedules and win probabilities refresh from a sports data feed. NFL Week '+DATA.week+' research (lines, injuries, matchups, player stats) was gathered '+esc(DATA.asOf)+'.</p>'+
   '<h3>Refreshing</h3><ul class="pts"><li>Scores refresh when you open the page and when you tap <b>Refresh scores</b>. The installed phone app also refreshes every 30 seconds while open, using ESPN’s public scoreboard.</li><li>If your view cannot reach the feed, the button says so. Ask Claude to “refresh Hitboard” and it will re-research lines, injuries and stats and update the page.</li><li>Lines, injuries and player stats do not come from the feed, so they only change when Claude updates the page.</li></ul>'+
   '<h3>What is real</h3><ul class="pts"><li>Schedules, scores and win probabilities from the data feed.</li><li>NFL spreads, totals and moneylines, each labeled with source and date. Older listings are marked, and where two sources differ both are shown.</li><li>Kalshi and Polymarket US prices (normalized so each pair sums to 100%).</li><li>An NBA and college football breakdown on each upcoming game in the Games tab: prediction, strengths and weaknesses, player hit rates, straight bets and uncertainty, from last season’s NBA scoring and this season’s college scoring. Tap Details on an upcoming game.</li><li>A matchup deep dive for every NFL game this week: records, scoring, pass and run offense and defense, pressure and takeaways with league ranks from Pro Football Reference. Three games (NE-CHI, DEN-ARI, GB-DET) have hand-written angles. The others have angles generated from the stat ranks.</li></ul>'+
-  '<h3>What is modeled</h3><ul class="pts"><li><b>Prop probability.</b> Normal curve centered on the player’s per-game average, with spread set by stat type (passing 22%, rushing 55%, receiving yards 60%, receptions 40% of the mean, widened 30% for samples under 3 games). The matchup slider shifts the average.</li><li><b>Edge.</b> Model probability minus the price’s implied probability with the sportsbook margin removed.</li></ul>'+
+  '<h3>Model checks</h3><ul class="pts"><li><b>Backtest.</b> I tested the approach on 4,129 regular-season NFL games from 1996 to 2017 (the betting dataset in the open-source slieb74/NFL-Betting-Data repo), predicting each game only from earlier games that season.</li><li><b>Market beats the model.</b> The closing total was off by 10.69 points on average, a stats-only model by 10.96. Its over/under picks hit 50%. So totals now lean 90% on the market line, and chances are held near 50%.</li><li><b>Margin.</b> Blending 30% stats model with 70% market line cut the average spread error slightly (10.52 versus 10.56), so that is the weight used.</li><li><b>Wind is the one rule that held.</b> Outdoor games with sustained wind of 15 to 19 mph went under 54% of the time and 20 mph or more 60%, so totals are trimmed 0.9 and 2.3 points. Cold and rain showed no edge, so they are ignored.</li><li><b>Machine learning.</b> Ridge regression and gradient boosting on team stats, line, weather and week did not beat the line when tested the honest way (train on past seasons, test on the next), hitting 48 to 49%. They are not used.</li><li><b>Shrinkage.</b> Early-season points per game are pulled toward the league average, and player averages toward their position’s average, because five games is a small sample.</li></ul><h3>What is modeled</h3><ul class="pts"><li><b>Prop probability.</b> Normal curve centered on the player’s per-game average, with spread set by stat type (passing 22%, rushing 55%, receiving yards 60%, receptions 40% of the mean, widened 30% for samples under 3 games). The matchup slider shifts the average.</li><li><b>Edge.</b> Model probability minus the price’s implied probability with the sportsbook margin removed.</li></ul>'+
   '<h3>What is missing</h3><ul class="pts"><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
@@ -733,15 +733,22 @@ var MET={
 function mv(k,m){return MET[m].f(TS[k])}
 function mrank(k,m){var v=mv(k,m),c=0;Object.keys(TS).forEach(function(x){var w=mv(x,m);if(MET[m].hi?w>v:w<v)c++});return c+1}
 function ordn(n){var s=['th','st','nd','rd'],v=n%100;return n+(s[(v-20)%10]||s[v]||s[0])}
+/* ---------- calibration and shrinkage (from backtest on 4,129 past games) ---------- */
+function lgPpg(){var v=Object.keys(TS).map(function(k){return mv(k,'ppg')});return v.reduce(function(a,b){return a+b},0)/v.length}
+function sv(k,m){var v=mv(k,m);if(m!=='ppg'&&m!=='papg')return v;return (v*TS[k].G+3*lgPpg())/(TS[k].G+3)}
+function calibCover(p){return Math.min(.55,.5+.25*(p-.5))}
+function calibTotal(p,under,w){var q=Math.min(.53,.5+.2*(p-.5));if(under&&w&&w.pu)q=Math.max(q,w.pu);return q}
+function kelly(p){var b=100/110,f=(p*b-(1-p))/b;return f<=0?'no edge':(f/4*100).toFixed(1)+'% of bankroll'}
 var PHI_SD={m:13.5,t:10.5};
 function model(g){
   var a=g.a,h=g.h;
   if(!TS[a]||!TS[h])return null;
-  var sa=(mv(a,'ppg')+mv(h,'papg'))/2-1.25,sh=(mv(h,'ppg')+mv(a,'papg'))/2+1.25;
+  var sa=(sv(a,'ppg')+sv(h,'papg'))/2-1.25,sh=(sv(h,'ppg')+sv(a,'papg'))/2+1.25;
   var mk_h=g.fav==='h'?g.fs:g.ds,mk_a=g.fav==='h'?g.ds:g.fs;
-  var W=0.4,fgw=feedFor(g),wadj=wxAdj(g.h,fgw&&fgw.start).adj;
-  var ba=W*sa+(1-W)*mk_a,bh=W*sh+(1-W)*mk_h;
-  return {sa:sa,sh:sh,ma:mk_a,mh:mk_h,ba:ba,bh:bh,margin:bh-ba,total:ba+bh+wadj,wadj:wadj,mmargin:mk_h-mk_a,mtotal:mk_a+mk_h,smargin:sh-sa,stotal:sa+sh};
+  var fgw=feedFor(g),wa=wxAdj(h,fgw&&fgw.start),wadj=wa.adj;
+  // backtest: stats model adds value on the margin (about 30% weight) but not on the total (about 10%)
+  var margin=0.3*(sh-sa)+0.7*(mk_h-mk_a),total=0.1*(sa+sh)+0.9*(mk_a+mk_h)+wadj;
+  return {sa:sa,sh:sh,ma:mk_a,mh:mk_h,ba:(total-margin)/2,bh:(total+margin)/2,margin:margin,total:total,wadj:wadj,wa:wa,mmargin:mk_h-mk_a,mtotal:mk_a+mk_h,smargin:sh-sa,stotal:sa+sh};
 }
 function confOf(d){d=Math.abs(d);return d>=3?'high':d>=1.5?'medium':'low'}
 function straightBets(g,m){
@@ -752,14 +759,14 @@ function straightBets(g,m){
   var side=edge>=0?g.h:g.a;
   var line=edge>=0?(m.mmargin>=0?'-'+Math.abs(m.mmargin).toFixed(1):'+'+Math.abs(m.mmargin).toFixed(1)):(m.mmargin>=0?'+'+Math.abs(m.mmargin).toFixed(1):'-'+Math.abs(m.mmargin).toFixed(1));
   var z=(Math.abs(m.margin-m.mmargin))/PHI_SD.m;
-  var p=Phi(z);
-  out.push({mk:'Spread',pick:side+' '+line,p:p,conf:confOf(edge),why:'Blended margin is '+g.h+' by '+m.margin.toFixed(1)+' versus the market '+g.h+' by '+m.mmargin.toFixed(1)+'.'});
+  var p=calibCover(Phi(z));
+  out.push({t:'sp',side:edge>=0?'h':'a',num:parseFloat(line),mk:'Spread',pick:side+' '+line,p:p,conf:confOf(edge),why:'Blended margin is '+g.h+' by '+m.margin.toFixed(1)+' versus the market '+g.h+' by '+m.mmargin.toFixed(1)+'.'});
   var te=m.total-m.mtotal,ov=te>=0;
-  out.push({mk:'Total',pick:(ov?'Over ':'Under ')+g.total,p:Phi(Math.abs(te)/PHI_SD.t),conf:confOf(te),why:'Blended total is '+m.total.toFixed(1)+' versus the listed '+g.total+'. The stats-only model says '+m.stotal.toFixed(1)+'.'});
+  out.push({t:'tot',over:ov,num:g.total,mk:'Total',pick:(ov?'Over ':'Under ')+g.total,p:calibTotal(Phi(Math.abs(te)/PHI_SD.t),!ov,m.wa),conf:m.wa&&m.wa.pu&&!ov?'medium':'low',why:'Blended total is '+m.total.toFixed(1)+' versus the listed '+g.total+'. The stats-only model says '+m.stotal.toFixed(1)+'.'+(m.wadj<0?' Wind adjustment '+m.wadj.toFixed(1)+' points.':'')+' Past totals were hard to beat, so the chance is held near 50%.'});
   var wp=Phi(m.margin/PHI_SD.m);
   var ws=wp>=0.5?g.h:g.a,wpp=wp>=0.5?wp:1-wp;
   var mkp=g.bkA!=null?(wp>=0.5?1-g.bkA:g.bkA):(wp>=0.5?1-g.mkA:g.mkA);
-  out.push({mk:'Moneyline',pick:ws+' to win',p:wpp,conf:wpp>=0.7?'high':wpp>=0.6?'medium':'low',why:'Blended win chance '+pc(wpp)+'%. '+(g.bkA!=null?'Sportsbook price (margin removed)':'Prediction-market price')+' implies '+pc(wp>=0.5?(g.bkA!=null?1-g.bkA:1-g.mkA):(g.bkA!=null?g.bkA:g.mkA))+'% for '+g.h+'.'});
+  out.push({t:'ml',side:wp>=0.5?'h':'a',mk:'Moneyline',pick:ws+' to win',p:wpp,conf:wpp>=0.7?'high':wpp>=0.6?'medium':'low',why:'Blended win chance '+pc(wpp)+'%. '+(g.bkA!=null?'Sportsbook price (margin removed)':'Prediction-market price')+' implies '+pc(wp>=0.5?(g.bkA!=null?1-g.bkA:1-g.mkA):(g.bkA!=null?g.bkA:g.mkA))+'% for '+g.h+'.'});
   return out;
 }
 var ROOF={MIN:'Dome',DET:'Dome',LV:'Dome',HOU:'Retractable roof, usually closed',ATL:'Retractable roof, usually closed',ARI:'Retractable roof, usually closed'};
@@ -774,7 +781,7 @@ function analystSections(g){
   h+='<h3>Prediction</h3>';
   var win=m.margin>=0?g.h:g.a,mg=Math.abs(m.margin);
   h+='<div class="card bcard"><div class="teams">'+win+' by '+mg.toFixed(1)+'</div><div class="facts"><span>'+g.a+' <b>'+m.ba.toFixed(1)+'</b></span><span>'+g.h+' <b>'+m.bh.toFixed(1)+'</b></span><span>Total <b>'+m.total.toFixed(1)+'</b></span></div>'+
-   '<p class="src" style="margin-top:8px">Stats-only model: '+g.a+' '+m.sa.toFixed(1)+', '+g.h+' '+m.sh.toFixed(1)+' (each team’s scoring blended with the other’s points allowed, home edge 1.25). Market-implied: '+g.a+' '+m.ma.toFixed(1)+', '+g.h+' '+m.mh.toFixed(1)+'. The prediction weights the stats model 40% and the market 60% because five games is a small sample.</p></div>';
+   '<p class="src" style="margin-top:8px">Stats-only model: '+g.a+' '+m.sa.toFixed(1)+', '+g.h+' '+m.sh.toFixed(1)+' (each team’s scoring blended with the other’s points allowed, home edge 1.25). Market-implied: '+g.a+' '+m.ma.toFixed(1)+', '+g.h+' '+m.mh.toFixed(1)+'. The margin weights the stats model 30% and the market 70%, and the total weights the model 10% and the market 90%. A backtest on 4,129 past games found the market total beats a stats-only model, while the model helps a little on the margin.</p></div>';
   h+='<h3>Strengths and weaknesses</h3><div class="tblwrap"><table><thead><tr><th></th><th>'+g.a+'</th><th>'+g.h+'</th></tr></thead><tbody>';
   var A=swList(g.a),H=swList(g.h);
   var f=function(r){return MET[r.m].n+' '+ordn(r.r)+' ('+MET[r.m].fm(r.v)+')'};
@@ -796,7 +803,7 @@ function analystSections(g){
      '<p class="src">Prop lines are not readable from DraftKings. Tap a player below, enter your book’s line, and the calculator gives the hit probability. The opponent column is the whole team’s yards allowed, not allowed to that position.</p>';
   }
   var bets=straightBets(g,m);
-  h+='<h3>Best straight bets</h3><div class="list">'+bets.map(function(b){return '<div class="card bcard"><div class="label">'+b.mk+' · confidence '+b.conf+'</div><div class="teams">'+esc(b.pick)+'</div><div class="facts"><span>Est. chance <b>'+pc(b.p)+'%</b></span><span>Fair odds <b>'+fairOdds(b.p)+'</b></span><span>Break-even at -110 <b>52.4%</b></span></div><p class="src" style="margin-top:6px">'+esc(b.why)+'</p></div>'}).join('')+'</div><p class="src">Estimated chances come from the blended prediction with a typical NFL swing of ±13.5 points on margin and ±10.5 on totals. Odds are not read from a sportsbook, so compare the chance with the price you see.</p>';
+  h+='<h3>Best straight bets</h3><div class="list">'+bets.map(function(b){return '<div class="card bcard"><div class="label">'+b.mk+' · confidence '+b.conf+'</div><div class="teams">'+esc(b.pick)+'</div><div class="facts"><span>Est. chance <b>'+pc(b.p)+'%</b></span><span>Fair odds <b>'+fairOdds(b.p)+'</b></span><span>Break-even at -110 <b>52.4%</b></span>'+(b.mk!=='Moneyline'?'<span>Stake at -110 <b>'+kelly(b.p)+'</b></span>':'')+'</div><p class="src" style="margin-top:6px">'+esc(b.why)+'</p></div>'}).join('')+'</div><p class="src">Estimated chances come from the blended prediction with a typical NFL swing of ±13.5 points on margin and ±10.5 on totals. Odds are not read from a sportsbook, so compare the chance with the price you see.</p>';
   h+='<h3>Line movement</h3><p class="note" style="margin-top:0">Current: '+esc(g.favT)+' -'+g.pts+', total '+g.total+' ('+esc(g.src)+'). '+(g.alt?esc(g.alt):'No earlier line was captured for this game.')+' Public betting percentages and sharp-money indicators are not available from free sources.</p>';
   var vol=[];
   if(!g.fresh)vol.push('The listed line is from Oct 13 and may have moved.');
@@ -919,18 +926,17 @@ function wxFor(k,start){
   var H=c.d,i=-1,best=1e18;
   for(var q=0;q<H.time.length;q++){var d=Math.abs(Date.parse(H.time[q]+':00Z')-start);if(d<best){best=d;i=q}}
   if(i<0||best>2*3600000)return null;
-  var w=0,g=0,pp=0,pr=0;
-  for(var z=i;z<=Math.min(i+3,H.time.length-1);z++){w=Math.max(w,H.wind_speed_10m[z]||0);g=Math.max(g,H.wind_gusts_10m[z]||0);pp=Math.max(pp,H.precipitation_probability[z]||0);pr+=H.precipitation[z]||0}
-  return {t:H.temperature_2m[i],wind:w,gust:g,pp:pp,pr:pr,sky:wcode(H.weather_code[i])};
+  var w=0,g=0,pp=0,pr=0,wsum=0,wn=0;
+  for(var z=i;z<=Math.min(i+3,H.time.length-1);z++){wsum+=H.wind_speed_10m[z]||0;wn++;w=Math.max(w,H.wind_speed_10m[z]||0);g=Math.max(g,H.wind_gusts_10m[z]||0);pp=Math.max(pp,H.precipitation_probability[z]||0);pr+=H.precipitation[z]||0}
+  return {t:H.temperature_2m[i],wind:w,wavg:wsum/Math.max(1,wn),gust:g,pp:pp,pr:pr,sky:wcode(H.weather_code[i])};
 }
 function wxAdj(k,start){
-  var st=STAD[k];if(!st||st[2]!=='open')return {adj:0,n:[]};
-  var w=wxFor(k,start);if(!w||w==='load')return {adj:0,n:[]};
-  var adj=0,n=[],eff=Math.max(w.wind,w.gust*0.7);
-  if(eff>10){var a=Math.min(3,(eff-10)*0.15);adj-=a;n.push('wind '+(-a).toFixed(1))}
-  if(w.pp>=60&&w.pr>=0.05){adj-=1.5;n.push('rain -1.5')}
-  if(w.t<=25){adj-=1;n.push('cold -1.0')}
-  return {adj:adj,n:n};
+  var st=STAD[k];if(!st||st[2]!=='open')return {adj:0,n:[],pu:0};
+  var w=wxFor(k,start);if(!w||w==='load')return {adj:0,n:[],pu:0};
+  // backtest on 4,129 past games: outdoor wind 15-19 mph went under 54% (-0.9 pts vs the line), 20+ mph 60% (-2.3 pts); cold and rain showed no usable edge
+  if(w.wavg>=20)return {adj:-2.3,n:['wind '+Math.round(w.wavg)+' mph -2.3'],pu:.57};
+  if(w.wavg>=15)return {adj:-0.9,n:['wind '+Math.round(w.wavg)+' mph -0.9'],pu:.54};
+  return {adj:0,n:[],pu:0};
 }
 function wxLi(k,start){
   var st=STAD[k];if(!st)return 'Stadium not in the venue list, so no forecast.';
@@ -944,7 +950,7 @@ function wxLi(k,start){
   var w=wxFor(k,start);
   if(!w)return pre+(c&&c.st==='ok'?'Kickoff is outside the 16-day forecast window.':'The forecast could not be loaded. Check wind and precipitation near kickoff.');
   var a=wxAdj(k,start);
-  return pre+'Forecast for kickoff (Open-Meteo): <b>'+Math.round(w.t)+'°F, '+w.sky+'</b>, wind '+Math.round(w.wind)+' mph gusting '+Math.round(w.gust)+', '+Math.round(w.pp)+'% chance of precipitation. '+(a.adj<0?'The model trims the game total by '+(-a.adj).toFixed(1)+' points ('+a.n.join(', ')+').':'No total adjustment, conditions are mild.');
+  return pre+'Forecast for kickoff (Open-Meteo): <b>'+Math.round(w.t)+'°F, '+w.sky+'</b>, wind '+Math.round(w.wind)+' mph gusting '+Math.round(w.gust)+', '+Math.round(w.pp)+'% chance of precipitation. '+(a.adj<0?'The model trims the game total by '+(-a.adj).toFixed(1)+' points ('+a.n.join(', ')+'), because past games with that much wind went under the total more often than not.':'No total adjustment. Past games showed an edge only when sustained wind reached 15 mph or more, and cold or rain showed none.');
 }
 
 /* ---------- availability: ESPN rosters and injury reports ---------- */
@@ -1034,6 +1040,7 @@ var DEEP=[];
   DEEPSRC.rush.split(';').forEach(function(l){var p=l.split('|');DEEP.push({n:p[0],t:tm(p[1]),pos:p[2],g:+p[3],kind:'rush',stat:'Rush Yds',avg:+p[5]/+p[3],note:p[4]+' carries, '+p[6]+' TD'})});
   DEEPSRC.pass.split(';').forEach(function(l){var p=l.split('|');DEEP.push({n:p[0],t:tm(p[1]),pos:'QB',g:+p[2],kind:'pass',stat:'Pass Yds',avg:+p[5]/+p[2],note:p[3]+'/'+p[4]+', '+p[6]+' TD, '+p[7]+' INT'})});
 })();
+(function(){var sum={},n={};DEEP.forEach(function(d){if(d.g<3)return;var k=d.kind+'|'+d.pos;sum[k]=(sum[k]||0)+d.avg;n[k]=(n[k]||0)+1});DEEP.forEach(function(d){var k=d.kind+'|'+d.pos,pr=n[k]?sum[k]/n[k]:d.avg;d.avgS=(d.g*d.avg+3*pr)/(d.g+3)})})();
 S.dk='rec';S.dgm='All';S.dmore=false;
 function covLabel(m){return m>=25?'man-heavy':m<=14?'zone-heavy':'balanced'}
 function covTxt(k){var c=COV[k];return c?'man '+Math.round(c[0])+'% / zone '+Math.round(c[1])+'% ('+covLabel(c[0])+')':''}
@@ -1055,9 +1062,9 @@ function deepRows(){
     var nx=nextOpp(nt(d.t));if(!nx||!TS[nx.opp])return;
     if(S.dgm!=='All'&&nx.key!==S.dgm)return;
     var dm=d.kind==='rush'?'drush':'dpass',f=mv(nx.opp,dm)/lavg[dm],pct=Math.max(-12,Math.min(12,(f-1)*50));
-    var p={avg:d.avg,kind:d.kind,g:d.g},mid=roundHalf(d.avg),lo=roundHalf(d.avg*.75),hi=roundHalf(d.avg*1.25);
+    var p={avg:d.avgS,kind:d.kind,g:d.g},mid=roundHalf(d.avgS),lo=roundHalf(d.avgS*.75),hi=roundHalf(d.avgS*1.25);
     var P=function(l){return calc(p,l,-110,-110,pct).po};
-    out.push({d:d,nx:nx,pct:pct,proj:d.avg*(1+pct/100),rk:mrank(nx.opp,dm),allow:mv(nx.opp,dm),marks:[[lo,P(lo)],[mid,P(mid)],[hi,P(hi)]]});
+    out.push({d:d,nx:nx,pct:pct,proj:d.avgS*(1+pct/100),rk:mrank(nx.opp,dm),allow:mv(nx.opp,dm),marks:[[lo,P(lo)],[mid,P(mid)],[hi,P(hi)]]});
   });
   out.sort(function(a,b){return b.proj-a.proj});
   return out;
@@ -1078,12 +1085,63 @@ function nflDeep(){
       '<td>'+r.proj.toFixed(1)+'<br><span class="src">avg '+d.avg.toFixed(1)+'</span></td><td>'+r.marks.map(function(m){return '<span class="hrpill '+(m[1]>=.7?'hi':m[1]<.4?'lo':'mid')+'" style="display:inline-block;margin:0 0 3px 0">'+m[0].toFixed(1)+'+ · '+Math.round(m[1]*100)+'%</span>'}).join('<br>')+'</td></tr>';
   }).join('')+'</tbody></table></div>';
   if(rows.length>cap)h+='<div class="actions"><button class="btn" data-act="dmore">Show all '+rows.length+' players</button></div>';
-  h+='<p class="note" style="margin-top:12px">Chances use the player’s 2026 per-game average, shifted up to 12% by how the opponent’s pass or run defense ranks, with the same normal-curve spread as the calculator. They are not sportsbook lines, so compare each mark with your book. '+esc(COV_SRC)+' Man-versus-zone splits for individual players are behind paywalls (PFF, Fantasy Points), so the chances above are not split by coverage; use the man and zone rates to judge which receivers the scheme helps. Stats: '+esc(DEEPSRC.asOf)+'.</p>';
+  h+='<p class="note" style="margin-top:12px">Chances use the player’s 2026 per-game average, pulled toward the average for his position group (a few games is a noisy sample) and shifted up to 12% by how the opponent’s pass or run defense ranks, with the same normal-curve spread as the calculator. They are not sportsbook lines, so compare each mark with your book. '+esc(COV_SRC)+' Man-versus-zone splits for individual players are behind paywalls (PFF, Fantasy Points), so the chances above are not split by coverage; use the man and zone rates to judge which receivers the scheme helps. Stats: '+esc(DEEPSRC.asOf)+'.</p>';
   return h;
 }
 function covHtml(a,h){
   var line=function(k){var c=COV[k];return c?'<li><b>'+k+' defense:</b> '+covTxt(k)+'.</li>':''};
   return '<h3>Coverage tendencies</h3><ul class="pts">'+line(a)+line(h)+'</ul><p class="src">'+esc(COV_SRC)+' Man-heavy defenses reward receivers who win one-on-one and get open fast; zone-heavy ones reward route-savvy players, tight ends and backs working the soft spots.</p>';
+}
+
+/* ---------- track record: picks are logged before kickoff and graded on the final score ---------- */
+S.log=[];
+try{var rl=localStorage.getItem('hitboard.log.v1');if(rl){var al=JSON.parse(rl);if(Array.isArray(al))S.log=al}}catch(e){}
+function saveLog(){try{localStorage.setItem('hitboard.log.v1',JSON.stringify(S.log.slice(-600)))}catch(e){}}
+function picksFor(g){
+  try{
+    if(g.lg==='nfl'){var r=research(g);if(r){var m=model(r);return m?straightBets(r,m):null}}
+    if(g.lg==='ncaamb')return null;
+    var fc=feedCalc(g);return fc?fc.bets:null;
+  }catch(e){return null}
+}
+function trackPicks(){
+  var changed=false,now=Date.now(),have={};
+  S.log.forEach(function(x){have[x.k]=1});
+  ['nfl','nba','ncaafb'].forEach(function(lg){(S.feed[lg]||[]).forEach(function(g){
+    if(kind(g)==='up'&&g.start>now){
+      var b=picksFor(g);if(!b)return;
+      b.forEach(function(x){
+        if(!x.t)return;var k=g.id+'|'+x.t;if(have[k])return;
+        S.log.push({k:k,gid:g.id,lg:lg,t:x.t,side:x.side||null,over:x.over==null?null:x.over,num:x.num==null?null:x.num,p:x.p,pick:x.pick,game:g.a+' @ '+g.h,at:now,res:null});changed=true;
+      });
+    }
+    if(kind(g)==='final'&&g.sa!=null){
+      S.log.forEach(function(x){
+        if(x.gid!==g.id||x.res)return;
+        var r=null,mh=g.sh-g.sa;
+        if(x.t==='ml'){r=mh===0?'P':((x.side==='h')===(mh>0)?'W':'L')}
+        else if(x.t==='sp'){var tm=x.side==='h'?mh:-mh,v=tm+x.num;r=v===0?'P':v>0?'W':'L'}
+        else if(x.t==='tot'){var tot=g.sa+g.sh;r=tot===x.num?'P':((tot>x.num)===x.over?'W':'L')}
+        if(r){x.res=r;x.score=g.a+' '+g.sa+', '+g.h+' '+g.sh;changed=true}
+      });
+    }
+  })});
+  if(changed)saveLog();
+}
+function trackHtml(){
+  var T={ml:'Moneyline',sp:'Spread',tot:'Total'},h='<h3>Model track record</h3>';
+  var done=S.log.filter(function(x){return x.res}),open=S.log.filter(function(x){return !x.res});
+  if(!S.log.length)return h+'<p class="note" style="margin-top:0">Every pick the model shows for an upcoming game is saved on this device before kickoff, then graded on the final score. Nothing is logged yet. Open the app while games are still upcoming.</p>';
+  var rows=Object.keys(T).map(function(t){
+    var d=done.filter(function(x){return x.t===t}),w=d.filter(function(x){return x.res==='W'}).length,l=d.filter(function(x){return x.res==='L'}).length,p=d.length-w-l;
+    var u=t==='ml'?null:(w*100/110-l);
+    return '<tr><td>'+T[t]+'</td><td>'+w+'-'+l+(p?'-'+p:'')+'</td><td>'+((w+l)?Math.round(100*w/(w+l))+'%':'—')+'</td><td>'+(u==null?'no price':(u>=0?'+':'')+u.toFixed(1)+' u')+'</td></tr>';
+  }).join('');
+  h+='<div class="tblwrap"><table><thead><tr><th>Bet type</th><th>W-L-P</th><th>Hit rate</th><th>Flat 1u at -110</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+  h+='<p class="src">'+done.length+' graded, '+open.length+' waiting on games. Picks are logged once, before kickoff, and never edited. A spread or total needs about 52.4% to break even at -110, and a small record says little, so judge it after many games.</p>';
+  var recent=done.slice(-8).reverse();
+  if(recent.length)h+='<ul class="pts">'+recent.map(function(x){return '<li><b>'+x.res+'</b> · '+esc(x.game)+' · '+esc(x.pick)+(x.score?' · '+esc(x.score):'')+'</li>'}).join('')+'</ul>';
+  return h;
 }
 
 /* ---------- NBA and college football breakdowns ---------- */
@@ -1110,7 +1168,7 @@ function cfbRank(key,stat,v){var c=0;Object.keys(CFB).forEach(function(k){var x=
 function nbaRank(stat,v){var c=0;Object.keys(NBAT).forEach(function(k){var t=NBAT[k];var x=stat==='PF'?t.PF:stat==='PA'?t.PA:t.PF-t.PA;if(stat==='PA'?x<v:x>v)c++});return c+1}
 function feedTeams(g){
   if(g.lg==='nfl'){var na=nt(g.a),nh=nt(g.h);if(!TS[na]||!TS[nh])return {sp:'nfl',missing:[!TS[na]?g.an:null,!TS[nh]?g.hn:null].filter(Boolean)};
-    return {sp:'nfl',A:{n:g.an,pf:mv(na,'ppg'),pa:mv(na,'papg'),rec:TS[na].rec,k:na},H:{n:g.hn,pf:mv(nh,'ppg'),pa:mv(nh,'papg'),rec:TS[nh].rec,k:nh},he:2.5,sdM:13.5,sdT:10.5}}
+    return {sp:'nfl',A:{n:g.an,pf:sv(na,'ppg'),pa:sv(na,'papg'),rec:TS[na].rec,k:na},H:{n:g.hn,pf:sv(nh,'ppg'),pa:sv(nh,'papg'),rec:TS[nh].rec,k:nh},he:2.5,sdM:13.5,sdT:10.5}}
   if(g.lg==='nba'){var A=NBAT[g.a],H=NBAT[g.h];if(!A||!H)return null;return {sp:'nba',A:{n:g.an,pf:A.PF,pa:A.PA,rec:A.W+'-'+A.L,k:g.a},H:{n:g.hn,pf:H.PF,pa:H.PA,rec:H.W+'-'+H.L,k:g.h},he:2.5,sdM:12,sdT:18}}
   if(g.lg==='ncaafb'){var a=cfbFind(g.an),h=cfbFind(g.hn);if(!a||!h||a.def==null||h.def==null)return {sp:'ncaafb',missing:[!a||a.def==null?g.an:null,!h||h.def==null?g.hn:null].filter(Boolean)};
     return {sp:'ncaafb',A:{n:g.an,pf:a.off,pa:a.def,rec:'',k:g.a,o:a},H:{n:g.hn,pf:h.off,pa:h.def,rec:'',k:g.h,o:h},he:3,sdM:17,sdT:14}}
@@ -1128,24 +1186,24 @@ function feedCalc(g){
   var A=T.A,H=T.H;
   var sa=(A.pf+H.pa)/2-T.he/2,sh=(H.pf+A.pa)/2+T.he/2;
   var stP=Phi((sh-sa)/T.sdM),fp=(g.pa!=null&&g.ph!=null)?g.ph/(g.pa+g.ph):null;
-  var p=fp!=null?0.4*stP+0.6*fp:stP,ln=null;
+  var p=fp!=null?0.3*stP+0.7*fp:stP,ln=null;
   if(g.lg==='nba')ln=DATA.nbaLines.games.filter(function(x){return x.a===g.a&&x.h===g.h})[0]||null;
-  var mkM=ln?(ln.fav==='h'?ln.pts:-ln.pts):null,total=sa+sh;if(ln)total=0.4*total+0.6*ln.tt;if(g.lg==='nfl')total+=wxAdj(T.H.k,g.start).adj;
-  var margin=mkM!=null?(0.4*(sh-sa)+0.6*mkM):T.sdM*invPhi(p);
+  var wxa=g.lg==='nfl'?wxAdj(T.H.k,g.start):{adj:0,pu:0},mkM=ln?(ln.fav==='h'?ln.pts:-ln.pts):null,total=sa+sh;if(ln)total=0.1*total+0.9*ln.tt;total+=wxa.adj;
+  var margin=mkM!=null?(0.3*(sh-sa)+0.7*mkM):T.sdM*invPhi(p);
   if(mkM!=null)p=Phi(margin/T.sdM);
   var bets=[],ws=p>=.5?g.h:g.a,wpp=p>=.5?p:1-p;
-  bets.push({mk:'Moneyline',pick:ws+' to win',p:wpp,conf:wpp>=.7?'high':wpp>=.6?'medium':'low',why:'Blended win chance '+pc(wpp)+'%'+(fp!=null?'; the feed alone says '+pc(p>=.5?fp:1-fp)+'%.':'. No feed win probability, so this is team stats only.')});
+  bets.push({t:'ml',side:p>=.5?'h':'a',mk:'Moneyline',pick:ws+' to win',p:wpp,conf:wpp>=.7?'high':wpp>=.6?'medium':'low',why:'Blended win chance '+pc(wpp)+'%'+(fp!=null?'; the feed alone says '+pc(p>=.5?fp:1-fp)+'%.':'. No feed win probability, so this is team stats only.')});
   if(ln){
     var edge=margin-mkM,side=edge>=0?g.h:g.a,mm=Math.abs(mkM);
     var lineTxt=edge>=0?(mkM>=0?'-':'+')+mm.toFixed(1):(mkM>=0?'+':'-')+mm.toFixed(1);
-    bets.push({mk:'Spread',pick:side+' '+lineTxt,p:Phi(Math.abs(edge)/T.sdM),conf:confOf(edge/(T.sdM/13.5)),why:'Blended margin '+(margin>=0?g.h:g.a)+' by '+Math.abs(margin).toFixed(1)+' versus the listed '+ln.sp+'.'});
+    bets.push({t:'sp',side:edge>=0?'h':'a',num:parseFloat(lineTxt),mk:'Spread',pick:side+' '+lineTxt,p:calibCover(Phi(Math.abs(edge)/T.sdM)),conf:confOf(edge/(T.sdM/13.5)),why:'Blended margin '+(margin>=0?g.h:g.a)+' by '+Math.abs(margin).toFixed(1)+' versus the listed '+ln.sp+'.'});
     var te=total-ln.tt;
-    bets.push({mk:'Total',pick:(te>=0?'Over ':'Under ')+ln.tt,p:Phi(Math.abs(te)/T.sdT),conf:confOf(te/(T.sdT/10.5)),why:'Blended total '+total.toFixed(1)+' versus the listed '+ln.tt+'.'});
+    bets.push({t:'tot',over:te>=0,num:ln.tt,mk:'Total',pick:(te>=0?'Over ':'Under ')+ln.tt,p:calibTotal(Phi(Math.abs(te)/T.sdT),te<0,wxa),conf:'low',why:'Blended total '+total.toFixed(1)+' versus the listed '+ln.tt+'.'});
   }else{
     var fm=Math.abs(margin),fav=margin>=0?g.h:g.a,x=Math.max(.5,Math.floor(fm-1)+.5);
-    bets.push({mk:'Spread',pick:fav+' -'+x.toFixed(1)+' or shorter',p:Phi((fm-x)/T.sdM),conf:confOf(fm-x),why:'No sportsbook spread was read. The model makes '+fav+' a '+fm.toFixed(1)+'-point favorite, so '+fav+' is a bet at -'+x.toFixed(1)+' or any shorter number. If your book lays more than that, skip it or take the other side.'});
+    bets.push({t:'sp',side:margin>=0?'h':'a',num:-x,mk:'Spread',pick:fav+' -'+x.toFixed(1)+' or shorter',p:calibCover(Phi((fm-x)/T.sdM)),conf:'low',why:'No sportsbook spread was read. The model makes '+fav+' a '+fm.toFixed(1)+'-point favorite, so '+fav+' is a bet at -'+x.toFixed(1)+' or any shorter number. If your book lays more than that, skip it or take the other side.'});
     var lt=leagueTotal(g.lg),over=lt==null?true:total>=lt,tx=Math.round((over?total-1.5:total+1.5)*2)/2;
-    bets.push({mk:'Total',pick:(over?'Over '+tx.toFixed(1)+' or lower':'Under '+tx.toFixed(1)+' or higher'),p:over?Phi((total-tx)/T.sdT):Phi((tx-total)/T.sdT),conf:confOf(total-(lt==null?total:lt)),why:'No sportsbook total was read. The model total is '+total.toFixed(1)+(lt!=null?' versus a league average game of about '+lt.toFixed(1):'')+', so the lean is '+(over?'over':'under')+'. Take it only at '+tx.toFixed(1)+' or '+(over?'lower':'higher')+'; skip it at a worse number.'});
+    bets.push({t:'tot',over:over,num:tx,mk:'Total',pick:(over?'Over '+tx.toFixed(1)+' or lower':'Under '+tx.toFixed(1)+' or higher'),p:calibTotal(over?Phi((total-tx)/T.sdT):Phi((tx-total)/T.sdT),!over,wxa),conf:'low',why:'No sportsbook total was read. The model total is '+total.toFixed(1)+(lt!=null?' versus a league average game of about '+lt.toFixed(1):'')+', so the lean is '+(over?'over':'under')+'. Take it only at '+tx.toFixed(1)+' or '+(over?'lower':'higher')+'; skip it at a worse number.'});
   }
   return {T:T,p:p,fp:fp,ln:ln,total:total,margin:margin,bets:bets};
 }
@@ -1166,17 +1224,17 @@ function feedAnalyst(g){
   var sa=(A.pf+H.pa)/2-T.he/2,sh=(H.pf+A.pa)/2+T.he/2;
   var stP=Phi((sh-sa)/T.sdM);
   var fp=(g.pa!=null&&g.ph!=null)?g.ph/(g.pa+g.ph):null;
-  var p=fp!=null?0.4*stP+0.6*fp:stP;
+  var p=fp!=null?0.3*stP+0.7*fp:stP;
   var ln=null;
   if(g.lg==='nba'){ln=DATA.nbaLines.games.filter(function(x){return x.a===g.a&&x.h===g.h})[0]||null}
   var mkM=ln?(ln.fav==='h'?ln.pts:-ln.pts):null;
-  var total=(sa+sh);if(ln)total=0.4*total+0.6*ln.tt;if(g.lg==='nfl')total+=wxAdj(T.H.k,g.start).adj;
-  var margin=mkM!=null?(0.4*(sh-sa)+0.6*mkM):T.sdM*invPhi(p);
+  var total=(sa+sh);if(ln)total=0.1*total+0.9*ln.tt;if(g.lg==='nfl')total+=wxAdj(T.H.k,g.start).adj;
+  var margin=mkM!=null?(0.3*(sh-sa)+0.7*mkM):T.sdM*invPhi(p);
   if(mkM!=null)p=Phi(margin/T.sdM);
   var ba=(total-margin)/2,bh=(total+margin)/2;
   var win=margin>=0?g.hn:g.an;
   h+='<h3>Prediction</h3><div class="card bcard"><div class="teams">'+esc(win)+' by '+Math.abs(margin).toFixed(1)+'</div><div class="facts"><span>'+esc(g.a)+' <b>'+ba.toFixed(1)+'</b></span><span>'+esc(g.h)+' <b>'+bh.toFixed(1)+'</b></span><span>Total <b>'+total.toFixed(1)+'</b></span></div>'+
-   '<p class="src" style="margin-top:8px">Stats-only model: '+esc(g.a)+' '+sa.toFixed(1)+', '+esc(g.h)+' '+sh.toFixed(1)+' ('+(g.lg==='nba'?'last season’s':'this season’s')+' scoring blended with the opponent’s points allowed, home edge '+T.he+'). '+(fp!=null?'The data feed gives '+esc(g.h)+' a '+pc(fp)+'% win chance. ':'The feed has no win probability for this game. ')+(ln?'The listed line is '+esc(ln.sp)+'. ':'')+'The prediction weights the stats model 40% and the market or feed 60%.</p></div>';
+   '<p class="src" style="margin-top:8px">Stats-only model: '+esc(g.a)+' '+sa.toFixed(1)+', '+esc(g.h)+' '+sh.toFixed(1)+' ('+(g.lg==='nba'?'last season’s':'this season’s')+' scoring blended with the opponent’s points allowed, home edge '+T.he+'). '+(fp!=null?'The data feed gives '+esc(g.h)+' a '+pc(fp)+'% win chance. ':'The feed has no win probability for this game. ')+(ln?'The listed line is '+esc(ln.sp)+'. ':'')+'The margin weights the stats model 30% and the market or feed 70%. The total uses the market line at 90% when one exists.</p></div>';
   function rowsFor(t,isNba){
     var R=[];
     if(isNba){var s=NBAT[t.k];R=[{n:'Scoring offense',r:nbaRank('PF',s.PF),v:s.PF.toFixed(1)+' pts/g'},{n:'Scoring defense',r:nbaRank('PA',s.PA),v:s.PA.toFixed(1)+' pts/g allowed'},{n:'Scoring margin',r:nbaRank('NET',s.PF-s.PA),v:((s.PF-s.PA)>=0?'+':'')+(s.PF-s.PA).toFixed(1)}]}
@@ -1208,7 +1266,7 @@ function feedAnalyst(g){
     h+='<h3>Projection table</h3><div class="tblwrap"><table><thead><tr><th>Player</th><th>Stat</th><th>Hit rate</th><th>Avg</th></tr></thead><tbody>'+rows.map(function(r){var rt=Math.round(100*r.h/r.n);return '<tr><td>'+esc(r.p)+' <span class="src">'+r.t+'</span></td><td>'+r.st+' over '+r.l+'</td><td><span class="hrpill '+hcls(r.h,r.n)+'">'+rt+'% ('+r.h+'/'+r.n+')</span></td><td>'+(r.u?r.a.toFixed(1):r.a)+'</td></tr>'}).join('')+'</tbody></table></div><p class="src">'+(g.lg==='nba'?'Last 10 games of last season.':'Last 5 games.')+' Marks are the source’s own, not sportsbook lines. Opponent-allowed averages by position are not in the sources.</p>';
   }else h+='<h3>Projection table</h3><p class="note" style="margin-top:0">No player hit-rate data for these teams in the sources.</p>';
   var bets=feedCalc(g).bets;
-  h+='<h3>Best straight bets</h3><div class="list">'+bets.map(function(b){return '<div class="card bcard"><div class="label">'+b.mk+(b.conf!=='n/a'?' · confidence '+b.conf:'')+'</div><div class="teams">'+esc(b.pick)+'</div>'+(b.p!=null?'<div class="facts"><span>Est. chance <b>'+pc(b.p)+'%</b></span><span>Fair odds <b>'+fairOdds(b.p)+'</b></span><span>Break-even at -110 <b>52.4%</b></span></div>':'')+'<p class="src" style="margin-top:6px">'+esc(b.why)+'</p></div>'}).join('')+'</div>';
+  h+='<h3>Best straight bets</h3><div class="list">'+bets.map(function(b){return '<div class="card bcard"><div class="label">'+b.mk+(b.conf!=='n/a'?' · confidence '+b.conf:'')+'</div><div class="teams">'+esc(b.pick)+'</div>'+(b.p!=null?'<div class="facts"><span>Est. chance <b>'+pc(b.p)+'%</b></span><span>Fair odds <b>'+fairOdds(b.p)+'</b></span><span>Break-even at -110 <b>52.4%</b></span>'+(b.mk!=='Moneyline'?'<span>Stake at -110 <b>'+kelly(b.p)+'</b></span>':'')+'</div>':'')+'<p class="src" style="margin-top:6px">'+esc(b.why)+'</p></div>'}).join('')+'</div>';
   h+='<h3>Line movement</h3><p class="note" style="margin-top:0">'+(ln?'Listed line: '+esc(ln.sp)+', total '+esc(ln.tot)+', moneyline '+esc(ln.ml)+'. '+esc(DATA.nbaLines.src)+' No opening-versus-current history is available.':'No sportsbook line was available for this game. Public betting percentages and sharp-money indicators are not available from free sources.')+'</p>';
   h+='<h3>Uncertainty</h3><ul class="pts"><li><b>Solid:</b> '+(g.lg==='nfl'?'team stats through five or six games and the feed’s win probability.':g.lg==='nba'?'last season’s scoring numbers and the feed’s win probability.':'this season’s scoring numbers through about six or seven games.')+'</li><li><b>Volatile:</b> '+(g.lg==='nfl'?'injuries (no verified list for this game), weather and a small sample. No sportsbook line was read for this game, so the fair spread and total above are numbers to compare with your book.':g.lg==='nba'?'rosters, trades, minutes and injuries for the new season. Last season’s teams are only a rough guide.':'schedule strength is not adjusted, injuries and weather are unknown, and one blowout moves a six-game average a lot.')+'</li><li><b>Props:</b> '+(g.lg==='nfl'?'season averages swing a lot game to game, so use them as context.':'hit rates here come from short samples ('+(g.lg==='nba'?'10':'5')+' games), so treat them as context rather than a forecast.')+'</li></ul>';
   return h;
@@ -1517,7 +1575,7 @@ function doRefresh(silent){
   var finish=function(out,srcName,failMsg){
     var ok=out.filter(function(o){return o.games}),bad=out.filter(function(o){return o.e});
     ok.forEach(function(o){S.feed[o.lg]=o.games});
-    if(ok.length)setTimeout(loadAvail,0);
+    if(ok.length){setTimeout(loadAvail,0);setTimeout(trackPicks,50)}
     if(ok.length){S.feedAt=Date.now();S.live=true;S.src=srcName;preloadWx()}
     var fm=failMsg&&bad.length&&bad[0].e&&bad[0].e.detail?failMsg+' ('+bad[0].e.detail+')':failMsg;
     if(!ok.length){if(silent&&S.live){done('', '')}else{silent=false;done(fm||errMsg(bad[0].e),'warn')}}
