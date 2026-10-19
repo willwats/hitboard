@@ -1338,8 +1338,25 @@ function espnNorm(lg,events){
   });
   return out;
 }
+var ESPN_CDN={nfl:'nfl',nba:'nba',ncaafb:'college-football',ncaamb:'mens-college-basketball'};
+function espnUrls(lg){
+  var plain=lg==='ncaafb'?'?groups=80&limit=300':lg==='ncaamb'?'?groups=50&limit=300':'?limit=100';
+  var base='https://site.api.espn.com/apis/site/v2/sports/'+ESPN[lg]+'/scoreboard';
+  var cdn='https://cdn.espn.com/core/'+ESPN_CDN[lg]+'/scoreboard?xhr=1'+(lg==='ncaafb'?'&group=80&limit=300':lg==='ncaamb'?'&group=50&limit=300':'');
+  return [espnUrl(lg),base+plain,cdn];
+}
 function fetchEspn(lg){
-  return fetch(espnUrl(lg),{cache:'no-store'}).then(function(r){if(!r.ok)throw {code:'upstream_error'};return r.json()}).then(function(j){return {lg:lg,games:espnNorm(lg,j.events)}},function(e){return {lg:lg,e:e&&e.code?e:{code:'upstream_error'}}});
+  var urls=espnUrls(lg),i=0,last='';
+  function next(){
+    if(i>=urls.length)return Promise.resolve({lg:lg,e:{code:'upstream_error',detail:last}});
+    var u=urls[i++];
+    return fetch(u).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}).then(function(j){
+      var ev=j.events||(j.content&&j.content.sbData&&j.content.sbData.events);
+      if(!ev)throw new Error('no games in reply');
+      return {lg:lg,games:espnNorm(lg,ev)};
+    }).catch(function(e){last=(e&&e.message)||'network error';return next()});
+  }
+  return next();
 }
 function preloadWx(){var seen={},ps=[];(S.feed.nfl||[]).forEach(function(g){if(kind(g)!=='up')return;var k=nt(g.h);if(seen[k])return;seen[k]=1;ps.push(loadWx(k))});Promise.all(ps).then(function(){var ae=document.activeElement;if(ps.length&&!(ae&&ae.tagName==='INPUT')&&!S.sheet)render()})}
 var ESPN_MSG='Could not reach ESPN. Check your connection and tap Refresh again.';
@@ -1357,8 +1374,9 @@ function doRefresh(silent){
     var ok=out.filter(function(o){return o.games}),bad=out.filter(function(o){return o.e});
     ok.forEach(function(o){S.feed[o.lg]=o.games});
     if(ok.length){S.feedAt=Date.now();S.live=true;S.src=srcName;preloadWx()}
-    if(!ok.length){if(silent&&S.live){done('', '')}else{silent=false;done(failMsg||errMsg(bad[0].e),'warn')}}
-    else if(bad.length)done('Updated '+ok.length+' of 4 sports. '+(failMsg||errMsg(bad[0].e)),'warn');
+    var fm=failMsg&&bad.length&&bad[0].e&&bad[0].e.detail?failMsg+' ('+bad[0].e.detail+')':failMsg;
+    if(!ok.length){if(silent&&S.live){done('', '')}else{silent=false;done(fm||errMsg(bad[0].e),'warn')}}
+    else if(bad.length)done('Updated '+ok.length+' of 4 sports. '+(fm||errMsg(bad[0].e)),'warn');
     else done(silent?'':'Updated all four sports.','good');
   };
   var cl=window.claude;
