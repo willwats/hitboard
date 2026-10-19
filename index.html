@@ -739,9 +739,9 @@ function model(g){
   if(!TS[a]||!TS[h])return null;
   var sa=(mv(a,'ppg')+mv(h,'papg'))/2-1.25,sh=(mv(h,'ppg')+mv(a,'papg'))/2+1.25;
   var mk_h=g.fav==='h'?g.fs:g.ds,mk_a=g.fav==='h'?g.ds:g.fs;
-  var W=0.4;
+  var W=0.4,fgw=feedFor(g),wadj=wxAdj(g.h,fgw&&fgw.start).adj;
   var ba=W*sa+(1-W)*mk_a,bh=W*sh+(1-W)*mk_h;
-  return {sa:sa,sh:sh,ma:mk_a,mh:mk_h,ba:ba,bh:bh,margin:bh-ba,total:ba+bh,mmargin:mk_h-mk_a,mtotal:mk_a+mk_h,smargin:sh-sa,stotal:sa+sh};
+  return {sa:sa,sh:sh,ma:mk_a,mh:mk_h,ba:ba,bh:bh,margin:bh-ba,total:ba+bh+wadj,wadj:wadj,mmargin:mk_h-mk_a,mtotal:mk_a+mk_h,smargin:sh-sa,stotal:sa+sh};
 }
 function confOf(d){d=Math.abs(d);return d>=3?'high':d>=1.5?'medium':'low'}
 function straightBets(g,m){
@@ -784,7 +784,7 @@ function analystSections(g){
   var mu=matchupText({lg:'nfl',a:g.a,h:g.h},Rm(g.a),Rm(g.h));
   if(mu)h+='<h3>Matchup edges</h3><p class="note" style="margin-top:0">Biggest mismatches: '+esc(mu)+'. A better-ranked offense against a worse-ranked defense is where points and yardage come from.</p>';
   var roof=ROOF[g.h]||'Outdoor stadium';
-  h+='<h3>Weather and pace</h3><ul class="pts"><li><b>Venue:</b> '+esc(g.venue)+'. '+roof+'.'+(ROOF[g.h]?' Weather is not a factor.':' A forecast is not reliable this far out. Check wind and precipitation within 48 hours of kickoff. Wind over 15 mph cuts passing and kicking totals.')+'</li>'+
+  h+='<h3>Weather and pace</h3><ul class="pts"><li><b>Venue:</b> '+esc(g.venue)+'. '+wxLi(g.h,(feedFor(g)||{}).start)+'</li>'+
    '<li><b>Pace:</b> '+g.a+' defenses face '+mv(g.a,'pace').toFixed(0)+' plays a game ('+ordn(mrank(g.a,'pace'))+' most), '+g.h+' face '+mv(g.h,'pace').toFixed(0)+' ('+ordn(mrank(g.h,'pace'))+'). More plays faced means more chances for volume stats and a lean toward overs.</li></ul>';
   var ps=PROPS.filter(function(p){return p.game===g.id});
   if(ps.length){
@@ -896,6 +896,55 @@ function vParlay(){
   return h+'<p class="note" style="margin-top:12px">Parlays need every leg to win. Chances here assume the legs are independent apart from the correlation notes. If injuries change a player’s role, drop the leg.</p>'+foot();
 }
 
+/* ---------- weather (Open-Meteo, no key) ---------- */
+var STAD={ARI:[33.5276,-112.2626,'retract'],ATL:[33.7554,-84.4009,'retract'],BAL:[39.278,-76.6227,'open'],BUF:[42.7738,-78.787,'open'],CAR:[35.2258,-80.8528,'open'],CHI:[41.8623,-87.6167,'open'],CIN:[39.0955,-84.5161,'open'],CLE:[41.5061,-81.6995,'open'],DAL:[32.7473,-97.0945,'retract'],DEN:[39.7439,-105.0201,'open'],DET:[42.34,-83.0456,'dome'],GB:[44.5013,-88.0622,'open'],HOU:[29.6847,-95.4107,'retract'],IND:[39.7601,-86.1639,'retract'],JAX:[30.3239,-81.6373,'open'],KC:[39.0489,-94.4839,'open'],LV:[36.0909,-115.1833,'dome'],LAC:[33.9535,-118.3392,'cover'],LAR:[33.9535,-118.3392,'cover'],MIA:[25.958,-80.2389,'open'],MIN:[44.9738,-93.2577,'dome'],NE:[42.0909,-71.2643,'open'],NO:[29.9511,-90.0812,'dome'],NYG:[40.8135,-74.0745,'open'],NYJ:[40.8135,-74.0745,'open'],PHI:[39.9008,-75.1675,'open'],PIT:[40.4468,-80.0158,'open'],SF:[37.403,-121.97,'open'],SEA:[47.5952,-122.3316,'open'],TB:[27.9759,-82.5033,'open'],TEN:[36.1665,-86.7713,'open'],WAS:[38.9076,-76.8645,'open']};
+S.wx={};
+function wcode(c){return c===0?'clear':c<=3?'partly cloudy':c<=48?'fog':c<=57?'drizzle':c<=67?'rain':c<=77?'snow':c<=82?'showers':c>=95?'thunderstorms':'mixed'}
+function loadWx(k,force){
+  var st=STAD[k];if(!st||st[2]==='dome'||st[2]==='retract'||st[2]==='cover')return Promise.resolve();
+  var c=S.wx[k],now=Date.now();
+  if(c&&c.st==='load')return Promise.resolve();
+  if(c&&now-c.t<30*60000)return Promise.resolve();
+  if(window.claude||typeof fetch!=='function'){S.wx[k]={st:'na',t:now};return Promise.resolve()}
+  S.wx[k]={st:'load',t:now};
+  var url='https://api.open-meteo.com/v1/forecast?latitude='+st[0]+'&longitude='+st[1]+'&hourly=temperature_2m,precipitation_probability,precipitation,wind_speed_10m,wind_gusts_10m,weather_code&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch&timezone=UTC&forecast_days=16';
+  return fetch(url).then(function(r){if(!r.ok)throw 0;return r.json()}).then(function(j){S.wx[k]={st:'ok',t:Date.now(),d:j.hourly}}).catch(function(){S.wx[k]={st:'err',t:Date.now()}});
+}
+function wxFor(k,start){
+  var c=S.wx[k];if(!c||!start)return null;
+  if(c.st==='load')return 'load';
+  if(c.st!=='ok')return null;
+  var H=c.d,i=-1,best=1e18;
+  for(var q=0;q<H.time.length;q++){var d=Math.abs(Date.parse(H.time[q]+':00Z')-start);if(d<best){best=d;i=q}}
+  if(i<0||best>2*3600000)return null;
+  var w=0,g=0,pp=0,pr=0;
+  for(var z=i;z<=Math.min(i+3,H.time.length-1);z++){w=Math.max(w,H.wind_speed_10m[z]||0);g=Math.max(g,H.wind_gusts_10m[z]||0);pp=Math.max(pp,H.precipitation_probability[z]||0);pr+=H.precipitation[z]||0}
+  return {t:H.temperature_2m[i],wind:w,gust:g,pp:pp,pr:pr,sky:wcode(H.weather_code[i])};
+}
+function wxAdj(k,start){
+  var st=STAD[k];if(!st||st[2]!=='open')return {adj:0,n:[]};
+  var w=wxFor(k,start);if(!w||w==='load')return {adj:0,n:[]};
+  var adj=0,n=[],eff=Math.max(w.wind,w.gust*0.7);
+  if(eff>10){var a=Math.min(3,(eff-10)*0.15);adj-=a;n.push('wind '+(-a).toFixed(1))}
+  if(w.pp>=60&&w.pr>=0.05){adj-=1.5;n.push('rain -1.5')}
+  if(w.t<=25){adj-=1;n.push('cold -1.0')}
+  return {adj:adj,n:n};
+}
+function wxLi(k,start){
+  var st=STAD[k];if(!st)return 'Stadium not in the venue list, so no forecast.';
+  if(st[2]==='dome')return '<b>Dome.</b> Indoor stadium, so weather is not a factor.';
+  if(st[2]==='retract')return '<b>Retractable roof.</b> Usually closed, so weather is rarely a factor.';
+  var pre=st[2]==='cover'?'<b>Covered stadium</b> with open sides. Rain is blocked and wind matters less. ':'<b>Outdoor stadium.</b> ';
+  if(st[2]==='cover')return pre.trim();
+  var c=S.wx[k];
+  if(c&&c.st==='load')return pre+'Loading the kickoff forecast…';
+  if(c&&c.st==='na')return pre+'The live forecast loads in the phone app at willwats.github.io/hitboard. Wind over 15 mph cuts passing and kicking totals.';
+  var w=wxFor(k,start);
+  if(!w)return pre+(c&&c.st==='ok'?'Kickoff is outside the 16-day forecast window.':'The forecast could not be loaded. Check wind and precipitation near kickoff.');
+  var a=wxAdj(k,start);
+  return pre+'Forecast for kickoff (Open-Meteo): <b>'+Math.round(w.t)+'°F, '+w.sky+'</b>, wind '+Math.round(w.wind)+' mph gusting '+Math.round(w.gust)+', '+Math.round(w.pp)+'% chance of precipitation. '+(a.adj<0?'The model trims the game total by '+(-a.adj).toFixed(1)+' points ('+a.n.join(', ')+').':'No total adjustment, conditions are mild.');
+}
+
 /* ---------- NBA and college football breakdowns ---------- */
 var NBAT={};DATA.nbats.split(';').forEach(function(x){var a=x.split('|');NBAT[a[0]]={W:+a[1],L:+a[2],PF:+a[3],PA:+a[4],G:+a[1]+ +a[2]}});
 function nn(s){
@@ -940,7 +989,7 @@ function feedCalc(g){
   var stP=Phi((sh-sa)/T.sdM),fp=(g.pa!=null&&g.ph!=null)?g.ph/(g.pa+g.ph):null;
   var p=fp!=null?0.4*stP+0.6*fp:stP,ln=null;
   if(g.lg==='nba')ln=DATA.nbaLines.games.filter(function(x){return x.a===g.a&&x.h===g.h})[0]||null;
-  var mkM=ln?(ln.fav==='h'?ln.pts:-ln.pts):null,total=sa+sh;if(ln)total=0.4*total+0.6*ln.tt;
+  var mkM=ln?(ln.fav==='h'?ln.pts:-ln.pts):null,total=sa+sh;if(ln)total=0.4*total+0.6*ln.tt;if(g.lg==='nfl')total+=wxAdj(T.H.k,g.start).adj;
   var margin=mkM!=null?(0.4*(sh-sa)+0.6*mkM):T.sdM*invPhi(p);
   if(mkM!=null)p=Phi(margin/T.sdM);
   var bets=[],ws=p>=.5?g.h:g.a,wpp=p>=.5?p:1-p;
@@ -980,7 +1029,7 @@ function feedAnalyst(g){
   var ln=null;
   if(g.lg==='nba'){ln=DATA.nbaLines.games.filter(function(x){return x.a===g.a&&x.h===g.h})[0]||null}
   var mkM=ln?(ln.fav==='h'?ln.pts:-ln.pts):null;
-  var total=(sa+sh);if(ln)total=0.4*total+0.6*ln.tt;
+  var total=(sa+sh);if(ln)total=0.4*total+0.6*ln.tt;if(g.lg==='nfl')total+=wxAdj(T.H.k,g.start).adj;
   var margin=mkM!=null?(0.4*(sh-sa)+0.6*mkM):T.sdM*invPhi(p);
   if(mkM!=null)p=Phi(margin/T.sdM);
   var ba=(total-margin)/2,bh=(total+margin)/2;
@@ -1003,7 +1052,7 @@ function feedAnalyst(g){
    '<tr><td>Best / worst</td><td>'+f(swA.s)+'<br>'+f(swA.w)+'</td><td>'+f(swH.s)+'<br>'+f(swH.w)+'</td></tr></tbody></table></div><p class="src">Ranks are out of '+tot+' teams, 1st is best. '+(g.lg==='nfl'?'Source: Pro Football Reference team stats through five or six games.':g.lg==='nba'?'Source: Basketball-Reference, 2025-26 season. New rosters and the 2026-27 season are not reflected.':'Source: NCAA.com FBS team stats. Opponent quality is not adjusted, and the FBS table covers Division I FBS teams only.')+'</p>';
   var mu=matchupText(g,Ra,Rh);
   if(mu)h+='<h3>Matchup edges</h3><p class="note" style="margin-top:0">Biggest mismatches: '+esc(mu)+'. A better-ranked offense against a worse-ranked defense is where points and yardage come from.</p>';
-  h+='<h3>Weather and pace</h3><ul class="pts">'+(g.lg==='nfl'?'<li>'+(ROOF[T.H.k]?ROOF[T.H.k]+', so weather is not a factor.':'Outdoor stadium. A forecast is not available here, so check wind and precipitation within 48 hours of kickoff. Wind over 15 mph cuts passing and kicking totals.')+'</li><li>Defenses face '+mv(T.A.k,'pace').toFixed(0)+' plays a game for '+esc(g.a)+' ('+ordn(mrank(T.A.k,'pace'))+' most) and '+mv(T.H.k,'pace').toFixed(0)+' for '+esc(g.h)+' ('+ordn(mrank(T.H.k,'pace'))+'). More plays faced leans toward volume stats and overs.</li>':g.lg==='nba'?'<li>Indoor arena, so weather does not matter. Pace data was not available; the two teams scored '+(A.pf+H.pf).toFixed(1)+' combined points per game last season versus a league average of about '+(Object.keys(NBAT).reduce(function(a,k){return a+NBAT[k].PF},0)/30*2).toFixed(1)+'.</li>':'<li>Most college stadiums are outdoors. A forecast is not available, so check wind and rain within 48 hours of kickoff. Strong wind cuts passing and kicking and lowers totals.</li><li>Pace data was not available. The two offenses average '+(A.pf+H.pf).toFixed(1)+' combined points per game.</li>')+'</ul>';
+  h+='<h3>Weather and pace</h3><ul class="pts">'+(g.lg==='nfl'?'<li>'+wxLi(T.H.k,g.start)+'</li><li>Defenses face '+mv(T.A.k,'pace').toFixed(0)+' plays a game for '+esc(g.a)+' ('+ordn(mrank(T.A.k,'pace'))+' most) and '+mv(T.H.k,'pace').toFixed(0)+' for '+esc(g.h)+' ('+ordn(mrank(T.H.k,'pace'))+'). More plays faced leans toward volume stats and overs.</li>':g.lg==='nba'?'<li>Indoor arena, so weather does not matter. Pace data was not available; the two teams scored '+(A.pf+H.pf).toFixed(1)+' combined points per game last season versus a league average of about '+(Object.keys(NBAT).reduce(function(a,k){return a+NBAT[k].PF},0)/30*2).toFixed(1)+'.</li>':'<li>Most college stadiums are outdoors. A forecast is not available, so check wind and rain within 48 hours of kickoff. Strong wind cuts passing and kicking and lowers totals.</li><li>Pace data was not available. The two offenses average '+(A.pf+H.pf).toFixed(1)+' combined points per game.</li>')+'</ul>';
   h+='<h3>Injuries</h3><p class="note" style="margin-top:0">No verified injury list for either team. Check the official report before the game, because a missing starter changes usage and totals.</p>';
   var key=function(r,t){return r[1]===t};
   var rows=[];
@@ -1292,6 +1341,7 @@ function espnNorm(lg,events){
 function fetchEspn(lg){
   return fetch(espnUrl(lg),{cache:'no-store'}).then(function(r){if(!r.ok)throw {code:'upstream_error'};return r.json()}).then(function(j){return {lg:lg,games:espnNorm(lg,j.events)}},function(e){return {lg:lg,e:e&&e.code?e:{code:'upstream_error'}}});
 }
+function preloadWx(){var seen={},ps=[];(S.feed.nfl||[]).forEach(function(g){if(kind(g)!=='up')return;var k=nt(g.h);if(seen[k])return;seen[k]=1;ps.push(loadWx(k))});Promise.all(ps).then(function(){var ae=document.activeElement;if(ps.length&&!(ae&&ae.tagName==='INPUT')&&!S.sheet)render()})}
 var ESPN_MSG='Could not reach ESPN. Check your connection and tap Refresh again.';
 function doRefresh(silent){
   if(S.busy)return;
@@ -1306,7 +1356,7 @@ function doRefresh(silent){
   var finish=function(out,srcName,failMsg){
     var ok=out.filter(function(o){return o.games}),bad=out.filter(function(o){return o.e});
     ok.forEach(function(o){S.feed[o.lg]=o.games});
-    if(ok.length){S.feedAt=Date.now();S.live=true;S.src=srcName}
+    if(ok.length){S.feedAt=Date.now();S.live=true;S.src=srcName;preloadWx()}
     if(!ok.length){if(silent&&S.live){done('', '')}else{silent=false;done(failMsg||errMsg(bad[0].e),'warn')}}
     else if(bad.length)done('Updated '+ok.length+' of 4 sports. '+(failMsg||errMsg(bad[0].e)),'warn');
     else done(silent?'':'Updated all four sports.','good');
@@ -1338,8 +1388,8 @@ document.addEventListener('click',function(e){
   else if(act==='cat'){S.cat=el.dataset.v;render()}
   else if(act==='gf'){S.gf=el.dataset.v;render()}
   else if(act==='gprops'){S.gf=el.dataset.id;S.tab='props';S.sport='nfl';S.cat='calc';render();window.scrollTo(0,0)}
-  else if(act==='game'){S.sheet={type:'game',id:el.dataset.id};renderSheet()}
-  else if(act==='fgame'){S.sheet={type:'fgame',id:el.dataset.id};var fg0=find(el.dataset.id);if(fg0)loadStats(fg0);renderSheet()}
+  else if(act==='game'){S.sheet={type:'game',id:el.dataset.id};var gw=gameById(el.dataset.id),fw=gw&&feedFor(gw);if(gw)loadWx(gw.h).then(function(){if(S.sheet&&S.sheet.id===gw.id)renderSheet()});renderSheet()}
+  else if(act==='fgame'){S.sheet={type:'fgame',id:el.dataset.id};var fg0=find(el.dataset.id);if(fg0)loadStats(fg0);if(fg0&&fg0.lg==='nfl')loadWx(nt(fg0.h)).then(function(){if(S.sheet&&S.sheet.id===fg0.id)renderSheet()});renderSheet()}
   else if(act==='prop'){openProp(el.dataset.id)}
   else if(act==='close'){S.sheet=null;renderSheet()}
   else if(act==='save'){
