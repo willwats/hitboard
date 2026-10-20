@@ -677,10 +677,10 @@ function tdParse(){
 function tdRow(r,showGm){return '<tr><td>'+esc(r.n)+badge(r.n,r.t)+' <span class="src">'+r.t+(showGm?' · '+r.gm:'')+'</span><br><span class="src">'+esc(matchTxt(r.t))+'</span></td><td><span class="hrpill '+(r.h>=6?'hi':r.h<=2?'lo':'mid')+'">'+r.h*10+'% ('+r.h+'/10)</span></td><td>'+(r.td==null?'—':r.td)+'</td></tr>'}
 function nflTD(){
   var d=DATA.tds,all=tdParse();
-  var top=all.slice().sort(function(a,b){return b.h-a.h||(b.td||0)-(a.td||0)}).slice(0,15);
+  var top=all.slice().sort(function(a,b){return b.h-a.h||(b.td||0)-(a.td||0)}).slice(0,30);
   var head='<thead><tr><th>Player</th><th>TD in L10</th><th>TDs</th></tr></thead>';
   var h='<p class="lede">'+esc(d.asOf)+' Compare a player’s rate with the price your book shows: +100 needs 50%, +200 needs 33%, +300 needs 25%.</p>';
-  h+='<h3>Top 15 anytime TD rates</h3><div class="tblwrap"><table>'+head+'<tbody>'+top.map(function(r){return tdRow(r,true)}).join('')+'</tbody></table></div>';
+  h+='<h3>Top 30 anytime TD rates</h3><div class="tblwrap"><table>'+head+'<tbody>'+top.map(function(r){return tdRow(r,true)}).join('')+'</tbody></table></div>';
   h+='<h3>Market prices, Bills at Raiders</h3><p class="src">'+esc(d.kal.src)+'</p><div class="tblwrap"><table><thead><tr><th>Player</th><th>Anytime TD</th><th>Last 10</th></tr></thead><tbody>'+
    d.kal.rows.filter(function(r){return avail(r[0],r[1]).show}).map(function(r){var m=all.filter(function(a){return a.n===r[0]})[0];return '<tr><td>'+esc(r[0])+' <span class="src">'+r[1]+'</span></td><td><span class="hrpill mid">'+r[2]+'%</span></td><td>'+(m?m.h*10+'%':'—')+'</td></tr>'}).join('')+'</tbody></table></div>';
   h+='<h3>By game</h3>'+d.g.map(function(g){var rows=all.filter(function(a){return a.gm===g[0]});
@@ -1364,17 +1364,17 @@ function straightList(lg){
   var out=[],now=Date.now();
   if(lg==='mlb'){
     var pool=mlbPool();
-    pool.bats.slice().sort(function(a,b){return mlbRates(b).hr-mlbRates(a).hr}).slice(0,3).forEach(function(b){var r=mlbRates(b);out.push({label:'Home run',title:b.n+' to homer',sub:b.t+' · '+oppTxt(b.t),p:r.hr,why:[b.hr+' home runs in '+b.g+' games this season, about one every '+(b.g/Math.max(b.hr,1)).toFixed(1)+' games.','Chance is for one typical game from season rate. It ignores the opposing pitcher and park.']})});
-    pool.bats.slice().sort(function(a,b){return mlbRates(b).sb-mlbRates(a).sb}).slice(0,2).forEach(function(b){var r=mlbRates(b);out.push({label:'Stolen base',title:b.n+' to steal a base',sub:b.t+' · '+oppTxt(b.t),p:r.sb,why:[b.sb+' steals in '+b.g+' games this season.','Speed props depend on getting on base, so check the lineup spot before betting.']})});
-    pool.bats.filter(function(b){return b.avg>=.28}).sort(function(a,b){return mlbRates(b).h1-mlbRates(a).h1}).slice(0,3).forEach(function(b){var r=mlbRates(b);out.push({label:'Hits',title:b.n+' 1+ hit',sub:b.t+' · '+oppTxt(b.t),p:r.h1,why:['Hitting '+String(b.avg.toFixed(3)).replace(/^0/,'')+' with about '+Math.round(b.ab/b.g)+' at-bats a game.','Most reliable hit market because one hit in four at-bats is enough.']})});
-    pool.pits.slice().sort(function(a,b){return pitMu(b)-pitMu(a)}).slice(0,4).forEach(function(p){var k=pitK(p),line=Math.max(3,Math.floor(k.mu)-1);out.push({label:'Strikeouts',title:p.n+' '+line+'+ strikeouts',sub:p.t+' · '+oppTxt(p.t),p:k.ge(line),why:['Projects '+k.mu.toFixed(1)+' strikeouts a start from '+p.so+' strikeouts in '+p.ip+' innings.','Line sits about one strikeout under his average to leave room for a short outing.']})});
+    pool.bats.slice().sort(function(a,b){return mlbRates(b).hr-mlbRates(a).hr}).slice(0,8).forEach(function(b){var r=mlbRates(b);out.push({label:'Home run',title:b.n+' to homer',sub:b.t+' · '+oppTxt(b.t),p:r.hr,why:[b.hr+' home runs in '+b.g+' games this season, about one every '+(b.g/Math.max(b.hr,1)).toFixed(1)+' games.','Chance is for one typical game from season rate. It ignores the opposing pitcher and park.']})});
+    pool.bats.slice().sort(function(a,b){return mlbRates(b).sb-mlbRates(a).sb}).slice(0,6).forEach(function(b){var r=mlbRates(b);out.push({label:'Stolen base',title:b.n+' to steal a base',sub:b.t+' · '+oppTxt(b.t),p:r.sb,why:[b.sb+' steals in '+b.g+' games this season.','Speed props depend on getting on base, so check the lineup spot before betting.']})});
+    pool.bats.filter(function(b){return b.avg>=.28}).sort(function(a,b){return mlbRates(b).h1-mlbRates(a).h1}).slice(0,8).forEach(function(b){var r=mlbRates(b);out.push({label:'Hits',title:b.n+' 1+ hit',sub:b.t+' · '+oppTxt(b.t),p:r.h1,why:['Hitting '+String(b.avg.toFixed(3)).replace(/^0/,'')+' with about '+Math.round(b.ab/b.g)+' at-bats a game.','Most reliable hit market because one hit in four at-bats is enough.']})});
+    pool.pits.slice().sort(function(a,b){return pitMu(b)-pitMu(a)}).slice(0,8).forEach(function(p){var k=pitK(p),line=Math.max(3,Math.floor(k.mu)-1);out.push({label:'Strikeouts',title:p.n+' '+line+'+ strikeouts',sub:p.t+' · '+oppTxt(p.t),p:k.ge(line),why:['Projects '+k.mu.toFixed(1)+' strikeouts a start from '+p.so+' strikeouts in '+p.ip+' innings.','Line sits about one strikeout under his average to leave room for a short outing.']})});
     return out;
   }
   // game picks, best two per game
   (S.feed[lg]||[]).forEach(function(g){
     if(kind(g)==='final'||g.start>now+5*864e5)return;
     var b=picksFor(g);if(!b)return;var ps=projScore(g);
-    b.filter(function(x){return x.p>=.5}).sort(function(a,c){return c.p-a.p}).slice(0,2).forEach(function(x){
+    b.filter(function(x){return x.p>=.5}).sort(function(a,c){return c.p-a.p}).slice(0,3).forEach(function(x){
       var why=[(x.mk?x.mk+'. ':'')+'The model gives this '+Math.round(x.p*100)+'%.'];
       if(ps)why.push('Projected score '+g.a+' '+ps.a.toFixed(1)+', '+g.h+' '+ps.h.toFixed(1)+' (total '+ps.total.toFixed(1)+').');
       var sa=standOf(lg,g.a),sh=standOf(lg,g.h);
@@ -1382,9 +1382,9 @@ function straightList(lg){
       out.push({label:'Game bet',title:x.pick,sub:g.a+' @ '+g.h+' · '+gTime(g),p:x.p,why:why});
     });
   });
-  var legs=legList(lg).filter(function(l){return l.p>=.6});
-  var best={};legs.forEach(function(l){var k=l.name;if(!best[k]||l.p>best[k].p)best[k]=l});
-  Object.keys(best).map(function(k){return best[k]}).sort(function(a,b){return b.p-a.p}).slice(0,10).forEach(function(l){
+  var legs=legList(lg).filter(function(l){return l.p>=.55});
+  var best={};legs.forEach(function(l){var k=l.name+'|'+(l.kind==='td'?'td':l.mk.split(' ')[0]);if(!best[k]||l.p>best[k].p)best[k]=l});
+  Object.keys(best).map(function(k){return best[k]}).sort(function(a,b){return b.p-a.p}).slice(0,40).forEach(function(l){
     var why=['Cleared this line in '+l.src+'.'];
     if(lg==='nfl'&&l.nx&&l.nx.opp&&TS[nt(l.nx.opp)]&&l.kind==='yds'){var o=nt(l.nx.opp),rush=/rush/i.test(l.mk),m=rush?'drush':'dpass',rk=mrank(o,m);why.push(o+' rank '+ordn(rk)+' against the '+(rush?'run':'pass')+' ('+MET[m].fm(mv(o,m))+'), '+(rk>=22?'a weak spot to attack.':rk<=10?'a tough matchup, which is why this is not higher.':'about average.'))}
     else if(l.kind==='td')why.push('Anytime touchdown prices run long, so a 40% or better last-10 rate is a real edge.');
@@ -1398,24 +1398,35 @@ function vParlay(){
   var h='<h2>'+name+' bets</h2>'+sportChips()+modeSwitch('parlay')+betTabs();
   if(lg==='ncaamb')return h+'<div class="card empty">No college basketball data is available yet, so no bets can be built.</div>'+foot();
   if(S.betTab!=='parlays'){
-    var L0=straightList(lg).sort(function(a,b){return b.p-a.p}),gm=L0.filter(function(x){return x.label==='Game bet'}).slice(0,5),L=gm.concat(L0.filter(function(x){return gm.indexOf(x)<0})).slice(0,12).sort(function(a,b){return b.p-a.p});
+    var L0=straightList(lg).sort(function(a,b){return b.p-a.p}),gm=L0.filter(function(x){return x.label==='Game bet'}).slice(0,8),L=gm.concat(L0.filter(function(x){return gm.indexOf(x)<0})).slice(0,S.betMore?45:24).sort(function(a,b){return b.p-a.p}),more=L0.length>24;
     if(!L.length)return h+'<div class="card empty">No straight bets with a game still to play in the data.</div>'+foot();
     var top=L;
-    return h+'<p class="lede">The '+top.length+' strongest single bets right now, with the reason behind each. Chances come from this app’s model and hit-rate data. Sportsbook prices were not readable, so compare the fair odds with your book and only bet where it pays more.</p>'+top.map(betCard).join('')+'<p class="note" style="margin-top:12px">Sorted by chance, not by value. A high chance at short odds can still be a poor bet. Check injuries before placing anything.</p>'+foot();
+    return h+'<p class="lede">The '+top.length+' strongest single bets right now, with the reason behind each. Chances come from this app’s model and hit-rate data. Sportsbook prices were not readable, so compare the fair odds with your book and only bet where it pays more.</p>'+top.map(betCard).join('')+(more?'<button class="chip" style="margin-top:10px" data-act="set" data-k="betMore" data-v="'+(S.betMore?'':'1')+'">'+(S.betMore?'Show fewer':'Show more bets')+'</button>':'')+'<p class="note" style="margin-top:12px">Sorted by chance, not by value. A high chance at short odds can still be a poor bet. Check injuries before placing anything.</p>'+foot();
   }
   if(lg==='mlb')return h+'<div class="card empty">The parlay builder does not cover baseball yet. Use the straight bets tab or the MLB props boards.</div>'+foot();
   var all=legList(lg);
   if(!all.length)return h+'<div class="card empty">No legs with a game still to play in the data.</div>'+foot();
   var nfl=lg==='nfl';
-  var cons=pickLegs(all,.8,3,nfl,['yds','nba','cfb']);
-  var std=pickLegs(all,.65,4,nfl,['yds','nba','cfb']);
-  var agg=pickLegs(all,.5,4,nfl,nfl?['yds','td']:null);
-  var lsh=nfl?pickLegs(all,.4,5,false,['td']):pickLegs(all,.3,5,false,null).slice(0,5);
+  var used={};function take(a){a.forEach(function(l){used[l.name]=1});return a}
+  function fresh(){return all.filter(function(l){return !used[l.name]})}
+  var cons=take(pickLegs(all,.8,4,nfl,['yds','nba','cfb']));
+  var std=take(pickLegs(all,.65,5,nfl,['yds','nba','cfb']));
+  var agg=take(pickLegs(all,.5,6,nfl,nfl?['yds','td']:null));
+  var lsh=take(nfl?pickLegs(all,.4,6,false,['td']):pickLegs(all,.3,6,false,null).slice(0,6));
+  var pairA=pickLegs(all,.8,2,false,['yds','nba','cfb']);
+  var altC=take(pickLegs(fresh(),.75,4,false,['yds','nba','cfb']));
+  var altS=take(pickLegs(fresh(),.6,5,false,['yds','nba','cfb']));
+  var altL=take(pickLegs(fresh(),nfl?.3:.25,6,false,nfl?['td']:null));
   h+='<p class="lede">Built only from the hit-rate data in this app, using legs whose game has not started. Each leg’s chance is its hit count nudged toward 50% (one extra hit and one extra miss) because the samples are small. '+(lg==='nfl'?'Yardage legs use the Covers hit-rate ladders and touchdown legs use the JediBets last-10 rates.':lg==='nba'?'Legs use last season’s last-10 hit rates because the 2026-27 season starts Oct 20.':'Legs use the last five games and few teams in the table have a game left this week.')+' Sportsbook odds were not readable, so each parlay shows fair odds to compare with your book.</p>';
   h+=parlayCard('Conservative','Highest-probability yardage or stat legs.',cons);
   h+=parlayCard('Standard','Strong legs, with a quarterback-plus-receiver stack when one clears the bar.',std);
   h+=parlayCard('Aggressive','Lower bar'+(nfl?', mixing yardage and touchdown legs.':'.'),agg);
   h+=parlayCard('Long shot',nfl?'Anytime touchdown scorers with the best last-10 rates.':'Lowest bar in the data.',lsh);
+  h+='<h3>More combinations, different players</h3>';
+  h+=parlayCard('Safe pair','Just two of the most reliable legs, for a short price.',pairA);
+  h+=parlayCard('Conservative B','A second safe slip using players not in the first four.',altC);
+  h+=parlayCard('Standard B','A second mid-risk slip with fresh players.',altS);
+  h+=parlayCard('Long shot B',nfl?'More touchdown scorers not used above.':'More low-bar legs not used above.',altL);
   return h+'<p class="note" style="margin-top:12px">Parlays need every leg to win. Chances here assume the legs are independent apart from the correlation notes. If injuries change a player’s role, drop the leg.</p>'+foot();
 }
 
