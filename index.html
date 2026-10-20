@@ -1098,6 +1098,18 @@ function parseLegs(raw){
   }
   return legs;
 }
+function slipGames(raw){
+  var out=[],seen={};
+  String(raw||'').split(/\n+/).forEach(function(ln){
+    var m=ln.match(/([A-Za-z0-9.' ]{3,}?)\s*@\s*([A-Za-z0-9.' ]{3,}?)\s*(?:[-+·•»]|$)/);if(!m)return;
+    var an=normName(m[1]).split(' ').pop(),hn=normName(m[2]).split(' ').pop();
+    LG.forEach(function(l){(S.feed[l[0]]||[]).forEach(function(g){
+      if(kind(g)==='final'&&g.start<Date.now()-864e5)return;
+      var a2=normName(g.an).split(' ').pop(),h2=normName(g.hn).split(' ').pop();
+      if(a2===an&&h2===hn&&!seen[g.id]){seen[g.id]=1;out.push(g.id)}})});
+  });
+  return out;
+}
 function amFromDec(d){return d>=2?Math.round((d-1)*100):-Math.round(100/(d-1))}
 function legPrice(l){
   var tb=DATA.hit.nba.tables.filter(function(t){return t.stat===l.stat})[0],key=normName(l.n),row=null;
@@ -1113,7 +1125,7 @@ function parseSlip(raw){
   var t=String(raw||'').replace(/[−–—]/g,'-'),R={type:'ml',side:null};
   var legs0=parseLegs(raw);
   if(legs0.length>=2){
-    R.type='parlay';R.legs=legs0;
+    R.type='parlay';R.legs=legs0;R.games=slipGames(raw);
     var w=t.match(/wager(?:\s*amount)?:?\s*\$?\s*([\d,]+(?:\.\d\d)?)/i),py=t.match(/(?:total\s*)?payout:?\s*\$?\s*([\d,]+(?:\.\d\d)?)/i);
     var am=(t.match(/\$\s*[\d,]+\.\d\d/g)||[]).map(function(x){return parseFloat(x.replace(/[$,\s]/g,''))}),stk=w?parseFloat(w[1].replace(/,/g,'')):null,pay=py?parseFloat(py[1].replace(/,/g,'')):null;
     if((stk==null||pay==null)&&am.length>=2&&am[am.length-1]>am[am.length-2]){stk=am[am.length-2];pay=am[am.length-1]}
@@ -1218,7 +1230,7 @@ function scanRes(){
 }
 function scanHtml(){
   var b=S.scan,G=upGames(),h='<div class="card scan"><h3 style="margin-top:0">Scan a bet</h3><p class="src" style="margin-top:0">Upload a screenshot of your bet slip. The app reads the text on your phone, fills in the bet, and gives the chance. Check the fields, since text reading can misread a number.</p>'+
-    '<label class="btn" style="display:block;text-align:center">Choose a screenshot<input type="file" id="slipfile" accept="image/*" style="display:none"></label>'+
+    '<label class="btn" style="display:block;text-align:center">Choose screenshots<input type="file" id="slipfile" accept="image/*" multiple style="display:none"></label>'+
     (b.busy?'<div class="busy" id="scanbusy">'+esc(b.busy)+'</div>':'')+(b.msg?'<p class="note">'+esc(b.msg)+'</p>':'')+(b.raw?'<details style="margin-top:8px"><summary class="src">What the reader saw</summary><pre style="white-space:pre-wrap;font-size:11px;color:var(--mut,#999)">'+esc(b.raw)+'</pre></details>':'');
   var opt=function(v,t,cur){return '<option value="'+esc(v)+'"'+(String(cur)===String(v)?' selected':'')+'>'+esc(t)+'</option>'};
   h+='<label for="sf_type">Bet type</label><select id="sf_type" data-sf="type">'+[['ml','Moneyline'],['sp','Spread'],['tot','Game total'],['prop','Player yards']].concat(b.type==='parlay'?[['parlay','Parlay (read from slip)']]:[]).map(function(x){return opt(x[0],x[1],b.type)}).join('')+'</select>';
@@ -1254,12 +1266,82 @@ function mineHtml(){
   D.forEach(function(x){u+=x.res==='W'?dec(x.odds)-1:-1;if(x.p!=null){ap+=x.p;np++}});
   var h='<h3>My bets</h3><div class="facts"><span>Record <b>'+w+'-'+(D.length-w)+'</b></span><span>Hit <b>'+(D.length?Math.round(100*w/D.length)+'%':'—')+'</b></span><span>Model said <b>'+(np?Math.round(100*ap/np)+'%':'—')+'</b></span><span>1u bets <b>'+(u>=0?'+':'')+u.toFixed(1)+' u</b></span></div><div class="list" style="margin-top:8px">';
   h+=M.slice().reverse().map(function(x){var i=M.indexOf(x);
-    return '<div class="card bcard"><div class="teams">'+esc(x.pick)+'</div>'+(x.legs?'<ul class="pts" style="margin:4px 0">'+x.legs.map(function(l){return '<li>'+esc(l)+'</li>'}).join('')+'</ul>':'')+'<div class="src">'+esc(x.game||'')+' · '+fo(x.odds)+' · '+(x.p!=null?'model '+(x.p*100).toFixed(1)+'%'+(x.partial?' (priced legs only)':''):'no model chance')+'</div>'+(x.score?'<div class="src">Final '+esc(x.score)+'</div>':'')+
+    return '<div class="card bcard"><div class="teams">'+esc(x.pick)+'</div>'+(x.legs?'<ul class="pts" style="margin:4px 0">'+x.legs.map(function(l){return '<li>'+esc(l)+'</li>'}).join('')+'</ul>':'')+'<div class="src">'+esc(x.game||'')+' · '+fo(x.odds)+' · '+(x.p!=null?'model '+(x.p*100).toFixed(1)+'%'+(x.partial?' (priced legs only)':''):'no model chance')+'</div>'+liveHtml(x)+(x.score?'<div class="src">Final '+esc(x.score)+'</div>':'')+
       '<div class="facts">'+(x.res?'<span>Result <b>'+(x.res==='W'?'Won':x.res==='L'?'Lost':'Push')+'</b></span>':(x.type==='prop'||x.type==='manual'||x.type==='parlay'?'<button class="btn" data-act="mres" data-i="'+i+'" data-r="W">Won</button><button class="btn" data-act="mres" data-i="'+i+'" data-r="L">Lost</button><button class="btn" data-act="mres" data-i="'+i+'" data-r="P">Push</button>':'<span>Waiting for the game to end</span>'))+'<button class="btn" data-act="mydel" data-i="'+i+'">Remove</button></div></div>';
   }).join('')+'</div>';
   return h;
 }
-function parlayEntry(b,a){return {id:String(Date.now()),at:Date.now(),type:'parlay',side:null,lg:'nba',line:null,odds:parseFloat(b.odds),stake:parseFloat(b.stake)||null,p:a.p,partial:a.unknown>0,legs:(b.legs||[]).map(function(l,i){return l.thr+'+ '+l.n+' '+l.stat.toLowerCase()+(a.legs[i]&&a.legs[i].p!=null?' ('+Math.round(a.legs[i].p*100)+'%)':'')}),pick:(b.legs||[]).length+'-leg parlay',game:'Parlay'+(b.stake?', $'+parseFloat(b.stake).toFixed(2)+' wager':''),res:null}}
+function parlayEntry(b,a){return {id:String(Date.now())+Math.floor(Math.random()*1000),at:Date.now(),type:'parlay',legD:(b.legs||[]).map(function(l){return {n:l.n,thr:l.thr,k:l.k,stat:l.stat}}),games:b.games||[],side:null,lg:'nba',line:null,odds:parseFloat(b.odds),stake:parseFloat(b.stake)||null,p:a.p,partial:a.unknown>0,legs:(b.legs||[]).map(function(l,i){return l.thr+'+ '+l.n+' '+l.stat.toLowerCase()+(a.legs[i]&&a.legs[i].p!=null?' ('+Math.round(a.legs[i].p*100)+'%)':'')}),pick:(b.legs||[]).length+'-leg parlay',game:'Parlay'+(b.stake?', $'+parseFloat(b.stake).toFixed(2)+' wager':''),res:null}}
+S.box={};
+function boxNum(j,player,stat){
+  var key=normName(player),out=null;
+  ((j.boxscore&&j.boxscore.players)||[]).forEach(function(tm){(tm.statistics||[]).forEach(function(cat){
+    var labels=cat.labels||[];
+    (cat.athletes||[]).forEach(function(a){
+      if(out!=null||!a.athlete||normName(a.athlete.displayName)!==key)return;
+      var st=a.stats||[],ix=function(l){return labels.indexOf(l)};
+      if(stat==='pts'&&ix('PTS')>=0)out=+st[ix('PTS')];
+      else if(stat==='reb'&&ix('REB')>=0)out=+st[ix('REB')];
+      else if(stat==='ast'&&ix('AST')>=0)out=+st[ix('AST')];
+      else if(stat==='tpm'&&ix('3PT')>=0)out=parseInt(String(st[ix('3PT')]).split('-')[0],10);
+      else if((stat==='pass'&&cat.name==='passing'||stat==='rush'&&cat.name==='rushing'||stat==='rec'&&cat.name==='receiving')&&ix('YDS')>=0)out=+st[ix('YDS')];
+    })})});
+  return isNaN(out)?null:out;
+}
+function boxFetch(g){
+  var c=S.box[g.id],now=Date.now();
+  if(!g.sid||(window.claude&&window.claude.use))return Promise.resolve();
+  if(c&&c.busy)return Promise.resolve();
+  if(c&&c.j&&(kind(g)==='final'&&c.fin||now-c.t<40000))return Promise.resolve();
+  S.box[g.id]={t:now,busy:true,j:c&&c.j,fin:c&&c.fin};
+  return fetch('https://site.api.espn.com/apis/site/v2/sports/'+ESPN[g.lg]+'/summary?event='+encodeURIComponent(g.sid),{cache:'no-store'}).then(function(r){if(!r.ok)throw 0;return r.json()}).then(function(j){S.box[g.id]={t:Date.now(),j:j,fin:kind(g)==='final'}}).catch(function(){S.box[g.id]={t:Date.now(),j:c&&c.j,fin:false}});
+}
+function legState(l,gids){
+  var best=null,anyStarted=false,allFinal=true,found=false;
+  gids.forEach(function(id){var g=find(id);if(!g)return;var started=kind(g)!=='up';if(started)anyStarted=true;if(kind(g)!=='final')allFinal=false;
+    var c=S.box[id];if(c&&c.j){var v=boxNum(c.j,l.n,l.k);if(v!=null){found=true;best=v}}});
+  if(!gids.length)return {st:'none'};
+  if(!anyStarted)return {st:'wait'};
+  if(found){if(best>=l.thr)return {st:'hit',cur:best};return allFinal?{st:'miss',cur:best}:{st:'live',cur:best}}
+  return allFinal?{st:'dnp'}:{st:'live',cur:null};
+}
+function trackBets(){
+  var pend=S.mine.filter(function(x){return !x.res&&((x.games&&x.games.length)||x.gid)});
+  if(!pend.length||(window.claude&&window.claude.use))return;
+  var ids={};pend.forEach(function(x){(x.games||[]).concat(x.gid?[x.gid]:[]).forEach(function(id){ids[id]=1})});
+  var ps=[];Object.keys(ids).forEach(function(id){var g=find(id);if(g&&kind(g)!=='up')ps.push(boxFetch(g))});
+  if(!ps.length)return;
+  Promise.all(ps).then(function(){
+    var ch=false;
+    pend.forEach(function(x){
+      if(x.type==='parlay'&&x.legD){
+        var st=x.legD.map(function(l){return legState(l,x.games||[]).st});
+        if(st.indexOf('miss')>=0){x.res='L';ch=true}
+        else if(st.every(function(v){return v==='hit'})){x.res='W';ch=true}
+      }else if(x.type==='prop'&&x.gid){
+        var g=find(x.gid),c=S.box[x.gid];if(!g||!c||!c.j)return;
+        var v=boxNum(c.j,x.player,x.pk);if(v==null)return;
+        if(x.side==='over'&&v>x.line){x.res='W';ch=true}
+        else if(x.side==='under'&&v>x.line){x.res='L';ch=true}
+        else if(kind(g)==='final'){x.res=x.side==='over'?'L':'W';ch=true}
+      }
+    });
+    if(ch)saveMine();
+    var ae=document.activeElement;if((S.tab==='picks'||S.betTab==='mine')&&!(ae&&ae.tagName==='INPUT'))render();
+  });
+}
+function liveHtml(x){
+  if(window.claude&&window.claude.use)return x.type==='parlay'||x.type==='prop'?'<div class="src">Live stat tracking runs in the installed app, not this preview.</div>':'';
+  if(x.type==='parlay'&&x.legD&&x.games&&x.games.length){
+    var rows=x.legD.map(function(l){var s2=legState(l,x.games),txt=s2.st==='wait'?'Not started':s2.st==='hit'?'Hit '+s2.cur+'/'+l.thr:s2.st==='miss'?'Missed '+s2.cur+'/'+l.thr:s2.st==='dnp'?'No stats, may not have played':s2.st==='live'?(s2.cur!=null?s2.cur+' of '+l.thr:'Waiting for stats'):'No game matched';
+      return '<li>'+(s2.st==='hit'?'✓ ':s2.st==='miss'||s2.st==='dnp'?'✗ ':'')+esc(l.n)+' '+l.thr+'+ '+esc(l.stat.toLowerCase())+': <b>'+esc(txt)+'</b></li>'});
+    return '<div class="src" style="margin-top:6px"><b>Live tracking</b> (checks every 30 seconds while the app is open)</div><ul class="pts" style="margin:2px 0">'+rows.join('')+'</ul>';
+  }
+  if(x.type==='parlay')return '<div class="src">The games for this slip could not be matched, so stats will not track. Mark it yourself when it settles.</div>';
+  if(x.type==='prop'&&x.gid){var g=find(x.gid),c=S.box[x.gid];if(g&&kind(g)==='up')return '<div class="src">Tracks automatically at kickoff, '+esc(gTime(g))+'.</div>';var v=c&&c.j?boxNum(c.j,x.player,x.pk):null;return '<div class="src"><b>Live:</b> '+(v!=null?v+' of '+x.line+' '+x.pk+' yds':'waiting for stats')+'</div>'}
+  if(x.gid&&!x.res){var g2=find(x.gid);if(g2){if(kind(g2)==='up')return '<div class="src">Tracks automatically at kickoff, '+esc(gTime(g2))+'.</div>';if(g2.sa!=null)return '<div class="src"><b>'+(kind(g2)==='live'?'Live':'Final')+':</b> '+esc(g2.a)+' '+g2.sa+', '+esc(g2.h)+' '+g2.sh+'</div>'}}
+  return '';
+}
 function gradeMine(){
   var ch=false;
   S.mine.forEach(function(x){
@@ -1271,6 +1353,7 @@ function gradeMine(){
     if(r){x.res=r;x.score=g.a+' '+g.sa+', '+g.h+' '+g.sh;ch=true}
   });
   if(ch)saveMine();
+  trackBets();
 }
 function loadTess(){
   return new Promise(function(ok,no){
@@ -1278,27 +1361,56 @@ function loadTess(){
     var sc=document.createElement('script');sc.src='https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';sc.onload=function(){window.Tesseract?ok():no()};sc.onerror=no;document.head.appendChild(sc);
   });
 }
-function ocrFile(f){
-  if(!f)return;
+function propGame(player,pk){
+  var d=DEEP.filter(function(x){return x.n===player&&(!pk||x.kind===pk)})[0];if(!d)return '';
+  var t=nt(d.t),g=upGames().filter(function(x){return nt(x.a)===t||nt(x.h)===t})[0];return g?g.id:'';
+}
+function recOne(f,label){
+  return Tesseract.recognize(f,'eng',{langPath:'https://cdn.jsdelivr.net/npm/@tesseract.js-data/eng/4.0.0_best_int',logger:function(m){if(m.status==='recognizing text'){S.scan.busy=label+'Reading… '+Math.round(m.progress*100)+'%';var el=$('#scanbusy');if(el)el.textContent=S.scan.busy}}}).then(function(r){return r.data.text});
+}
+function saveParsed(P,text){
+  // returns true when the slip was complete and saved
+  var sc={type:P.type,gid:P.gid||'',side:P.side||'h',player:P.player||'',pk:P.pk||'rec',line:P.line!=null?String(P.line):'',odds:P.odds!=null?String(P.odds):(P.type==='parlay'?'':'-110'),legs:P.legs||[],games:P.games||[],stake:P.stake!=null?String(P.stake):''};
+  var full=P.odds!=null&&(sc.type==='parlay'?sc.legs.length>=2:sc.type==='prop'?(sc.player&&sc.line!==''):(sc.gid&&(sc.type==='ml'||sc.line!=='')));
+  if(!full)return null;
+  var a=analyzeBet(sc);
+  if(sc.type==='parlay'){S.mine.push(parlayEntry(sc,a));return 'parlay'}
+  var g=sc.type==='prop'?null:find(sc.gid);
+  S.mine.push({id:String(Date.now())+Math.floor(Math.random()*1000),at:Date.now(),type:sc.type,side:sc.side,pk:sc.pk,player:sc.player,gid:sc.type==='prop'?propGame(sc.player,sc.pk):sc.gid,lg:g?g.lg:'nfl',line:sc.type==='ml'?null:parseFloat(sc.line),odds:parseFloat(sc.odds),p:a.p,pick:betDesc({type:sc.type,side:sc.side,pk:sc.pk,player:sc.player,line:parseFloat(sc.line)},g),game:g?g.a+' @ '+g.h:(a.game||''),res:null,auto:true});
+  return sc.type;
+}
+function ocrFiles(files){
+  files=Array.prototype.slice.call(files||[]);if(!files.length)return;
   S.scan.busy='Loading the reader (first time only)…';S.scan.msg='';render();
+  var saved=0,left=[],i=0;
   loadTess().then(function(){
-    return Tesseract.recognize(f,'eng',{langPath:'https://cdn.jsdelivr.net/npm/@tesseract.js-data/eng/4.0.0_best_int',logger:function(m){if(m.status==='recognizing text'){S.scan.busy='Reading… '+Math.round(m.progress*100)+'%';var el=$('#scanbusy');if(el)el.textContent=S.scan.busy}}});
-  }).then(function(r){
-    var P=parseSlip(r.data.text);S.scan.raw=r.data.text;
-    var keep=S.scan;S.scan={type:P.type,gid:P.gid||'',side:P.side||'h',player:P.player||'',pk:P.pk||'rec',line:P.line!=null?String(P.line):'',odds:P.odds!=null?String(P.odds):(P.type==='parlay'?'':'-110'),busy:'',msg:'',raw:r.data.text,legs:P.legs||[],stake:P.stake!=null?String(P.stake):''};
-    var got=[];if(P.legs)got.push(P.legs.length+' legs');if(P.type==='parlay'&&P.odds==null)got.push('(odds not found, enter them below)');if(P.gid||P.player)got.push(P.player||'game');if(P.line!=null)got.push('line');if(P.odds!=null)got.push('odds');
-    S.scan.msg=got.length?'Read the slip and filled in: '+got.join(', ')+'. Check every field before saving.':'Could not find a bet in that image. Fill the fields in below, or save it as a typed note.';
-    var sc=S.scan,full=P.odds!=null&&(sc.type==='parlay'?sc.legs.length>=2:sc.type==='prop'?(sc.player&&sc.line!==''):(sc.gid&&(sc.type==='ml'||sc.line!=='')));
-    if(full){
-      var a2=analyzeBet(sc),g2=(sc.type==='prop'||sc.type==='parlay')?null:find(sc.gid);
-      if(sc.type==='parlay'){S.mine.push(parlayEntry(sc,a2));saveMine();S.scan={type:'ml',gid:'',side:'h',player:'',pk:'rec',line:'',odds:'-110',busy:'',msg:'Read the slip and saved the '+sc.legs.length+'-leg parlay to My bets below. Mark it Won or Lost when it settles.',raw:r.data.text,note:'',legs:[],stake:''};render();return}
-      S.mine.push({id:String(Date.now()),at:Date.now(),type:sc.type,side:sc.side,pk:sc.pk,player:sc.player,gid:sc.gid,lg:g2?g2.lg:'nfl',line:sc.type==='ml'?null:parseFloat(sc.line),odds:parseFloat(sc.odds),p:a2.p,pick:betDesc({type:sc.type,side:sc.side,pk:sc.pk,player:sc.player,line:parseFloat(sc.line)},g2),game:g2?g2.a+' @ '+g2.h:(a2.game||''),res:null,auto:true});
-      saveMine();S.scan={type:'ml',gid:'',side:'h',player:'',pk:'rec',line:'',odds:'-110',busy:'',msg:'Read the slip and saved it to My bets below. Check the pick and odds, and remove it if the reader got something wrong.',raw:r.data.text,note:''};
+    var next=function(){
+      if(i>=files.length)return Promise.resolve();
+      var label=files.length>1?'Screenshot '+(i+1)+' of '+files.length+'. ':'';
+      return recOne(files[i],label).then(function(text){
+        var P=parseSlip(text),ok=saveParsed(P,text);
+        if(ok)saved++;else left.push({P:P,text:text});
+        i++;return next();
+      });
+    };
+    return next();
+  }).then(function(){
+    saveMine();
+    var msg='';
+    if(saved)msg+='Read '+files.length+' screenshot'+(files.length>1?'s':'')+' and saved '+saved+' to My bets. Check each one and remove any the reader got wrong. ';
+    var base={type:'ml',gid:'',side:'h',player:'',pk:'rec',line:'',odds:'-110',busy:'',msg:'',raw:'',note:'',legs:[],games:[],stake:''};
+    if(left.length){
+      var L=left[0],P=L.P;
+      base={type:P.type,gid:P.gid||'',side:P.side||'h',player:P.player||'',pk:P.pk||'rec',line:P.line!=null?String(P.line):'',odds:P.odds!=null?String(P.odds):(P.type==='parlay'?'':'-110'),busy:'',msg:'',raw:L.text,note:'',legs:P.legs||[],games:P.games||[],stake:P.stake!=null?String(P.stake):''};
+      msg+=(left.length>1?left.length+' screenshots could not be read completely. The first is filled in below; ':'One screenshot could not be read completely. It is filled in below; ')+'check the fields and save it, or save it as a note.';
     }
-    render();
+    base.msg=msg||'Could not find a bet in that image.';
+    S.scan=base;render();
+    trackBets();
   }).catch(function(){S.scan.busy='';S.scan.msg='Could not read that image. The reader needs internet the first time and does not run in the preview copy. Fill the fields in below, or use the installed app.';render()});
 }
-window.HB={parseSlip:parseSlip,analyzeBet:analyzeBet,S:S,consFor:consFor,find:find,discoverHtml:discoverHtml,upGames:upGames};
+function ocrFile(f){if(f)ocrFiles([f])}
+window.HB={trackBets:trackBets,legState:legState,slipGames:slipGames,parseSlip:parseSlip,analyzeBet:analyzeBet,S:S,consFor:consFor,find:find,discoverHtml:discoverHtml,upGames:upGames};
 function vPicks(){
   var ps=S.picks;
   if(!ps.length)return '<h2>My picks</h2>'+scanHtml()+'<h3>Prop slip</h3><div class="card empty">No picks yet. Open a player in Props, enter your line and odds, then save the side you like.</div>'+trackHtml()+foot();
@@ -1326,7 +1438,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v23, Oct 20';
+var BUILD='v24, Oct 20';
 function foot(){return '<p class="foot"><button class="linkbtn" data-act="tab" data-t="about">How the model works</button> · <span class="src">Build '+BUILD+'</span></p><p class="foot">For entertainment and research only, not betting advice. Probabilities are estimates and can be wrong. If gambling is a problem for you or someone you know, call 1-800-GAMBLER.</p>'}
 
 /* ---------- sheets ---------- */
@@ -2533,12 +2645,12 @@ document.addEventListener('click',function(e){
   }
   else if(act==='mysave'){
     var b=S.scan,od=parseFloat(b.odds);
-    if(b.type==='parlay'){if(!isFinite(od)||Math.abs(od)<100){S.scan.msg='Enter the odds first, like +864.';render();return}S.mine.push(parlayEntry(b,analyzeBet(b)));saveMine();S.scan={type:'ml',gid:'',side:'h',player:'',pk:'rec',line:'',odds:'-110',busy:'',msg:'Saved. Mark it Won or Lost when it settles.',raw:'',note:'',legs:[],stake:''};render();return}if(!isFinite(od)||Math.abs(od)<100){S.scan.msg='Enter the odds first, like -110.';render();return}
+    if(b.type==='parlay'){if(!isFinite(od)||Math.abs(od)<100){S.scan.msg='Enter the odds first, like +864.';render();return}S.mine.push(parlayEntry(b,analyzeBet(b)));saveMine();S.scan={type:'ml',gid:'',side:'h',player:'',pk:'rec',line:'',odds:'-110',busy:'',msg:'Saved. Stats track automatically once the games start while the app is open.',raw:'',note:'',legs:[],games:[],stake:''};render();trackBets();return}if(!isFinite(od)||Math.abs(od)<100){S.scan.msg='Enter the odds first, like -110.';render();return}
     if(b.type==='prop'&&!b.player){S.scan.msg='Enter the player first.';render();return}
     if(b.type!=='prop'&&!find(b.gid)){S.scan.msg='Choose the game first.';render();return}
     if(b.type!=='ml'&&!isFinite(parseFloat(b.line))){S.scan.msg='Enter the line first.';render();return}
     var a=analyzeBet(b),g=b.type==='prop'?null:find(b.gid);
-    S.mine.push({id:String(Date.now()),at:Date.now(),type:b.type,side:b.side,pk:b.pk,player:b.player,gid:b.gid,lg:g?g.lg:'nfl',line:b.type==='ml'?null:parseFloat(b.line),odds:od,p:a.p,pick:betDesc({type:b.type,side:b.side,pk:b.pk,player:b.player,line:parseFloat(b.line)},g),game:g?g.a+' @ '+g.h:(a.game||''),res:null});
+    S.mine.push({id:String(Date.now()),at:Date.now(),type:b.type,side:b.side,pk:b.pk,player:b.player,gid:b.type==='prop'?propGame(b.player,b.pk):b.gid,lg:g?g.lg:'nfl',line:b.type==='ml'?null:parseFloat(b.line),odds:od,p:a.p,pick:betDesc({type:b.type,side:b.side,pk:b.pk,player:b.player,line:parseFloat(b.line)},g),game:g?g.a+' @ '+g.h:(a.game||''),res:null});
     saveMine();S.scan={type:'ml',gid:'',side:'h',player:'',pk:'rec',line:'',odds:'-110',busy:'',msg:'Saved. It will be graded when the game ends.',raw:''};render();
   }
   else if(act==='mydel'){S.mine.splice(+el.dataset.i,1);saveMine();render()}
@@ -2554,7 +2666,7 @@ document.addEventListener('input',function(e){
   propOut();
 });
 document.addEventListener('change',function(e){
-  var t=e.target;if(t.id==='slipfile'){ocrFile(t.files&&t.files[0]);return}
+  var t=e.target;if(t.id==='slipfile'){var fl=Array.prototype.slice.call(t.files||[]);t.value='';ocrFiles(fl);return}
   var f=t.dataset&&t.dataset.sf;if(!f)return;
   if(t.tagName!=='SELECT'){S.scan[f]=t.value;var r0=$('#scanres');if(r0)r0.innerHTML=scanRes();return}
   S.scan[f]=t.value;
