@@ -1162,6 +1162,7 @@ function parseSlip(raw){
   var legs0=parseLegs(raw);
   if(legs0.length>=2){
     R.type='parlay';R.legs=legs0;R.games=slipGames(raw);
+    var ex=t.match(/(\d{1,2})\s*pick\s*parlay/i);if(ex)R.expect=parseInt(ex[1],10);
     var w=t.match(/wager(?:\s*amount)?:?\s*\$?\s*([\d,]+(?:\.\d\d)?)/i),py=t.match(/(?:total\s*payout|to\s*pay|payout)\s*:?\s*\$?\s*([\d,]+(?:\.\d\d)?)/i);
     var am=(t.match(/\$\s*[\d,]+\.\d\d/g)||[]).map(function(x){return parseFloat(x.replace(/[$,\s]/g,''))}),stk=w?parseFloat(w[1].replace(/,/g,'')):null,pay=py?parseFloat(py[1].replace(/,/g,'')):null;
     if((stk==null||pay==null)&&am.length>=2&&am[am.length-1]>am[am.length-2]){stk=am[am.length-2];pay=am[am.length-1]}
@@ -1407,16 +1408,29 @@ function propGame(player,pk){
 function recOne(f,label){
   return Tesseract.recognize(f,'eng',{langPath:'https://cdn.jsdelivr.net/npm/@tesseract.js-data/eng/4.0.0_best_int',logger:function(m){if(m.status==='recognizing text'){S.scan.busy=label+'Reading… '+Math.round(m.progress*100)+'%';var el=$('#scanbusy');if(el)el.textContent=S.scan.busy}}}).then(function(r){return r.data.text});
 }
-function saveParsed(P,text){
+function saveParsed(P,text,dry){
   // returns true when the slip was complete and saved
   var sc={type:P.type,gid:P.gid||'',side:P.side||'h',player:P.player||'',pk:P.pk||'rec',line:P.line!=null?String(P.line):'',odds:P.odds!=null?String(P.odds):(P.type==='parlay'?'':'-110'),legs:P.legs||[],games:P.games||[],stake:P.stake!=null?String(P.stake):''};
-  var full=P.odds!=null&&(sc.type==='parlay'?sc.legs.length>=2:sc.type==='prop'?(sc.player&&sc.line!==''):(sc.gid&&(sc.type==='ml'||sc.line!=='')));
+  var full=P.odds!=null&&(sc.type==='parlay'?(sc.legs.length>=2&&(!P.expect||sc.legs.length>=P.expect)):sc.type==='prop'?(sc.player&&sc.line!==''):(sc.gid&&(sc.type==='ml'||sc.line!=='')));
   if(!full)return null;
+  if(dry)return true;
   var a=analyzeBet(sc);
   if(sc.type==='parlay'){S.mine.push(parlayEntry(sc,a));return 'parlay'}
   var g=sc.type==='prop'?null:find(sc.gid);
   S.mine.push({id:String(Date.now())+Math.floor(Math.random()*1000),at:Date.now(),type:sc.type,side:sc.side,pk:sc.pk,player:sc.player,gid:sc.type==='prop'?propGame(sc.player,sc.pk):sc.gid,lg:g?g.lg:'nfl',line:sc.type==='ml'?null:parseFloat(sc.line),odds:parseFloat(sc.odds),p:a.p,pick:betDesc({type:sc.type,side:sc.side,pk:sc.pk,player:sc.player,line:parseFloat(sc.line)},g),game:g?g.a+' @ '+g.h:(a.game||''),res:null,auto:true});
   return sc.type;
+}
+function parseScore(P){return (P.type==='parlay'?(P.legs||[]).length*2+(P.expect&&(P.legs||[]).length>=P.expect?5:0):(P.gid?2:0)+(P.player?2:0)+(P.line!=null?1:0))+(P.odds!=null?3:0)}
+function preCanvas(f){
+  return (window.createImageBitmap?createImageBitmap(f):Promise.reject()).then(function(bm){
+    var sc=bm.width<1600?1600/bm.width:1,c=document.createElement('canvas');c.width=Math.round(bm.width*sc);c.height=Math.round(bm.height*sc);
+    var x=c.getContext('2d');x.drawImage(bm,0,0,c.width,c.height);
+    var d=x.getImageData(0,0,c.width,c.height),px=d.data,sum=0,n=0,i;
+    for(i=0;i<px.length;i+=16){sum+=.3*px[i]+.59*px[i+1]+.11*px[i+2];n++}
+    var dark=sum/n<110;
+    for(i=0;i<px.length;i+=4){var v=.3*px[i]+.59*px[i+1]+.11*px[i+2];if(dark)v=255-v;px[i]=px[i+1]=px[i+2]=v}
+    x.putImageData(d,0,0);return c;
+  });
 }
 function ocrFiles(files){
   files=Array.prototype.slice.call(files||[]);if(!files.length)return;
@@ -1427,9 +1441,18 @@ function ocrFiles(files){
       if(i>=files.length)return Promise.resolve();
       var label=files.length>1?'Screenshot '+(i+1)+' of '+files.length+'. ':'';
       return recOne(files[i],label).then(function(text){
-        var P=parseSlip(text),ok=saveParsed(P,text);
-        if(ok)saved++;else left.push({P:P,text:text});
-        i++;return next();
+        var P=parseSlip(text);
+        var again=function(){var cur=files[i];
+          return preCanvas(cur).then(function(cv){return recOne(cv,label+'Second pass. ')}).then(function(t2){
+            var P2=parseSlip(t2);if(parseScore(P2)>parseScore(P)){P=P2;text=t2}
+          }).catch(function(){});
+        };
+        var full=function(Q){var e=saveParsed(Q,'',true);return e};
+        return (full(P)?Promise.resolve():again()).then(function(){
+          var ok=saveParsed(P,text);
+          if(ok)saved++;else left.push({P:P,text:text});
+          i++;return next();
+        });
       });
     };
     return next();
@@ -1477,7 +1500,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v25, Oct 20';
+var BUILD='v26, Oct 20';
 function foot(){return '<p class="foot"><button class="linkbtn" data-act="tab" data-t="about">How the model works</button> · <span class="src">Build '+BUILD+'</span></p><p class="foot">For entertainment and research only, not betting advice. Probabilities are estimates and can be wrong. If gambling is a problem for you or someone you know, call 1-800-GAMBLER.</p>'}
 
 /* ---------- sheets ---------- */
