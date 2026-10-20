@@ -762,8 +762,8 @@ function analyzeBet(b){
   if(b.type==='ml'){if(!ml)return {p:null,note:'No moneyline model for this game.'};var pH=ml.side==='h'?ml.p:1-ml.p;res.p=b.side==='h'?pH:1-pH;res.note='Model moneyline chance after calibration.'+warn;return res}
   if(M==null)return {p:null,note:'The model has no projected score for this game yet.'};
   if(!isFinite(line))return {p:null,note:'Enter the line.'};
-  if(b.type==='sp'){var m=b.side==='h'?M:-M,pr=calibCover(Phi((m+line)/sd));res.p=learnP(L,'sp',pr);res.note='Model projects '+(b.side==='h'?g.h:g.a)+' to '+(m>=0?'win':'lose')+' by '+Math.abs(m).toFixed(1)+'. Spread chances are held near 50% because the backtest found no usable edge.'+warn;return res}
-  if(b.type==='tot'){var po=1-Phi((line-TT)/sdT),pr2=b.side==='over'?po:1-po,w=g.lg==='nfl'?wxAdj(nt(g.h),g.start):null;res.p=learnP(L,'tot',calibTotal(pr2,b.side==='under',w));res.note='Model projects '+TT.toFixed(1)+' total points. Total chances are held near 50% because the market line is hard to beat.'+warn;return res}
+  if(b.type==='sp'){var m=b.side==='h'?M:-M,pr=calibCover(Phi((m+line)/sd));res.p=learnP(L,'sp',pr);res.m=(b.side==='h'?M:-M);res.note='Model projects '+(b.side==='h'?g.h:g.a)+' to '+(m>=0?'win':'lose')+' by '+Math.abs(m).toFixed(1)+'. Spread chances are held near 50% because the backtest found no usable edge.'+warn;return res}
+  if(b.type==='tot'){var po=1-Phi((line-TT)/sdT),pr2=b.side==='over'?po:1-po,w=g.lg==='nfl'?wxAdj(nt(g.h),g.start):null;res.p=learnP(L,'tot',calibTotal(pr2,b.side==='under',w));res.tt=TT;res.note='Model projects '+TT.toFixed(1)+' total points. Total chances are held near 50% because the market line is hard to beat.'+warn;return res}
   return out;
 }
 function scanRes(){
@@ -845,7 +845,7 @@ function ocrFile(f){
     render();
   }).catch(function(){S.scan.busy='';S.scan.msg='Could not read that image. The reader needs internet the first time and does not run in the preview copy. Fill the fields in below, or use the installed app.';render()});
 }
-window.HB={parseSlip:parseSlip,analyzeBet:analyzeBet,S:S};
+window.HB={parseSlip:parseSlip,analyzeBet:analyzeBet,S:S,consFor:consFor,find:find};
 function vPicks(){
   var ps=S.picks;
   if(!ps.length)return '<h2>My picks</h2>'+scanHtml()+'<h3>Prop slip</h3><div class="card empty">No picks yet. Open a player in Props, enter your line and odds, then save the side you like.</div>'+trackHtml()+foot();
@@ -968,6 +968,7 @@ function analystSections(g){
   }
   var bets=straightBets(g,m);
   h+='<h3>Best straight bets</h3><div class="list">'+bets.map(function(b){return '<div class="card bcard"><div class="label">'+b.mk+' · confidence '+b.conf+'</div><div class="teams">'+esc(b.pick)+'</div><div class="facts"><span>Est. chance <b>'+pc(b.p)+'%</b></span><span>Fair odds <b>'+fairOdds(b.p)+'</b></span><span>Break-even at -110 <b>52.4%</b></span>'+(b.mk!=='Moneyline'?'<span>Stake at -110 <b>'+kelly(b.p)+'</b></span>':'')+'</div><p class="src" style="margin-top:6px">'+esc(b.why)+'</p></div>'}).join('')+'</div><p class="src">Estimated chances come from the blended prediction with a typical NFL swing of ±13.5 points on margin and ±10.5 on totals. Odds are not read from a sportsbook, so compare the chance with the price you see.</p>';
+  h+=consHtml(feedFor(g));
   h+='<h3>Line movement</h3><p class="note" style="margin-top:0">Current: '+esc(g.favT)+' -'+g.pts+', total '+g.total+' ('+esc(g.src)+'). '+(g.alt?esc(g.alt):'No earlier line was captured for this game.')+' Public betting percentages and sharp-money indicators are not available from free sources.</p>';
   var vol=[];
   if(!g.fresh)vol.push('The listed line is from Oct 13 and may have moved.');
@@ -1257,6 +1258,71 @@ function covHtml(a,h){
   return '<h3>Coverage tendencies</h3><ul class="pts">'+line(a)+line(h)+'</ul><p class="src">'+esc(COV_SRC)+' Man-heavy defenses reward receivers who win one-on-one and get open fast; zone-heavy ones reward route-savvy players, tight ends and backs working the soft spots.</p>';
 }
 
+
+/* ---------- public consensus snapshot from Covers (read on Oct 19, 2026, about 9:30 PM ET) ---------- */
+var CONS_AT=Date.UTC(2026,9,20,1,20);
+var CONS_SRC='Covers.com contest-player picks and listed lines, read Oct 19 at about 9:30 PM ET. This is a saved snapshot, not a live feed, and it is Covers players, not sportsbook bet counts.';
+// [league, away, home, ET date, away spread, total or null, % of picks on the away side]
+var CONS=[
+['nfl','WAS','SF','2026-10-19',7.5,51.5,22],['nfl','NE','CHI','2026-10-22',3.5,null,41],
+['nfl','MIA','NYJ','2026-10-25',4.5,null,17],['nfl','TB','CAR','2026-10-25',3.5,null,19],['nfl','LA','LV','2026-10-25',-4.5,null,28],
+['nfl','GB','DET','2026-10-25',3.5,null,30],['nfl','CLE','TEN','2026-10-25',-1.5,null,69],['nfl','CIN','BAL','2026-10-25',2.5,null,66],
+['nfl','IND','MIN','2026-10-25',5.5,null,34],['nfl','KC','SEA','2026-10-25',2.5,null,58],['nfl','NYG','HOU','2026-10-25',9.5,null,44],
+['nfl','PIT','NO','2026-10-25',-3.5,null,45],['nfl','SF','ATL','2026-10-25',-4.5,null,51],['nfl','DEN','ARI','2026-10-25',-4.5,null,50],
+['nba','Milwaukee','Washington','2026-10-21',5.5,238,60],['nba','Atlanta','Orlando','2026-10-21',2.5,235,35],['nba','Chicago','Toronto','2026-10-21',9.5,236.5,33],['nba','Charlotte','Brooklyn','2026-10-21',-1.5,219.5,53],['nba','Minnesota','Miami','2026-10-21',1.5,243,37],['nba','Utah','Memphis','2026-10-21',1.5,242,62],['nba','Indiana','New Orleans','2026-10-21',-3.5,241,63],['nba','Dallas','Houston','2026-10-21',8.5,230,61],['nba','Phoenix','Portland','2026-10-21',3.5,233,41],['nba','Golden State','L.A. Lakers','2026-10-21',7.5,231,43],['nba','Sacramento','L.A. Clippers','2026-10-21',4.5,228.5,29],['nba','Cleveland','Philadelphia','2026-10-22',4.5,233.5,56],
+['nba','Boston','Detroit','2026-10-20',-1.5,222,37],['nba','Philadelphia','New York','2026-10-20',4.5,232,60],['nba','Oklahoma City','San Antonio','2026-10-20',2.5,232,27],
+['ncaafb','Middle Tennessee','FIU','2026-10-20',10.5,45.5,44],['ncaafb','Missouri State','Delaware','2026-10-20',3.5,53,33],['ncaafb','South Alabama','Marshall','2026-10-20',-2.5,64.5,62],
+['ncaafb','New Mexico State','Sam Houston','2026-10-21',-2.5,45,67],['ncaafb','James Madison','App State','2026-10-22',-10.5,56,60],['ncaafb','Liberty','Kennesaw State','2026-10-22',-9.5,49,58],
+['ncaafb','East Carolina','Memphis','2026-10-22',10.5,54.5,28],['ncaafb','Duke','Virginia','2026-10-23',1.5,47,55],['ncaafb','UMass','UConn','2026-10-23',14.5,49.5,48],
+['ncaafb','Army','Tulsa','2026-10-23',1.5,54,56],['ncaafb','Air Force','Wyoming','2026-10-23',-4.5,45,52],['ncaafb','NC State','Stanford','2026-10-23',-6.5,55,64],
+['ncaafb','Rice','Florida Atlantic','2026-10-24',8.5,54.5,41],['ncaafb','LSU','Auburn','2026-10-24',-7.5,51,57],['ncaafb','Texas Tech','Cincinnati','2026-10-24',-10.5,56.5,54],
+['ncaafb','West Virginia','TCU','2026-10-24',8.5,56.5,55],['ncaafb','Pittsburgh','Miami (FL)','2026-10-24',20.5,51,63],['ncaafb','California','SMU','2026-10-24',19.5,53.5,42],
+['ncaafb','Indiana','Michigan','2026-10-24',-6.5,41.5,48],['ncaafb','Western Michigan','Toledo','2026-10-24',3.5,45.5,58],['ncaafb','Akron','Kent State','2026-10-24',2.5,46,36],
+['ncaafb','Baylor','Kansas','2026-10-24',-2.5,53.5,59],['ncaafb','Miami (OH)','Central Michigan','2026-10-24',-2.5,41,70],['ncaafb','Oregon','Illinois','2026-10-24',-8.5,50.5,44],
+['ncaafb',"Hawai'i",'Northern Illinois','2026-10-24',-4.5,47.5,49],['ncaafb','Boston College','Georgia Tech','2026-10-24',3.5,49,41],['ncaafb','Tennessee','South Carolina','2026-10-24',2.5,51,49],
+['ncaafb','North Texas','Navy','2026-10-24',-2.5,62,64],['ncaafb','Sacramento State','Ball State','2026-10-24',14.5,51,26],['ncaafb','Bowling Green','Buffalo','2026-10-24',3.5,44.5,37],
+['ncaafb','Texas A&M','Alabama','2026-10-24',14.5,50.5,48],['ncaafb','BYU','UCF','2026-10-24',-6.5,43.5,61],['ncaafb','Iowa','Minnesota','2026-10-24',-7.5,41,54]
+];
+var CALIAS={'fiu':'florida international','app state':'appalachian state','la lakers':'los angeles lakers'};
+function cnm(x){x=normName(x);return CALIAS[x]||x}
+function cteam(cov,full,abbr,lg){
+  if(lg==='nfl')return nt(cov)===nt(abbr);
+  var c=cnm(cov),f=normName(full);return f===c||f.indexOf(c+' ')===0;
+}
+function consFor(g){
+  var out=null;
+  CONS.forEach(function(c){
+    if(c[0]!==g.lg)return;
+    if(!cteam(c[1],g.an,g.a,g.lg)||!cteam(c[2],g.hn,g.h,g.lg))return;
+    if(Math.abs(g.start-Date.parse(c[3]+'T17:00:00Z'))>1.3*864e5)return;
+    out={spA:c[4],total:c[5],pA:c[6],pH:100-c[6]};
+  });
+  return out;
+}
+function fsp(team,v){return team+' '+(v>0?'+':v<0?'−':'')+Math.abs(v)}
+function consHtml(g){
+  if(!g||kind(g)==='final')return '';
+  var c=consFor(g);if(!c)return '';
+  var a=analyzeBet({type:'sp',gid:g.id,side:'a',line:c.spA}),hh=analyzeBet({type:'sp',gid:g.id,side:'h',line:-c.spA});
+  var h='<h3>Public consensus and lean</h3>';
+  h+='<div class="facts"><span>Line <b>'+esc(fsp(g.a,c.spA))+' / '+esc(fsp(g.h,-c.spA))+'</b></span>'+(c.total!=null?'<span>Total <b>'+c.total+'</b></span>':'')+'<span>Public picks <b>'+esc(g.a)+' '+c.pA+'% · '+esc(g.h)+' '+c.pH+'%</b></span></div>';
+  if(a.p==null||hh.p==null||a.m==null)return h+'<p class="note">The model has no projected score for this game yet, so there is no lean.</p><p class="src">'+esc(CONS_SRC)+'</p>';
+  var sideA=a.p>=hh.p,ms=sideA?g.a:g.h,mp=sideA?a.p:hh.p,edge=sideA?a.m+c.spA:(-a.m)-c.spA;
+  // a.m is the away team's expected margin; edge = points the model side beats the line by
+  var pubSide=c.pA>=50?'a':'h',pubPct=Math.max(c.pA,c.pH),pubTeam=pubSide==='a'?g.a:g.h,same=(pubSide==='a')===sideA;
+  var ae=Math.abs(edge),strength=ae<1?'None':ae<2.5?'Small':ae<4?'Moderate':'Large';
+  var lean,why;
+  if(ae<1){lean='No lean';why='The model is within a point of the line, so there is nothing to act on.'}
+  else if(same){lean=ms+' '+(sideA?fsp('',c.spA).trim():fsp('',-c.spA).trim());why='The model and the public are on the same side'+(pubPct>=65?', and the public is heavy there, so the price may already be shaded against you':'')+'.'}
+  else if(pubPct>=65){lean=ms+' '+(sideA?fsp('',c.spA).trim():fsp('',-c.spA).trim());why='Against the crowd: '+pubPct+'% of Covers players are on '+pubTeam+', but the model likes '+ms+'.'}
+  else{lean=ms+' '+(sideA?fsp('',c.spA).trim():fsp('',-c.spA).trim());why='The public is split ('+c.pA+'/'+c.pH+') and the model disagrees only mildly with the crowd.'}
+  var hf=-a.m; // home margin
+  h+='<div class="card bcard"><div class="label">Lean · '+strength+'</div><div class="teams">'+esc(lean)+'</div><div class="src">'+esc(why)+'</div></div>';
+  h+='<ul class="pts"><li><b>Relative line.</b> The model’s fair line is '+esc(g.h)+' '+(hf>=0?'−':'+')+Math.abs(hf).toFixed(1)+' against a listed '+esc(fsp(g.h,-c.spA))+'. That is '+Math.abs(edge).toFixed(1)+' points '+(edge>=0?'in favor of ':'against ')+esc(ms)+'.</li><li><b>Model chance on this line.</b> '+esc(ms)+' covers '+(mp*100).toFixed(1)+'%. A spread needs 52.4% at -110 to break even.</li>'+
+    (c.total!=null?(function(){var o=analyzeBet({type:'tot',gid:g.id,side:'over',line:c.total}),u=analyzeBet({type:'tot',gid:g.id,side:'under',line:c.total});return o.p==null?'':'<li><b>Total.</b> Model projects '+(o.tt!=null?o.tt.toFixed(1):'n/a')+' against '+c.total+', so '+(o.p>=u.p?'over':'under')+' '+(Math.max(o.p,u.p)*100).toFixed(1)+'%.</li>'})():'')+'</ul>';
+  h+='<p class="src">'+esc(CONS_SRC)+' The lean compares the model to the listed line and notes where the crowd sits. I could not test whether fading the public pays, because Covers does not publish history, so the crowd is context here, not a weighted input. Large gaps usually mean the model is missing news such as injuries.</p>';
+  return h;
+}
 /* ---------- learning from the pick log ---------- */
 function learn(lg){
   var gm={};S.log.forEach(function(x){if(x.lg===lg&&x.res&&x.rm!=null&&x.rt!=null&&x.am!=null)gm[x.gid]=x});
@@ -1679,6 +1745,7 @@ function feedSheet(g){
   }
   if(k!=='up')h+='<h2 style="margin-top:22px">'+(k==='final'?'Pre-game breakdown':'Full breakdown')+'</h2><p class="src">Built from season stats before this game, so you can see how the matchup looked going in.</p>';
   h+=g.lg==='ncaamb'?'<p class="note" style="margin-top:14px">No team ratings for college basketball yet.</p>':feedAnalyst(g);
+  if(k==='up')h+=consHtml(g);
   return h;
 }
 function propOut(){
