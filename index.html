@@ -1219,7 +1219,7 @@ function scanRes(){
 function scanHtml(){
   var b=S.scan,G=upGames(),h='<div class="card scan"><h3 style="margin-top:0">Scan a bet</h3><p class="src" style="margin-top:0">Upload a screenshot of your bet slip. The app reads the text on your phone, fills in the bet, and gives the chance. Check the fields, since text reading can misread a number.</p>'+
     '<label class="btn" style="display:block;text-align:center">Choose a screenshot<input type="file" id="slipfile" accept="image/*" style="display:none"></label>'+
-    (b.busy?'<div class="busy" id="scanbusy">'+esc(b.busy)+'</div>':'')+(b.msg?'<p class="note">'+esc(b.msg)+'</p>':'');
+    (b.busy?'<div class="busy" id="scanbusy">'+esc(b.busy)+'</div>':'')+(b.msg?'<p class="note">'+esc(b.msg)+'</p>':'')+(b.raw?'<details style="margin-top:8px"><summary class="src">What the reader saw</summary><pre style="white-space:pre-wrap;font-size:11px;color:var(--mut,#999)">'+esc(b.raw)+'</pre></details>':'');
   var opt=function(v,t,cur){return '<option value="'+esc(v)+'"'+(String(cur)===String(v)?' selected':'')+'>'+esc(t)+'</option>'};
   h+='<label for="sf_type">Bet type</label><select id="sf_type" data-sf="type">'+[['ml','Moneyline'],['sp','Spread'],['tot','Game total'],['prop','Player yards']].concat(b.type==='parlay'?[['parlay','Parlay (read from slip)']]:[]).map(function(x){return opt(x[0],x[1],b.type)}).join('')+'</select>';
   if(b.type==='parlay'){
@@ -1326,7 +1326,8 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-function foot(){return '<p class="foot"><button class="linkbtn" data-act="tab" data-t="about">How the model works</button></p><p class="foot">For entertainment and research only, not betting advice. Probabilities are estimates and can be wrong. If gambling is a problem for you or someone you know, call 1-800-GAMBLER.</p>'}
+var BUILD='v23, Oct 20';
+function foot(){return '<p class="foot"><button class="linkbtn" data-act="tab" data-t="about">How the model works</button> · <span class="src">Build '+BUILD+'</span></p><p class="foot">For entertainment and research only, not betting advice. Probabilities are estimates and can be wrong. If gambling is a problem for you or someone you know, call 1-800-GAMBLER.</p>'}
 
 /* ---------- sheets ---------- */
 /* ---------- team model, analyst sections, parlays ---------- */
