@@ -540,7 +540,7 @@ var $=function(s){return document.querySelector(s)};
 function nt(x){return x==='LA'?'LAR':x==='JAC'?'JAX':x==='WSH'?'WAS':x}
 function research(g){if(g.lg!=='nfl')return null;return GAMES.filter(function(r){return r.a===nt(g.a)&&r.h===nt(g.h)})[0]||null}
 function feedFor(r){return S.feed.nfl.filter(function(g){return nt(g.a)===r.a&&nt(g.h)===r.h})[0]||null}
-function kind(g){var s=g.status;if(s==='closed'||s==='complete'||s==='final')return 'final';if(s==='scheduled'||s==='created')return 'up';return 'live'}
+function kind(g){var s=g.status;if(s==='closed'||s==='complete'||s==='final')return 'final';if(s==='scheduled'||s==='created')return g.start&&g.start<Date.now()-5*36e5?'final':'up';return 'live'}
 function fmtTime(ms){try{return new Date(ms).toLocaleString([],{weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}catch(e){return new Date(ms).toISOString()}}
 function fmtClock(ms){try{return new Date(ms).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}catch(e){return ''}}
 function find(id){var out=null;LG.forEach(function(l){S.feed[l[0]].forEach(function(g){if(g.id===id)out=g})});return out}
@@ -553,7 +553,7 @@ function barHtml(a,h,pa,ph,cap){
 function mlText(g){return g.ml?g.a+' '+fo(g.ml.a)+' / '+g.h+' '+fo(g.ml.h):'not available'}
 function statusPill(g){
   var k=kind(g);
-  if(k==='final')return '<span class="pill final">Final</span>';
+  if(k==='final')return g.sa==null&&(g.status==='scheduled'||g.status==='created')?'<span class="pill">Played, score not loaded</span>':'<span class="pill final">Final</span>';
   if(k==='up')return '<span class="pill">'+esc(g.title||'Upcoming')+'</span>';
   var stale=Date.now()-S.feedAt>20*60000;
   return '<span class="pill live">'+(stale?'In progress at last refresh':'Live')+(g.q&&g.lg!=='mlb'?' · Q'+g.q:'')+(g.clock&&!stale?' '+esc(g.clock):'')+'</span>';
@@ -597,23 +597,37 @@ function refreshBar(){
   var stale=!S.live&&Date.now()-S.feedAt>600000?'<div class="msg warn" role="status">Scores below are from a saved snapshot and may be out of date.</div>':'';
   return '<div class="rbar"><div><div class="label">'+when+'</div>'+(S.msg?'<div class="msg '+S.msgKind+'" role="status">'+S.msg+'</div>':stale)+'</div><button class="btn primary" style="flex:none" data-act="refresh"'+(S.busy?' disabled':'')+'>'+(S.busy?'Refreshing…':'Refresh scores')+'</button></div>';
 }
+S.gv='up';
+function dayHead(ms){return new Date(ms).toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'})}
+function groupDays(list,fn){
+  var out='',cur='';
+  list.forEach(function(g){var d=dayHead(g.start);if(d!==cur){cur=d;out+=(out?'</div>':'')+'<h3>'+esc(d)+'</h3><div class="feed">'}out+=fn(g)});
+  return out?out+'</div>':'';
+}
 function vGames(){
   var lg=S.sport,name=LG.filter(function(l){return l[0]===lg})[0][1],all=S.feed[lg].slice();
   var live=all.filter(function(g){return kind(g)==='live'}).sort(function(a,b){return a.start-b.start});
   var up=all.filter(function(g){return kind(g)==='up'}).sort(function(a,b){return a.start-b.start});
-  var fin=all.filter(function(g){return kind(g)==='final'}).sort(function(a,b){return b.start-a.start}).slice(0,6);
+  var fin=all.filter(function(g){return kind(g)==='final'}).sort(function(a,b){return b.start-a.start});
   var h='<h2>'+name+' board</h2>'+sportChips()+modeSwitch('games')+refreshBar();
+  var gv=S.gv==='recent'?'recent':'up';
+  if(gv==='up'&&!up.length&&!live.length&&fin.length)gv='recent';
+  h+='<div class="chips" role="group" aria-label="Games view">'+[['up','Upcoming ('+(up.length+live.length)+')'],['recent','Recent ('+fin.length+')']].map(function(m){return '<button class="chip" data-act="set" data-k="gv" data-v="'+m[0]+'" aria-pressed="'+(gv===m[0])+'">'+m[1]+'</button>'}).join('')+'</div>';
   if(!all.length){
-    h+='<div class="card empty">No '+name+' games in the data feed right now. '+(lg==='ncaamb'?'College basketball has not started its season in the feed yet. ':'')+'Tap Refresh to check again.</div>';
+    return h+'<div class="card empty">No '+name+' games in the data feed right now. '+(lg==='ncaamb'?'College basketball has not started its season in the feed yet. ':'')+'Tap Refresh to check again.</div>'+foot();
   }
-  if(live.length)h+='<h3>Live</h3><div class="feed">'+live.map(feedCard).join('')+'</div>';
-  if(lg!=='mlb'&&lg!=='ncaamb')h+=discoverHtml();
-  if(up.length){
-    h+='<h3>Upcoming</h3>';
-    if(lg==='nfl')h+='<p class="lede" style="margin-top:0">Week '+DATA.week+' cards show lines from the source and date listed. Byes: '+DATA.byes.join(', ')+'.</p>';
-    h+='<div class="feed">'+up.map(feedCard).join('')+'</div>';
+  if(gv==='up'){
+    if(live.length)h+='<h3>Live now</h3><div class="feed">'+live.map(feedCard).join('')+'</div>';
+    if(lg!=='mlb'&&lg!=='ncaamb')h+=discoverHtml();
+    if(up.length){
+      var f=up[0],l=up[up.length-1],span=dayHead(f.start)===dayHead(l.start)?dayHead(f.start):dayHead(f.start)+' to '+dayHead(l.start);
+      h+='<p class="lede" style="margin-top:12px"><b>Next slate:</b> '+esc(span)+', '+up.length+' game'+(up.length>1?'s':'')+'.'+(lg==='nfl'?' Week '+DATA.week+' lines are from the source and date shown on each card. Byes: '+DATA.byes.join(', ')+'.':'')+' Games move to Recent as soon as the feed marks them final.</p>';
+      h+=groupDays(up,feedCard);
+    }else if(!live.length)h+='<div class="card empty">No upcoming '+name+' games in the feed. Tap Refresh, or open Recent for the latest results.</div>';
+  }else{
+    h+='<p class="lede" style="margin-top:12px">Finished games from about the last week, newest first. A game marked “score not loaded” has been played but the feed has not returned its result yet. Tap Refresh.</p>';
+    h+=fin.length?groupDays(fin,feedCard):'<div class="card empty">No finished games in the feed yet.</div>';
   }
-  if(fin.length)h+='<h3>Recent finals</h3><div class="feed">'+fin.map(feedCard).join('')+'</div>';
   return h+foot();
 }
 function propRows(list){
@@ -1500,7 +1514,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v26, Oct 20';
+var BUILD='v27, Oct 20';
 function foot(){return '<p class="foot"><button class="linkbtn" data-act="tab" data-t="about">How the model works</button> · <span class="src">Build '+BUILD+'</span></p><p class="foot">For entertainment and research only, not betting advice. Probabilities are estimates and can be wrong. If gambling is a problem for you or someone you know, call 1-800-GAMBLER.</p>'}
 
 /* ---------- sheets ---------- */
@@ -2675,7 +2689,7 @@ document.addEventListener('click',function(e){
   var act=el.dataset.act;
   if(act==='scrim'){if(e.target!==el)return;S.sheet=null;renderSheet();return}
   if(act==='tab'){S.tab=el.dataset.t;render();window.scrollTo(0,0)}
-  else if(act==='sport'){S.sport=el.dataset.v;S.cat=null;render()}
+  else if(act==='sport'){S.sport=el.dataset.v;S.cat=null;S.gv='up';render()}
   else if(act==='refresh'){doRefresh()}
   else if(act==='cat'){S.cat=el.dataset.v;render()}
   else if(act==='ckretry'){S.ck.err='';render()}
