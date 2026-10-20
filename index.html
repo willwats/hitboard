@@ -415,7 +415,7 @@ var DATA={
 };
 
 /* ============================= LOGIC ============================= */
-var CV={pass:.22,rush:.55,rec:.6,recpt:.4,npts:.26,nreb:.33,nast:.38,cpass:.28,crush:.6,crec:.65,mk:.32};var PXPOIS={ntpm:1,mh:1,mhr:1,msb:1}; // assumed game-to-game variation (std dev as a share of the mean)
+var CV={pass:.22,rush:.55,rec:.6,recpt:.4,npts:.26,nreb:.33,nast:.38,cpass:.28,crush:.6,crec:.65,mk:.32};var PXPOIS={ntpm:1,mh:1,mhr:1,msb:1,hg:1,hp:1,ha:1,hs:1,hsv:1}; // assumed game-to-game variation (std dev as a share of the mean)
 function imp(o){return o<0?-o/(-o+100):100/(o+100)}
 function nov(a,b){var x=imp(a),y=imp(b);return x/(x+y)}
 function erf(x){var s=x<0?-1:1;x=Math.abs(x);var t=1/(1+.3275911*x);var y=1-(((((1.061405429*t-1.453152027)*t)+1.421413741)*t-.284496736)*t+.254829592)*t*Math.exp(-x*x);return s*y}
@@ -446,18 +446,19 @@ function calc(p,line,oo,uo,adj){
 function defLine(p){return Math.floor(p.avg)+.5}
 
 /* ---------- live feed: snapshot baked in, replaced by Refresh ---------- */
-var LG=[['nfl','NFL'],['nba','NBA'],['ncaafb','NCAAF'],['ncaamb','NCAAB'],['mlb','MLB']];
+var LG=[['nfl','NFL'],['nba','NBA'],['ncaafb','NCAAF'],['ncaamb','NCAAB'],['mlb','MLB'],['nhl','NHL']];
 var FEED_SERVER="widgets",FEED_TOOL="fetch_sports_data";
 function row(lg,st,iso,a,h,an,hn,sa,sh,pa,ph,clk,q,title,sid){
   return {sid:sid||null,lg:lg,id:lg+':'+a+'@'+h+':'+iso,status:st,start:Date.parse(iso),a:a,h:h,an:an,hn:hn,sa:sa==null?null:sa,sh:sh==null?null:sh,pa:pa==null?null:pa,ph:ph==null?null:ph,clock:clk||null,q:q||null,title:title||''};
 }
-var SNAP={at:Date.UTC(2026,9,18,19,17),feed:{nfl:[],nba:[],ncaafb:[],ncaamb:[],mlb:[]}};
+var SNAP={at:Date.UTC(2026,9,18,19,17),feed:{nfl:[],nba:[],ncaafb:[],ncaamb:[],mlb:[],nhl:[]}};
 (function(){
   var F=SNAP.feed;
   function nfl(){F.nfl.push(row.apply(null,['nfl'].concat([].slice.call(arguments))))}
   function nba(){F.nba.push(row.apply(null,['nba'].concat([].slice.call(arguments))))}
   function cf(){F.ncaafb.push(row.apply(null,['ncaafb'].concat([].slice.call(arguments))))}
   function mlb(){F.mlb.push(row.apply(null,['mlb'].concat([].slice.call(arguments))))}
+  function nhl(){F.nhl.push(row.apply(null,['nhl'].concat([].slice.call(arguments))))}
   mlb("closed","2026-10-18T00:08:00Z","TB","CLE","Tampa Bay Rays","Cleveland Guardians",7,3);
   mlb("closed","2026-10-18T21:08:00Z","TB","CLE","Tampa Bay Rays","Cleveland Guardians",3,1);
   mlb("closed","2026-10-20T00:08:00Z","CLE","TB","Cleveland Guardians","Tampa Bay Rays",3,7);
@@ -465,6 +466,46 @@ var SNAP={at:Date.UTC(2026,9,18,19,17),feed:{nfl:[],nba:[],ncaafb:[],ncaamb:[],m
   mlb("scheduled","2026-10-25T00:00:00Z","TB","MIL","Tampa Bay Rays","Milwaukee Brewers",null,null);
   mlb("scheduled","2026-10-27T00:00:00Z","MIL","TB","Milwaukee Brewers","Tampa Bay Rays",null,null);
   mlb("scheduled","2026-10-28T00:00:00Z","MIL","TB","Milwaukee Brewers","Tampa Bay Rays",null,null);
+  nhl("closed","2026-10-17T17:00:00Z","NJ","WSH","New Jersey Devils","Washington Capitals",2,4,null,null);
+  nhl("closed","2026-10-17T19:30:00Z","CAR","WPG","Carolina Hurricanes","Winnipeg Jets",3,2,null,null);
+  nhl("closed","2026-10-17T20:00:00Z","VAN","TB","Vancouver Canucks","Tampa Bay Lightning",2,4,null,null);
+  nhl("closed","2026-10-17T22:00:00Z","SEA","FLA","Seattle Kraken","Florida Panthers",3,8,null,null);
+  nhl("closed","2026-10-17T23:00:00Z","BUF","MTL","Buffalo Sabres","Montreal Canadiens",3,4,null,null);
+  nhl("closed","2026-10-17T23:00:00Z","NYI","TOR","New York Islanders","Toronto Maple Leafs",4,1,null,null);
+  nhl("closed","2026-10-17T23:00:00Z","SJ","DET","San Jose Sharks","Detroit Red Wings",3,4,null,null);
+  nhl("closed","2026-10-17T23:00:00Z","NYR","CBJ","New York Rangers","Columbus Blue Jackets",0,1,null,null);
+  nhl("closed","2026-10-17T23:00:00Z","OTT","PHI","Ottawa Senators","Philadelphia Flyers",1,3,null,null);
+  nhl("closed","2026-10-17T23:00:00Z","DAL","CHI","Dallas Stars","Chicago Blackhawks",4,0,null,null);
+  nhl("closed","2026-10-18T00:00:00Z","STL","NSH","St. Louis Blues","Nashville Predators",2,5,null,null);
+  nhl("closed","2026-10-18T01:00:00Z","BOS","LA","Boston Bruins","Los Angeles Kings",4,1,null,null);
+  nhl("closed","2026-10-18T02:00:00Z","PIT","VGK","Pittsburgh Penguins","Vegas Golden Knights",2,6,null,null);
+  nhl("closed","2026-10-18T02:00:00Z","EDM","UTA","Edmonton Oilers","Utah Mammoth",6,2,null,null);
+  nhl("closed","2026-10-18T22:00:00Z","CBJ","MIN","Columbus Blue Jackets","Minnesota Wild",1,2,null,null);
+  nhl("closed","2026-10-19T00:00:00Z","CAR","CGY","Carolina Hurricanes","Calgary Flames",2,3,null,null);
+  nhl("closed","2026-10-19T23:00:00Z","COL","PHI","Colorado Avalanche","Philadelphia Flyers",2,3,null,null);
+  nhl("closed","2026-10-19T23:00:00Z","ANA","NYR","Anaheim Ducks","New York Rangers",2,5,null,null);
+  nhl("closed","2026-10-19T23:30:00Z","SJ","TOR","San Jose Sharks","Toronto Maple Leafs",1,3,null,null);
+  nhl("closed","2026-10-20T01:00:00Z","PIT","UTA","Pittsburgh Penguins","Utah Mammoth",4,5,null,null);
+  nhl("scheduled","2026-10-20T23:00:00Z","COL","NJ","Colorado Avalanche","New Jersey Devils",null,null,null,null);
+  nhl("scheduled","2026-10-20T23:00:00Z","LA","WSH","Los Angeles Kings","Washington Capitals",null,null,null,null);
+  nhl("scheduled","2026-10-20T23:00:00Z","ANA","NYI","Anaheim Ducks","New York Islanders",null,null,null,null);
+  nhl("scheduled","2026-10-20T23:00:00Z","SJ","MTL","San Jose Sharks","Montreal Canadiens",null,null,null,null);
+  nhl("scheduled","2026-10-20T23:00:00Z","TOR","CBJ","Toronto Maple Leafs","Columbus Blue Jackets",null,null,null,null);
+  nhl("scheduled","2026-10-21T00:00:00Z","BOS","DAL","Boston Bruins","Dallas Stars",null,null,40.3,59.7);
+  nhl("scheduled","2026-10-21T00:00:00Z","WPG","STL","Winnipeg Jets","St. Louis Blues",null,null,45.2,54.8);
+  nhl("scheduled","2026-10-21T01:00:00Z","MIN","EDM","Minnesota Wild","Edmonton Oilers",null,null,45.2,54.8);
+  nhl("scheduled","2026-10-21T01:40:00Z","DET","SEA","Detroit Red Wings","Seattle Kraken",null,null,51,49);
+  nhl("scheduled","2026-10-21T02:00:00Z","CAR","VAN","Carolina Hurricanes","Vancouver Canucks",null,null,73.2,26.8);
+  nhl("scheduled","2026-10-21T02:30:00Z","TB","VGK","Tampa Bay Lightning","Vegas Golden Knights",null,null,50.1,49.9);
+  nhl("scheduled","2026-10-21T23:30:00Z","PHI","BUF","Philadelphia Flyers","Buffalo Sabres",null,null,37.7,62.3);
+  nhl("scheduled","2026-10-21T23:30:00Z","FLA","OTT","Florida Panthers","Ottawa Senators",null,null,50,50);
+  nhl("scheduled","2026-10-22T23:00:00Z","ANA","NJ","Anaheim Ducks","New Jersey Devils",null,null,null,null);
+  nhl("scheduled","2026-10-22T23:00:00Z","SJ","OTT","San Jose Sharks","Ottawa Senators",null,null,null,null);
+  nhl("scheduled","2026-10-22T23:00:00Z","FLA","PIT","Florida Panthers","Pittsburgh Penguins",null,null,null,null);
+  nhl("scheduled","2026-10-22T23:00:00Z","NSH","BOS","Nashville Predators","Boston Bruins",null,null,null,null);
+  nhl("scheduled","2026-10-22T23:00:00Z","NYR","TOR","New York Rangers","Toronto Maple Leafs",null,null,null,null);
+  nhl("scheduled","2026-10-22T23:30:00Z","LA","NYI","Los Angeles Kings","New York Islanders",null,null,null,null);
+  nhl("scheduled","2026-10-23T00:00:00Z","WPG","DAL","Winnipeg Jets","Dallas Stars",null,null,null,null);
   // status, iso, away, home, awayName, homeName, awayScore, homeScore, awayProb, homeProb, clock, quarter, title
   nfl('inprogress','2026-10-18T17:00:00Z','TEN','IND','Tennessee Titans','Indianapolis Colts',6,13,null,null,'15:00',4);
   nfl('inprogress','2026-10-18T17:00:00Z','CAR','PHI','Carolina Panthers','Philadelphia Eagles',13,7,null,null,'9:04',3);
@@ -559,7 +600,7 @@ function statusPill(g){
   if(k==='final')return g.sa==null&&(g.status==='scheduled'||g.status==='created')?'<span class="pill">Played, score not loaded</span>':'<span class="pill final">Final</span>';
   if(k==='up')return '<span class="pill">'+esc(g.title||'Upcoming')+'</span>';
   var stale=Date.now()-S.feedAt>20*60000;
-  return '<span class="pill live">'+(stale?'In progress at last refresh':'Live')+(g.q&&g.lg!=='mlb'?' · Q'+g.q:'')+(g.clock&&!stale?' '+esc(g.clock):'')+'</span>';
+  return '<span class="pill live">'+(stale?'In progress at last refresh':'Live')+(g.q&&g.lg!=='mlb'?' · '+(g.lg==='nhl'?periodLabel('nhl',+g.q):'Q'+g.q):'')+(g.clock&&!stale?' '+esc(g.clock):'')+'</span>';
 }
 function feedCard(g){
   var r=research(g),k=kind(g),h='<article class="card"><div class="gtop"><span class="label">'+esc(fmtTime(g.start))+'</span>'+statusPill(g)+'</div>';
@@ -602,13 +643,13 @@ function refreshBar(){
 }
 function miniRow(g){
   var k=kind(g),tag=LG.filter(function(l){return l[0]===g.lg})[0][1],right=k==='up'?'<span class="src">'+esc(gTime(g))+'</span>':(g.sa!=null?'<b>'+esc(g.a)+' '+g.sa+'</b> <b>'+esc(g.h)+' '+g.sh+'</b>':'<span class="src">Played</span>');
-  var st=k==='live'?'<span class="pill live" style="margin-left:6px">'+(g.q&&g.lg!=='mlb'?'Q'+g.q+' ':'')+esc(g.clock||'Live')+'</span>':k==='final'&&g.sa!=null?'<span class="pill final" style="margin-left:6px">Final</span>':'';
+  var st=k==='live'?'<span class="pill live" style="margin-left:6px">'+(g.q&&g.lg!=='mlb'?(g.lg==='nhl'?periodLabel('nhl',+g.q):'Q'+g.q)+' ':'')+esc(g.clock||'Live')+'</span>':k==='final'&&g.sa!=null?'<span class="pill final" style="margin-left:6px">Final</span>':'';
   return '<div class="card" style="padding:10px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px"><span style="min-width:0"><span class="label">'+esc(tag)+'</span><br>'+teamBtn(g.lg,g.an,g.a)+' <span class="src">at</span> '+teamBtn(g.lg,g.hn,g.h)+'</span><span style="text-align:right;white-space:nowrap">'+right+st+'</span></div>';
 }
 function homeRecs(){
   var key=S.feedAt+'|'+S.mine.length+'|'+Object.keys(S.tracked).length;
   if(S.homeKey===key)return S.homeRecs;
-  var all=[];['nfl','nba','ncaafb','mlb'].forEach(function(lg){try{straightList(lg).forEach(function(b){b.lgKey=lg;all.push(b)})}catch(e){}});
+  var all=[];['nfl','nba','ncaafb','mlb','nhl'].forEach(function(lg){try{straightList(lg).forEach(function(b){b.lgKey=lg;all.push(b)})}catch(e){}});
   var per={};all.sort(function(a,b){return b.p-a.p});
   var top=all.filter(function(b){if(!b.rec||b.rec.t==='manual')return false;per[b.lgKey]=(per[b.lgKey]||0)+1;return per[b.lgKey]<=3}).slice(0,8);
   S.homeRecs=top;S.homeKey=key;return top;
@@ -715,6 +756,7 @@ var CATS={
   nba:[['xdeep','All players'],['Points','Points'],['Rebounds','Rebounds'],['Assists','Assists'],['Threes','Threes'],['xcalc','Calculator'],['lines','Game lines']],
   ncaafb:[['xdeep','All players'],['Passing yards','Passing'],['Rushing yards','Rushing'],['Receiving yards','Receiving'],['kick','Kickers'],['xcalc','Calculator']],
   ncaamb:[],
+  nhl:[['xdeep','All players'],['xcalc','Calculator']],
   mlb:[['xdeep','All players'],['hr','Home runs'],['sb','Stolen bases'],['hit','Hits'],['pit','Pitchers'],['cheat','Cheatsheet'],['xcalc','Calculator']]
 };
 function curCat(){var l=CATS[S.sport];if(!l.length)return null;var ok=l.some(function(c){return c[0]===S.cat});return ok?S.cat:l[0][0]}
@@ -802,12 +844,12 @@ function fetchStand(lg){
   var u='https://site.api.espn.com/apis/v2/sports/'+ESPN[lg]+'/standings'+(lg==='ncaafb'?'?group=80':'?level=3');
   try{fetch(u).then(function(r){if(!r.ok)throw 0;return r.json()}).then(function(j){
     var gs=[];walkStand(j,gs);
-    var want={nfl:[8,32],nba:[6,30],mlb:[6,30],ncaafb:[8,100]}[lg],out=[],n=0;
+    var want={nfl:[8,32],nba:[6,30],mlb:[6,30],nhl:[4,32],ncaafb:[8,100]}[lg],out=[],n=0;
     gs.forEach(function(g){
       var ts=g.e.map(function(e){
         var st={};(e.stats||[]).forEach(function(x){st[x.name]=x.value});
         if(e.team==null||st.wins==null||st.losses==null)return null;
-        return {n:e.team.displayName||e.team.name,w:+st.wins,l:+st.losses,t:+(st.ties||0),c:''};
+        return {n:e.team.displayName||e.team.name,w:+st.wins,l:+st.losses,t:+(st.ties||st.otLosses||0),c:''};
       }).filter(Boolean);
       if(ts.length<3)return;n+=ts.length;out.push({g:g.g,t:ts});
     });
@@ -822,6 +864,7 @@ function vDiv(){
   if(lg==='ncaamb')return h+'<div class="card empty">College basketball has not started its season yet, so there are no standings.</div>'+foot();
   fetchStand(lg);
   var L=S.stand.live[lg],groups=L?L.groups:STAND[lg],src=L?'Live from ESPN, '+fmtClock(L.at):'Saved snapshot, '+S.stand.src+'. It refreshes from ESPN when your connection allows.';
+  if(lg==='nhl')return h+nhlDivHtml(groups,src)+foot();
   h+='<p class="lede" style="margin-top:0">'+(isC?'Overall records by conference.':'Standings by '+(lg==='mlb'?'division':'division')+', with games behind the leader and each team’s next game.')+' '+esc(src)+'</p>';
   var leg=lg==='mlb'?'<p class="src">Tags: Div = clinched division, WC = clinched wild card, Out = eliminated. The regular season is over, so the playoffs are under way.</p>':'';
   groups.forEach(function(G){
@@ -940,8 +983,86 @@ function mlbCheat(pool){
 }
 
 
+var NHL_TEAM_TXT="Washington Capitals|WSH|8|5|3|0|3.5|3.0|26.125|29.625|0.190476|0.821429|10\nNew Jersey Devils|NJ|8|4|4|0|3.125|3.375|35.0|25.0|0.206896|0.695653|8\nVegas Golden Knights|VGK|10|8|2|0|4.1|2.4|29.8|25.4|0.277777|0.739131|16\nVancouver Canucks|VAN|10|2|7|1|3.0|4.5|21.1|32.7|0.2|0.580646|5\nAnaheim Ducks|ANA|8|4|4|0|3.0|3.25|25.0|26.75|0.241379|0.793104|8\nSt. Louis Blues|STL|8|3|4|1|3.375|3.5|26.0|26.625|0.190476|0.84|7\nDallas Stars|DAL|8|4|3|1|2.375|1.5|25.5|22.625|0.15|0.892858|9\nDetroit Red Wings|DET|8|3|3|2|2.375|2.875|30.5|27.0|0.178571|0.689656|8\nOttawa Senators|OTT|9|6|3|0|2.44444|2.55555|23.11111|26.22222|0.128205|0.794118|12\nWinnipeg Jets|WPG|8|4|2|2|2.875|3.0|26.625|29.25|0.3|0.789474|10\nColorado Avalanche|COL|9|5|3|1|4.22222|2.88888|30.22222|25.77777|0.193548|0.818182|11\nNashville Predators|NSH|8|3|2|3|2.875|2.75|24.375|29.125|0.296296|0.851852|9\nBoston Bruins|BOS|9|7|2|0|3.77777|2.11111|25.44444|28.33333|0.25|0.8125|14\nColumbus Blue Jackets|CBJ|7|3|4|0|2.42857|3.28571|26.14285|28.57142|0.117647|0.68|6\nChicago Blackhawks|CHI|9|3|6|0|2.33333|4.0|21.44444|30.55555|0.125|0.740741|6\nCalgary Flames|CGY|8|2|6|0|2.125|4.625|30.0|29.625|0.210526|0.814815|4\nTampa Bay Lightning|TB|8|6|2|0|3.125|2.625|30.875|23.0|0.107142|0.75|12\nPittsburgh Penguins|PIT|10|3|6|1|3.2|3.7|27.4|27.8|0.233333|0.807693|7\nMontreal Canadiens|MTL|8|4|3|1|3.125|3.75|29.125|25.875|0.148148|0.82353|9\nSan Jose Sharks|SJ|9|4|4|1|2.44444|3.44444|28.0|28.0|0.2|0.774194|9\nNew York Rangers|NYR|11|7|3|1|3.0|2.18181|24.18181|25.72727|0.205882|0.941177|15\nNew York Islanders|NYI|8|4|3|1|3.0|2.125|24.875|26.375|0.166666|0.866667|9\nLos Angeles Kings|LA|6|0|4|2|2.0|4.16666|29.83333|26.83333|0.142857|0.619048|2\nSeattle Kraken|SEA|9|5|3|1|3.77777|3.44444|26.44444|31.77777|0.206896|0.76|11\nUtah Mammoth|UTA|10|7|3|0|3.8|3.1|30.1|22.5|0.361111|0.6875|14\nMinnesota Wild|MIN|9|6|2|1|3.11111|2.33333|29.77777|25.44444|0.321428|0.892858|13\nBuffalo Sabres|BUF|9|4|3|2|3.0|3.66666|26.77777|25.66666|0.090909|0.645162|10\nCarolina Hurricanes|CAR|10|7|2|1|3.6|2.4|33.1|22.9|0.25641|0.914286|15\nPhiladelphia Flyers|PHI|11|2|6|3|1.54545|3.18181|21.45454|32.27272|0.129032|0.846154|7\nEdmonton Oilers|EDM|8|6|1|1|4.625|3.0|24.375|26.125|0.25|0.708334|13\nFlorida Panthers|FLA|9|5|2|2|3.33333|2.77777|29.33333|24.0|0.209302|0.805556|12\nToronto Maple Leafs|TOR|10|4|4|2|3.2|3.2|28.4|29.5|0.285714|0.96875|10";
+var NHL_SK_TXT="T|EDM\nS|Mattias Ekholm|D|8|1|2|8|1314.625\nS|Zach Hyman|L|2|1|0|4|1112.5\nS|Connor Murphy|D|8|0|1|6|1284.625\nS|Jason Dickinson|C|3|0|1|2|732.3333\nS|Leon Draisaitl|C|8|6|8|28|1263.875\nS|Kasperi Kapanen|R|8|3|1|12|1052.875\nS|Jake Walman|D|5|0|0|5|908.6\nS|Connor McDavid|C|8|6|17|18|1403.375\nS|Mathieu Joseph|R|8|1|3|9|876.0\nS|Ryan Shea|D|8|1|2|5|1364.125\nS|Trent Frederic|C|8|1|0|8|603.75\nS|Max Jones|L|5|0|0|5|627.6\nS|Alex Formenton|L|8|1|2|9|879.875\nS|Evan Bouchard|D|8|6|10|27|1513.75\nS|Ty Emberson|D|6|0|1|1|739.0\nS|Filip Hallander|C|4|0|0|3|685.25\nS|Vasily Podkolzin|R|8|7|4|22|1154.375\nS|Shakir Mukhamadullin|D|5|1|0|1|711.8\nS|Colton Dach|C|4|0|0|8|855.0\nS|Isaac Howard|L|8|0|2|7|586.625\nS|Josh Samanski|C|6|0|1|0|464.0\nS|Owen Michaels|R|8|2|1|7|792.125\nG|Tristan Jarry|3|3|62|71\nG|Devon Levi|5|5|123|137\nT|ANA\nS|Alex Killorn|L|8|1|2|15|972.875\nS|Nick Jensen|D|1|1|0|1|1092.0\nS|Mikael Granlund|C|7|2|6|14|1162.4286\nS|Frank Vatrano|R|5|1|1|5|728.8\nS|A.J. Greer|L|7|1|1|16|737.0\nS|Ryan Poehling|C|5|1|1|6|854.8\nS|Judd Caulfield|R|8|1|2|7|750.625\nS|Drew Helleson|D|2|0|0|4|1118.5\nS|Jackson LaCombe|D|8|1|5|6|1549.5\nS|Nikita Nesterenko|C|7|2|1|10|725.0\nS|Sam Colangelo|R|4|1|0|4|733.5\nS|Jeff Malott|L|8|1|2|7|586.75\nS|Tyson Hinds|D|8|0|0|11|881.25\nS|Cutter Gauthier|L|7|2|3|26|1037.2857\nS|Tristan Luneau|D|8|0|2|5|1277.875\nS|Pavel Mintyukov|D|8|0|2|5|1143.375\nS|Noah Warren|D|8|0|3|7|1027.25\nS|Leo Carlsson|C|8|2|7|9|1172.25\nS|Travis Mitchell|D|5|0|0|3|996.2\nS|Beckett Sennecke|R|8|5|3|22|1230.875\nS|Roger McQueen|C|3|0|0|8|861.6667\nS|Tim Washe|C|8|2|2|9|924.75\nS|Nikita Klepov|R|3|0|0|0|807.6667\nG|Ville Husso|3|2|54|61\nG|Lukas Dostal|6|6|134|152\nT|BOS\nS|Sean Kuraly|C|4|0|0|8|764.5\nS|Hampus Lindholm|D|9|1|3|9|1248.1111\nS|Connor Clifton|D|6|0|1|6|1237.6667\nS|Elias Lindholm|C|9|3|4|14|980.3333\nS|Nikita Zadorov|D|8|0|3|10|1191.875\nS|David Pastrnak|R|9|4|8|34|1184.0\nS|Pavel Zacha|C|8|2|3|12|1085.375\nS|Will Borgen|D|9|1|2|4|1125.0\nS|Charlie McAvoy|D|3|1|1|7|1550.0\nS|Tanner Jeannot|L|9|1|0|4|695.8889\nS|Morgan Geekie|C|9|1|7|9|1065.6667\nS|Casey Mittelstadt|C|9|2|1|13|810.4444\nS|Mark Kastelic|C|9|1|4|8|679.8889\nS|Jonathan Aspirot|D|4|0|0|4|1018.0\nS|JJ Peterka|R|9|3|3|15|988.1111\nS|Marat Khusnutdinov|C|9|2|3|10|815.7778\nS|Mason Lohrei|D|9|2|3|9|1091.5556\nS|Frederic Brunet|D|6|1|1|7|1020.5\nS|Fraser Minten|C|9|4|4|23|989.4444\nS|Matthew Poitras|C|6|3|2|8|642.1667\nS|James Hagens|C|9|2|4|15|763.1111\nG|Michael DiPietro|2|2|52|57\nG|Jeremy Swayman|7|7|184|197\nT|BUF\nS|Sam Carrick|C|4|0|0|1|443.0\nS|Matt Grzelcyk|D|1|0|0|0|867.0\nS|Dennis Gilbert|D|3|1|1|1|616.3333\nS|Beck Malenstyn|L|9|0|2|2|595.7778\nS|Tage Thompson|C|9|5|4|42|1198.6667\nS|Justin Danforth|R|6|0|0|1|549.3333\nS|Josh Norris|C|9|2|1|12|886.8889\nS|Ryan McLeod|C|9|1|1|7|926.7778\nS|Mattias Samuelsson|D|9|2|5|13|1400.1111\nS|Rasmus Dahlin|D|6|2|2|19|1418.0\nS|Peyton Krebs|C|9|0|4|6|845.7778\nS|Louis Crevier|D|9|0|1|9|897.1111\nS|Jack Quinn|R|9|5|4|24|1174.3333\nS|Josh Doan|R|9|1|1|13|974.7778\nS|Owen Power|D|9|2|6|11|1604.7778\nS|Olen Zellweger|D|8|2|1|20|1182.875\nS|Tyson Kozak|C|2|0|0|0|549.0\nS|Jiri Kulich|C|7|1|2|8|785.2857\nS|Noah Ostlund|C|9|2|4|20|1132.6667\nS|Zach Benson|L|9|0|6|18|1192.3333\nS|Zach Metsa|D|9|0|2|3|776.2222\nS|Konsta Helenius|C|8|1|1|11|824.5\nG|Ukko-Pekka Luukkonen|7|6|147|171\nG|Colten Ellis|3|3|51|59\nT|CAR\nS|Jordan Staal|C|6|0|0|6|933.6667\nS|Nicolas Deslauriers|L|5|0|1|2|476.2\nS|Taylor Hall|L|8|3|2|17|781.0\nS|Mike Reilly|D|8|0|2|9|746.375\nS|Mark Jankowski|L|9|6|1|15|826.3333\nS|Shayne Gostisbehere|D|10|2|5|21|1085.0\nS|Jordan Martinook|L|10|1|2|17|866.8\nS|Jaccob Slavin|D|10|0|3|18|1265.8\nS|William Carrier|L|10|0|6|15|749.5\nS|Nikolaj Ehlers|L|10|1|4|19|971.3\nS|Sebastian Aho|C|10|6|8|30|1197.3\nS|Jalen Chatfield|D|10|1|2|18|1227.8\nS|Sean Walker|D|10|0|6|14|1294.6\nS|Eric Robinson|L|10|2|4|16|746.9\nS|K'Andre Miller|D|10|1|2|16|1344.1\nS|Jesperi Kotkaniemi|C|8|2|2|9|679.5\nS|Andrei Svechnikov|R|10|6|5|30|1053.0\nS|Logan Stankoven|C|10|4|2|27|1049.8\nS|Jackson Blake|R|10|1|7|27|1096.8\nS|Bradly Nadeau|L|2|0|1|2|846.5\nS|Felix Unger S\u00f6rum|R|2|0|0|1|698.5\nS|Charles Alexis Legault|D|2|0|0|2|713.5\nG|Pyotr Kochetkov|5|5|93|102\nG|Brandon Bussi|5|5|112|127\nT|CBJ\nS|Charlie Coyle|C|7|0|6|13|1133.1429\nS|Erik Gudbranson|D|7|0|1|5|1044.1429\nS|Damon Severson|D|5|1|3|5|1435.8\nS|Carson Soucy|D|6|0|1|4|907.8333\nS|Sean Monahan|C|7|1|2|10|1027.2857\nS|Valeri Nichushkin|R|7|1|2|10|985.2857\nS|Danton Heinen|L|7|0|0|6|649.7143\nS|Zach Werenski|D|7|0|6|16|1762.1429\nS|Conor Garland|R|7|0|0|6|763.4286\nS|Ryan Lomberg|L|7|0|0|12|512.0\nS|Mathieu Olivier|R|7|2|0|12|877.7143\nS|Jake Christiansen|D|6|0|0|1|765.1667\nS|Dmitri Voronkov|L|5|0|1|6|724.4\nS|Emil Andrae|D|4|0|1|1|635.75\nS|Kent Johnson|C|7|4|1|20|1047.7143\nS|Cole Sillinger|C|7|3|2|10|911.8571\nS|Matthew Knies|L|7|2|2|12|1099.5714\nS|Luca Del Bel Belluz|C|2|0|0|0|409.5\nS|Denton Mateychuk|D|7|1|1|15|1409.1429\nS|Adam Fantilli|C|7|2|1|19|1231.4286\nG|Cam Talbot|3|3|70|80\nG|Jet Greaves|5|4|107|118\nT|CGY\nS|Mikael Backlund|C|8|1|1|24|1063.5\nS|Ryan Strome|C|8|1|2|18|835.125\nS|Joel Hanley|D|1|0|0|0|978.0\nS|Jake Middleton|D|8|1|1|10|1066.875\nS|Morgan Frost|C|8|3|2|17|945.75\nS|Zach Whitecloud|D|8|0|0|7|1239.25\nS|Joel Farabee|L|8|0|5|20|1105.375\nS|Kevin Bahl|D|8|1|0|9|1297.75\nS|Martin Pospisil|C|8|1|1|15|786.875\nS|Yegor Sharangovich|C|8|2|2|16|994.375\nS|Connor Zary|C|2|0|1|2|817.5\nS|Yan Kuznetsov|D|7|0|1|10|1089.5714\nS|Matt Coronato|R|8|2|3|19|1059.25\nS|Brennan Othmann|L|2|0|0|2|642.0\nS|Simon Nemec|D|8|0|3|14|1268.0\nS|Adam Klapka|R|8|2|0|11|639.875\nS|Jonathan Castagna|C|5|0|1|5|676.6\nS|Samuel Honzek|L|4|0|0|3|938.5\nS|Aydar Suniev|L|5|2|1|7|848.8\nS|Zayne Parekh|D|8|0|2|14|1069.375\nS|Matvei Gridin|R|8|1|2|14|876.375\nS|Maxim Tsyplakov|R|6|0|1|3|671.5\nG|Dustin Wolf|5|5|121|145\nG|Devin Cooley|3|3|79|91\nT|CHI\nS|Ian Cole|D|9|0|0|6|1012.2222\nS|Patrick Kane|R|9|1|4|16|1167.2222\nS|Teuvo Teravainen|C|7|2|3|7|880.1429\nS|Dominic Toninato|C|3|0|0|1|532.0\nS|Tyler Bertuzzi|L|9|2|3|10|1048.4444\nS|Ryan Donato|C|9|2|1|11|677.7778\nS|Andrew Mangiapane|L|1|0|0|1|323.0\nS|Jordan Greenway|L|9|1|0|14|815.8889\nS|Bowen Byram|D|6|0|1|5|1482.0\nS|Alex Vlasic|D|9|0|2|5|1202.2222\nS|Cole Smith|R|9|1|1|9|824.4444\nS|Wyatt Kaiser|D|9|0|3|6|1165.2222\nS|Ethan Del Mastro|D|3|0|0|3|870.6667\nS|Ryan Greene|C|9|0|2|5|863.4444\nS|Kevin Korchinski|D|1|0|0|2|681.0\nS|Frank Nazar|C|7|3|1|14|1093.1429\nS|Sam Rinzel|D|8|1|1|11|1052.25\nS|Connor Bedard|C|3|1|2|8|1218.3333\nS|Nick Lardis|L|6|0|2|6|657.1667\nS|Oliver Moore|C|9|2|1|13|708.2222\nS|Roman Kantserov|R|9|3|0|12|1108.8889\nS|Artyom Levshunov|D|9|1|2|12|1227.2222\nS|Anton Frondell|C|9|1|5|16|1043.7778\nG|Spencer Knight|7|7|198|223\nG|Arvid Soderblom|2|2|41|50\nT|COL\nS|Brent Burns|D|9|0|3|11|970.8889\nS|Nazem Kadri|C|9|0|6|25|1212.1111\nS|Brock Nelson|C|9|3|4|18|1116.7778\nS|Jaden Schwartz|L|9|3|3|17|814.3333\nS|Josh Manson|D|9|1|3|10|966.1111\nS|Gabriel Landeskog|L|9|3|2|11|943.7778\nS|Brett Kulak|D|9|0|4|7|1082.4444\nS|Artturi Lehkonen|L|9|6|3|14|1155.1111\nS|Nathan MacKinnon|C|9|6|10|39|1276.7778\nS|Devon Toews|D|9|2|5|12|1268.2222\nS|Noah Juulsen|D|7|0|1|3|649.8571\nS|Nicolas Roy|C|6|2|2|10|701.1667\nS|Martin Necas|C|9|5|6|20|1232.8889\nS|Cale Makar|D|8|3|6|21|1322.375\nS|Parker Kelly|C|9|1|4|7|749.3333\nS|Zachary L'Heureux|L|3|0|1|6|545.0\nS|Fedor Svechkov|C|9|1|3|9|830.1111\nS|Gavin Brindley|C|3|0|0|3|467.3333\nS|Sam Malinski|D|8|0|2|10|986.0\nS|T.J. Hughes|R|9|2|1|19|885.1111\nG|Scott Wedgewood|2|2|46|51\nG|Mackenzie Blackwood|7|7|160|180\nT|DAL\nS|Jamie Benn|L|8|1|1|11|747.25\nS|Tyler Myers|D|8|0|0|3|867.125\nS|Tyler Seguin|C|8|2|2|23|916.375\nS|Colin Blackwell|C|6|0|0|7|602.6667\nS|Radek Faksa|C|8|0|1|7|668.375\nS|Esa Lindell|D|8|0|0|4|1248.75\nS|Mikko Rantanen|R|8|2|6|15|1243.0\nS|Roope Hintz|C|8|3|2|16|1017.375\nS|Kyle Capobianco|D|1|0|0|0|179.0\nS|Sam Steel|C|8|1|2|11|968.5\nS|Jason Robertson|L|8|3|4|26|1176.75\nS|Miro Heiskanen|D|8|3|3|13|1510.25\nS|Oskar B\u00e4ck|C|7|0|1|4|680.4286\nS|Nils Lundkvist|D|8|0|2|6|1044.25\nS|Thomas Harley|D|8|0|3|13|1435.125\nS|Joel Kiviranta|L|4|1|0|4|711.5\nS|Wyatt Johnston|C|6|0|4|16|1202.6667\nS|Lian Bichsel|D|8|0|0|3|929.5\nS|Justin Hryckowian|C|8|0|0|9|902.375\nS|Arttu Hyry|R|8|3|0|13|830.75\nG|Casey DeSmith|2|2|49|53\nG|Jake Oettinger|6|6|120|126\nT|DET\nS|Ben Chiarot|D|8|0|1|7|1157.75\nS|Justin Faulk|D|8|2|3|15|1155.5\nS|Andrew Copp|C|8|1|1|15|1170.0\nS|J.T. Compher|L|2|0|0|3|879.5\nS|Dylan Larkin|C|6|1|2|14|1308.6667\nS|Andreas Englund|D|4|0|0|4|686.0\nS|Viktor Arvidsson|L|8|3|2|21|1148.75\nS|Keegan Kolesar|R|8|0|0|2|658.625\nS|Mason Appleton|C|2|0|0|1|590.5\nS|Alex DeBrincat|R|8|5|4|30|1209.0\nS|Michael Rasmussen|C|8|0|2|9|1022.75\nS|Sheldon Dries|C|5|0|0|5|601.2\nS|Moritz Seider|D|8|0|5|15|1544.0\nS|Albert Johansson|D|8|0|0|12|952.75\nS|Lucas Raymond|L|8|0|4|23|1227.125\nS|William Wallinder|D|4|1|1|4|853.75\nS|Carter Mazur|L|3|0|1|3|503.6667\nS|Marco Kasper|C|1|0|0|4|650.0\nS|Anton Johansson|D|8|1|1|5|875.875\nS|Nate Danielson|C|7|0|2|4|625.1429\nS|Axel Sandin-Pellikka|D|6|0|1|6|743.3333\nS|Emmitt Finnie|C|8|3|2|20|1020.0\nS|Michael Brandsegg-Nyg\u00e5rd|R|8|2|4|22|917.875\nG|John Gibson|6|6|138|158\nG|Daniil Tarasov|3|2|55|57\nT|FLA\nS|Brad Marchand|L|2|1|0|5|683.0\nS|Lars Eller|C|9|0|5|8|877.3333\nS|Dmitry Kulikov|D|9|0|2|5|915.0\nS|Radko Gudas|D|6|0|0|3|787.8333\nS|Carter Verhaeghe|C|9|6|2|16|1108.5556\nS|Aleksander Barkov|C|2|0|0|2|893.5\nS|Seth Jones|D|9|1|9|25|1530.6667\nS|Garnet Hathaway|R|9|0|0|3|576.4444\nS|Aaron Ekblad|D|7|0|3|11|1262.8571\nS|Sam Reinhart|C|9|5|3|29|1250.8889\nS|Sam Bennett|C|9|3|3|21|1105.5556\nS|Sam Lafferty|C|5|0|0|4|603.0\nS|Gustav Forsling|D|8|1|1|10|1282.875\nS|Bokondji Imama|L|9|0|0|6|453.7778\nS|Niko Mikkola|D|9|1|1|13|1186.1111\nS|Matthew Tkachuk|L|9|3|11|19|1172.4444\nS|Eetu Luostarinen|C|9|2|0|13|954.6667\nS|Brady Tkachuk|L|9|6|4|32|1022.1111\nS|Anton Lundell|C|9|1|2|25|1077.4444\nS|Sandis Vilmanis|L|9|0|1|11|785.5556\nS|Uvis Balinskis|D|6|0|1|2|864.6667\nG|Jacob Markstrom|6|6|105|117\nG|Akira Schmid|4|3|86|98\nT|LA\nS|Corey Perry|R|5|0|0|6|714.2\nS|Drew Doughty|D|6|0|1|4|1220.1667\nS|Brian Dumoulin|D|6|1|0|7|921.5\nS|Erik Haula|L|6|1|2|15|947.5\nS|Mats Zuccarello|R|3|0|1|1|1091.0\nS|Joel Edmundson|D|6|0|0|12|905.5\nS|Joel Armia|R|6|1|0|8|822.3333\nS|Scott Laughton|C|6|0|1|10|880.1667\nS|Cody Ceci|D|6|0|1|6|994.8333\nS|Erik Gustafsson|D|4|0|1|4|1083.25\nS|Adrian Kempe|R|6|1|3|17|1272.3333\nS|Artemi Panarin|L|6|3|1|19|1324.8333\nS|Trevor Moore|L|6|1|1|14|986.3333\nS|Mikey Anderson|D|6|0|1|4|984.8333\nS|Alex Turcotte|C|3|0|1|1|846.3333\nS|Andre Lee|L|4|0|0|4|585.25\nS|Quinton Byfield|R|6|1|1|14|1263.3333\nS|Alex Laferriere|R|6|2|2|11|1073.1667\nS|Samuel Helenius|C|4|0|0|4|489.0\nS|Brandt Clarke|D|6|1|4|15|1184.6667\nS|Jared Wright|R|1|0|0|3|624.0\nG|Darcy Kuemper|4|4|83|98\nG|Anton Forsberg|3|2|53|60\nT|MIN\nS|Nick Foligno|L|3|1|0|3|597.0\nS|Zach Bogosian|D|8|0|0|11|1017.125\nS|Jared Spurgeon|D|6|1|4|7|1341.6667\nS|Marcus Foligno|L|4|0|0|4|729.75\nS|Tyler Pitlick|C|3|0|0|4|473.3333\nS|Blake Coleman|L|9|2|1|18|947.8889\nS|Jonas Brodin|D|9|0|1|8|1307.4444\nS|Olli Maatta|D|6|0|2|3|1283.5\nS|Michael McCarron|C|9|0|4|12|820.7778\nS|Ryan Hartman|R|9|0|1|8|800.7778\nS|Joel Eriksson Ek|C|9|1|5|25|1214.4444\nS|Yakov Trenin|C|9|0|2|10|778.3333\nS|Kirill Kaprizov|L|9|10|5|31|1287.1111\nS|Quinn Hughes|D|9|2|10|27|1594.7778\nS|Nico Sturm|C|3|0|0|2|542.3333\nS|Bobby Brink|R|9|0|4|13|769.7778\nS|Matt Boldy|L|9|5|2|41|1298.0\nS|Daemon Hunt|D|9|0|0|4|809.0\nS|Matt Kiersted|D|2|0|0|3|739.0\nS|Rieger Lorenz|L|5|0|1|2|518.8\nS|Danila Yurov|R|9|4|1|15|810.4444\nS|David Spacek|D|5|0|0|7|812.4\nS|Maxim Shabanov|R|9|2|4|10|900.5556\nG|Calvin Pickard|1|1|20|25\nG|Jesper Wallstedt|8|8|188|204\nT|MTL\nS|Chris Kreider|L|8|1|3|7|896.875\nS|Phillip Danault|C|8|0|1|10|952.75\nS|Mike Matheson|D|5|0|1|9|1449.2\nS|Josh Anderson|R|8|4|2|17|820.375\nS|Jake Evans|C|8|0|0|6|810.0\nS|Alexandre Carrier|D|8|1|3|10|1152.75\nS|Nick Suzuki|C|8|4|6|22|1312.25\nS|Alexandre Texier|L|8|1|2|13|776.875\nS|Noah Dobson|D|8|0|2|17|1293.5\nS|Kirby Dach|C|8|0|1|3|585.875\nS|Cole Caufield|R|8|5|1|29|1181.125\nS|Jayden Struble|D|3|0|0|0|725.3333\nS|Alex Newhook|C|8|1|3|10|975.25\nS|Kaiden Guhle|D|4|0|1|4|1300.25\nS|Zachary Bolduc|R|8|4|2|16|830.125\nS|Oliver Kapanen|C|1|0|0|3|700.0\nS|Arber Xhekaj|D|8|0|0|3|719.625\nS|Owen Beck|C|2|0|0|2|442.5\nS|Lane Hutson|D|8|2|6|19|1588.25\nS|Juraj Slafkovsk\u00fd|L|8|1|4|23|1144.25\nS|Adam Engstrom|D|4|0|0|3|660.5\nS|David Reinbacher|D|1|0|0|1|549.0\nS|Florian Xhekaj|L|2|0|0|2|456.0\nS|Ivan Demidov|R|2|1|1|4|937.0\nG|Jakub Dobes|4|4|96|114\nG|Jacob Fowler|4|4|81|90\nT|NJ\nS|Brenden Dillon|D|5|0|0|1|866.0\nS|Dougie Hamilton|D|8|1|3|24|1275.75\nS|Stefan Noesen|R|5|1|2|6|570.0\nS|Brett Pesce|D|8|0|2|7|1275.625\nS|Anthony Mantha|R|8|1|1|10|792.5\nS|Jonas Siegenthaler|D|8|0|1|2|1140.25\nS|Timo Meier|R|8|1|3|30|981.0\nS|Evan Rodrigues|C|8|2|2|14|946.5\nS|Jesper Bratt|L|8|2|5|22|1083.375\nS|Cody Glass|C|8|1|0|12|729.625\nS|Nico Hischier|C|8|4|1|16|1110.5\nS|Jesper Boqvist|C|6|2|1|12|698.8333\nS|Johnathan Kovacevic|D|3|0|0|2|909.6667\nS|Declan Chisholm|D|8|0|1|2|876.25\nS|Jack Hughes|C|8|2|7|32|1269.625\nS|Arseny Gritsyuk|R|8|3|2|19|948.25\nS|Dawson Mercer|C|8|0|4|19|903.375\nS|Luke Evangelista|R|5|2|1|12|1032.6\nS|Luke Hughes|D|8|3|1|24|1441.0\nS|Amadeus Lombardi|C|8|0|3|14|646.75\nG|Jake Allen|5|5|113|129\nG|Nico Daws|3|3|60|70\nT|NSH\nS|Steven Stamkos|C|8|4|6|14|1165.375\nS|Roman Josi|D|8|1|8|19|1532.75\nS|Ryan O'Reilly|C|8|4|3|18|1296.75\nS|Jonathan Marchessault|R|8|2|1|16|1000.0\nS|Brady Skjei|D|8|0|2|8|1190.625\nS|Filip Forsberg|L|8|1|7|24|1268.75\nS|Alexander Kerfoot|C|8|1|3|7|998.375\nS|Ross Colton|C|8|1|1|8|752.375\nS|Nicolas Hague|D|8|0|1|7|1064.25\nS|Nick Perbix|D|8|0|0|3|1090.375\nS|Jack Drury|C|8|1|1|9|977.5\nS|Nils Hoglander|L|8|3|0|10|660.375\nS|Jayden Struble|D|4|0|0|0|1046.25\nS|Adam Edstrom|C|8|4|0|15|822.125\nS|Jack Ahcan|D|3|0|1|0|456.3333\nS|Mavrik Bourque|C|4|0|1|7|945.0\nS|Adam Wilsby|D|8|0|5|7|1124.0\nS|Ryan Ufko|D|1|0|0|1|927.0\nS|William Trudeau|D|3|0|0|2|550.6667\nS|Reid Schaefer|L|5|0|0|4|627.0\nS|Matthew Wood|R|8|1|1|12|917.25\nS|Vitali Pinchuk|C|4|0|1|4|524.25\nG|Juuse Saros|7|7|193|213\nG|Matt Murray|1|1|18|20\nT|NYI\nS|Kyle Palmieri|C|8|2|1|14|952.875\nS|Brayden Schenn|C|8|2|3|16|982.625\nS|Casey Cizikas|C|8|1|1|7|752.5\nS|Ondrej Palat|L|8|1|1|9|772.125\nS|Jean-Gabriel Pageau|C|8|1|3|9|926.5\nS|Scott Mayfield|D|2|0|0|1|818.5\nS|Adam Pelech|D|8|0|2|8|1230.0\nS|Anthony Duclair|L|8|2|0|9|750.625\nS|Bo Horvat|C|8|5|4|26|1233.125\nS|Ryan Pulock|D|8|0|0|2|1136.0\nS|Tony DeAngelo|D|8|1|1|11|979.625\nS|Logan Stanley|D|8|0|4|5|1249.625\nS|Alexander Romanov|D|3|0|0|3|994.0\nS|Simon Holmstrom|R|8|3|1|9|985.5\nS|Matias Maccelli|L|8|2|4|13|867.5\nS|Emil Heineman|L|8|2|0|9|934.0\nS|Matthew Kessel|D|3|0|1|2|813.0\nS|Calum Ritchie|C|8|1|1|7|730.5\nS|Matthew Schaefer|D|8|0|7|31|1547.625\nS|Victor Eklund|R|8|1|1|8|804.75\nG|Semyon Varlamov|2|2|38|42\nG|Ilya Sorokin|6|6|156|166\nT|NYR\nS|Justin Dowling|C|3|0|0|0|461.0\nS|Mika Zibanejad|C|11|2|7|19|1246.4545\nS|J.T. Miller|C|11|2|5|14|1112.8182\nS|Oliver Bjorkstrand|R|11|4|1|17|639.3636\nS|Marcus Pettersson|D|11|0|2|7|1218.6364\nS|Vladislav Gavrikov|D|11|1|4|15|1260.6364\nS|Adam Fox|D|11|0|10|13|1291.0\nS|Taylor Raddysh|R|2|0|1|1|522.0\nS|Eeli Tolvanen|R|11|3|1|14|785.0\nS|Sean Durzi|D|11|2|2|6|1221.0909\nS|Joseph Veleno|C|4|0|0|2|697.25\nS|Pavel Dorofeyev|R|11|2|3|35|1048.1818\nS|Tye Kartye|L|11|2|5|14|910.0\nS|Braden Schneider|D|11|0|2|17|1055.4545\nS|Alexis Lafreni\u00e8re|L|11|7|6|22|1141.0\nS|Will Cuylle|L|11|3|3|27|944.7273\nS|Matt Rempe|C|2|0|0|1|406.0\nS|Jaroslav Chmelar|R|7|0|0|3|494.7143\nS|Noah Laba|C|11|0|2|9|894.8182\nS|Gabe Perreault|R|11|4|3|23|980.5455\nS|Cole Beaudoin|C|4|0|0|1|526.5\nS|Alberts Smits|D|11|0|0|5|904.0\nG|Spencer Martin|1|0|15|18\nG|Igor Shesterkin|5|5|101|109\nG|Dylan Garand|7|6|143|154\nT|OTT\nS|Claude Giroux|R|9|1|5|13|1051.6667\nS|Nick Cousins|C|9|1|1|4|558.2222\nS|Andre Burakovsky|L|5|0|0|2|768.6\nS|Warren Foegele|L|9|0|2|8|704.4444\nS|Michael Amadio|R|9|2|2|9|943.0\nS|Hayden Hodgson|R|2|0|0|0|322.5\nS|Thomas Chabot|D|9|1|3|19|1519.6667\nS|Cameron Crotty|D|3|0|0|0|669.0\nS|Fabian Zetterlund|L|9|1|2|15|780.0\nS|Drake Batherson|R|9|4|2|21|1076.5556\nS|Dylan Cozens|C|9|0|2|18|1081.2222\nS|Shane Pinto|C|9|1|5|14|1165.7778\nS|Jordan Spence|D|9|0|1|8|1343.5556\nS|Ridly Greig|C|7|1|1|10|992.1429\nS|Tyler Kleven|D|9|1|1|9|1270.7778\nS|Jake Sanderson|D|1|0|0|0|269.0\nS|Tim St\u00fctzle|C|9|5|7|16|1329.7778\nS|Artem Zub|D|2|0|1|2|1167.0\nS|William Eklund|L|4|1|1|9|835.5\nS|Jorian Donovan|D|1|0|0|0|552.0\nS|Stephen Halliday|C|9|2|1|12|695.5556\nS|Nikolas Matinpalo|D|7|0|0|5|926.0\nS|Hoyt Stanley|D|4|0|0|1|655.0\nS|Carter Yakemchuk|D|9|1|1|13|1133.1111\nG|Linus Ullmark|7|7|155|164\nG|Samuel Ersson|3|2|58|70\nT|PHI\nS|Garrett Wilson|L|2|0|0|0|588.5\nS|Nick Seeler|D|11|0|2|8|1196.7273\nS|Sean Couturier|C|11|0|3|13|1020.9091\nS|Rasmus Ristolainen|D|3|1|0|4|1096.6667\nS|Travis Sanheim|D|11|1|2|20|1540.4545\nS|Christian Dvorak|C|11|2|2|11|1046.0\nS|Michael Bunting|L|7|0|1|9|685.0\nS|Travis Konecny|R|5|0|3|8|1008.6\nS|Noel Acciari|C|11|1|0|10|858.9091\nS|Carl Grundstrom|R|5|0|0|5|679.8\nS|Owen Tippett|R|9|1|1|21|986.4444\nS|Jack Studnicka|C|3|0|0|1|528.0\nS|Noah Cates|L|11|0|1|10|773.6364\nS|Simon Benoit|D|9|0|0|6|866.1111\nS|Trevor Zegras|C|11|2|5|20|1106.6364\nS|Cam York|D|5|0|0|6|1309.4\nS|Jacob Gaucher|C|1|0|0|0|765.0\nS|Jamie Drysdale|D|11|0|0|15|1328.2727\nS|Tyson Foerster|R|10|1|0|22|1055.5\nS|Helge Grans|D|1|0|0|0|746.0\nS|David Jiricek|D|9|0|1|6|888.4444\nS|Alex Bump|L|4|0|0|5|709.75\nS|Hunter McDonald|D|1|0|0|0|600.0\nS|Cole Knuble|R|1|0|0|1|824.0\nS|Denver Barkey|C|8|0|3|4|880.75\nS|Oliver Bonk|D|5|0|2|5|1200.4\nS|Matvei Michkov|R|11|6|1|14|890.9091\nS|Porter Martone|R|11|2|1|12|799.4545\nG|Dan Vladar|5|5|144|162\nG|Joseph Woll|6|6|176|192\nT|PIT\nS|Evgeni Malkin|C|10|5|2|21|1046.6\nS|Sidney Crosby|C|10|3|3|22|1169.3\nS|Kris Letang|D|10|0|4|21|1203.8\nS|Erik Karlsson|D|10|1|10|15|1387.8\nS|Bryan Rust|R|7|3|2|9|1042.1429\nS|Rickard Rakell|R|10|1|3|24|1181.7\nS|Trevor van Riemsdyk|D|5|0|0|2|1128.4\nS|Tommy Novak|C|10|3|5|16|893.8\nS|Samuel Girard|D|9|1|6|12|1123.8889\nS|Filip Hallander|C|2|1|2|3|617.0\nS|Connor Dewar|C|10|1|1|14|790.4\nS|Spencer Stastney|D|5|0|1|3|1040.0\nS|Blake Lizotte|C|10|0|3|13|778.1\nS|Kaedan Korczak|D|10|0|5|10|1091.4\nS|Nick Robertson|L|10|4|0|19|736.6\nS|Elmer Soderblom|L|4|0|0|1|661.25\nS|Hendrix Lapierre|C|6|1|2|3|718.6667\nS|Ilya Solovyov|D|1|0|0|0|952.0\nS|Egor Chinakhov|R|8|2|1|14|951.0\nS|Ville Koivunen|R|8|1|2|8|809.75\nS|Declan Carlile|D|10|3|2|15|1127.3\nS|Andrei Kuzmenko|L|6|0|1|6|749.1667\nS|Ben Kindel|C|9|2|2|23|1038.8889\nG|Arturs Silovs|6|6|136|157\nG|Sergei Murashov|4|4|106|120\nT|SEA\nS|Jordan Eberle|R|9|3|4|19|977.4444\nS|Adam Larsson|D|9|0|2|10|1323.5556\nS|Chandler Stephenson|C|9|1|7|6|1032.4444\nS|Frederick Gaudreau|C|9|5|2|11|914.2222\nS|Jared McCann|L|9|3|5|26|957.6667\nS|Brandon Montour|D|8|0|5|13|1348.0\nS|Vince Dunn|D|9|2|5|16|1387.4444\nS|Ryan Lindgren|D|4|0|0|3|764.75\nS|Josh Mahura|D|6|0|2|4|866.6667\nS|Cale Fleury|D|3|0|1|4|909.6667\nS|Curtis Douglas|C|2|0|0|1|412.0\nS|Kaapo Kakko|R|9|2|6|8|843.0\nS|Bobby McMann|C|9|3|1|25|985.4444\nS|Matty Beniers|C|9|2|2|10|1036.8889\nS|Mackie Samoskevich|R|8|3|1|12|922.625\nS|Ryan Winterton|C|9|2|4|16|809.0\nS|Ryker Evans|D|9|1|3|8|1355.7778\nS|Ville Ottavainen|D|6|1|0|7|766.8333\nS|Jacob Melanson|R|1|0|0|1|571.0\nS|Shane Wright|C|9|3|1|17|831.7778\nS|Ben Meyers|C|7|1|4|5|757.1429\nS|Berkly Catton|C|9|2|4|16|893.7778\nG|Philipp Grubauer|5|4|121|133\nG|Joey Daccord|5|5|134|152\nT|SJ\nS|Dmitry Orlov|D|9|1|2|7|1104.6667\nS|Tyler Toffoli|C|9|2|4|22|781.2222\nS|Barclay Goodrow|C|9|0|0|10|694.7778\nS|Jacob Trouba|D|9|1|2|14|1300.0\nS|Darnell Nurse|D|8|1|0|20|1268.375\nS|Alexander Wennberg|C|9|0|3|14|1200.1111\nS|Mason Marchment|L|9|3|0|19|961.2222\nS|Kiefer Sherwood|L|9|1|1|11|898.3333\nS|Ty Dellandrea|C|2|0|0|1|805.5\nS|Michael Kesselring|D|9|0|2|9|1185.4444\nS|Nolan Allan|D|4|1|0|3|996.75\nS|Zack Ostapchuk|C|9|0|0|10|627.2222\nS|Luca Cagnoni|D|8|1|1|12|1074.25\nS|Will Smith|C|9|3|3|24|1206.0\nS|Macklin Celebrini|C|7|3|8|31|1363.0\nS|Sam Dickinson|D|7|0|1|6|1099.5714\nS|Collin Graf|R|9|1|0|10|875.3333\nS|Igor Chernyshov|L|9|2|2|10|849.1111\nS|Michael Misa|C|9|0|3|7|804.3333\nS|Ivar Stenberg|L|9|2|4|12|941.5556\nG|Alex Nedeljkovic|3|3|80|87\nG|Yaroslav Askarov|6|6|141|163\nT|STL\nS|Cam Fowler|D|8|0|4|11|1319.5\nS|Colton Parayko|D|8|0|4|12|1280.75\nS|Pavel Buchnevich|L|7|1|4|9|1064.1429\nS|Ross Johnston|L|6|0|1|3|500.3333\nS|Brandon Carlo|D|8|0|1|4|1015.5\nS|Dillon Dube|C|3|1|0|1|691.6667\nS|Robert Thomas|C|8|1|3|9|1215.75\nS|Alexey Toropchenko|R|1|0|0|0|308.0\nS|Pius Suter|C|8|3|3|12|847.125\nS|Jonatan Berggren|R|8|2|2|10|904.0\nS|Connor McMichael|L|8|2|4|11|976.25\nS|Philip Broberg|D|8|1|3|13|1374.375\nS|Dylan Holloway|L|8|1|5|15|1078.125\nS|Jake Neighbours|L|8|3|1|10|876.5\nS|Justin Barron|D|5|0|1|8|928.2\nS|Dylan Peterson|C|3|0|0|1|540.3333\nS|Mason McTavish|C|8|5|4|29|961.375\nS|Zach Dean|C|3|0|0|0|598.3333\nS|Jimmy Snuggerud|R|8|4|1|20|1058.5\nS|Dalibor Dvorsky|R|8|2|1|13|757.5\nS|Theo Lindstein|D|4|0|1|3|872.5\nS|Adam Jiricek|D|8|1|0|14|942.75\nG|Jordan Binnington|3|3|69|83\nG|Joel Hofer|5|5|116|128\nT|TB\nS|Ryan McDonagh|D|8|0|1|6|924.125\nS|John Carlson|D|8|2|2|23|1196.5\nS|Victor Hedman|D|8|1|2|11|847.875\nS|Nikita Kucherov|R|8|3|7|24|1303.0\nS|Zemgus Girgensons|C|8|1|1|10|822.75\nS|Scott Sabourin|R|1|0|0|1|569.0\nS|Jake Guentzel|C|8|4|5|20|1211.875\nS|Brayden Point|C|8|1|5|16|1152.625\nS|Erik Cernak|D|8|0|1|13|1131.375\nS|Jansen Harkins|C|1|0|0|1|655.0\nS|Anthony Cirelli|C|8|1|2|11|1068.875\nS|Brandon Hagel|L|8|6|5|38|1312.0\nS|Jeffrey Viel|L|6|0|0|6|535.3333\nS|Charle-Edouard D'Astous|D|7|1|1|11|894.2857\nS|Pontus Holmberg|R|8|2|3|14|876.75\nS|Ilya Mikheyev|R|8|2|2|10|873.25\nS|Max Crozier|D|5|0|2|8|1005.6\nS|Gage Goncalves|C|7|0|0|5|957.1429\nS|J.J. Moser|D|8|0|0|7|1083.625\nS|Emil Lilleberg|D|3|0|0|2|735.3333\nS|Conor Geekie|C|8|1|0|9|700.0\nS|Dominic James|C|2|0|1|1|778.5\nG|Andrei Vasilevskiy|6|6|117|132\nG|Dennis Hildeby|2|2|46|50\nT|TOR\nS|John Tavares|C|7|2|5|17|991.2857\nS|Oliver Ekman-Larsson|D|10|0|0|4|1011.5\nS|Chris Tanev|D|6|0|1|1|1010.5\nS|Morgan Rielly|D|10|0|4|14|1162.5\nS|Colton Sissons|C|10|2|2|12|907.2\nS|Teddy Blueger|C|10|0|0|11|724.5\nS|Jake McCabe|D|10|0|0|8|1210.2\nS|Nick Paul|L|10|2|3|9|964.7\nS|William Nylander|R|10|5|8|31|1238.7\nS|Darren Raddysh|D|10|0|5|26|1450.6\nS|Jack Roslovic|C|10|3|3|30|998.2\nS|Auston Matthews|C|10|7|9|30|1299.4\nS|Troy Stecher|D|10|0|1|7|1082.0\nS|Brandon Duhaime|L|10|0|0|6|669.8\nS|Zack MacEwen|R|4|0|0|2|397.75\nS|Vinni Lettieri|C|1|0|0|1|560.0\nS|Bo Groulx|C|6|0|0|3|499.3333\nS|Kirill Marchenko|R|10|4|6|27|1116.1\nS|Marshall Rifai|D|1|0|0|0|544.0\nS|Nick Blankenburg|D|5|1|0|6|804.8\nS|Easton Cowan|R|10|3|4|21|907.0\nS|Gavin McKenna|L|10|3|3|18|846.1\nG|Sergei Bobrovsky|7|7|193|214\nG|Anthony Stolarz|3|3|70|80\nT|UTA\nS|Anders Lee|L|10|2|3|18|802.3\nS|Vincent Trocheck|C|10|2|2|12|978.9\nS|Nate Schmidt|D|10|1|2|12|1220.3\nS|MacKenzie Weegar|D|10|2|0|17|1278.1\nS|Nick Schmaltz|C|10|7|6|31|1096.9\nS|Lawson Crouse|L|10|1|3|17|898.1\nS|John Marino|D|9|2|3|8|1222.5556\nS|Kevin Stenlund|C|10|1|4|8|830.7\nS|Clayton Keller|R|10|4|9|23|1062.2\nS|Andrew Peeke|D|10|1|2|9|941.3\nS|Mikhail Sergachev|D|10|3|8|27|1360.8\nS|Michael Carcone|L|5|1|1|17|749.2\nS|Kailer Yamamoto|R|5|2|3|12|879.6\nS|Nick DeSimone|D|1|0|0|1|939.0\nS|Barrett Hayton|C|10|1|6|17|834.8\nS|Jack McBain|C|10|1|2|10|758.9\nS|Dylan Guenther|R|10|4|5|30|984.8\nS|Logan Cooley|C|10|1|8|11|1079.8\nS|Dmitri Simashev|D|10|0|2|10|901.4\nS|Daniil But|L|10|2|2|11|666.8\nG|Karel Vejmelka|8|7|153|174\nG|Sebastian Cossa|4|3|41|50\nT|VAN\nS|Luke Schenn|D|7|0|2|5|776.2857\nS|Brendan Gallagher|R|9|0|1|10|637.1111\nS|Jamie Oleksiak|D|9|1|3|5|1066.6667\nS|Brock Boeser|R|10|2|5|14|1109.6\nS|Guillaume Brisebois|D|1|0|0|2|764.0\nS|Jake DeBrusk|L|8|3|2|20|976.25\nS|Filip Hronek|D|10|0|6|11|1526.1\nS|Elias Pettersson|C|10|3|7|16|1172.7\nS|Filip Chytil|C|2|0|2|2|1170.5\nS|Linus Karlsson|C|10|2|5|19|851.7\nS|Paul Cotter|L|10|4|3|9|921.2\nS|Drew O'Connor|L|10|1|2|10|942.5\nS|Marco Rossi|C|9|3|1|16|1005.0\nS|Aatu R\u00e4ty|C|4|1|0|4|609.75\nS|Arshdeep Bains|L|8|1|2|5|680.25\nS|Jonathan Lekkerim\u00e4ki|R|10|2|4|13|844.0\nS|Liam Ohgren|L|10|2|3|13|916.5\nS|Elias Pettersson|D|10|3|0|11|1098.1\nS|Victor Mancini|D|3|0|0|0|784.0\nS|Max Sasson|C|10|2|1|11|786.3\nS|Tom Willander|D|10|0|3|7|1263.8\nS|Zeev Buium|D|10|0|1|8|1269.6\nG|Kevin Lankinen|7|6|134|166\nG|Leevi Meril\u00e4inen|6|4|149|161\nT|VGK\nS|Brayden McNabb|D|10|0|6|9|1114.6\nS|Nic Dowd|C|10|0|2|4|739.6\nS|Mark Stone|R|10|7|7|20|1090.5\nS|William Karlsson|C|10|2|3|17|1043.3\nS|Tomas Hertl|C|10|4|3|23|968.7\nS|Shea Theodore|D|10|2|2|20|1285.6\nS|Ivan Barbashev|L|10|0|7|14|953.2\nS|Victor Olofsson|L|4|4|1|9|788.25\nS|Noah Hanifin|D|10|2|2|13|1211.3\nS|Rasmus Andersson|D|10|2|3|21|1126.4\nS|Jack Eichel|C|10|5|13|28|1195.8\nS|Parker Wotherspoon|D|6|0|0|5|1095.6667\nS|Jeremy Lauzon|D|10|0|0|13|1028.5\nS|Mitch Marner|R|10|2|9|23|1196.2\nS|Brett Howden|C|10|4|3|16|939.2\nS|Dylan Coghlan|D|4|0|1|6|892.0\nS|Raphael Lavoie|C|6|0|2|7|658.0\nS|Marc Gatcomb|C|10|1|1|19|650.9\nS|Braeden Bowman|R|10|2|1|11|819.2\nS|Trevor Connelly|L|10|4|3|20|825.3\nG|Adin Hill|4|4|87|96\nG|Carter Hart|6|6|143|157\nT|WPG\nS|Nino Niederreiter|R|5|0|0|8|752.8\nS|Dylan DeMelo|D|8|1|2|5|1293.5\nS|Adam Lowry|C|8|1|3|8|913.875\nS|Mark Scheifele|C|8|2|6|14|1227.375\nS|Vladislav Namestnikov|C|6|0|1|7|725.5\nS|Josh Morrissey|D|4|0|3|12|1204.25\nS|Haydn Fleury|D|4|0|0|5|970.0\nS|Kyle Connor|L|8|8|3|37|1241.5\nS|Mario Ferraro|D|8|1|0|9|1196.25\nS|Gabriel Vilardi|C|8|0|3|14|1016.5\nS|Dylan Samberg|D|8|0|2|8|1364.875\nS|Alex Iafallo|L|8|3|1|11|833.875\nS|Neal Pionk|D|8|1|5|14|1420.875\nS|Morgan Barron|C|8|0|2|9|894.375\nS|Jack St. Ivany|D|4|0|0|1|811.25\nS|Cole Koepke|L|6|1|0|7|583.3333\nS|Cole Perfetti|C|8|5|3|21|1106.125\nS|Tyrel Bauer|D|4|0|0|1|510.0\nS|Isak Rosen|R|8|0|1|11|771.0\nS|Brad Lambert|C|7|0|1|3|570.1429\nS|Viggo Bj\u00f6rck|C|8|0|0|8|880.5\nG|Stuart Skinner|5|5|135|149\nG|Clay Stevenson|3|3|75|84\nT|WSH\nS|Alex Ovechkin|L|8|1|3|11|836.375\nS|Justin Holl|D|3|2|0|2|779.0\nS|Dylan McIlrath|D|3|0|0|0|381.6667\nS|Boone Jenner|C|8|4|1|22|945.125\nS|Tom Wilson|R|8|2|3|16|1125.625\nS|Jonny Brodzinski|C|1|0|0|2|514.0\nS|Alex Tuch|R|8|5|2|22|1126.25\nS|Dylan Strome|C|8|1|5|15|1004.25\nS|Anthony Beauvillier|R|8|1|0|8|703.0\nS|Matt Roy|D|2|0|0|0|1105.5\nS|Jakob Chychrun|D|8|1|3|22|1463.0\nS|Jordan Kyrou|R|8|2|3|10|810.25\nS|Pierre-Luc Dubois|C|4|1|3|6|1026.25\nS|Vincent Desharnais|D|8|0|3|2|1193.875\nS|Timothy Liljegren|D|8|1|0|5|1104.0\nS|Martin Feh\u00e9rv\u00e1ry|D|8|0|1|2|1335.25\nS|Aliaksei Protas|L|8|0|2|8|971.5\nS|Justin Sourdif|C|7|1|0|6|804.1429\nS|Ivan Miroshnichenko|L|2|1|0|1|677.5\nS|Ethen Frank|R|2|0|0|2|583.0\nS|Ryan Leonard|R|8|3|4|20|828.125\nS|Cole Hutson|D|8|1|3|19|1108.5\nS|Ilya Protas|L|8|1|4|8|712.875\nG|Charlie Lindgren|2|2|52|58\nG|Logan Thompson|6|6|161|177";
+/* ---------- NHL ---------- */
+var NHL_SRC='NHL stats API, read Oct 20, 2026. Every team has played 8 to 11 games so far.';
+var NHL_DIV={'Atlantic':['BOS','BUF','DET','FLA','MTL','OTT','TB','TOR'],'Metropolitan':['CAR','CBJ','NJ','NYI','NYR','PHI','PIT','WSH'],'Central':['CHI','COL','DAL','MIN','NSH','STL','UTA','WPG'],'Pacific':['ANA','CGY','EDM','LA','SJ','SEA','VAN','VGK']};
+var NHLT={},NHL_SK=[],NHL_GK=[];
+NHL_TEAM_TXT.split('\n').forEach(function(l){var p=l.split('|');NHLT[p[1]]={n:p[0],k:p[1],gp:+p[2],w:+p[3],l:+p[4],otl:+p[5],gf:+p[6],ga:+p[7],sf:+p[8],sa:+p[9],pp:+p[10],pk:+p[11],pts:+p[12]}});
+(function(){var t=null;NHL_SK_TXT.split('\n').forEach(function(l){var p=l.split('|');
+  if(p[0]==='T')t=p[1];
+  else if(p[0]==='S')NHL_SK.push({n:p[1],t:t,pos:p[2],g:+p[3],G:+p[4],A:+p[5],S:+p[6],toi:(+p[7])/60});
+  else if(p[0]==='G')NHL_GK.push({n:p[1],t:t,gp:+p[2],gs:+p[3],sv:+p[4],sa:+p[5]});
+})})();
+STAND.nhl=Object.keys(NHL_DIV).map(function(d){return {g:d+' Division',t:NHL_DIV[d].map(function(a){var T=NHLT[a];return {n:T.n,w:T.w,l:T.l,t:T.otl,c:''}})}});
+function nhlK(x){x=String(x||'').toUpperCase();return ({UTAH:'UTA',TBL:'TB',NJD:'NJ',LAK:'LA',SJS:'SJ',MON:'MTL',VEG:'VGK',WAS:'WSH'})[x]||x}
+var _nl=null;
+function nhlLg(){
+  if(_nl)return _nl;
+  var o={gf:0,ga:0,sf:0,sa:0,gp:0};
+  Object.keys(NHLT).forEach(function(k){var T=NHLT[k];o.gf+=T.gf*T.gp;o.ga+=T.ga*T.gp;o.sf+=T.sf*T.gp;o.sa+=T.sa*T.gp;o.gp+=T.gp});
+  ['gf','ga','sf','sa'].forEach(function(m){o[m]/=o.gp});
+  return (_nl=o);
+}
+function nhlShr(x,gp,lg,k){k=k||12;return (x*gp+lg*k)/(gp+k)}
+function nhlRank(m,v,hi){return rankIn(Object.keys(NHLT).map(function(k){return NHLT[k][m]}),v,hi)}
+function nhlPts(t){return 2*t.w+t.t}
+// typical per-game rates for a skater with this much ice time, used to steady a small sample
+function nhlPrior(s){
+  var m=s.toi,D=s.pos==='D',gl=(D?.00017:.0009)*m*m;
+  return {g:gl,a:gl*(D?3.2:1.6),s:(D?.05:.12)*m};
+}
+function nhlLo(r){return r<=16?ordn(r)+' fewest':ordn(33-r)+' most'}
+function nhlSv(g){return g.sa?g.sv/g.sa:0}
+function nhlDivHtml(groups,src){
+  var h='<p class="lede" style="margin-top:0">Standings by division, ranked by points (2 for a win, 1 for an overtime or shootout loss), with each team’s next game. '+esc(src)+'</p>';
+  groups.forEach(function(G){
+    var ts=G.t.slice().sort(function(a,b){return nhlPts(b)-nhlPts(a)||b.w-a.w}),ld=ts[0],gp=function(t){return t.w+t.l+t.t};
+    var tied=ts.filter(function(t){return nhlPts(t)===nhlPts(ld)});
+    var blurb=!gp(ld)?'No games played yet.':(tied.length>1?tied.length+' teams are level on '+nhlPts(ld)+' points.':esc(ld.n)+' lead with '+nhlPts(ld)+' points'+(ts[1]?', '+(nhlPts(ld)-nhlPts(ts[1]))+' ahead of '+esc(ts[1].n)+'.':'.'));
+    h+='<h3>'+esc(G.g)+'</h3><p class="src" style="margin-top:0">'+blurb+'</p><div class="tblwrap"><table><thead><tr><th>Team</th><th>GP</th><th>W-L-OTL</th><th>Pts</th><th>Pts %</th><th>Next</th></tr></thead><tbody>'+ts.map(function(t){
+      var n=gp(t),pp=n?nhlPts(t)/(2*n):0;
+      return '<tr><td><b>'+teamBtn('nhl',t.n)+'</b></td><td>'+n+'</td><td>'+t.w+'-'+t.l+'-'+t.t+'</td><td><b>'+nhlPts(t)+'</b></td><td>'+(n?pp.toFixed(3).replace(/^0/,''):'—')+'</td><td><span class="src">'+esc(nextFor('nhl',t.n))+'</span></td></tr>';
+    }).join('')+'</tbody></table></div>';
+  });
+  return h+'<p class="src">The top three in each division and two wild cards per conference make the playoffs. It is early, so the order will change a lot.</p>';
+}
+function nhlSkTable(abbr,n){
+  var sk=NHL_SK.filter(function(s){return s.t===abbr&&s.g>=1}).sort(function(a,b){return (b.G+b.A)-(a.G+a.A)||b.G-a.G}).slice(0,n);
+  if(!sk.length)return '';
+  return '<h3>Top scorers</h3><div class="tblwrap"><table><thead><tr><th>Player</th><th>GP</th><th>G</th><th>A</th><th>Pts</th><th>Shots/g</th><th>TOI</th></tr></thead><tbody>'+sk.map(function(s){
+    var m=Math.floor(s.toi),sec=Math.round((s.toi-m)*60);if(sec>=60){m++;sec=0}
+    return '<tr><td><b>'+esc(s.n)+'</b> <span class="src">'+esc(s.pos)+'</span></td><td>'+s.g+'</td><td>'+s.G+'</td><td>'+s.A+'</td><td><b>'+(s.G+s.A)+'</b></td><td>'+(s.S/s.g).toFixed(1)+'</td><td>'+m+':'+(sec<10?'0':'')+sec+'</td></tr>';
+  }).join('')+'</tbody></table></div>';
+}
+function nhlProfile(abbr){
+  var T=NHLT[abbr],h='';
+  h+='<h3>Season profile</h3><div class="facts"><span>Goals for <b>'+T.gf.toFixed(2)+' ('+ordn(nhlRank('gf',T.gf,1))+')</b></span><span>Goals against <b>'+T.ga.toFixed(2)+' ('+ordn(nhlRank('ga',T.ga,0))+' best)</b></span><span>Shots for <b>'+T.sf.toFixed(1)+' ('+ordn(nhlRank('sf',T.sf,1))+')</b></span><span>Shots against <b>'+T.sa.toFixed(1)+' ('+ordn(nhlRank('sa',T.sa,0))+' best)</b></span><span>Power play <b>'+(T.pp*100).toFixed(1)+'%</b></span><span>Penalty kill <b>'+(T.pk*100).toFixed(1)+'%</b></span></div><p class="src">Per game through '+T.gp+' games, ranked among 32 teams. '+esc(NHL_SRC)+'</p>';
+  h+=nhlSkTable(abbr,8);
+  var gk=NHL_GK.filter(function(g){return g.t===abbr&&g.gp>=1}).sort(function(a,b){return b.gs-a.gs||b.gp-a.gp});
+  if(gk.length)h+='<h3>Goalies</h3><ul class="pts">'+gk.slice(0,3).map(function(g){return '<li><b>'+esc(g.n)+'</b>: '+g.gs+' start'+(g.gs===1?'':'s')+', '+g.sv+' saves on '+g.sa+' shots ('+String(nhlSv(g).toFixed(3)).replace(/^0/,'')+')</li>'}).join('')+'</ul>';
+  return h;
+}
+function nhlGameTable(g){
+  pxRefresh('nhl');
+  var rows=[],A=nhlK(g.a),H=nhlK(g.h);
+  [A,H].forEach(function(tm){
+    PROPS.filter(function(p){return p.lg==='nhl'&&p.kind==='hg'&&nhlK(p.team)===tm&&p.g>=2}).sort(function(a,b){return b.avg-a.avg}).slice(0,4).forEach(function(p){
+      var adj=pxAdj(p),mu=p.avg*(1+adj/100),pg=calc(p,.5,-110,-110,adj).po;
+      var sp=PROPS.filter(function(q){return q.lg==='nhl'&&q.kind==='hs'&&q.name===p.name&&q.team===p.team})[0];
+      rows.push({p:p,mu:mu,pg:pg,sh:sp?sp.avg*(1+pxAdj(sp)/100):null});
+    });
+  });
+  if(!rows.length)return '';
+  return '<h3>Projection table</h3><div class="tblwrap"><table><thead><tr><th>Player</th><th>Goals/g</th><th>Goal chance</th><th>Shots proj.</th></tr></thead><tbody>'+rows.map(function(r){
+    return '<tr><td><button class="pxname" data-act="prop" data-id="'+r.p.id+'"><b>'+esc(r.p.name)+'</b></button> <span class="src">'+esc(r.p.team)+' '+esc(r.p.pos||'')+'</span></td><td>'+r.p.avg.toFixed(2)+'</td><td><span class="hrpill '+(r.pg>=.4?'hi':r.pg<.2?'lo':'mid')+'">'+Math.round(r.pg*100)+'%</span></td><td>'+(r.sh==null?'—':r.sh.toFixed(1))+'</td></tr>';
+  }).join('')+'</tbody></table></div><p class="src">Rates are season goals and shots per game, steadied toward a typical rate for the player’s ice time and shifted for how much this opponent allows. Prop lines are not readable from sportsbooks, so compare these with your book.</p>';
+}
+
 /* ---------- team profiles ---------- */
 var TNAMES={
+ nhl:[['new jersey','NJ'],['new york islanders','NYI'],['new york rangers','NYR'],['los angeles','LA'],['san jose','SJ'],['tampa bay','TB'],['st louis','STL'],['utah','UTA'],['vegas','VGK'],['washington','WSH'],['boston','BOS'],['buffalo','BUF'],['detroit','DET'],['florida','FLA'],['montreal','MTL'],['ottawa','OTT'],['toronto','TOR'],['carolina','CAR'],['columbus','CBJ'],['philadelphia','PHI'],['pittsburgh','PIT'],['chicago','CHI'],['colorado','COL'],['dallas','DAL'],['minnesota','MIN'],['nashville','NSH'],['winnipeg','WPG'],['anaheim','ANA'],['calgary','CGY'],['edmonton','EDM'],['seattle','SEA'],['vancouver','VAN']],
  nfl:[['new york giants','NYG'],['new york jets','NYJ'],['los angeles chargers','LAC'],['los angeles rams','LAR'],['buffalo','BUF'],['new england','NE'],['miami','MIA'],['cleveland','CLE'],['pittsburgh','PIT'],['baltimore','BAL'],['cincinnati','CIN'],['jacksonville','JAX'],['indianapolis','IND'],['houston','HOU'],['tennessee','TEN'],['kansas city','KC'],['denver','DEN'],['las vegas','LV'],['philadelphia','PHI'],['dallas','DAL'],['washington','WAS'],['minnesota','MIN'],['green bay','GB'],['chicago','CHI'],['detroit','DET'],['carolina','CAR'],['atlanta','ATL'],['new orleans','NO'],['tampa bay','TB'],['san francisco','SF'],['seattle','SEA'],['arizona','ARI']],
  nba:[['los angeles lakers','LAL'],['la clippers','LAC'],['golden state','GSW'],['san antonio','SAS'],['new orleans','NOP'],['new york','NYK'],['oklahoma city','OKC'],['portland','POR'],['utah','UTA'],['phoenix','PHX'],['sacramento','SAC'],['dallas','DAL'],['houston','HOU'],['memphis','MEM'],['denver','DEN'],['minnesota','MIN'],['boston','BOS'],['brooklyn','BKN'],['philadelphia','PHI'],['toronto','TOR'],['chicago','CHI'],['cleveland','CLE'],['detroit','DET'],['indiana','IND'],['milwaukee','MIL'],['atlanta','ATL'],['charlotte','CHA'],['miami','MIA'],['orlando','ORL'],['washington','WAS']],
  mlb:[['new york yankees','NYY'],['new york mets','NYM'],['chicago white','CWS'],['chicago cubs','CHC'],['los angeles angels','LAA'],['los angeles dodgers','LAD'],['tampa bay','TB'],['boston','BOS'],['baltimore','BAL'],['toronto','TOR'],['cleveland','CLE'],['minnesota','MIN'],['detroit','DET'],['kansas city','KC'],['houston','HOU'],['texas','TEX'],['seattle','SEA'],['athletics','ATH'],['atlanta','ATL'],['philadelphia','PHI'],['miami','MIA'],['washington','WSH'],['milwaukee','MIL'],['pittsburgh','PIT'],['st louis','STL'],['cincinnati','CIN'],['san diego','SD'],['arizona','AZ'],['san francisco','SF'],['colorado','COL']]
@@ -1002,6 +1123,8 @@ function teamSheet(lg,name){
     var c=cfbFind(name);
     if(c&&c.def!=null){var ks3=Object.keys(CFB).filter(function(k){return CFB[k].def!=null}),ov=ks3.map(function(k){return CFB[k].off}),dv=ks3.map(function(k){return CFB[k].def});
       h+='<h3>Season profile</h3><div class="facts"><span>Points for <b>'+c.off.toFixed(1)+' ('+ordn(rankIn(ov,c.off,1))+' of '+ks3.length+')</b></span><span>Points against <b>'+c.def.toFixed(1)+' ('+ordn(rankIn(dv,c.def,0))+')</b></span></div><p class="src">'+esc(DATA.cfb.asOf||'Team scoring from the saved college football data.')+'</p>'}
+  }else if(lg==='nhl'&&abbr&&NHLT[abbr]){
+    h+=nhlProfile(abbr);
   }else if(lg==='mlb'){
     var bs=MLB_BAT.filter(function(b){return b.t===abbr&&b.pa>=150}).sort(function(a,b){return b.ops-a.ops}),ps=MLB_PIT.filter(function(p){return p.t===abbr&&p.gs>=8}).sort(function(a,b){return a.era-b.era});
     if(bs.length)h+='<h3>Lineup</h3><div class="tblwrap"><table><thead><tr><th>Batter</th><th>HR</th><th>SB</th><th>AVG</th><th>OPS</th></tr></thead><tbody>'+bs.slice(0,9).map(function(b){return '<tr><td><b>'+esc(b.n)+'</b></td><td>'+b.hr+'</td><td>'+b.sb+'</td><td>'+String(b.avg.toFixed(3)).replace(/^0/,'')+'</td><td>'+String(b.ops.toFixed(3)).replace(/^0/,'')+'</td></tr>'}).join('')+'</tbody></table></div>';
@@ -1038,6 +1161,12 @@ function teamSheet(lg,name){
         var oab=NBAT[nx.lg==='nba'?(homeG?nx.a:nx.h):''],mab=abbr&&NBAT[abbr];
         if(oab&&mab){var ks4=Object.keys(NBAT),opa=ks4.map(function(k){return NBAT[k].PA}),opf=ks4.map(function(k){return NBAT[k].PF});
           h+='<h3>Against '+esc(oppN)+' strengths and weaknesses</h3><ul class="pts"><li><b>Their defense:</b> allows '+oab.PA.toFixed(1)+' ('+ordn(rankIn(opa,oab.PA,0))+' best), '+strTxt(rankIn(opa,oab.PA,0),30)+'.</li><li><b>Their offense:</b> scores '+oab.PF.toFixed(1)+' ('+ordn(rankIn(opf,oab.PF,1))+' best), '+strTxt(rankIn(opf,oab.PF,1),30)+'.</li></ul><p class="src">Last season’s numbers, so early-season results will shift them.</p>'}
+      }else if(lg==='nhl'){
+        var ob2=NHLT[nhlK(oppA)],mb2=abbr&&NHLT[abbr];
+        if(ob2&&mb2){
+          h+='<h3>Against '+esc(oppN)+' strengths and weaknesses</h3><ul class="pts"><li><b>Their defense:</b> allows '+ob2.ga.toFixed(2)+' goals a game ('+ordn(nhlRank('ga',ob2.ga,0))+' best), '+strTxt(nhlRank('ga',ob2.ga,0),32)+', and '+ob2.sa.toFixed(1)+' shots ('+ordn(nhlRank('sa',ob2.sa,0))+' fewest).</li><li><b>Their offense:</b> scores '+ob2.gf.toFixed(2)+' a game ('+ordn(nhlRank('gf',ob2.gf,1))+' best), '+strTxt(nhlRank('gf',ob2.gf,1),32)+'.</li><li><b>Special teams:</b> power play '+(ob2.pp*100).toFixed(1)+'%, penalty kill '+(ob2.pk*100).toFixed(1)+'%.</li></ul>';
+          h+=nhlGameTable(nx);
+        }
       }else if(lg==='ncaafb'){
         var oc=cfbFind(oppN);
         if(oc&&oc.def!=null){var ks5=Object.keys(CFB).filter(function(k){return CFB[k].def!=null}),od=ks5.map(function(k){return CFB[k].def}),oo=ks5.map(function(k){return CFB[k].off});
@@ -1252,7 +1381,7 @@ function playerBtn(name,lg,team,k,thr,opp,label){return '<button class="linkbtn"
 /* ---------- top model leans across sports ---------- */
 function discoverHtml(){
   var now=Date.now(),items=[];
-  ['nfl','nba','ncaafb'].forEach(function(lg){(S.feed[lg]||[]).forEach(function(g){
+  ['nfl','nba','ncaafb','nhl'].forEach(function(lg){(S.feed[lg]||[]).forEach(function(g){
     if(kind(g)!=='up'||g.start>now+36*36e5)return;
     var b=picksFor(g);if(!b)return;
     b.forEach(function(x){if(x.p>=.52)items.push({g:g,x:x})});
@@ -1268,7 +1397,7 @@ S.mine=[];
 try{var rm0=localStorage.getItem('hitboard.mine.v1');if(rm0){var am0=JSON.parse(rm0);if(Array.isArray(am0))S.mine=am0}}catch(e){}
 function saveMine(){try{localStorage.setItem('hitboard.mine.v1',JSON.stringify(S.mine.slice(-300)))}catch(e){}}
 S.scan={type:'ml',gid:'',side:'h',player:'',pk:'rec',line:'',odds:'-110',busy:'',msg:'',raw:'',note:''};
-function upGames(){var out=[];['nfl','nba','ncaafb'].forEach(function(lg){(S.feed[lg]||[]).forEach(function(g){if(kind(g)!=='final')out.push(g)})});out.sort(function(a,b){return a.start-b.start});return out}
+function upGames(){var out=[];['nfl','nba','ncaafb','nhl'].forEach(function(lg){(S.feed[lg]||[]).forEach(function(g){if(kind(g)!=='final')out.push(g)})});out.sort(function(a,b){return a.start-b.start});return out}
 function gTime(g){return new Date(g.start).toLocaleString('en-US',{weekday:'short',hour:'numeric',minute:'2-digit'})}
 var NBA_STATS=[[/three\s*pointers?\s*made|threes|3-?pt|3pm/i,'tpm','Threes'],[/rebounds?/i,'reb','Rebounds'],[/assists?/i,'ast','Assists'],[/points?/i,'pts','Points']];
 var TAB={PHO:'PHX',GS:'GSW',NY:'NYK',SA:'SAS',NO:'NOP',BK:'BKN',CHO:'CHA',WSH:'WAS',UTAH:'UTA',LVR:'LV',KAN:'KC',TAM:'TB',GNB:'GB',NWE:'NE',NOR:'NO',SFO:'SF'};
@@ -1691,10 +1820,10 @@ function vAbout(){
   '<h3>Refreshing</h3><ul class="pts"><li>Scores refresh when you open the page and when you tap <b>Refresh scores</b>. The installed phone app also refreshes every 30 seconds while open, using ESPN’s public scoreboard.</li><li>If your view cannot reach the feed, the button says so. Ask Claude to “refresh Hitboard” and it will re-research lines, injuries and stats and update the page.</li><li>Lines, injuries and player stats do not come from the feed, so they only change when Claude updates the page.</li></ul>'+
   '<h3>What is real</h3><ul class="pts"><li>Schedules, scores and win probabilities from the data feed.</li><li>NFL spreads, totals and moneylines, each labeled with source and date. Older listings are marked, and where two sources differ both are shown.</li><li>Kalshi and Polymarket US prices (normalized so each pair sums to 100%).</li><li>An NBA and college football breakdown on each upcoming game in the Games tab: prediction, strengths and weaknesses, player hit rates, straight bets and uncertainty, from last season’s NBA scoring and this season’s college scoring. Tap Details on an upcoming game.</li><li>A matchup deep dive for every NFL game this week: records, scoring, pass and run offense and defense, pressure and takeaways with league ranks from Pro Football Reference. Three games (NE-CHI, DEN-ARI, GB-DET) have hand-written angles. The others have angles generated from the stat ranks.</li></ul>'+
   '<h3>Model checks</h3><ul class="pts">'+liveLi()+'<li><b>Starting weights.</b> The first weights came from a one-time check on 4,129 old NFL games (1996 to 2017, the slieb74/NFL-Betting-Data set). They are only a starting point. The 2026 record above now adjusts them as games finish.</li><li><b>Market beats the model.</b> The closing total was off by 10.69 points on average, a stats-only model by 10.96. Its over/under picks hit 50%. So totals now lean 90% on the market line, and chances are held near 50%.</li><li><b>Margin.</b> Blending 30% stats model with 70% market line cut the average spread error slightly (10.52 versus 10.56), so that is the weight used.</li><li><b>Wind is the one rule that held.</b> Outdoor games with sustained wind of 15 to 19 mph went under 54% of the time and 20 mph or more 60%, so totals are trimmed 0.9 and 2.3 points. Cold and rain showed no edge, so they are ignored.</li><li><b>Machine learning.</b> Ridge regression and gradient boosting on team stats, line, weather and week did not beat the line when tested the honest way (train on past seasons, test on the next), hitting 48 to 49%. They are not used.</li><li><b>Shrinkage.</b> Early-season points per game are pulled toward the league average, and player averages toward their position’s average, because five games is a small sample.</li></ul><h3>What is modeled</h3><ul class="pts"><li><b>Prop probability.</b> Normal curve centered on the player’s per-game average, with spread set by stat type (passing 22%, rushing 55%, receiving yards 60%, receptions 40% of the mean, widened 30% for samples under 3 games). The matchup slider shifts the average.</li><li><b>Edge.</b> Model probability minus the price’s implied probability with the sportsbook margin removed.</li></ul>'+
-  '<h3>What is missing</h3><ul class="pts"><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
+  '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v31, Oct 20';
+var BUILD='v32, Oct 20';
 function foot(){return '<p class="foot"><button class="linkbtn" data-act="tab" data-t="about">How the model works</button> · <span class="src">Build '+BUILD+'</span></p><p class="foot">For entertainment and research only, not betting advice. Probabilities are estimates and can be wrong. If gambling is a problem for you or someone you know, call 1-800-GAMBLER.</p>'}
 
 /* ---------- sheets ---------- */
@@ -1831,6 +1960,7 @@ function legList(lg){
       L.push({name:r[0],team:r[1],mk:t.stat+' over '+t.line,p:smooth(r[2],r[3]),src:r[2]+' of last '+r[3]+' games',nx:{txt:nx},kind:'cfb'});
     })});
   }
+  if(lg==='nhl')nhlLegs(L);
   return L;
 }
 function fairOdds(p){if(p<=0||p>=1)return '—';return p>=.5?'-'+Math.round(100*p/(1-p)):'+'+Math.round(100*(1-p)/p)}
@@ -1858,7 +1988,7 @@ function corrNote(legs){
   var byTeam={};legs.forEach(function(l){(byTeam[l.team]=byTeam[l.team]||[]).push(l)});
   var notes=[];
   Object.keys(byTeam).forEach(function(t){var a=byTeam[t];
-    if(a.length>=2)notes.push(t+': '+a.map(function(x){return x.name}).join(' and ')+' are on the same team, so a high-volume passing game helps both legs. That positive link makes the real chance of both higher than the multiplied figure.');
+    if(a.length>=2)notes.push(t+': '+a.map(function(x){return x.name}).join(' and ')+' are on the same team, so '+(a[0].kind==='nhl'?'a high-scoring night for the team helps both legs':'a high-volume passing game helps both legs')+'. That positive link makes the real chance of both higher than the multiplied figure.');
   });
   var byG={};legs.forEach(function(l){var k=l.nx.id||l.nx.txt;(byG[k]=byG[k]||new Set()).add(l.team)});
   Object.keys(byG).forEach(function(k){if(byG[k].size>=2)notes.push('Legs from both teams in the same game depend on a shootout, which also lifts both sides.')});
@@ -1915,6 +2045,13 @@ function gameReasons(lg,g,x,ps){
   }
   con.push('Injury news and line movement after this was built can change it. Check the report before you bet.');
   con.push('The model gives it '+Math.round(p*100)+'%, so it should lose about '+Math.round((1-p)*100)+' times in 100. A fair price is '+fairOdds(p)+'; shorter than that is not worth it.');
+  if(lg==='nhl'){
+    var bad=/football|turnover|garbage-time|key numbers|basketball/;
+    pro=pro.filter(function(t){return !bad.test(t)}).map(function(t){return t.replace(/\bpoints\b/g,'goals')});
+    con=con.filter(function(t){return !bad.test(t)}).map(function(t){return t.replace(/\bpoints\b/g,'goals')});
+    if(homePick)pro.push(pickT+' are at home, worth only about a quarter of a goal in hockey.');
+    con.push('Hockey is low scoring and goalie-driven. A hot goalie or one bounce decides many games, and the starter is not confirmed here.');
+  }
   return {pro:pro,con:con};
 }
 function propReasons(lg,l){
@@ -1939,6 +2076,11 @@ function propReasons(lg,l){
   }else if(l.kind==='td'){
     pro.push('Touchdown scorers at a 40% or better rate in their last ten are a genuine edge if the price is plus money.');
     con.push('Touchdowns are the most random prop. Goal-line carries can switch to another back, and one fumble or a blowout changes who scores.');
+  }else if(lg==='nhl'){
+    if(l.src)pro.push(l.src+'.');
+    pro.push('The chance counts goals, assists or shots as a Poisson variable, which fits a low-scoring sport, and shifts for how much the opponent allows.');
+    con.push('Built from only the first 8 to 11 games of the season, blended with a typical rate for his ice time. Early-season rates move a lot.');
+    con.push('Line changes, power-play time, the opposing goalie and scratches are not in the number. Check the lineup on game day.');
   }else if(lg==='nba'){
     con.push('These are last season’s last-ten rates. Minutes, roster and role change in a new season, and early games are volatile.');
     con.push('Check the injury report and minutes. A player who sits out or is on a minutes limit makes the bet void or a loser.');
@@ -2006,9 +2148,10 @@ function straightList(lg){
   var legs=legList(lg).filter(function(l){return l.p>=.55});
   var best={};legs.forEach(function(l){var k=l.name+'|'+(l.kind==='td'?'td':l.mk.split(' ')[0]);if(!best[k]||l.p>best[k].p)best[k]=l});
   Object.keys(best).map(function(k){return best[k]}).sort(function(a,b){return b.p-a.p}).slice(0,40).forEach(function(l){
-    var why=['Cleared this line in '+l.src+'.'];
+    var why=[lg==='nhl'?l.src+'.':'Cleared this line in '+l.src+'.'];
     if(lg==='nfl'&&l.nx&&l.nx.opp&&TS[nt(l.nx.opp)]&&l.kind==='yds'){var o=nt(l.nx.opp),rush=/rush/i.test(l.mk),m=rush?'drush':'dpass',rk=mrank(o,m);why.push(o+' rank '+ordn(rk)+' against the '+(rush?'run':'pass')+' ('+MET[m].fm(mv(o,m))+'), '+(rk>=22?'a weak spot to attack.':rk<=10?'a tough matchup, which is why this is not higher.':'about average.'))}
     else if(l.kind==='td')why.push('Anytime touchdown prices run long, so a 40% or better last-10 rate is a real edge.');
+    else if(lg==='nhl')why.push('Built from season rates steadied toward a typical rate for his ice time, then shifted for the opponent. Check the lineup and the starting goalie first.');
     else if(lg!=='nfl')why.push('From last-ten-game hit rates in the table. Check injuries and minutes first.');
     var lr=recLearn(lg+'-prop'),pAdj=Math.max(.03,Math.min(.97,l.p+lr.adj)),pr2=propReasons(lg,Object.assign({},l,{p:pAdj}));
     if(lr.adj)pr2.pro.push('Adjusted '+(lr.adj>0?'+':'')+Math.round(lr.adj*100)+' points from your tracked '+lg.toUpperCase()+' props: '+lr.w+' of '+lr.n+' hit, against '+Math.round(lr.avgP*100)+'% predicted.');
@@ -2040,17 +2183,17 @@ function vParlay(){
   var nfl=lg==='nfl';
   var used={};function take(a){a.forEach(function(l){used[l.name]=1});return a}
   function fresh(){return all.filter(function(l){return !used[l.name]})}
-  var cons=take(pickLegs(all,.8,4,nfl,['yds','nba','cfb']));
-  var std=take(pickLegs(all,.65,5,nfl,['yds','nba','cfb']));
+  var cons=take(pickLegs(all,.8,4,nfl,['yds','nba','cfb','nhl']));
+  var std=take(pickLegs(all,.65,5,nfl,['yds','nba','cfb','nhl']));
   var agg=take(pickLegs(all,.5,6,nfl,nfl?['yds','td']:null));
   var lsh=take(nfl?pickLegs(all,.4,6,false,['td']):pickLegs(all,.3,6,false,null).slice(0,6));
-  var pairA=pickLegs(all,.8,2,false,['yds','nba','cfb']);
-  var altC=take(pickLegs(fresh(),.75,4,false,['yds','nba','cfb']));
-  var altS=take(pickLegs(fresh(),.6,5,false,['yds','nba','cfb']));
+  var pairA=pickLegs(all,.8,2,false,['yds','nba','cfb','nhl']);
+  var altC=take(pickLegs(fresh(),.75,4,false,['yds','nba','cfb','nhl']));
+  var altS=take(pickLegs(fresh(),.6,5,false,['yds','nba','cfb','nhl']));
   var altL=take(pickLegs(fresh(),nfl?.3:.25,6,false,nfl?['td']:null));
-  h+='<p class="lede">Built only from the hit-rate data in this app, using legs whose game has not started. Each leg’s chance is its hit count nudged toward 50% (one extra hit and one extra miss) because the samples are small. '+(lg==='nfl'?'Yardage legs use the Covers hit-rate ladders and touchdown legs use the JediBets last-10 rates.':lg==='nba'?'Legs use last season’s last-10 hit rates because the 2026-27 season starts Oct 20.':'Legs use the last five games and few teams in the table have a game left this week.')+' Sportsbook odds were not readable, so each parlay shows fair odds to compare with your book.</p>';
+  h+='<p class="lede">'+(lg==='nhl'?'Built from season goal, assist and shot rates, using legs whose game has not started. Each leg’s chance treats the player’s rate as a Poisson count after blending it with a typical rate for his ice time, then shifts for the opponent’s defense. ':'Built only from the hit-rate data in this app, using legs whose game has not started. Each leg’s chance is its hit count nudged toward 50% (one extra hit and one extra miss) because the samples are small. ')+(lg==='nhl'?'Only 8 to 11 games are in, so treat every leg as rough. ':'')+(lg==='nfl'?'Yardage legs use the Covers hit-rate ladders and touchdown legs use the JediBets last-10 rates.':lg==='nba'?'Legs use last season’s last-10 hit rates because the 2026-27 season starts Oct 20.':lg==='nhl'?'':'Legs use the last five games and few teams in the table have a game left this week.')+' Sportsbook odds were not readable, so each parlay shows fair odds to compare with your book.</p>';
   h+=parlayCard('Conservative','Highest-probability yardage or stat legs.',cons);
-  h+=parlayCard('Standard','Strong legs, with a quarterback-plus-receiver stack when one clears the bar.',std);
+  h+=parlayCard('Standard',(lg==='nhl'?'Strong legs from different games.':'Strong legs, with a quarterback-plus-receiver stack when one clears the bar.'),std);
   h+=parlayCard('Aggressive','Lower bar'+(nfl?', mixing yardage and touchdown legs.':'.'),agg);
   h+=parlayCard('Long shot',nfl?'Anytime touchdown scorers with the best last-10 rates.':'Lowest bar in the data.',lsh);
   h+='<h3>More combinations, different players</h3>';
@@ -2111,7 +2254,7 @@ function wxLi(k,start){
 
 /* ---------- availability: ESPN rosters and injury reports ---------- */
 S.ros={};S.inj={};S.availAt=0;S.rosAt=0;
-function normName(n){return (n||'').toLowerCase().replace(/[.'’]/g,'').replace(/\b(jr|sr|ii|iii|iv|v)\b/g,'').replace(/[^a-z ]/g,' ').replace(/\s+/g,' ').trim()}
+function normName(n){return (n||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[.'’]/g,'').replace(/\b(jr|sr|ii|iii|iv|v)\b/g,'').replace(/[^a-z ]/g,' ').replace(/\s+/g,' ').trim()}
 function nameKeys(n){var p=normName(n).split(' ');return [p.join(' '),p[p.length-1]+'|'+p[0].charAt(0)]}
 var OUT_RE=/^(out|injured reserve|ir|suspended|pup|non-football|reserve|physically unable)/i;
 function avail(name,team){
@@ -2137,7 +2280,7 @@ function collectNames(o,out){
 }
 function nameMap(lg){var m={};(S.feed[lg]||[]).forEach(function(g){m[g.an]=lg==='nfl'?nt(g.a):g.a;m[g.hn]=lg==='nfl'?nt(g.h):g.h});return m}
 function loadInj(lg){
-  var path=lg==='nfl'?'football/nfl':lg==='mlb'?'baseball/mlb':'basketball/nba';
+  var path=lg==='nfl'?'football/nfl':lg==='mlb'?'baseball/mlb':lg==='nhl'?'hockey/nhl':'basketball/nba';
   return getJson('https://site.api.espn.com/apis/site/v2/sports/'+path+'/injuries').then(function(j){
     var nm=nameMap(lg),by={},idx={};
     (j.injuries||[]).forEach(function(t){
@@ -2170,7 +2313,7 @@ function loadAvail(){
   if(window.claude||typeof fetch!=='function')return;
   var now=Date.now();if(S.availBusy||now-S.availAt<4*60000)return;
   S.availBusy=true;
-  Promise.all([loadInj('nfl'),loadInj('nba'),loadInj('mlb'),loadRosters()]).then(function(){
+  Promise.all([loadInj('nfl'),loadInj('nba'),loadInj('mlb'),loadInj('nhl'),loadRosters()]).then(function(){
     S.availBusy=false;if(S.inj.nfl||S.inj.nba||Object.keys(S.ros).length)S.availAt=Date.now();
     var ae=document.activeElement;if(!(ae&&ae.tagName==='INPUT')&&!S.sheet)render();
   });
@@ -2344,7 +2487,7 @@ function picksFor(g){
 function trackPicks(){
   var changed=false,now=Date.now(),have={};
   S.log.forEach(function(x){have[x.k]=1});
-  ['nfl','nba','ncaafb'].forEach(function(lg){(S.feed[lg]||[]).forEach(function(g){
+  ['nfl','nba','ncaafb','nhl'].forEach(function(lg){(S.feed[lg]||[]).forEach(function(g){
     if(kind(g)==='up'&&g.start>now){
       var b=picksFor(g);if(!b)return;
       b.forEach(function(x){
@@ -2458,6 +2601,12 @@ function nbaRank(stat,v){var c=0;Object.keys(NBAT).forEach(function(k){var t=NBA
 function feedTeams(g){
   if(g.lg==='nfl'){var na=nt(g.a),nh=nt(g.h);if(!TS[na]||!TS[nh])return {sp:'nfl',missing:[!TS[na]?g.an:null,!TS[nh]?g.hn:null].filter(Boolean)};
     return {sp:'nfl',A:{n:g.an,pf:sv(na,'ppg'),pa:sv(na,'papg'),rec:TS[na].rec,k:na},H:{n:g.hn,pf:sv(nh,'ppg'),pa:sv(nh,'papg'),rec:TS[nh].rec,k:nh},he:2.5,sdM:13.5,sdT:10.5}}
+  if(g.lg==='nhl'){
+    var nA=NHLT[nhlK(g.a)],nH=NHLT[nhlK(g.h)];
+    if(!nA||!nH)return {sp:'nhl',missing:[!nA?g.an:null,!nH?g.hn:null].filter(Boolean)};
+    var nL=nhlLg(),nS=function(T,nm){return {n:nm,pf:nhlShr(T.gf,T.gp,nL.gf),pa:nhlShr(T.ga,T.gp,nL.ga),rec:T.w+'-'+T.l+'-'+T.otl,k:T.k}};
+    return {sp:'nhl',A:nS(nA,g.an),H:nS(nH,g.hn),he:.25,sdM:2.3,sdT:2.4};
+  }
   if(g.lg==='nba'){var A=NBAT[g.a],H=NBAT[g.h];if(!A||!H)return null;return {sp:'nba',A:{n:g.an,pf:A.PF,pa:A.PA,rec:A.W+'-'+A.L,k:g.a},H:{n:g.hn,pf:H.PF,pa:H.PA,rec:H.W+'-'+H.L,k:g.h},he:2.5,sdM:12,sdT:18}}
   if(g.lg==='ncaafb'){var a=cfbFind(g.an),h=cfbFind(g.hn);if(!a||!h||a.def==null||h.def==null)return {sp:'ncaafb',missing:[!a||a.def==null?g.an:null,!h||h.def==null?g.hn:null].filter(Boolean)};
     return {sp:'ncaafb',A:{n:g.an,pf:a.off,pa:a.def,rec:'',k:g.a,o:a},H:{n:g.hn,pf:h.off,pa:h.def,rec:'',k:g.h,o:h},he:3,sdM:17,sdT:14}}
@@ -2466,6 +2615,7 @@ function feedTeams(g){
 function leagueTotal(lg){
   var v=[];
   if(lg==='nfl')Object.keys(TS).forEach(function(k){v.push(mv(k,'ppg'))});
+  else if(lg==='nhl')return nhlLg().gf*2;
   else if(lg==='nba')Object.keys(NBAT).forEach(function(k){v.push(NBAT[k].PF)});
   else Object.keys(CFB).forEach(function(k){v.push(CFB[k].off)});
   return v.length?2*v.reduce(function(a,b){return a+b},0)/v.length:null;
@@ -2496,7 +2646,16 @@ function feedCalc(g){
     var lt=leagueTotal(g.lg),over=lt==null?true:total>=lt,tx=Math.round((over?total-1.5:total+1.5)*2)/2;
     bets.push({t:'tot',over:over,num:tx,mk:'Total',pick:(over?'Over '+tx.toFixed(1)+' or lower':'Under '+tx.toFixed(1)+' or higher'),p:calibTotal(over?Phi((total-tx)/T.sdT):Phi((tx-total)/T.sdT),!over,wxa),conf:'low',why:'No sportsbook total was read. The model total is '+total.toFixed(1)+(lt!=null?' versus a league average game of about '+lt.toFixed(1):'')+', so the lean is '+(over?'over':'under')+'. Take it only at '+tx.toFixed(1)+' or '+(over?'lower':'higher')+'; skip it at a worse number.'});
   }
-  bets.forEach(function(b){b.p0=b.p;b.p=learnP(LN,b.t,b.p);b.rm=rawM;b.rt=rawT});
+  if(g.lg==='nhl'&&!ln){
+    bets=bets.filter(function(b){return b.t==='ml'});
+    var fmN=Math.abs(margin),favN=margin>=0?g.h:g.a,dogN=margin>=0?g.a:g.h,favS=margin>=0?'h':'a',dogS=margin>=0?'a':'h';
+    var pFav=Phi((fmN-1.5)/T.sdM),pDog=Phi((1.5-fmN)/T.sdM);
+    if(pFav>=.5)bets.push({t:'sp',side:favS,num:-1.5,mk:'Puck line',pick:favN+' -1.5',p:Math.min(.7,.5+.8*(pFav-.5)),conf:'low',why:'No sportsbook puck line was read. The model makes '+favN+' a '+fmN.toFixed(1)+'-goal favorite, so -1.5 needs a win by two or more. Take it only if your book pays at least the fair odds shown.'});
+    else bets.push({t:'sp',side:dogS,num:1.5,mk:'Puck line',pick:dogN+' +1.5',p:Math.min(.78,.5+.85*(pDog-.5)),conf:'low',why:'No sportsbook puck line was read. The model makes '+favN+' only a '+fmN.toFixed(1)+'-goal favorite, so '+dogN+' +1.5 wins unless they lose by two or more. That side usually carries a short price, so take it only if your book pays at least the fair odds shown.'});
+    var ltN=leagueTotal('nhl'),overN=total>=ltN,txN=Math.floor(overN?total-1:total+1)+.5;
+    bets.push({t:'tot',over:overN,num:txN,mk:'Total',pick:(overN?'Over ':'Under ')+txN.toFixed(1),p:calibTotal(overN?Phi((total-txN)/T.sdT):Phi((txN-total)/T.sdT),!overN,{adj:0,pu:0}),conf:'low',why:'No sportsbook total was read. The model total is '+total.toFixed(1)+' goals versus a league average game of about '+ltN.toFixed(1)+', so the lean is '+(overN?'over':'under')+'. Take it at '+txN.toFixed(1)+' or '+(overN?'lower':'higher')+'; skip it at a worse number.'});
+  }
+  bets.forEach(function(b){b.p0=b.p;b.p=(g.lg==='nhl'&&b.t==='sp')?Math.max(.3,Math.min(.8,b.p+(LN.dp.sp||0))):learnP(LN,b.t,b.p);b.rm=rawM;b.rt=rawT});
   return {T:T,p:p,fp:fp,ln:ln,total:total,margin:margin,bets:bets,LN:LN};
 }
 function matchupText(g,Ra,Rh){
@@ -2518,33 +2677,37 @@ function feedAnalyst(g){
   var ba=(total-margin)/2,bh=(total+margin)/2;
   var win=margin>=0?g.hn:g.an;
   h+='<h3>Prediction</h3><div class="card bcard"><div class="teams">'+esc(win)+' by '+Math.abs(margin).toFixed(1)+'</div><div class="facts"><span>'+esc(g.a)+' <b>'+ba.toFixed(1)+'</b></span><span>'+esc(g.h)+' <b>'+bh.toFixed(1)+'</b></span><span>Total <b>'+total.toFixed(1)+'</b></span></div>'+
-   '<p class="src" style="margin-top:8px">Stats-only model: '+esc(g.a)+' '+sa.toFixed(1)+', '+esc(g.h)+' '+sh.toFixed(1)+' ('+(g.lg==='nba'?'last season’s':'this season’s')+' scoring blended with the opponent’s points allowed, home edge '+T.he+'). '+(fp!=null?'The data feed gives '+esc(g.h)+' a '+pc(fp)+'% win chance. ':'The feed has no win probability for this game. ')+(ln?'The listed line is '+esc(ln.sp)+'. ':'')+'The margin weights the stats model 30% and the market or feed 70%. The total uses the market line at 90% when one exists.</p></div>';
+   '<p class="src" style="margin-top:8px">Stats-only model: '+esc(g.a)+' '+sa.toFixed(1)+', '+esc(g.h)+' '+sh.toFixed(1)+' ('+(g.lg==='nba'?'last season’s':'this season’s')+' scoring blended with the opponent’s '+(g.lg==='nhl'?'goals':'points')+' allowed, home edge '+T.he+'). '+(fp!=null?'The data feed gives '+esc(g.h)+' a '+pc(fp)+'% win chance. ':'The feed has no win probability for this game. ')+(ln?'The listed line is '+esc(ln.sp)+'. ':'')+'The margin weights the stats model 30% and the market or feed 70%. The total uses the market line at 90% when one exists.</p></div>';
   function rowsFor(t,isNba){
     var R=[];
     if(isNba){var s=NBAT[t.k];R=[{n:'Scoring offense',r:nbaRank('PF',s.PF),v:s.PF.toFixed(1)+' pts/g'},{n:'Scoring defense',r:nbaRank('PA',s.PA),v:s.PA.toFixed(1)+' pts/g allowed'},{n:'Scoring margin',r:nbaRank('NET',s.PF-s.PA),v:((s.PF-s.PA)>=0?'+':'')+(s.PF-s.PA).toFixed(1)}]}
     else if(g.lg==='nfl'){R=['ppg','papg','opass','orush','dpass','drush'].map(function(m){return {n:MET[m].n,r:mrank(t.k,m),v:MET[m].fm(mv(t.k,m))}})}
+    else if(g.lg==='nhl'){var NT=NHLT[t.k];R=[{n:'Scoring offense',r:nhlRank('gf',NT.gf,1),v:NT.gf.toFixed(2)+' goals/g'},{n:'Scoring defense',r:nhlRank('ga',NT.ga,0),v:NT.ga.toFixed(2)+' goals/g allowed'},{n:'Shot volume',r:nhlRank('sf',NT.sf,1),v:NT.sf.toFixed(1)+' shots/g'},{n:'Shots allowed',r:nhlRank('sa',NT.sa,0),v:NT.sa.toFixed(1)+' shots/g'},{n:'Power play',r:nhlRank('pp',NT.pp,1),v:(NT.pp*100).toFixed(1)+'%'},{n:'Penalty kill',r:nhlRank('pk',NT.pk,1),v:(NT.pk*100).toFixed(1)+'%'}]}
     else{R=[{n:'Scoring offense',r:cfbRank(null,'off',t.o.off),v:t.o.off.toFixed(1)+' pts/g'},{n:'Scoring defense',r:cfbRank(null,'def',t.o.def),v:t.o.def.toFixed(1)+' pts/g allowed'}]}
     return R;
   }
-  var Ra=rowsFor(A,g.lg==='nba'),Rh=rowsFor(H,g.lg==='nba'),tot=g.lg==='nba'?30:g.lg==='nfl'?32:Object.keys(CFB).length;
+  var Ra=rowsFor(A,g.lg==='nba'),Rh=rowsFor(H,g.lg==='nba'),tot=g.lg==='nba'?30:(g.lg==='nfl'||g.lg==='nhl')?32:Object.keys(CFB).length;
   function sw(R){var s=R.slice().sort(function(a,b){return a.r-b.r});return {s:s[0],w:s[s.length-1]}}
   var swA=sw(Ra),swH=sw(Rh),f=function(x){return x.n+' '+ordn(x.r)+' ('+x.v+')'};
   h+='<h3>Strengths and weaknesses</h3><div class="tblwrap"><table><thead><tr><th></th><th>'+esc(g.a)+'</th><th>'+esc(g.h)+'</th></tr></thead><tbody>'+
    (A.rec?'<tr><td>'+(g.lg==='nba'?'2025-26 record':g.lg==='nfl'?'Record before the week':'Record')+'</td><td>'+A.rec+'</td><td>'+H.rec+'</td></tr>':'')+
    Ra.map(function(x,i){return '<tr><td>'+x.n+'</td><td>'+ordn(x.r)+' · '+x.v+'</td><td>'+ordn(Rh[i].r)+' · '+Rh[i].v+'</td></tr>'}).join('')+
-   '<tr><td>Best / worst</td><td>'+f(swA.s)+'<br>'+f(swA.w)+'</td><td>'+f(swH.s)+'<br>'+f(swH.w)+'</td></tr></tbody></table></div><p class="src">Ranks are out of '+tot+' teams, 1st is best. '+(g.lg==='nfl'?'Source: Pro Football Reference team stats through five or six games.':g.lg==='nba'?'Source: Basketball-Reference, 2025-26 season. New rosters and the 2026-27 season are not reflected.':'Source: NCAA.com FBS team stats. Opponent quality is not adjusted, and the FBS table covers Division I FBS teams only.')+'</p>';
+   '<tr><td>Best / worst</td><td>'+f(swA.s)+'<br>'+f(swA.w)+'</td><td>'+f(swH.s)+'<br>'+f(swH.w)+'</td></tr></tbody></table></div><p class="src">Ranks are out of '+tot+' teams, 1st is best. '+(g.lg==='nfl'?'Source: Pro Football Reference team stats through five or six games.':g.lg==='nhl'?'Source: '+NHL_SRC+' Shot and goal rates are blended with a league average because the samples are small.':g.lg==='nba'?'Source: Basketball-Reference, 2025-26 season. New rosters and the 2026-27 season are not reflected.':'Source: NCAA.com FBS team stats. Opponent quality is not adjusted, and the FBS table covers Division I FBS teams only.')+'</p>';
   var mu=matchupText(g,Ra,Rh);
   if(mu)h+='<h3>Matchup edges</h3><p class="note" style="margin-top:0">Biggest mismatches: '+esc(mu)+'. A better-ranked offense against a worse-ranked defense is where points and yardage come from.</p>';
   if(g.lg==='nfl')h+=covHtml(T.A.k,T.H.k);
-  h+='<h3>Weather and pace</h3><ul class="pts">'+(g.lg==='nfl'?'<li>'+wxLi(T.H.k,g.start)+'</li><li>Defenses face '+mv(T.A.k,'pace').toFixed(0)+' plays a game for '+esc(g.a)+' ('+ordn(mrank(T.A.k,'pace'))+' most) and '+mv(T.H.k,'pace').toFixed(0)+' for '+esc(g.h)+' ('+ordn(mrank(T.H.k,'pace'))+'). More plays faced leans toward volume stats and overs.</li>':g.lg==='nba'?'<li>Indoor arena, so weather does not matter. Pace data was not available; the two teams scored '+(A.pf+H.pf).toFixed(1)+' combined points per game last season versus a league average of about '+(Object.keys(NBAT).reduce(function(a,k){return a+NBAT[k].PF},0)/30*2).toFixed(1)+'.</li>':'<li>Most college stadiums are outdoors. A forecast is not available, so check wind and rain within 48 hours of kickoff. Strong wind cuts passing and kicking and lowers totals.</li><li>Pace data was not available. The two offenses average '+(A.pf+H.pf).toFixed(1)+' combined points per game.</li>')+'</ul>';
-  var ih=(g.lg==='nfl'||g.lg==='nba')?injHtml(g.lg,[[g.lg==='nfl'?T.A.k:g.a,g.a],[g.lg==='nfl'?T.H.k:g.h,g.h]]):'';
+  h+='<h3>Weather and pace</h3><ul class="pts">'+(g.lg==='nfl'?'<li>'+wxLi(T.H.k,g.start)+'</li><li>Defenses face '+mv(T.A.k,'pace').toFixed(0)+' plays a game for '+esc(g.a)+' ('+ordn(mrank(T.A.k,'pace'))+' most) and '+mv(T.H.k,'pace').toFixed(0)+' for '+esc(g.h)+' ('+ordn(mrank(T.H.k,'pace'))+'). More plays faced leans toward volume stats and overs.</li>':g.lg==='nhl'?'<li>Indoor arena, so weather does not matter. The two teams score '+(A.pf+H.pf).toFixed(1)+' goals combined a game and allow '+(A.pa+H.pa).toFixed(1)+', and take '+(NHLT[A.k].sf+NHLT[H.k].sf).toFixed(0)+' shots between them. A league-average game has about '+leagueTotal("nhl").toFixed(1)+' goals.</li>':g.lg==='nba'?'<li>Indoor arena, so weather does not matter. Pace data was not available; the two teams scored '+(A.pf+H.pf).toFixed(1)+' combined points per game last season versus a league average of about '+(Object.keys(NBAT).reduce(function(a,k){return a+NBAT[k].PF},0)/30*2).toFixed(1)+'.</li>':'<li>Most college stadiums are outdoors. A forecast is not available, so check wind and rain within 48 hours of kickoff. Strong wind cuts passing and kicking and lowers totals.</li><li>Pace data was not available. The two offenses average '+(A.pf+H.pf).toFixed(1)+' combined points per game.</li>')+'</ul>';
+  var ih=(g.lg==='nfl'||g.lg==='nba'||g.lg==='nhl')?injHtml(g.lg,[[g.lg==='nfl'?T.A.k:g.a,g.a],[g.lg==='nfl'?T.H.k:g.h,g.h]]):'';
   h+='<h3>Injuries</h3>'+(ih||'<p class="note" style="margin-top:0">No verified injury list for either team. Check the official report before the game, because a missing starter changes usage and totals.</p>');
   var key=function(r,t){return r[1]===t};
   var rows=[];
   var tabs=g.lg==='nba'?DATA.hit.nba.tables:g.lg==='nfl'?[]:DATA.hit.ncaafb.tables;
   tabs.forEach(function(t){t.rows.forEach(function(r){if(r[1]===g.a||r[1]===g.h)rows.push({p:r[0],t:r[1],st:t.stat,l:t.line,h:r[2],n:r[3],a:r[4],u:t.unit})})});
   var nps=g.lg==='nfl'?PR().filter(function(p){return p.team===T.A.k||p.team===T.H.k}):[];
-  if(nps.length){
+  var nhlH=g.lg==='nhl'?nhlGameTable(g):'';
+  if(nhlH){
+    h+=nhlH;
+  }else if(nps.length){
     h+='<h3>Projection table</h3><div class="tblwrap"><table><thead><tr><th>Player</th><th>Stat</th><th>Season avg</th><th>Opp. allowed</th></tr></thead><tbody>'+nps.map(function(p){var opp=p.team===T.A.k?T.H.k:T.A.k,mm=p.kind==='rush'?'drush':'dpass';return '<tr><td>'+esc(p.name)+badge(p.name,p.team)+' <span class="src">'+p.team+'</span></td><td>'+p.stat+'</td><td>'+p.avg.toFixed(1)+'</td><td>'+mv(opp,mm).toFixed(0)+' team yds/g ('+ordn(mrank(opp,mm))+')</td></tr>'}).join('')+'</tbody></table></div><p class="src">Season averages from Pro Football Reference. Prop lines are not readable from DraftKings, so compare these with the line at your book. The opponent column is the whole team’s yards allowed.</p>';
   }else if(rows.length){
     h+='<h3>Projection table</h3><div class="tblwrap"><table><thead><tr><th>Player</th><th>Stat</th><th>Hit rate</th><th>Avg</th></tr></thead><tbody>'+rows.map(function(r){var rt=Math.round(100*r.h/r.n);return '<tr><td>'+esc(r.p)+' <span class="src">'+r.t+'</span></td><td>'+r.st+' over '+r.l+'</td><td><span class="hrpill '+hcls(r.h,r.n)+'">'+rt+'% ('+r.h+'/'+r.n+')</span></td><td>'+(r.u?r.a.toFixed(1):r.a)+'</td></tr>'}).join('')+'</tbody></table></div><p class="src">'+(g.lg==='nba'?'Last 10 games of last season.':'Last 5 games.')+' Marks are the source’s own, not sportsbook lines. Opponent-allowed averages by position are not in the sources.</p>';
@@ -2552,7 +2715,7 @@ function feedAnalyst(g){
   var bets=feedCalc(g).bets;
   h+='<h3>Best straight bets</h3><div class="list">'+bets.map(function(b){return '<div class="card bcard"><div class="label">'+b.mk+(b.conf!=='n/a'?' · confidence '+b.conf:'')+'</div><div class="teams">'+esc(b.pick)+'</div>'+(b.p!=null?'<div class="facts"><span>Est. chance <b>'+pc(b.p)+'%</b></span><span>Fair odds <b>'+fairOdds(b.p)+'</b></span><span>Break-even at -110 <b>52.4%</b></span>'+(b.mk!=='Moneyline'?'<span>Stake at -110 <b>'+kelly(b.p)+'</b></span>':'')+'</div>':'')+'<p class="src" style="margin-top:6px">'+esc(b.why)+'</p></div>'}).join('')+'</div>';
   h+='<h3>Line movement</h3><p class="note" style="margin-top:0">'+(ln?'Listed line: '+esc(ln.sp)+', total '+esc(ln.tot)+', moneyline '+esc(ln.ml)+'. '+esc(DATA.nbaLines.src)+' No opening-versus-current history is available.':'No sportsbook line was available for this game. Public betting percentages and sharp-money indicators are not available from free sources.')+'</p>';
-  h+='<h3>Uncertainty</h3><ul class="pts"><li><b>Solid:</b> '+(g.lg==='nfl'?'team stats through five or six games and the feed’s win probability.':g.lg==='nba'?'last season’s scoring numbers and the feed’s win probability.':'this season’s scoring numbers through about six or seven games.')+'</li><li><b>Volatile:</b> '+(g.lg==='nfl'?'injuries (no verified list for this game), weather and a small sample. No sportsbook line was read for this game, so the fair spread and total above are numbers to compare with your book.':g.lg==='nba'?'rosters, trades, minutes and injuries for the new season. Last season’s teams are only a rough guide.':'schedule strength is not adjusted, injuries and weather are unknown, and one blowout moves a six-game average a lot.')+'</li><li><b>Props:</b> '+(g.lg==='nfl'?'season averages swing a lot game to game, so use them as context.':'hit rates here come from short samples ('+(g.lg==='nba'?'10':'5')+' games), so treat them as context rather than a forecast.')+'</li></ul>';
+  h+='<h3>Uncertainty</h3><ul class="pts"><li><b>Solid:</b> '+(g.lg==='nhl'?'goal and shot rates over the first 8 to 11 games, blended with the league average, and the feed’s win probability.':g.lg==='nfl'?'team stats through five or six games and the feed’s win probability.':g.lg==='nba'?'last season’s scoring numbers and the feed’s win probability.':'this season’s scoring numbers through about six or seven games.')+'</li><li><b>Volatile:</b> '+(g.lg==='nhl'?'the starting goalie (not confirmed here), line changes, injuries and a sample of only 8 to 11 games per team. Hockey is low scoring, so one bounce decides many games.':g.lg==='nfl'?'injuries (no verified list for this game), weather and a small sample. No sportsbook line was read for this game, so the fair spread and total above are numbers to compare with your book.':g.lg==='nba'?'rosters, trades, minutes and injuries for the new season. Last season’s teams are only a rough guide.':'schedule strength is not adjusted, injuries and weather are unknown, and one blowout moves a six-game average a lot.')+'</li><li><b>Props:</b> '+(g.lg==='nfl'?'season averages swing a lot game to game, so use them as context.':g.lg==='nhl'?'player rates are season averages from 8 to 11 games, steadied toward typical rates, so treat them as context rather than a forecast.':'hit rates here come from short samples ('+(g.lg==='nba'?'10':'5')+' games), so treat them as context rather than a forecast.')+'</li></ul>';
   return h;
 }
 
@@ -2583,6 +2746,7 @@ function gameSheet(g){
 /* ---------- scoreboard: stats, recap ---------- */
 function projOf(g){var T=feedTeams(g);if(!T||T.missing)return null;var sa=(T.A.pf+T.H.pa)/2-T.he/2,sh=(T.H.pf+T.A.pa)/2+T.he/2;return {sa:sa,sh:sh,margin:sh-sa,total:sa+sh}}
 function periodLabel(lg,n){
+  if(lg==='nhl')return n<=3?'P'+n:(n===4?'OT':(n===5?'SO':'OT'+(n-3)));
   if(lg==='ncaamb')return n<=2?'H'+n:(n===3?'OT':'OT'+(n-2));
   return n<=4?'Q'+n:(n===5?'OT':'OT'+(n-4));
 }
@@ -2664,10 +2828,16 @@ function recap(g,st){
   var k=kind(g),hoops=g.lg==='nba'||g.lg==='ncaamb',out=[];
   var tie=g.sa===g.sh,w=g.sa>g.sh?g.a:g.h,l=w===g.a?g.h:g.a,ws=Math.max(g.sa,g.sh),ls=Math.min(g.sa,g.sh),mg=ws-ls,tot=ws+ls;
   var desc=hoops?(mg<=3?'decided by 3 or fewer':mg<=9?'a single-digit game':mg<=19?'a double-digit win':'a blowout'):(mg<=3?'decided by a field goal or less':mg<=8?'a one-score game':mg<=16?'a two-score game':'a blowout');
+  if(g.lg==='nhl')desc=mg<=1?'a one-goal game':mg<=2?'a two-goal game':'a blowout';
   if(k==='live')out.push((tie?g.a+' and '+g.h+' are tied '+g.sa+'-'+g.sh:w+' leads '+l+' '+ws+'-'+ls)+' in a game still in progress.');
   else out.push(tie?g.a+' and '+g.h+' tied '+g.sa+'-'+g.sh+'.':w+' beat '+l+' '+ws+'-'+ls+' ('+desc+').');
   var per=st&&st.periods;
-  if(per&&per.length>=2&&k==='final'){
+  if(per&&per.length>=3&&k==='final'&&g.lg==='nhl'){
+    var a2=(+per[0].a||0)+(+per[1].a||0),h2=(+per[0].h||0)+(+per[1].h||0);
+    if(a2===h2)out.push('The game was tied '+a2+'-'+h2+' after two periods.');
+    else{var lw=a2>h2?g.a:g.h;if(!tie&&lw!==w)out.push(w+' trailed '+Math.max(a2,h2)+'-'+Math.min(a2,h2)+' after two periods and came back.');else if(!tie)out.push(w+' led '+Math.max(a2,h2)+'-'+Math.min(a2,h2)+' after two periods and held on.')}
+    if(per.length>3)out.push('It needed '+(per.length>4?'a shootout':'overtime')+' to settle.');
+  }else if(per&&per.length>=2&&k==='final'){
     var n=g.lg==='ncaamb'?1:2,ha=0,hh=0;per.slice(0,n).forEach(function(p){ha+=+p.a||0;hh+=+p.h||0});
     if(ha===hh)out.push('The game was tied at halftime, '+ha+'-'+hh+'.');
     else{var hw=ha>hh?g.a:g.h;if(!tie&&hw!==w)out.push(w+' trailed '+Math.max(ha,hh)+'-'+Math.min(ha,hh)+' at halftime and came back.');else if(!tie)out.push(w+' led '+Math.max(ha,hh)+'-'+Math.min(ha,hh)+' at halftime and held on.')}
@@ -2785,7 +2955,8 @@ function renderSheet(){
 var PXK={
   nba:[['npts','Points'],['nreb','Rebounds'],['nast','Assists'],['ntpm','Threes']],
   ncaafb:[['cpass','Passing'],['crush','Rushing'],['crec','Receiving']],
-  mlb:[['mh','Hits'],['mhr','Home runs'],['msb','Stolen bases'],['mk','Strikeouts']]
+  mlb:[['mh','Hits'],['mhr','Home runs'],['msb','Stolen bases'],['mk','Strikeouts']],
+  nhl:[['hg','Goals'],['hp','Points'],['hs','Shots'],['ha','Assists'],['hsv','Saves']]
 };
 var PXGK={npts:'pts',nreb:'reb',nast:'ast',ntpm:'tpm'};
 S.xk=null;S.xg='All';
@@ -2813,6 +2984,43 @@ function pxAdd(o){
   // saved picks on these props could not be restored earlier in the file
   try{var raw2=localStorage.getItem('hitboard.picks.v2');if(raw2){var a2=JSON.parse(raw2);if(Array.isArray(a2))S.picks=a2.filter(function(x){return propById(x.pid)&&(x.side==='over'||x.side==='under')})}}catch(e){}
 })();
+(function(){
+  var lgA=nhlLg();
+  NHL_SK.filter(function(s){return s.g>=2&&s.toi>=8}).forEach(function(s){
+    var pr=nhlPrior(s),gl=(s.G+5*pr.g)/(s.g+5),as=(s.A+6*pr.a)/(s.g+6),sh=(s.S+3*pr.s)/(s.g+3),mn=Math.round(s.toi);
+    [['hg','Goals',gl,s.G,s.G+' goal'+(s.G===1?'':'s')+' in '+s.g+' games'],
+     ['hp','Points',gl+as,s.G+s.A,(s.G+s.A)+' points ('+s.G+' goals, '+s.A+' assists) in '+s.g+' games'],
+     ['ha','Assists',as,s.A,s.A+' assist'+(s.A===1?'':'s')+' in '+s.g+' games'],
+     ['hs','Shots',sh,s.S,s.S+' shots on goal in '+s.g+' games']].forEach(function(m){
+      var raw=m[3]/s.g;
+      pxAdd({lg:'nhl',kind:m[0],name:s.n,team:s.t,pos:s.pos,stat:m[1],g:s.g,avg:m[2],total:m[3],sline:m[4]+' this season',
+        note:m[4]+' this season ('+raw.toFixed(2)+' a game, about '+mn+' minutes of ice time). Only '+s.g+' games are in, so the rate is blended with a typical rate for a '+(s.pos==='D'?'defenseman':'forward')+' with that much ice time, giving '+m[2].toFixed(2)+'. Counted as a Poisson variable, which fits rare events in a low-scoring sport.'});
+    });
+  });
+  NHL_GK.filter(function(k){return k.gs>=1&&k.gp>=1}).forEach(function(k){
+    var avg=(k.sv+3*lgA.sa*0.905)/(k.gp+3);
+    pxAdd({lg:'nhl',kind:'hsv',name:k.n,team:k.t,pos:'G',stat:'Saves',g:k.gp,avg:avg,total:k.sv,sline:k.sv+' saves in '+k.gp+' game'+(k.gp===1?'':'s')+' this season',
+      note:k.sv+' saves on '+k.sa+' shots in '+k.gp+' game'+(k.gp===1?'':'s')+' this season ('+(k.sv/k.gp).toFixed(1)+' saves a game, '+String(nhlSv(k).toFixed(3)).replace(/^0/,'')+'). Blended with a league-average workload. This assumes he starts, so check the confirmed goalie.'});
+  });
+  try{var raw3=localStorage.getItem('hitboard.picks.v2');if(raw3){var a3=JSON.parse(raw3);if(Array.isArray(a3))S.picks=a3.filter(function(x){return propById(x.pid)&&(x.side==='over'||x.side==='under')})}}catch(e){}
+})();
+function nhlLegs(L){
+  pxRefresh('nhl');
+  PROPS.forEach(function(p){
+    if(p.lg!=='nhl'||!p.ok||!p.game)return;
+    var it=pxStat(p);if(it&&OUT_RE.test(it.st))return;
+    var adj=pxAdj(p),mu=p.avg*(1+adj/100),ls;
+    ls=pxMarks(p,mu).map(function(x){return Math.floor(x)+.5});
+    if(p.kind==='hs'&&ls[0]-1>=1.5)ls.unshift(ls[0]-1);
+    if(p.kind==='hsv')ls.unshift(ls[0]-3);
+    ls.forEach(function(ln){
+      if(ln<=0)return;
+      var c=calc(p,ln,-110,-110,adj);
+      if(c.po<.05||c.po>.985)return;
+      L.push({name:p.name,team:p.team,mk:p.stat+' '+(Math.floor(ln)+1)+'+',p:c.po,src:p.sline,nx:{txt:p.mt.split(',').slice(0,2).join(',')},kind:'nhl'});
+    });
+  });
+}
 function pxNext(lg,team){
   var best=null,t=tabb(team);
   if(lg==='mlb'){var g0=mlbNextGame(team);return g0&&kind(g0)==='up'?g0:null}
@@ -2849,9 +3057,20 @@ function pxAdj(p){
     var ks2=Object.keys(CFB).filter(function(k){return CFB[k].def!=null}),la2=ks2.reduce(function(t,k){return t+CFB[k].def},0)/ks2.length;
     return cl((c.def/la2-1)*100*(p.kind==='crush'?.5:.7),12);
   }
+  if(p.lg==='nhl'){
+    var NT2=NHLT[nhlK(p.opp)];if(!NT2)return 0;var NL=nhlLg(),f;
+    if(p.kind==='hs')f=nhlShr(NT2.sa,NT2.gp,NL.sa)/NL.sa;
+    else if(p.kind==='hsv')f=nhlShr(NT2.sf,NT2.gp,NL.sf)/NL.sf;
+    else f=nhlShr(NT2.ga,NT2.gp,NL.ga)/NL.ga;
+    return cl((f-1)*100*({hg:.7,hp:.6,ha:.5,hs:.7,hsv:.8})[p.kind],15);
+  }
   return 0;
 }
 function pxCtx(p){
+  if(p.lg==='nhl'){var NT=NHLT[nhlK(p.opp)];if(!NT)return '';
+    if(p.kind==='hs')return p.opp+' allows '+NT.sa.toFixed(1)+' shots/g ('+nhlLo(nhlRank('sa',NT.sa,0))+')';
+    if(p.kind==='hsv')return p.opp+' takes '+NT.sf.toFixed(1)+' shots/g ('+ordn(nhlRank('sf',NT.sf,1))+' most)';
+    return p.opp+' allows '+NT.ga.toFixed(2)+' goals/g ('+nhlLo(nhlRank('ga',NT.ga,0))+')'}
   if(p.lg==='nba'){var T=nbaT(p.opp,p.oppName);return T?p.opp+' allows '+T.PA.toFixed(1)+' pts/g last season ('+ordn(nbaRank('PA',T.PA))+' best)':''}
   if(p.lg==='ncaafb'){var c=cfbFind(p.oppName||'');if(c&&c.def!=null){return p.opp+' allows '+c.def.toFixed(1)+' pts/g ('+ordn(cfbRank(null,'def',c.def))+' best)'}return ''}
   if(p.lg==='mlb'&&p.opp){var r=mlbRec(p.oppName||'');if(r&&(r.w+r.l)>0)return p.opp+' is '+r.w+'-'+r.l+' this season ('+pctTxt(r)+')';}
@@ -2861,7 +3080,7 @@ function pxCtx2(p){
   if(!p.g1||p.lg==='mlb')return '';
   var ps=projScore(p.g1);if(!ps)return '';
   var tm=p.home?ps.margin:-ps.margin;
-  return 'Model has '+p.team+(tm>=0?' winning by ':' trailing by ')+Math.abs(tm).toFixed(0)+', game total about '+ps.total.toFixed(0);
+  return 'Model has '+p.team+(tm>=0?' winning by ':' trailing by ')+Math.abs(tm).toFixed(p.lg==='nhl'?1:0)+', game total about '+ps.total.toFixed(p.lg==='nhl'?1:0);
 }
 var PXPOS={cpass:'QB',crush:'RB',crec:'WR/TE',mk:'P'};
 function pxStat(p){
@@ -2876,6 +3095,7 @@ function pxAvailNote(lg){
 }
 function pxMarks(p,mu){
   var out=[];
+  if(p.kind==='hsv'){var bs=roundHalf(mu);return [bs-3,bs,bs+3]}
   if(PXPOIS[p.kind]){var b=roundHalf(mu);out=b<=.5?[.5,1.5,2.5]:[b-1,b,b+1]}
   else{out=[roundHalf(mu*.75),roundHalf(mu),roundHalf(mu*1.25)];if(out[1]<=out[0])out[0]=Math.max(.5,out[1]-1);if(out[2]<=out[1])out[2]=out[1]+1}
   return out;
@@ -2896,7 +3116,7 @@ function pxList(lg,kd){
   return PROPS.filter(function(p){if(p.lg!==lg||p.kind!==kd||!p.ok||!(S.xg==='All'||p.game===S.xg))return false;var it=pxStat(p);return !(it&&OUT_RE.test(it.st))});
 }
 function pxEmpty(lg){
-  return '<div class="card empty">No players match. Only players whose team has a game in the feed are shown'+(lg==='mlb'?', and MLB is in the playoffs, so just the teams still playing appear':'')+'. '+(lg==='nba'?'The table holds the leaders in each stat, not every player.':'')+'</div>';
+  return '<div class="card empty">No players match. Only players whose team has a game in the feed are shown'+(lg==='mlb'?', and MLB is in the playoffs, so just the teams still playing appear':'')+'. '+(lg==='nba'?'The table holds the leaders in each stat, not every player.':lg==='nhl'?'Skaters with at least 2 games and goalies who have started are listed.':'')+'</div>';
 }
 function pxDeep(lg){
   pxRefresh(lg);
@@ -2908,12 +3128,12 @@ function pxDeep(lg){
   if(!rows.length)return h+pxEmpty(lg);
   var cap=S.dmore?rows.length:60;
   h+='<div class="tblwrap"><table><thead><tr><th>Player and matchup</th><th>Proj.</th><th>Chance to clear</th></tr></thead><tbody>'+rows.slice(0,cap).map(function(r){
-    var p=r.p,cx=pxCtx(p),c2=pxCtx2(p),pos=PXPOS[p.kind]||'';
+    var p=r.p,cx=pxCtx(p),c2=pxCtx2(p),pos=p.pos||PXPOS[p.kind]||'';
     return '<tr><td><button class="pxname" data-act="prop" data-id="'+p.id+'"><b>'+esc(p.name)+'</b></button>'+pxBadge(p)+' <span class="src">'+esc(p.team)+(pos?' '+pos:'')+'</span><br><span class="src">'+esc(p.mt)+'</span>'+(cx?'<br><span class="src">'+esc(cx)+'</span>':'')+(c2?'<br><span class="src">'+esc(c2)+'</span>':'')+(p.hits!=null?'<br><span class="src">Cleared '+p.mark+' in '+p.hits+' of '+p.g+' games</span>':'')+'</td>'+
       '<td>'+r.mu.toFixed(PXPOIS[p.kind]&&r.mu<3?2:1)+'<br><span class="src">avg '+p.avg.toFixed(PXPOIS[p.kind]&&p.avg<3?2:1)+(p.implied?' (implied)':'')+'</span></td><td>'+r.marks.map(function(m){return '<span class="hrpill '+(m[1]>=.7?'hi':m[1]<.4?'lo':'mid')+'" style="display:inline-block;margin:0 0 3px 0">'+m[0].toFixed(1)+'+ · '+Math.round(m[1]*100)+'%</span>'}).join('<br>')+'</td></tr>';
   }).join('')+'</tbody></table></div>';
   if(rows.length>cap)h+='<div class="actions"><button class="btn" data-act="dmore">Show all '+rows.length+' players</button></div>';
-  var nt2=lg==='nba'?'Chances use each player’s last-10 average from last season and shift up to 10% by how the opponent defended last season. Rosters, minutes and roles change, so early-season games are noisy.':lg==='ncaafb'?'The source gives a hit rate at one mark, so the average is backed out of that rate and may be rough. Chances shift up to 12% by how many points the opponent allows.':'Chances use season rates for one typical game. They ignore the opposing pitcher, ballpark and lineup spot.';
+  var nt2=lg==='nhl'?'Chances use season goal, assist and shot rates through 8 to 11 games, steadied toward a typical rate for each player’s ice time, and shift up to 15% by how much the opponent allows. They ignore line combinations, power-play time and the opposing goalie.':lg==='nba'?'Chances use each player’s last-10 average from last season and shift up to 10% by how the opponent defended last season. Rosters, minutes and roles change, so early-season games are noisy.':lg==='ncaafb'?'The source gives a hit rate at one mark, so the average is backed out of that rate and may be rough. Chances shift up to 12% by how many points the opponent allows.':'Chances use season rates for one typical game. They ignore the opposing pitcher, ballpark and lineup spot.';
   return h+'<p class="note" style="margin-top:12px">'+nt2+' They are not sportsbook lines, so compare each mark with your book.</p>';
 }
 function pxCalc(lg){
@@ -2931,7 +3151,7 @@ function pxWhy(p,c,s,side){
   if(p.hits!=null){var r=p.hits/p.g,t=p.mark;
     if(Math.abs(line-t)<=.01){(over?r>=.7:r<=.4)?R.pro.push('He cleared '+t+' in '+p.hits+' of '+p.g+' games ('+Math.round(r*100)+'%).'):(over?r<=.4:r>=.7)?R.con.push('He cleared '+t+' in only '+p.hits+' of '+p.g+' games ('+Math.round(r*100)+'%).'):R.note.push('He cleared '+t+' in '+p.hits+' of '+p.g+' games.')}
     else R.note.push('For reference he cleared '+t+' in '+p.hits+' of '+p.g+' games, but your line is different.')}
-  if(p.g<8&&p.lg!=='mlb')R.con.push('Only '+p.g+' games in the sample.');
+  if((p.g<8||p.lg==='nhl')&&p.lg!=='mlb')R.con.push('Only '+p.g+' games in the sample.');
   if(p.lg==='nba'||p.lg==='ncaafb'){
     var ctx=pxCtx(p);
     var pa=pxAdj(p);
@@ -2948,6 +3168,17 @@ function pxWhy(p,c,s,side){
     if(PXPOIS[p.kind])R.con.push('Counts like this depend on the opposing starter, the lineup spot and the ballpark, none of which are in this number.');
     else R.con.push('Strikeouts depend on the opposing lineup, the pitch count and the ump. A short outing ends the bet early.');
     R.con.push('Check the lineup card once it posts. A day off or a pinch-hit role makes the bet a loser or void.');
+  }else if(p.lg==='nhl'){
+    var ctxN=pxCtx(p),paN=pxAdj(p);
+    if(ctxN){if(Math.abs(paN)>=3)((over?paN>0:paN<0)?R.pro:R.con).push(ctxN+', '+(paN>0?'a soft':'a tough')+' matchup for this stat.');else R.note.push(ctxN+', about average.')}
+    var psN=p.g1?projScore(p.g1):null;
+    if(psN&&psN.total){
+      if(psN.total>=6.4)(over?R.pro:R.con).push('Projected total of '+psN.total.toFixed(1)+' goals points to an open game.');
+      else if(psN.total<=5.5)(over?R.con:R.pro).push('Projected total of '+psN.total.toFixed(1)+' goals points to a tight, low-scoring game.');
+    }
+    if(p.kind==='hsv')R.con.push('This assumes he starts. A backup or a late scratch kills the bet, so check the confirmed goalie before betting.');
+    else R.con.push('Line combinations, power-play time and scratches change a skater’s chances. Check the lineup on game day.');
+    R.con.push('Only the first 8 to 11 games of the season are in, so rates move a lot from one game to the next.');
   }
   var im=imp(over?s.oo:s.uo);
   if(pS-im>=.04)R.pro.push('Price check: the model gives the '+side+' '+pc(pS)+'% and the odds imply '+pc(im)+'%, an edge of about '+((pS-im)*100).toFixed(1)+' points.');
@@ -3115,7 +3346,7 @@ function errMsg(e){
   if(c==='server_unavailable'||c==='upstream_error'||c==='rate_limited')return 'The feed did not answer. Wait a moment and tap Refresh again.';
   return 'The feed returned an error. Try again in a moment.';
 }
-var ESPN={nfl:'football/nfl',nba:'basketball/nba',ncaafb:'football/college-football',ncaamb:'basketball/mens-college-basketball',mlb:'baseball/mlb'};
+var ESPN={nfl:'football/nfl',nba:'basketball/nba',ncaafb:'football/college-football',ncaamb:'basketball/mens-college-basketball',mlb:'baseball/mlb',nhl:'hockey/nhl'};
 function espnUrl(lg){
   var d0=new Date(Date.now()-7*864e5),d1=new Date(Date.now()+8*864e5),fd=function(d){return d.toISOString().slice(0,10).replace(/-/g,'')};
   var dr='&dates='+fd(d0)+'-'+fd(d1);
@@ -3135,6 +3366,7 @@ function espnNorm(lg,events){
     var title=(c.notes&&c.notes[0]&&c.notes[0].headline)||'';
     var NBAX={NY:'NYK',GS:'GSW',SA:'SAS',NO:'NOP',UTAH:'UTA',WSH:'WAS'};
     if(lg==='nba'){aw.team.abbreviation=NBAX[aw.team.abbreviation]||aw.team.abbreviation;hm.team.abbreviation=NBAX[hm.team.abbreviation]||hm.team.abbreviation}
+    if(lg==='nhl'){aw.team.abbreviation=nhlK(aw.team.abbreviation);hm.team.abbreviation=nhlK(hm.team.abbreviation)}
     var clk=state==='in'?(st.shortDetail&&/half|end/i.test(st.shortDetail)?st.shortDetail:(e.status.displayClock||null)):null;
     if(lg==='mlb')clk=state==='in'?(st.shortDetail||null):null;
     var rr=(row(lg,status,e.date,aw.team.abbreviation,hm.team.abbreviation,aw.team.displayName||aw.team.abbreviation,hm.team.displayName||hm.team.abbreviation,sc(aw),sc(hm),null,null,clk,state==='in'?e.status.period:null,title,e.id));
@@ -3143,7 +3375,7 @@ function espnNorm(lg,events){
   });
   return out;
 }
-var ESPN_CDN={nfl:'nfl',nba:'nba',ncaafb:'college-football',ncaamb:'mens-college-basketball',mlb:'mlb'};
+var ESPN_CDN={nfl:'nfl',nba:'nba',ncaafb:'college-football',ncaamb:'mens-college-basketball',mlb:'mlb',nhl:'nhl'};
 function espnUrls(lg){
   var plain=lg==='ncaafb'?'?groups=80&limit=300':lg==='ncaamb'?'?groups=50&limit=300':'?limit=100';
   var base='https://site.api.espn.com/apis/site/v2/sports/'+ESPN[lg]+'/scoreboard';
@@ -3195,8 +3427,8 @@ function doRefresh(silent){
     if(ok.length){S.feedAt=Date.now();S.live=true;S.src=srcName;preloadWx()}
     var fm=failMsg&&bad.length&&bad[0].e&&bad[0].e.detail?failMsg+' ('+bad[0].e.detail+')':failMsg;
     if(!ok.length){if(silent&&S.live){done('', '')}else{silent=false;done(fm||errMsg(bad[0].e),'warn')}}
-    else if(bad.length)done('Updated '+ok.length+' of 4 sports. '+(fm||errMsg(bad[0].e)),'warn');
-    else done(silent?'':'Updated all four sports.','good');
+    else if(bad.length)done('Updated '+ok.length+' of '+LG.length+' sports. '+(fm||errMsg(bad[0].e)),'warn');
+    else done(silent?'':'Updated all sports.','good');
   };
   var cl=window.claude;
   if(cl&&cl.use){
