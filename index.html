@@ -570,7 +570,7 @@ function feedCard(g){
   return h+'</div></article>';
 }
 function modeSwitch(cur){
-  return '<div class="chips" role="group" aria-label="Section">'+[['games','Games'],['scores','Scores'],['props','Props'],['parlay','Parlays']].map(function(m){return '<button class="chip" data-act="tab" data-t="'+m[0]+'" aria-pressed="'+(cur===m[0])+'">'+m[1]+'</button>'}).join('')+'</div>';
+  return '<div class="chips" role="group" aria-label="Section">'+[['games','Games'],['scores','Scores'],['props','Props'],['parlay','Parlays'],['record','Record']].map(function(m){return '<button class="chip" data-act="tab" data-t="'+m[0]+'" aria-pressed="'+(cur===m[0])+'">'+m[1]+'</button>'}).join('')+'</div>';
 }
 function sportChips(){
   return '<div class="chips" role="group" aria-label="Sport">'+LG.map(function(l){return '<button class="chip" data-act="sport" data-v="'+l[0]+'" aria-pressed="'+(S.sport===l[0])+'">'+l[1]+'</button>'}).join('')+'</div>';
@@ -748,7 +748,8 @@ function model(g){
   var fgw=feedFor(g),wa=wxAdj(h,fgw&&fgw.start),wadj=wa.adj;
   // backtest: stats model adds value on the margin (about 30% weight) but not on the total (about 10%)
   var margin=0.3*(sh-sa)+0.7*(mk_h-mk_a),total=0.1*(sa+sh)+0.9*(mk_a+mk_h)+wadj;
-  return {sa:sa,sh:sh,ma:mk_a,mh:mk_h,ba:(total-margin)/2,bh:(total+margin)/2,margin:margin,total:total,wadj:wadj,wa:wa,mmargin:mk_h-mk_a,mtotal:mk_a+mk_h,smargin:sh-sa,stotal:sa+sh};
+  var rawM=margin,rawT=total,LN=learn('nfl');margin+=LN.dm;total+=LN.dt;
+  return {sa:sa,sh:sh,ma:mk_a,mh:mk_h,ba:(total-margin)/2,bh:(total+margin)/2,margin:margin,total:total,rmargin:rawM,rtotal:rawT,LN:LN,wadj:wadj,wa:wa,mmargin:mk_h-mk_a,mtotal:mk_a+mk_h,smargin:sh-sa,stotal:sa+sh};
 }
 function confOf(d){d=Math.abs(d);return d>=3?'high':d>=1.5?'medium':'low'}
 function straightBets(g,m){
@@ -767,6 +768,7 @@ function straightBets(g,m){
   var ws=wp>=0.5?g.h:g.a,wpp=wp>=0.5?wp:1-wp;
   var mkp=g.bkA!=null?(wp>=0.5?1-g.bkA:g.bkA):(wp>=0.5?1-g.mkA:g.mkA);
   out.push({t:'ml',side:wp>=0.5?'h':'a',mk:'Moneyline',pick:ws+' to win',p:wpp,conf:wpp>=0.7?'high':wpp>=0.6?'medium':'low',why:'Blended win chance '+pc(wpp)+'%. '+(g.bkA!=null?'Sportsbook price (margin removed)':'Prediction-market price')+' implies '+pc(wp>=0.5?(g.bkA!=null?1-g.bkA:1-g.mkA):(g.bkA!=null?g.bkA:g.mkA))+'% for '+g.h+'.'});
+  out.forEach(function(b){b.p0=b.p;b.p=learnP(m.LN,b.t,b.p);b.rm=m.rmargin;b.rt=m.rtotal});
   return out;
 }
 var ROOF={MIN:'Dome',DET:'Dome',LV:'Dome',HOU:'Retractable roof, usually closed',ATL:'Retractable roof, usually closed',ARI:'Retractable roof, usually closed'};
@@ -1093,10 +1095,26 @@ function covHtml(a,h){
   return '<h3>Coverage tendencies</h3><ul class="pts">'+line(a)+line(h)+'</ul><p class="src">'+esc(COV_SRC)+' Man-heavy defenses reward receivers who win one-on-one and get open fast; zone-heavy ones reward route-savvy players, tight ends and backs working the soft spots.</p>';
 }
 
+/* ---------- learning from the pick log ---------- */
+function learn(lg){
+  var gm={};S.log.forEach(function(x){if(x.lg===lg&&x.res&&x.rm!=null&&x.rt!=null&&x.am!=null)gm[x.gid]=x});
+  var ks=Object.keys(gm),n=ks.length,em=0,et=0;
+  ks.forEach(function(k){var x=gm[k];em+=x.am-x.rm;et+=x.atot-x.rt});
+  var w=n/(n+40),cl=function(v){return Math.max(-3,Math.min(3,v))};
+  var L={n:n,dm:n?cl(w*em/n):0,dt:n?cl(w*et/n):0,dp:{ml:0,sp:0,tot:0},cnt:{}};
+  ['ml','sp','tot'].forEach(function(t){
+    var e=S.log.filter(function(x){return x.lg===lg&&x.t===t&&x.res&&x.res!=='P'&&x.p0!=null}),m=e.length;L.cnt[t]=m;
+    if(m<20)return;
+    var hit=e.filter(function(x){return x.res==='W'}).length/m,ap=e.reduce(function(a,x){return a+x.p0},0)/m;
+    L.dp[t]=Math.max(-.08,Math.min(.08,(m/(m+80))*(hit-ap)));
+  });
+  return L;
+}
+function learnP(L,t,p){if(!L||!L.dp)return p;var q=p+(L.dp[t]||0);return t==='ml'?Math.max(.05,Math.min(.95,q)):Math.max(.4,Math.min(.6,q))}
 /* ---------- track record: picks are logged before kickoff and graded on the final score ---------- */
 S.log=[];
 try{var rl=localStorage.getItem('hitboard.log.v1');if(rl){var al=JSON.parse(rl);if(Array.isArray(al))S.log=al}}catch(e){}
-function saveLog(){try{localStorage.setItem('hitboard.log.v1',JSON.stringify(S.log.slice(-600)))}catch(e){}}
+function saveLog(){try{localStorage.setItem('hitboard.log.v1',JSON.stringify(S.log.slice(-1500)))}catch(e){}}
 function picksFor(g){
   try{
     if(g.lg==='nfl'){var r=research(g);if(r){var m=model(r);return m?straightBets(r,m):null}}
@@ -1112,7 +1130,7 @@ function trackPicks(){
       var b=picksFor(g);if(!b)return;
       b.forEach(function(x){
         if(!x.t)return;var k=g.id+'|'+x.t;if(have[k])return;
-        S.log.push({k:k,gid:g.id,lg:lg,t:x.t,side:x.side||null,over:x.over==null?null:x.over,num:x.num==null?null:x.num,p:x.p,pick:x.pick,game:g.a+' @ '+g.h,at:now,res:null});changed=true;
+        S.log.push({k:k,gid:g.id,lg:lg,t:x.t,side:x.side||null,over:x.over==null?null:x.over,num:x.num==null?null:x.num,p:x.p,p0:x.p0==null?x.p:x.p0,rm:x.rm==null?null:x.rm,rt:x.rt==null?null:x.rt,pick:x.pick,game:g.a+' @ '+g.h,a:g.a,h:g.h,at:now,res:null});changed=true;
       });
     }
     if(kind(g)==='final'&&g.sa!=null){
@@ -1122,11 +1140,61 @@ function trackPicks(){
         if(x.t==='ml'){r=mh===0?'P':((x.side==='h')===(mh>0)?'W':'L')}
         else if(x.t==='sp'){var tm=x.side==='h'?mh:-mh,v=tm+x.num;r=v===0?'P':v>0?'W':'L'}
         else if(x.t==='tot'){var tot=g.sa+g.sh;r=tot===x.num?'P':((tot>x.num)===x.over?'W':'L')}
-        if(r){x.res=r;x.score=g.a+' '+g.sa+', '+g.h+' '+g.sh;changed=true}
+        if(r){x.res=r;x.am=mh;x.atot=g.sa+g.sh;x.score=g.a+' '+g.sa+', '+g.h+' '+g.sh;changed=true}
       });
     }
   })});
   if(changed)saveLog();
+}
+
+function pct1(x){return (x*100).toFixed(1)+'%'}
+function vRecord(){
+  var lg=S.sport,name=LG.filter(function(l){return l[0]===lg})[0][1];
+  var h='<h2>'+name+' record</h2>'+sportChips()+modeSwitch('record')+refreshBar();
+  if(lg==='ncaamb')return h+'<div class="card empty">The app makes no college basketball picks yet, so there is nothing to track.</div>'+foot();
+  var E=S.log.filter(function(x){return x.lg===lg}),D=E.filter(function(x){return x.res}),O=E.filter(function(x){return !x.res});
+  if(!E.length)return h+'<div class="card empty">No '+name+' picks are logged yet. The app saves every pick it shows for an upcoming game, then grades it on the final score. Open it while games are still upcoming.</div>'+foot();
+  var T={ml:'Moneyline',sp:'Spread',tot:'Total'};
+  h+='<h3>Results by bet type</h3><div class="tblwrap"><table><thead><tr><th>Bet</th><th>W-L-P</th><th>Hit</th><th>Model said</th><th>Flat 1u</th></tr></thead><tbody>'+Object.keys(T).map(function(t){
+    var d=D.filter(function(x){return x.t===t}),w=d.filter(function(x){return x.res==='W'}).length,l=d.filter(function(x){return x.res==='L'}).length,p=d.length-w-l;
+    var np=d.filter(function(x){return x.res!=='P'&&x.p0!=null}),ap=np.length?np.reduce(function(a,x){return a+x.p0},0)/np.length:null;
+    var u=t==='ml'?null:(w*100/110-l);
+    return '<tr><td>'+T[t]+'</td><td>'+w+'-'+l+(p?'-'+p:'')+'</td><td>'+((w+l)?pct1(w/(w+l)):'—')+'</td><td>'+(ap==null?'—':pct1(ap))+'</td><td>'+(u==null?'no price':(u>=0?'+':'')+u.toFixed(1)+' u')+'</td></tr>';
+  }).join('')+'</tbody></table></div><p class="src">'+D.length+' graded picks, '+O.length+' waiting. A spread or total needs 52.4% to break even at -110. "Model said" is the average chance the model gave before any learning adjustment.</p>';
+  // score accuracy
+  var gm={};D.forEach(function(x){if(x.rm!=null&&x.rt!=null&&x.am!=null)gm[x.gid]=x});
+  var ks=Object.keys(gm),n=ks.length;
+  if(n){
+    var em=0,et=0,sm=0,st=0,win=0;
+    ks.forEach(function(k){var x=gm[k];em+=Math.abs(x.am-x.rm);et+=Math.abs(x.atot-x.rt);sm+=x.am-x.rm;st+=x.atot-x.rt;if((x.am>0)===(x.rm>0)&&x.am!==0)win++});
+    h+='<h3>Score accuracy</h3><div class="facts"><span>Games <b>'+n+'</b></span><span>Winner right <b>'+Math.round(100*win/n)+'%</b></span><span>Margin off by <b>'+(em/n).toFixed(1)+'</b></span><span>Total off by <b>'+(et/n).toFixed(1)+'</b></span></div><p class="src">Typical misses by sportsbook lines are about 10.5 points on margin and total in the NFL, so a model that is much worse than that is wrong, and one that is only a bit better is doing well. Average bias: margin '+(sm/n>=0?'+':'')+(sm/n).toFixed(1)+' (positive means the home team did better than projected), total '+(st/n>=0?'+':'')+(st/n).toFixed(1)+'.</p>';
+  }
+  // calibration
+  var cal=function(types,edges){
+    var d=D.filter(function(x){return types.indexOf(x.t)>=0&&x.res!=='P'&&x.p0!=null});
+    var rows=[];for(var i=0;i<edges.length-1;i++){var b=d.filter(function(x){return x.p0>=edges[i]&&x.p0<edges[i+1]});if(!b.length)continue;var hit=b.filter(function(x){return x.res==='W'}).length,ap=b.reduce(function(a,x){return a+x.p0},0)/b.length;rows.push('<tr><td>'+Math.round(edges[i]*100)+'–'+Math.round(edges[i+1]*100)+'%</td><td>'+b.length+'</td><td>'+pct1(ap)+'</td><td>'+pct1(hit/b.length)+'</td></tr>')}
+    return rows.join('');
+  };
+  var c1=cal(['ml'],[.5,.6,.7,.8,1.01]),c2=cal(['sp','tot'],[.4,.52,.54,.56,.7]);
+  if(c1||c2)h+='<h3>Is the model honest about its chances?</h3><div class="tblwrap"><table><thead><tr><th>Model chance</th><th>Picks</th><th>Said</th><th>Hit</th></tr></thead><tbody>'+(c1?'<tr><td colspan="4"><b>Moneyline</b></td></tr>'+c1:'')+(c2?'<tr><td colspan="4"><b>Spread and total</b></td></tr>'+c2:'')+'</tbody></table></div><p class="src">If the hit column runs below the said column, the model is overconfident there.</p>';
+  // learning
+  var L=learn(lg);
+  h+='<h3>What the app has learned from this record</h3><ul class="pts">'+
+   '<li><b>Score bias:</b> '+(L.n?'from '+L.n+' graded games the model now shifts margins by '+(L.dm>=0?'+':'')+L.dm.toFixed(1)+' and totals by '+(L.dt>=0?'+':'')+L.dt.toFixed(1)+' points (capped at 3, and weighted down until there are many games).':'no adjustment yet. It needs graded games with a saved projection.')+'</li>'+
+   ['ml','sp','tot'].map(function(t){return '<li><b>'+T[t]+' chances:</b> '+(L.cnt[t]>=20?'shifted '+(L.dp[t]>=0?'+':'')+(L.dp[t]*100).toFixed(1)+' points from '+L.cnt[t]+' graded picks.':'no adjustment until 20 graded picks ('+(L.cnt[t]||0)+' so far).')+'</li>'}).join('')+'</ul>';
+  // per-game list
+  var byG={};E.forEach(function(x){(byG[x.gid]=byG[x.gid]||[]).push(x)});
+  var games=Object.keys(byG).map(function(k){return byG[k]}).sort(function(a,b){return b[0].at-a[0].at});
+  var card=function(arr){
+    var f=arr[0],proj=(f.rm!=null&&f.rt!=null)?f.a+' '+((f.rt-f.rm)/2).toFixed(1)+', '+f.h+' '+((f.rt+f.rm)/2).toFixed(1):'';
+    var fin=arr.filter(function(x){return x.score})[0];
+    return '<div class="card bcard"><div class="teams">'+esc(f.game)+'</div>'+(proj?'<div class="src">Model projected '+esc(proj)+'</div>':'')+(fin?'<div class="src">Final '+esc(fin.score)+'</div>':'<div class="src">Not played yet</div>')+
+      '<div class="facts">'+arr.map(function(x){return '<span>'+esc(T[x.t])+' <b>'+esc(x.pick)+'</b> '+(x.res?'<b>'+x.res+'</b>':pct1(x.p))+'</span>'}).join('')+'</div></div>';
+  };
+  var done=games.filter(function(a){return a.every(function(x){return x.res})}),pend=games.filter(function(a){return a.some(function(x){return !x.res})});
+  if(pend.length)h+='<h3>Waiting on games</h3><div class="list">'+pend.slice(0,12).map(card).join('')+'</div>';
+  if(done.length)h+='<h3>Graded games</h3><div class="list">'+done.slice(0,20).map(card).join('')+'</div>';
+  return h+'<p class="note" style="margin-top:12px">Picks are saved on this device before kickoff and never edited. Clearing your browser data erases the record.</p>'+foot();
 }
 function trackHtml(){
   var T={ml:'Moneyline',sp:'Spread',tot:'Total'},h='<h3>Model track record</h3>';
@@ -1191,6 +1259,8 @@ function feedCalc(g){
   var wxa=g.lg==='nfl'?wxAdj(T.H.k,g.start):{adj:0,pu:0},mkM=ln?(ln.fav==='h'?ln.pts:-ln.pts):null,total=sa+sh;if(ln)total=0.1*total+0.9*ln.tt;total+=wxa.adj;
   var margin=mkM!=null?(0.3*(sh-sa)+0.7*mkM):T.sdM*invPhi(p);
   if(mkM!=null)p=Phi(margin/T.sdM);
+  var rawM=margin,rawT=total,LN=learn(g.lg);
+  if(LN.n){margin+=LN.dm;total+=LN.dt;p=Phi(margin/T.sdM)}
   var bets=[],ws=p>=.5?g.h:g.a,wpp=p>=.5?p:1-p;
   bets.push({t:'ml',side:p>=.5?'h':'a',mk:'Moneyline',pick:ws+' to win',p:wpp,conf:wpp>=.7?'high':wpp>=.6?'medium':'low',why:'Blended win chance '+pc(wpp)+'%'+(fp!=null?'; the feed alone says '+pc(p>=.5?fp:1-fp)+'%.':'. No feed win probability, so this is team stats only.')});
   if(ln){
@@ -1205,7 +1275,8 @@ function feedCalc(g){
     var lt=leagueTotal(g.lg),over=lt==null?true:total>=lt,tx=Math.round((over?total-1.5:total+1.5)*2)/2;
     bets.push({t:'tot',over:over,num:tx,mk:'Total',pick:(over?'Over '+tx.toFixed(1)+' or lower':'Under '+tx.toFixed(1)+' or higher'),p:calibTotal(over?Phi((total-tx)/T.sdT):Phi((tx-total)/T.sdT),!over,wxa),conf:'low',why:'No sportsbook total was read. The model total is '+total.toFixed(1)+(lt!=null?' versus a league average game of about '+lt.toFixed(1):'')+', so the lean is '+(over?'over':'under')+'. Take it only at '+tx.toFixed(1)+' or '+(over?'lower':'higher')+'; skip it at a worse number.'});
   }
-  return {T:T,p:p,fp:fp,ln:ln,total:total,margin:margin,bets:bets};
+  bets.forEach(function(b){b.p0=b.p;b.p=learnP(LN,b.t,b.p);b.rm=rawM;b.rt=rawT});
+  return {T:T,p:p,fp:fp,ln:ln,total:total,margin:margin,bets:bets,LN:LN};
 }
 function matchupText(g,Ra,Rh){
   var pairs=g.lg==='nfl'?[[0,1],[2,4],[3,5]]:[[0,1]],c=[];
@@ -1222,15 +1293,7 @@ function feedAnalyst(g){
   if(T.missing)return '<p class="note" style="margin-top:14px">Not enough team stats for '+esc(T.missing.join(' and '))+'. Some teams are missing from the scoring tables I could read (the defense table stops near the 100th team). Their breakdown cannot be built from the sources I could read.</p>';
   var A=T.A,H=T.H,h='';
   var sa=(A.pf+H.pa)/2-T.he/2,sh=(H.pf+A.pa)/2+T.he/2;
-  var stP=Phi((sh-sa)/T.sdM);
-  var fp=(g.pa!=null&&g.ph!=null)?g.ph/(g.pa+g.ph):null;
-  var p=fp!=null?0.3*stP+0.7*fp:stP;
-  var ln=null;
-  if(g.lg==='nba'){ln=DATA.nbaLines.games.filter(function(x){return x.a===g.a&&x.h===g.h})[0]||null}
-  var mkM=ln?(ln.fav==='h'?ln.pts:-ln.pts):null;
-  var total=(sa+sh);if(ln)total=0.1*total+0.9*ln.tt;if(g.lg==='nfl')total+=wxAdj(T.H.k,g.start).adj;
-  var margin=mkM!=null?(0.3*(sh-sa)+0.7*mkM):T.sdM*invPhi(p);
-  if(mkM!=null)p=Phi(margin/T.sdM);
+  var C=feedCalc(g),fp=C.fp,p=C.p,ln=C.ln,total=C.total,margin=C.margin;
   var ba=(total-margin)/2,bh=(total+margin)/2;
   var win=margin>=0?g.hn:g.an;
   h+='<h3>Prediction</h3><div class="card bcard"><div class="teams">'+esc(win)+' by '+Math.abs(margin).toFixed(1)+'</div><div class="facts"><span>'+esc(g.a)+' <b>'+ba.toFixed(1)+'</b></span><span>'+esc(g.h)+' <b>'+bh.toFixed(1)+'</b></span><span>Total <b>'+total.toFixed(1)+'</b></span></div>'+
@@ -1495,10 +1558,10 @@ function renderSheet(){
 /* ---------- shell ---------- */
 var TABS=[['games','Games','<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>'],['scores','Scores','<path d="M4 6h16M4 12h16M4 18h10"/>'],['props','Props','<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'],['picks','My picks','<path d="M5 4h14v17l-7-4-7 4z"/>'],['about','Data','<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/>']];
 function renderNav(){
-  $('#nav').innerHTML=TABS.map(function(t){return '<button data-act="tab" data-t="'+t[0]+'"'+((S.tab===t[0]||(t[0]==='props'&&S.tab==='parlay'))?' aria-current="page"':'')+'><svg viewBox="0 0 24 24" aria-hidden="true">'+t[2]+'</svg>'+t[1]+(t[0]==='picks'&&S.picks.length?'<span class="badge">'+S.picks.length+'</span>':'')+'</button>'}).join('');
+  $('#nav').innerHTML=TABS.map(function(t){return '<button data-act="tab" data-t="'+t[0]+'"'+((S.tab===t[0]||(t[0]==='props'&&S.tab==='parlay')||(t[0]==='scores'&&S.tab==='record'))?' aria-current="page"':'')+'><svg viewBox="0 0 24 24" aria-hidden="true">'+t[2]+'</svg>'+t[1]+(t[0]==='picks'&&S.picks.length?'<span class="badge">'+S.picks.length+'</span>':'')+'</button>'}).join('');
 }
 function render(){
-  $('#view').innerHTML={games:vGames,scores:vScores,props:vProps,parlay:vParlay,picks:vPicks,about:vAbout}[S.tab]();
+  $('#view').innerHTML={games:vGames,scores:vScores,record:vRecord,props:vProps,parlay:vParlay,picks:vPicks,about:vAbout}[S.tab]();
   $('#stamp').innerHTML='Feed '+esc(fmtClock(S.feedAt))+'<br>'+(S.live?'live':'snapshot');
   renderNav();
 }
