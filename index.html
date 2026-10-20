@@ -581,7 +581,7 @@ function sportChips(){
   return '<div class="chips" role="group" aria-label="Sport">'+LG.map(function(l){return '<button class="chip" data-act="sport" data-v="'+l[0]+'" aria-pressed="'+(S.sport===l[0])+'">'+l[1]+'</button>'}).join('')+'</div>';
 }
 function refreshBar(){
-  var when='Updated '+fmtClock(S.feedAt)+' · '+(S.live?'live from '+S.src:'saved snapshot')+(S.dk.at?' · DraftKings lines '+fmtClock(S.dk.at):'');
+  var when='Updated '+fmtClock(S.feedAt)+' · '+(S.live?'live from '+S.src:'saved snapshot');
   var stale=!S.live&&Date.now()-S.feedAt>600000?'<div class="msg warn" role="status">Scores below are from a saved snapshot and may be out of date.</div>':'';
   return '<div class="rbar"><div><div class="label">'+when+'</div>'+(S.msg?'<div class="msg '+S.msgKind+'" role="status">'+S.msg+'</div>':stale)+'</div><button class="btn primary" style="flex:none" data-act="refresh"'+(S.busy?' disabled':'')+'>'+(S.busy?'Refreshing…':'Refresh scores')+'</button></div>';
 }
@@ -767,8 +767,7 @@ function analyzeBet(b){
   return out;
 }
 function scanRes(){
-  var b=S.scan,a=analyzeBet(b),od=parseFloat(b.odds),h='',gx=b.type!=='prop'&&find(b.gid),dkt=gx?dkText(gx):'';
-  if(dkt)h+='<p class="src" style="margin-top:0">DraftKings now: '+esc(dkt)+'</p>';
+  var b=S.scan,a=analyzeBet(b),od=parseFloat(b.odds),h='';
   if(!isFinite(od)||Math.abs(od)<100)h+='<p class="src">Enter the odds as an American price like -110 or +150.</p>';
   if(a.p==null)return h+'<p class="note">'+esc(a.note||'')+'</p>';
   var be=1/dec(od||-110),ev=100*(a.p*dec(od||-110)-1),edge=a.p-be;
@@ -1258,38 +1257,6 @@ function covHtml(a,h){
   return '<h3>Coverage tendencies</h3><ul class="pts">'+line(a)+line(h)+'</ul><p class="src">'+esc(COV_SRC)+' Man-heavy defenses reward receivers who win one-on-one and get open fast; zone-heavy ones reward route-savvy players, tight ends and backs working the soft spots.</p>';
 }
 
-/* ---------- DraftKings lines from odds.json (written by the scheduled GitHub job) ---------- */
-S.dk={at:0,games:[]};
-function dkSame(a,b){a=normName(a);b=normName(b);if(a===b)return true;var x=a.split(' '),y=b.split(' ');return x[0]===y[0]&&x[x.length-1]===y[y.length-1]}
-function dkFor(g){var best=null;S.dk.games.forEach(function(d){if(d.lg!==g.lg)return;if(dkSame(d.away,g.an)&&dkSame(d.home,g.hn)&&Math.abs(Date.parse(d.start)-g.start)<20*36e5)best=d});return best}
-function dkLn(g){
-  var d=dkFor(g);if(!d||!d.spread||!d.total)return null;var h=d.spread.h;
-  return {dk:true,fav:h<=0?'h':'a',pts:Math.abs(h),tt:d.total.pt,sp:(h<=0?g.h:g.a)+' -'+Math.abs(h),tot:String(d.total.pt),ml:d.ml?g.a+' '+fo(d.ml.a)+' / '+g.h+' '+fo(d.ml.h):'not listed'};
-}
-function dkText(g){
-  var d=dkFor(g);if(!d)return '';
-  var p=[];if(d.spread)p.push(g.h+' '+(d.spread.h>0?'+':'')+d.spread.h+(d.spread.hp!=null?' ('+fo(d.spread.hp)+')':''));
-  if(d.total)p.push('total '+d.total.pt+(d.total.o!=null?' (O '+fo(d.total.o)+' / U '+fo(d.total.u)+')':''));
-  if(d.ml)p.push(g.a+' '+fo(d.ml.a)+' / '+g.h+' '+fo(d.ml.h));
-  return p.join(' · ');
-}
-function applyDK(){
-  (S.feed.nfl||[]).forEach(function(g){
-    var d=dkFor(g),r=research(g);if(!d||!r||!d.spread||!d.total)return;
-    var h=d.spread.h;r.fav=h<=0?'h':'a';r.pts=Math.abs(h);r.total=d.total.pt;if(d.ml)r.ml={a:d.ml.a,h:d.ml.h};
-    var fs=(r.total+r.pts)/2,ds=(r.total-r.pts)/2;r.fs=fs;r.ds=ds;r.favT=r.fav==='h'?r.h:r.a;r.dogT=r.fav==='h'?r.a:r.h;
-    r.bkA=r.ml?nov(r.ml.a,r.ml.h):null;r.gap=r.bkA==null?null:Math.abs(r.bkA-r.mkA);r.dk=true;
-  });
-}
-function loadOdds(){
-  if(typeof fetch!=='function')return Promise.resolve();
-  try{return fetch('odds.json?t='+Date.now()).then(function(r){return r.ok?r.json():null}).then(function(j){
-    if(!j||!Array.isArray(j.games)||!j.at)return;
-    var changed=Date.parse(j.at)!==S.dk.at;
-    S.dk={at:Date.parse(j.at),games:j.games,remaining:j.remaining};applyDK();
-    if(changed&&!(S.tab==='picks'))render();
-  }).catch(function(){})}catch(e){return Promise.resolve()}
-}
 /* ---------- learning from the pick log ---------- */
 function learn(lg){
   var gm={};S.log.forEach(function(x){if(x.lg===lg&&x.res&&x.rm!=null&&x.rt!=null&&x.am!=null)gm[x.gid]=x});
@@ -1451,8 +1418,7 @@ function feedCalc(g){
   var sa=(A.pf+H.pa)/2-T.he/2,sh=(H.pf+A.pa)/2+T.he/2;
   var stP=Phi((sh-sa)/T.sdM),fp=(g.pa!=null&&g.ph!=null)?g.ph/(g.pa+g.ph):null;
   var p=fp!=null?0.3*stP+0.7*fp:stP,ln=null;
-  ln=dkLn(g);
-  if(!ln&&g.lg==='nba')ln=DATA.nbaLines.games.filter(function(x){return x.a===g.a&&x.h===g.h})[0]||null;
+  if(g.lg==='nba')ln=DATA.nbaLines.games.filter(function(x){return x.a===g.a&&x.h===g.h})[0]||null;
   var wxa=g.lg==='nfl'?wxAdj(T.H.k,g.start):{adj:0,pu:0},mkM=ln?(ln.fav==='h'?ln.pts:-ln.pts):null,total=sa+sh;if(ln)total=0.1*total+0.9*ln.tt;total+=wxa.adj;
   var margin=mkM!=null?(0.3*(sh-sa)+0.7*mkM):T.sdM*invPhi(p);
   if(mkM!=null)p=Phi(margin/T.sdM);
@@ -1527,7 +1493,7 @@ function feedAnalyst(g){
   }else h+='<h3>Projection table</h3><p class="note" style="margin-top:0">No player hit-rate data for these teams in the sources.</p>';
   var bets=feedCalc(g).bets;
   h+='<h3>Best straight bets</h3><div class="list">'+bets.map(function(b){return '<div class="card bcard"><div class="label">'+b.mk+(b.conf!=='n/a'?' · confidence '+b.conf:'')+'</div><div class="teams">'+esc(b.pick)+'</div>'+(b.p!=null?'<div class="facts"><span>Est. chance <b>'+pc(b.p)+'%</b></span><span>Fair odds <b>'+fairOdds(b.p)+'</b></span><span>Break-even at -110 <b>52.4%</b></span>'+(b.mk!=='Moneyline'?'<span>Stake at -110 <b>'+kelly(b.p)+'</b></span>':'')+'</div>':'')+'<p class="src" style="margin-top:6px">'+esc(b.why)+'</p></div>'}).join('')+'</div>';
-  h+='<h3>Line movement</h3><p class="note" style="margin-top:0">'+(ln?'Listed line: '+esc(ln.sp)+', total '+esc(ln.tot)+', moneyline '+esc(ln.ml)+'. '+(ln.dk?'Source: DraftKings through The Odds API, fetched '+esc(fmtClock(S.dk.at))+'. Lines can move after that.':esc(DATA.nbaLines.src))+' No opening-versus-current history is available.':'No sportsbook line was available for this game. Public betting percentages and sharp-money indicators are not available from free sources.')+'</p>';
+  h+='<h3>Line movement</h3><p class="note" style="margin-top:0">'+(ln?'Listed line: '+esc(ln.sp)+', total '+esc(ln.tot)+', moneyline '+esc(ln.ml)+'. '+esc(DATA.nbaLines.src)+' No opening-versus-current history is available.':'No sportsbook line was available for this game. Public betting percentages and sharp-money indicators are not available from free sources.')+'</p>';
   h+='<h3>Uncertainty</h3><ul class="pts"><li><b>Solid:</b> '+(g.lg==='nfl'?'team stats through five or six games and the feed’s win probability.':g.lg==='nba'?'last season’s scoring numbers and the feed’s win probability.':'this season’s scoring numbers through about six or seven games.')+'</li><li><b>Volatile:</b> '+(g.lg==='nfl'?'injuries (no verified list for this game), weather and a small sample. No sportsbook line was read for this game, so the fair spread and total above are numbers to compare with your book.':g.lg==='nba'?'rosters, trades, minutes and injuries for the new season. Last season’s teams are only a rough guide.':'schedule strength is not adjusted, injuries and weather are unknown, and one blowout moves a six-game average a lot.')+'</li><li><b>Props:</b> '+(g.lg==='nfl'?'season averages swing a lot game to game, so use them as context.':'hit rates here come from short samples ('+(g.lg==='nba'?'10':'5')+' games), so treat them as context rather than a forecast.')+'</li></ul>';
   return h;
 }
@@ -1835,7 +1801,7 @@ function doRefresh(silent){
   var finish=function(out,srcName,failMsg){
     var ok=out.filter(function(o){return o.games}),bad=out.filter(function(o){return o.e});
     ok.forEach(function(o){S.feed[o.lg]=o.games});
-    if(ok.length){setTimeout(loadAvail,0);setTimeout(function(){loadOdds().then(trackPicks)},0)}
+    if(ok.length){setTimeout(loadAvail,0);setTimeout(trackPicks,50)}
     if(ok.length){S.feedAt=Date.now();S.live=true;S.src=srcName;preloadWx()}
     var fm=failMsg&&bad.length&&bad[0].e&&bad[0].e.detail?failMsg+' ('+bad[0].e.detail+')':failMsg;
     if(!ok.length){if(silent&&S.live){done('', '')}else{silent=false;done(fm||errMsg(bad[0].e),'warn')}}
@@ -1916,7 +1882,6 @@ document.addEventListener('change',function(e){
 document.addEventListener('input',function(e){var t=e.target,f=t.dataset&&t.dataset.sf;if(!f||t.tagName==='SELECT')return;S.scan[f]=t.value;var r=$('#scanres');if(r)r.innerHTML=scanRes()});
 document.addEventListener('keydown',function(e){if(e.key==='Escape'&&S.sheet){S.sheet=null;renderSheet()}});
 render();
-setTimeout(loadOdds,300);
 setTimeout(function(){doRefresh(true)},600);
 if(!(window.claude&&window.claude.use)){setInterval(function(){if(document.visibilityState==='visible')doRefresh(true)},30000);document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')doRefresh(true)})}
 })();
