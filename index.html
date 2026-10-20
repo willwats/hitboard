@@ -533,14 +533,14 @@ function normFeed(lg,games){
 }
 
 /* ---------- state ---------- */
-var S={cat:null,tab:'games',sport:'nfl',gf:'All',sheet:null,picks:[],stake:10,feed:SNAP.feed,feedAt:SNAP.at,live:false,src:'the data feed',busy:false,msg:'',msgKind:'',stats:{}};
+var S={cat:null,tab:'home',sport:'nfl',gf:'All',sheet:null,picks:[],stake:10,feed:SNAP.feed,feedAt:SNAP.at,live:false,src:'the data feed',busy:false,msg:'',msgKind:'',stats:{}};
 try{var raw=localStorage.getItem('hitboard.picks.v2');if(raw){var a=JSON.parse(raw);if(Array.isArray(a))S.picks=a.filter(function(x){return propById(x.pid)&&(x.side==='over'||x.side==='under')})}}catch(e){}
 function save(){try{localStorage.setItem('hitboard.picks.v2',JSON.stringify(S.picks))}catch(e){}}
 var $=function(s){return document.querySelector(s)};
 function nt(x){return x==='LA'?'LAR':x==='JAC'?'JAX':x==='WSH'?'WAS':x}
 function research(g){if(g.lg!=='nfl')return null;return GAMES.filter(function(r){return r.a===nt(g.a)&&r.h===nt(g.h)})[0]||null}
 function feedFor(r){return S.feed.nfl.filter(function(g){return nt(g.a)===r.a&&nt(g.h)===r.h})[0]||null}
-function kind(g){var s=g.status;if(s==='closed'||s==='complete'||s==='final')return 'final';if(s==='scheduled'||s==='created')return g.start&&g.start<Date.now()-5*36e5?'final':'up';return 'live'}
+function kind(g){var s=g.status;if(s==='closed'||s==='complete'||s==='final')return 'final';if(s==='scheduled'||s==='created')return g.start&&g.start<Date.now()-5*36e5?'final':'up';return g.start&&g.start<Date.now()-7*36e5?'final':'live'}
 function fmtTime(ms){try{return new Date(ms).toLocaleString([],{weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}catch(e){return new Date(ms).toISOString()}}
 function fmtClock(ms){try{return new Date(ms).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}catch(e){return ''}}
 function find(id){var out=null;LG.forEach(function(l){S.feed[l[0]].forEach(function(g){if(g.id===id)out=g})});return out}
@@ -596,6 +596,46 @@ function refreshBar(){
   var when='Updated '+fmtClock(S.feedAt)+' · '+(S.live?'live from '+S.src:'saved snapshot');
   var stale=!S.live&&Date.now()-S.feedAt>600000?'<div class="msg warn" role="status">Scores below are from a saved snapshot and may be out of date.</div>':'';
   return '<div class="rbar"><div><div class="label">'+when+'</div>'+(S.msg?'<div class="msg '+S.msgKind+'" role="status">'+S.msg+'</div>':stale)+'</div><button class="btn primary" style="flex:none" data-act="refresh"'+(S.busy?' disabled':'')+'>'+(S.busy?'Refreshing…':'Refresh scores')+'</button></div>';
+}
+function miniRow(g){
+  var k=kind(g),tag=LG.filter(function(l){return l[0]===g.lg})[0][1],right=k==='up'?'<span class="src">'+esc(gTime(g))+'</span>':(g.sa!=null?'<b>'+esc(g.a)+' '+g.sa+'</b> <b>'+esc(g.h)+' '+g.sh+'</b>':'<span class="src">Played</span>');
+  var st=k==='live'?'<span class="pill live" style="margin-left:6px">'+(g.q&&g.lg!=='mlb'?'Q'+g.q+' ':'')+esc(g.clock||'Live')+'</span>':k==='final'&&g.sa!=null?'<span class="pill final" style="margin-left:6px">Final</span>':'';
+  return '<div class="card" style="padding:10px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px"><span style="min-width:0"><span class="label">'+esc(tag)+'</span><br>'+teamBtn(g.lg,g.an,g.a)+' <span class="src">at</span> '+teamBtn(g.lg,g.hn,g.h)+'</span><span style="text-align:right;white-space:nowrap">'+right+st+'</span></div>';
+}
+function homeRecs(){
+  var key=S.feedAt+'|'+S.mine.length+'|'+Object.keys(S.tracked).length;
+  if(S.homeKey===key)return S.homeRecs;
+  var all=[];['nfl','nba','ncaafb','mlb'].forEach(function(lg){try{straightList(lg).forEach(function(b){b.lgKey=lg;all.push(b)})}catch(e){}});
+  var per={};all.sort(function(a,b){return b.p-a.p});
+  var top=all.filter(function(b){if(!b.rec||b.rec.t==='manual')return false;per[b.lgKey]=(per[b.lgKey]||0)+1;return per[b.lgKey]<=3}).slice(0,8);
+  S.homeRecs=top;S.homeKey=key;return top;
+}
+function vHome(){
+  var all=[];LG.forEach(function(l){(S.feed[l[0]]||[]).forEach(function(g){all.push(g)})});
+  var live=all.filter(function(g){return kind(g)==='live'}).sort(function(a,b){return a.start-b.start});
+  var up=all.filter(function(g){return kind(g)==='up'}).sort(function(a,b){return a.start-b.start}).slice(0,10);
+  var done=all.filter(function(g){return kind(g)==='final'&&g.sa!=null&&g.start>Date.now()-30*36e5}).sort(function(a,b){return b.start-a.start}).slice(0,8);
+  var h='<h2>Home</h2>'+refreshBar();
+  h+='<h3>Live now</h3>'+(live.length?live.map(miniRow).join(''):'<div class="card empty">No games are live right now.</div>');
+  h+='<h3>Next up</h3>'+(up.length?up.map(miniRow).join(''):'<div class="card empty">No upcoming games in the feed. Tap Refresh.</div>');
+  if(done.length)h+='<h3>Just finished</h3>'+done.map(miniRow).join('');
+  // tracker
+  var M=S.mine,D=M.filter(function(x){return x.res&&x.res!=='P'}),w=D.filter(function(x){return x.res==='W'}).length,u=0,ap=0,np=0,open=M.filter(function(x){return !x.res});
+  D.forEach(function(x){u+=x.res==='W'?dec(x.odds)-1:-1;if(x.p!=null){ap+=x.p;np++}});
+  h+='<h3>Your tracker</h3><div class="card"><div class="facts"><span>Record <b>'+w+'-'+(D.length-w)+'</b></span><span>Hit <b>'+(D.length?Math.round(100*w/D.length)+'%':'—')+'</b></span><span>Model said <b>'+(np?Math.round(100*ap/np)+'%':'—')+'</b></span><span>1u bets <b>'+(u>=0?'+':'')+u.toFixed(1)+' u</b></span><span>Open <b>'+open.length+'</b></span></div>';
+  if(open.length)h+='<ul class="pts" style="margin-top:8px">'+open.slice(-5).reverse().map(function(x){return '<li><b>'+esc(x.pick)+'</b> <span class="src">'+fo(x.odds)+(x.p!=null?' · model '+Math.round(x.p*100)+'%':'')+'</span>'+liveHtml(x)+'</li>'}).join('')+'</ul>';
+  else h+='<p class="src" style="margin:8px 0 0">No open bets. Track a recommended bet below, or upload a slip in My picks.</p>';
+  h+='<div class="actions" style="margin-top:8px"><button class="btn" data-act="tab" data-t="picks">All my bets</button></div></div>';
+  // learning
+  var keys={},rows=[];M.forEach(function(x){if(x.rec&&x.key)keys[x.key]=1});
+  Object.keys(keys).forEach(function(k){var L=recLearn(k);if(L.n)rows.push('<li><b>'+esc(k.replace('game-','game ').replace('-prop',' props'))+':</b> '+L.w+' of '+L.n+' hit ('+Math.round(L.hit*100)+'%), predicted '+Math.round(L.avgP*100)+'%. '+(L.n<10?'The model starts adjusting after 10 graded bets.':L.adj?'Probabilities now shift '+(L.adj>0?'+':'')+Math.round(L.adj*100)+' points.':'No adjustment needed.')+'</li>')});
+  h+='<h3>What the model is learning</h3><div class="card">'+(rows.length?'<ul class="pts" style="margin:0">'+rows.join('')+'</ul>':'<p class="src" style="margin:0">Track recommended bets and the app grades them from the final score or box score. After 10 graded bets of a kind, it compares predicted chances with what actually hit and shifts future chances toward the real rate.</p>')+'</div>';
+  // recommendations
+  var R=homeRecs();
+  h+='<h3>Recommended bets to track</h3>';
+  if(!R.length)h+='<div class="card empty">No trackable recommendations right now.</div>';
+  else{h+='<p class="lede" style="margin-top:0">The strongest few per sport. Type the odds you got, or leave it blank to track at the model’s fair odds. Open the Bets tab for the full reasoning.</p>'+R.map(function(b,i){return '<div class="card bcard"><div style="display:flex;justify-content:space-between;gap:10px"><div><div class="label">'+esc(b.label)+' · '+esc(b.lgKey.toUpperCase())+'</div><div class="teams" style="font-size:15px">'+esc(b.title)+'</div><div class="src">'+esc(b.sub)+'</div></div><span class="hrpill '+(b.p>=.7?'hi':b.p<.5?'lo':'mid')+'">'+Math.round(b.p*100)+'%</span></div><div class="src" style="margin-top:4px">Fair odds '+fairOdds(b.p)+'</div>'+trackBtn('h',i,b)+'</div>'}).join('')}
+  return h+foot();
 }
 S.gv='up';
 function dayHead(ms){return new Date(ms).toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'})}
@@ -1321,7 +1361,7 @@ function mineHtml(){
   var h='<h3>My bets</h3><div class="facts"><span>Record <b>'+w+'-'+(D.length-w)+'</b></span><span>Hit <b>'+(D.length?Math.round(100*w/D.length)+'%':'—')+'</b></span><span>Model said <b>'+(np?Math.round(100*ap/np)+'%':'—')+'</b></span><span>1u bets <b>'+(u>=0?'+':'')+u.toFixed(1)+' u</b></span></div><div class="list" style="margin-top:8px">';
   h+=M.slice().reverse().map(function(x){var i=M.indexOf(x);
     return '<div class="card bcard"><div class="teams">'+esc(x.pick)+'</div>'+(x.legs?'<ul class="pts" style="margin:4px 0">'+x.legs.map(function(l){return '<li>'+esc(l)+'</li>'}).join('')+'</ul>':'')+'<div class="src">'+esc(x.game||'')+' · '+fo(x.odds)+' · '+(x.p!=null?'model '+(x.p*100).toFixed(1)+'%'+(x.partial?' (priced legs only)':''):'no model chance')+'</div>'+liveHtml(x)+(x.score?'<div class="src">Final '+esc(x.score)+'</div>':'')+
-      '<div class="facts">'+(x.res?'<span>Result <b>'+(x.res==='W'?'Won':x.res==='L'?'Lost':'Push')+'</b></span>':(x.type==='prop'||x.type==='manual'||x.type==='parlay'?'<button class="btn" data-act="mres" data-i="'+i+'" data-r="W">Won</button><button class="btn" data-act="mres" data-i="'+i+'" data-r="L">Lost</button><button class="btn" data-act="mres" data-i="'+i+'" data-r="P">Push</button>':'<span>Waiting for the game to end</span>'))+'<button class="btn" data-act="mydel" data-i="'+i+'">Remove</button></div></div>';
+      '<div class="facts">'+(x.res?'<span>Result <b>'+(x.res==='W'?'Won':x.res==='L'?'Lost':'Push')+'</b></span>':(x.type==='prop'||x.type==='manual'||x.type==='parlay'||x.type==='rprop'?'<button class="btn" data-act="mres" data-i="'+i+'" data-r="W">Won</button><button class="btn" data-act="mres" data-i="'+i+'" data-r="L">Lost</button><button class="btn" data-act="mres" data-i="'+i+'" data-r="P">Push</button>':'<span>Waiting for the game to end</span>'))+'<button class="btn" data-act="mydel" data-i="'+i+'">Remove</button></div></div>';
   }).join('')+'</div>';
   return h;
 }
@@ -1372,6 +1412,11 @@ function trackBets(){
         var st=x.legD.map(function(l){return legState(l,x.games||[]).st});
         if(st.indexOf('miss')>=0){x.res='L';ch=true}
         else if(st.every(function(v){return v==='hit'})){x.res='W';ch=true}
+      }else if(x.type==='rprop'&&x.gid){
+        var g3=find(x.gid),c3=S.box[x.gid];if(!g3||!c3||!c3.j)return;
+        var v3=boxNum(c3.j,x.player,x.k);
+        if(v3!=null&&v3>=x.thr){x.res='W';ch=true}
+        else if(kind(g3)==='final'&&v3!=null){x.res='L';ch=true}
       }else if(x.type==='prop'&&x.gid){
         var g=find(x.gid),c=S.box[x.gid];if(!g||!c||!c.j)return;
         var v=boxNum(c.j,x.player,x.pk);if(v==null)return;
@@ -1385,13 +1430,14 @@ function trackBets(){
   });
 }
 function liveHtml(x){
-  if(window.claude&&window.claude.use)return x.type==='parlay'||x.type==='prop'?'<div class="src">Live stat tracking runs in the installed app, not this preview.</div>':'';
+  if(window.claude&&window.claude.use)return x.type==='parlay'||x.type==='prop'||x.type==='rprop'?'<div class="src">Live stat tracking runs in the installed app, not this preview.</div>':'';
   if(x.type==='parlay'&&x.legD&&x.games&&x.games.length){
     var rows=x.legD.map(function(l){var s2=legState(l,x.games),txt=s2.st==='wait'?'Not started':s2.st==='hit'?'Hit '+s2.cur+'/'+l.thr:s2.st==='miss'?'Missed '+s2.cur+'/'+l.thr:s2.st==='dnp'?'No stats, may not have played':s2.st==='live'?(s2.cur!=null?s2.cur+' of '+l.thr:'Waiting for stats'):'No game matched';
       return '<li>'+(s2.st==='hit'?'✓ ':s2.st==='miss'||s2.st==='dnp'?'✗ ':'')+esc(l.n)+' '+l.thr+'+ '+esc(l.stat.toLowerCase())+': <b>'+esc(txt)+'</b></li>'});
     return '<div class="src" style="margin-top:6px"><b>Live tracking</b> (checks every 30 seconds while the app is open)</div><ul class="pts" style="margin:2px 0">'+rows.join('')+'</ul>';
   }
   if(x.type==='parlay')return '<div class="src">The games for this slip could not be matched, so stats will not track. Mark it yourself when it settles.</div>';
+  if(x.type==='rprop'&&x.gid){var g4=find(x.gid),c4=S.box[x.gid];if(g4&&kind(g4)==='up')return '<div class="src">Tracks automatically at kickoff, '+esc(gTime(g4))+'.</div>';var v4=c4&&c4.j?boxNum(c4.j,x.player,x.k):null;return '<div class="src"><b>Live:</b> '+(v4!=null?v4+' of '+x.thr+' needed':'waiting for stats')+'</div>'}
   if(x.type==='prop'&&x.gid){var g=find(x.gid),c=S.box[x.gid];if(g&&kind(g)==='up')return '<div class="src">Tracks automatically at kickoff, '+esc(gTime(g))+'.</div>';var v=c&&c.j?boxNum(c.j,x.player,x.pk):null;return '<div class="src"><b>Live:</b> '+(v!=null?v+' of '+x.line+' '+x.pk+' yds':'waiting for stats')+'</div>'}
   if(x.gid&&!x.res){var g2=find(x.gid);if(g2){if(kind(g2)==='up')return '<div class="src">Tracks automatically at kickoff, '+esc(gTime(g2))+'.</div>';if(g2.sa!=null)return '<div class="src"><b>'+(kind(g2)==='live'?'Live':'Final')+':</b> '+esc(g2.a)+' '+g2.sa+', '+esc(g2.h)+' '+g2.sh+'</div>'}}
   return '';
@@ -1399,7 +1445,7 @@ function liveHtml(x){
 function gradeMine(){
   var ch=false;
   S.mine.forEach(function(x){
-    if(x.res||x.type==='prop'||x.type==='manual'||x.type==='parlay')return;var g=find(x.gid);if(!g||kind(g)!=='final'||g.sa==null)return;
+    if(x.res||x.type==='prop'||x.type==='manual'||x.type==='parlay'||x.type==='rprop')return;var g=find(x.gid);if(!g||kind(g)!=='final'||g.sa==null)return;
     var mh=g.sh-g.sa,r=null;
     if(x.type==='ml')r=mh===0?'P':((x.side==='h')===(mh>0)?'W':'L');
     else if(x.type==='sp'){var tm=x.side==='h'?mh:-mh,v=tm+x.line;r=v===0?'P':v>0?'W':'L'}
@@ -1514,7 +1560,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v27, Oct 20';
+var BUILD='v28, Oct 20';
 function foot(){return '<p class="foot"><button class="linkbtn" data-act="tab" data-t="about">How the model works</button> · <span class="src">Build '+BUILD+'</span></p><p class="foot">For entertainment and research only, not betting advice. Probabilities are estimates and can be wrong. If gambling is a problem for you or someone you know, call 1-800-GAMBLER.</p>'}
 
 /* ---------- sheets ---------- */
@@ -1770,9 +1816,26 @@ function propReasons(lg,l){
   con.push('The model gives it '+Math.round(l.p*100)+'%, so it should lose about '+Math.round((1-l.p)*100)+' times in 100. Fair odds are '+fairOdds(l.p)+'.');
   return {pro:pro,con:con};
 }
-function betCard(b){
+function fairAm(p){return p>=.5?-Math.round(100*p/(1-p)):Math.round(100*(1-p)/p)}
+function feedGidFor(lg,team){
+  var best=null;(S.feed[lg]||[]).forEach(function(g){if(kind(g)!=='up')return;var hit=lg==='nfl'?(nt(g.a)===nt(team)||nt(g.h)===nt(team)):(g.a===team||g.h===team);if(hit&&(!best||g.start<best.start))best=g});
+  return best?best.id:'';
+}
+function recLearn(key){
+  var D=S.mine.filter(function(x){return x.rec&&x.key===key&&(x.res==='W'||x.res==='L')}),n=D.length,w=D.filter(function(x){return x.res==='W'}).length,ap=0;
+  D.forEach(function(x){ap+=x.p||0});ap=n?ap/n:0;
+  var adj=n>=10?Math.max(-.08,Math.min(.08,(w/n-ap)*n/(n+30))):0;
+  return {n:n,w:w,hit:n?w/n:0,avgP:ap,adj:adj};
+}
+S.tracked={};S.recList=[];S.homeRecs=[];
+function trackBtn(src,i,b){
+  var k=b.title+'|'+b.sub;
+  if(S.tracked[k]||S.mine.some(function(x){return x.rec&&x.pick===b.title&&x.game===b.sub}))return '<div class="src" style="margin-top:8px"><b>✓ Tracking</b> in My bets. See Home for results.</div>';
+  return '<div style="display:flex;gap:8px;align-items:center;margin-top:8px"><input type="text" inputmode="numeric" id="ro_'+src+i+'" placeholder="Your odds (optional)" style="flex:1;min-width:0"><button class="btn" data-act="trackrec" data-src="'+src+'" data-i="'+i+'">Track bet</button></div>';
+}
+function betCard(b,i,src){
   return '<div class="card bcard"><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><div><div class="label">'+esc(b.label)+'</div><div class="teams" style="font-size:16px">'+esc(b.title)+'</div><div class="src">'+esc(b.sub)+'</div></div><span class="hrpill '+(b.p>=.7?'hi':b.p<.5?'lo':'mid')+'">'+Math.round(b.p*100)+'%</span></div>'+
-   (b.pro?'<div class="src" style="margin-top:8px"><b>Why it can hit</b></div><ul class="pts" style="margin-top:2px">'+b.pro.map(function(w){return '<li>'+esc(w)+'</li>'}).join('')+'</ul><div class="src"><b>Why it might not</b></div><ul class="pts" style="margin-top:2px">'+b.con.map(function(w){return '<li>'+esc(w)+'</li>'}).join('')+'</ul>':'<ul class="pts" style="margin-top:8px">'+b.why.map(function(w){return '<li>'+esc(w)+'</li>'}).join('')+'</ul>')+'<div class="facts"><span>Fair odds <b>'+fairOdds(b.p)+'</b></span></div></div>';
+   (b.pro?'<div class="src" style="margin-top:8px"><b>Why it can hit</b></div><ul class="pts" style="margin-top:2px">'+b.pro.map(function(w){return '<li>'+esc(w)+'</li>'}).join('')+'</ul><div class="src"><b>Why it might not</b></div><ul class="pts" style="margin-top:2px">'+b.con.map(function(w){return '<li>'+esc(w)+'</li>'}).join('')+'</ul>':'<ul class="pts" style="margin-top:8px">'+b.why.map(function(w){return '<li>'+esc(w)+'</li>'}).join('')+'</ul>')+'<div class="facts"><span>Fair odds <b>'+fairOdds(b.p)+'</b></span></div>'+(src?trackBtn(src,i,b):'')+'</div>';
 }
 function straightList(lg){
   var out=[],now=Date.now();
@@ -1803,7 +1866,7 @@ function straightList(lg){
       var sa=standOf(lg,g.a),sh=standOf(lg,g.h);
       if(sa&&sh&&(sa.t.w+sa.t.l)>0)why.push(g.a+' are '+sa.t.w+'-'+sa.t.l+' and '+g.h+' are '+sh.t.w+'-'+sh.t.l+' this season.');
       var rs=gameReasons(lg,g,x,ps);
-      out.push({label:'Game bet',title:x.pick,sub:g.a+' @ '+g.h+' · '+gTime(g),p:x.p,why:why,pro:rs.pro,con:rs.con});
+      out.push({label:'Game bet',title:x.pick,sub:g.a+' @ '+g.h+' · '+gTime(g),p:x.p,why:why,pro:rs.pro,con:rs.con,rec:x.t?{t:x.t,side:x.side||null,over:x.over,num:x.num==null?null:x.num,gid:g.id,lg:lg,key:'game-'+x.t}:null});
     });
   });
   var legs=legList(lg).filter(function(l){return l.p>=.55});
@@ -1813,8 +1876,16 @@ function straightList(lg){
     if(lg==='nfl'&&l.nx&&l.nx.opp&&TS[nt(l.nx.opp)]&&l.kind==='yds'){var o=nt(l.nx.opp),rush=/rush/i.test(l.mk),m=rush?'drush':'dpass',rk=mrank(o,m);why.push(o+' rank '+ordn(rk)+' against the '+(rush?'run':'pass')+' ('+MET[m].fm(mv(o,m))+'), '+(rk>=22?'a weak spot to attack.':rk<=10?'a tough matchup, which is why this is not higher.':'about average.'))}
     else if(l.kind==='td')why.push('Anytime touchdown prices run long, so a 40% or better last-10 rate is a real edge.');
     else if(lg!=='nfl')why.push('From last-ten-game hit rates in the table. Check injuries and minutes first.');
-    var pr2=propReasons(lg,l);
-    out.push({label:'Player prop',title:l.name+' '+l.mk,sub:(l.nx&&l.nx.txt||'')+' · '+l.team,p:l.p,why:why,pro:pr2.pro,con:pr2.con});
+    var lr=recLearn(lg+'-prop'),pAdj=Math.max(.03,Math.min(.97,l.p+lr.adj)),pr2=propReasons(lg,Object.assign({},l,{p:pAdj}));
+    if(lr.adj)pr2.pro.push('Adjusted '+(lr.adj>0?'+':'')+Math.round(lr.adj*100)+' points from your tracked '+lg.toUpperCase()+' props: '+lr.w+' of '+lr.n+' hit, against '+Math.round(lr.avgP*100)+'% predicted.');
+    var rec=null,mm=l.mk.match(/(\d+(?:\.5)?)\s*\+?\s*$/),stat=null;
+    if(l.kind!=='td'&&mm){
+      if(lg==='nba')stat=/Point/i.test(l.mk)?'pts':/Reb/i.test(l.mk)?'reb':/Ast|Assist/i.test(l.mk)?'ast':/Three/i.test(l.mk)?'tpm':null;
+      else stat=/rush/i.test(l.mk)?'rush':/pass/i.test(l.mk)?'pass':/rec/i.test(l.mk)?'rec':null;
+      var gid=feedGidFor(lg,l.team);
+      if(stat&&gid)rec={t:'rprop',name:l.name,k:stat,thr:/over/.test(l.mk)?Math.ceil(parseFloat(mm[1])):parseFloat(mm[1]),gid:gid,lg:lg,key:lg+'-prop'};
+    }
+    out.push({label:'Player prop',title:l.name+' '+l.mk,sub:(l.nx&&l.nx.txt||'')+' · '+l.team,p:pAdj,why:why,pro:pr2.pro,con:pr2.con,rec:rec||{t:'manual',key:lg+'-prop'}});
   });
   return out;
 }
@@ -1827,7 +1898,7 @@ function vParlay(){
     var L0=straightList(lg).sort(function(a,b){return b.p-a.p}),gm=L0.filter(function(x){return x.label==='Game bet'}).slice(0,8),L=gm.concat(L0.filter(function(x){return gm.indexOf(x)<0})).slice(0,S.betMore?45:24).sort(function(a,b){return b.p-a.p}),more=L0.length>24;
     if(!L.length)return h+'<div class="card empty">No straight bets with a game still to play in the data.</div>'+foot();
     var top=L;
-    return h+'<p class="lede">The '+top.length+' strongest single bets right now, with the reason behind each. Chances come from this app’s model and hit-rate data. Sportsbook prices were not readable, so compare the fair odds with your book and only bet where it pays more.</p>'+top.map(betCard).join('')+(more?'<button class="chip" style="margin-top:10px" data-act="set" data-k="betMore" data-v="'+(S.betMore?'':'1')+'">'+(S.betMore?'Show fewer':'Show more bets')+'</button>':'')+'<p class="note" style="margin-top:12px">Sorted by chance, not by value. A high chance at short odds can still be a poor bet. Check injuries before placing anything.</p>'+foot();
+    return h+'<p class="lede">The '+top.length+' strongest single bets right now, with the reason behind each. Chances come from this app’s model and hit-rate data. Sportsbook prices were not readable, so compare the fair odds with your book and only bet where it pays more.</p>'+(S.recList=top,top.map(function(b,i){return betCard(b,i,'b')}).join(''))+(more?'<button class="chip" style="margin-top:10px" data-act="set" data-k="betMore" data-v="'+(S.betMore?'':'1')+'">'+(S.betMore?'Show fewer':'Show more bets')+'</button>':'')+'<p class="note" style="margin-top:12px">Sorted by chance, not by value. A high chance at short odds can still be a poor bet. Check injuries before placing anything.</p>'+foot();
   }
   if(lg==='mlb')return h+'<div class="card empty">The parlay builder does not cover baseball yet. Use the straight bets tab or the MLB props boards.</div>'+foot();
   var all=legList(lg);
@@ -2575,12 +2646,12 @@ function renderSheet(){
 }
 
 /* ---------- shell ---------- */
-var TABS=[['games','Games','<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>'],['scores','Scores','<path d="M4 6h16M4 12h16M4 18h10"/>'],['props','Props','<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'],['picks','My picks','<path d="M5 4h14v17l-7-4-7 4z"/>']];
+var TABS=[['home','Home','<path d="M3 11l9-8 9 8M5 10v10h14V10"/>'],['games','Games','<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>'],['scores','Scores','<path d="M4 6h16M4 12h16M4 18h10"/>'],['props','Props','<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'],['picks','My picks','<path d="M5 4h14v17l-7-4-7 4z"/>']];
 function renderNav(){
   $('#nav').innerHTML=TABS.map(function(t){return '<button data-act="tab" data-t="'+t[0]+'"'+((S.tab===t[0]||(t[0]==='props'&&S.tab==='parlay')||(t[0]==='scores'&&S.tab==='record')||(t[0]==='games'&&S.tab==='div'))?' aria-current="page"':'')+'><svg viewBox="0 0 24 24" aria-hidden="true">'+t[2]+'</svg>'+t[1]+(t[0]==='picks'&&S.picks.length?'<span class="badge">'+S.picks.length+'</span>':'')+'</button>'}).join('');
 }
 function render(){
-  $('#view').innerHTML={games:vGames,scores:vScores,div:vDiv,record:vRecord,props:vProps,parlay:vParlay,picks:vPicks,about:vAbout}[S.tab]();
+  $('#view').innerHTML={home:vHome,games:vGames,scores:vScores,div:vDiv,record:vRecord,props:vProps,parlay:vParlay,picks:vPicks,about:vAbout}[S.tab]();
   $('#stamp').innerHTML='Feed '+esc(fmtClock(S.feedAt))+'<br>'+(S.live?'live':'snapshot');
   renderNav();
 }
@@ -2640,7 +2711,17 @@ function fetchEspn(lg){
     return fetch(u).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}).then(function(j){
       var ev=j.events||(j.content&&j.content.sbData&&j.content.sbData.events);
       if(!ev)throw new Error('no games in reply');
-      return {lg:lg,games:espnNorm(lg,ev)};
+      var gm=espnNorm(lg,ev),hasUp=gm.some(function(g){return g.status==='scheduled'&&g.start>Date.now()});
+      if(hasUp||lg==='mlb'&&gm.length)return {lg:lg,games:gm};
+      // the range request returned nothing upcoming: ask day by day for the next week
+      var qs=lg==='ncaafb'?'&groups=80&limit=300':lg==='ncaamb'?'&groups=50&limit=300':'&limit=100',ps=[];
+      for(var d=0;d<8;d++){var dt=new Date(Date.now()+d*864e5).toISOString().slice(0,10).replace(/-/g,'');
+        ps.push(fetch('https://site.api.espn.com/apis/site/v2/sports/'+ESPN[lg]+'/scoreboard?dates='+dt+qs).then(function(r){return r.ok?r.json():null}).catch(function(){return null}))}
+      return Promise.all(ps).then(function(js){
+        var seen={};gm.forEach(function(g){seen[g.id]=1});
+        js.forEach(function(j){if(j&&j.events)espnNorm(lg,j.events).forEach(function(g){if(!seen[g.id]){seen[g.id]=1;gm.push(g)}})});
+        return {lg:lg,games:gm};
+      });
     }).catch(function(e){last=(e&&e.message)||'network error';return next()});
   }
   return next();
@@ -2659,7 +2740,10 @@ function doRefresh(silent){
   };
   var finish=function(out,srcName,failMsg){
     var ok=out.filter(function(o){return o.games}),bad=out.filter(function(o){return o.e});
-    ok.forEach(function(o){S.feed[o.lg]=o.games});
+    ok.forEach(function(o){
+      var hasUp=o.games.some(function(g){return kind(g)==='up'});
+      if(!hasUp){var keep=(S.feed[o.lg]||[]).filter(function(g){return kind(g)==='up'&&g.start>Date.now()&&!o.games.some(function(n){return n.id===g.id})});if(keep.length)o.games=o.games.concat(keep)}
+      S.feed[o.lg]=o.games});
     if(ok.length){setTimeout(function(){fetchStand(S.sport)},0);setTimeout(loadAvail,0);setTimeout(trackPicks,50)}
     if(ok.length){S.feedAt=Date.now();S.live=true;S.src=srcName;preloadWx()}
     var fm=failMsg&&bad.length&&bad[0].e&&bad[0].e.detail?failMsg+' ('+bad[0].e.detail+')':failMsg;
@@ -2712,6 +2796,15 @@ document.addEventListener('click',function(e){
     save();renderNav();propOut();
   }
   else if(act==='rm'){S.picks.splice(+el.dataset.i,1);save();render()}
+  else if(act==='trackrec'){
+    var lst=el.dataset.src==='h'?S.homeRecs:S.recList,b0=lst[+el.dataset.i];if(!b0)return;
+    var inp=document.getElementById('ro_'+el.dataset.src+el.dataset.i),od0=inp?parseFloat(String(inp.value).replace(/[−–]/g,'-')):NaN;
+    var odd=isFinite(od0)&&Math.abs(od0)>=100?od0:fairAm(b0.p),r0=b0.rec||{t:'manual',key:'other'};
+    var ent={id:String(Date.now())+Math.floor(Math.random()*1000),at:Date.now(),type:r0.t,lg:r0.lg||S.sport,gid:r0.gid||'',odds:odd,p:b0.p,pick:b0.title,game:b0.sub,res:null,rec:true,key:r0.key,oddsGiven:isFinite(od0)&&Math.abs(od0)>=100};
+    if(r0.t==='ml'||r0.t==='sp'||r0.t==='tot'){ent.side=r0.t==='tot'?(r0.over?'over':'under'):r0.side;ent.line=r0.t==='ml'?null:r0.num}
+    if(r0.t==='rprop'){ent.player=r0.name;ent.k=r0.k;ent.thr=r0.thr}
+    S.mine.push(ent);S.tracked[b0.title+'|'+b0.sub]=1;saveMine();trackBets();render();
+  }
   else if(act==='mynote'){
     var nb=S.scan,txt=(nb.note||'').trim()||String(nb.raw||'').replace(/\s+/g,' ').trim().slice(0,90);
     if(!txt){S.scan.msg='Type a short description of the bet first.';render();return}
