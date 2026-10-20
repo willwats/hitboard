@@ -619,6 +619,7 @@ function vHome(){
   h+='<h3>Live now</h3>'+(live.length?live.map(miniRow).join(''):'<div class="card empty">No games are live right now.</div>');
   h+='<h3>Next up</h3>'+(up.length?up.map(miniRow).join(''):'<div class="card empty">No upcoming games in the feed. Tap Refresh.</div>');
   if(done.length)h+='<h3>Just finished</h3>'+done.map(miniRow).join('');
+  h+=alertsHtml();
   // tracker
   var M=S.mine,D=M.filter(function(x){return x.res&&x.res!=='P'}),w=D.filter(function(x){return x.res==='W'}).length,u=0,ap=0,np=0,open=M.filter(function(x){return !x.res});
   D.forEach(function(x){u+=x.res==='W'?dec(x.odds)-1:-1;if(x.p!=null){ap+=x.p;np++}});
@@ -680,7 +681,7 @@ function hcls(h,g){var r=h/g;return r>=.8?'hi':r<=.3?'lo':'mid'}
 function hrTable(t,i){
   var tag=t.thr?'':'';
   return '<h3>'+esc(t.stat)+(t.line!=null?' over '+t.line:'')+'</h3><div class="tblwrap"><table><thead><tr><th>Player</th><th>Hit rate</th><th>'+esc(t.unit||'Avg')+'</th></tr></thead><tbody>'+
-   t.rows.map(function(r){var rate=Math.round(100*r[2]/r[3]);return '<tr><td>'+esc(r[0])+' <span class="src">'+esc(r[1])+'</span></td><td><span class="hrpill '+hcls(r[2],r[3])+'">'+rate+'% ('+r[2]+'/'+r[3]+')</span></td><td>'+(t.unit?r[4].toFixed(1):r[4])+'</td></tr>'}).join('')+'</tbody></table></div>';
+   t.rows.map(function(r){var rate=Math.round(100*r[2]/r[3]);var gk=S.sport==='nba'?({Points:'pts',Rebounds:'reb',Assists:'ast',Threes:'tpm'})[t.stat]:null;return '<tr><td>'+(gk?playerBtn(r[0],'nba',r[1],gk,Math.ceil(t.line),''):esc(r[0]))+' <span class="src">'+esc(r[1])+'</span></td><td><span class="hrpill '+hcls(r[2],r[3])+'">'+rate+'% ('+r[2]+'/'+r[3]+')</span></td><td>'+(t.unit?r[4].toFixed(1):r[4])+'</td></tr>'}).join('')+'</tbody></table></div>';
 }
 function nflHit(){
   var d=DATA.hit.nfl;
@@ -1117,6 +1118,130 @@ function ckKick(){
   return h+'<p class="note" style="margin-top:12px">Kickers with a game still to play this week are listed first. Totals come from the app’s game model where one exists. Loaded '+esc(fmtClock(S.ck.at))+'. Sportsbook kicker lines were not readable.</p>';
 }
 
+
+/* ---------- alerts ---------- */
+S.alerts=[];S.notifyOn=false;
+try{var ra=localStorage.getItem('hitboard.alerts.v1');if(ra){var aa=JSON.parse(ra);if(Array.isArray(aa))S.alerts=aa}S.notifyOn=localStorage.getItem('hitboard.notify')==='1'}catch(e){}
+function saveAlerts(){try{localStorage.setItem('hitboard.alerts.v1',JSON.stringify(S.alerts.slice(0,60)))}catch(e){}}
+function notifyDevice(text){
+  if(!S.notifyOn||typeof Notification==='undefined'||Notification.permission!=='granted')return;
+  try{
+    if(navigator.serviceWorker&&navigator.serviceWorker.ready)navigator.serviceWorker.ready.then(function(r){return r.showNotification('Hitboard',{body:text,icon:'icon-192.png',tag:'hb'+Date.now()})}).catch(function(){try{new Notification('Hitboard',{body:text})}catch(e){}});
+    else new Notification('Hitboard',{body:text});
+  }catch(e){}
+}
+function pushAlert(text,key){
+  if(S.alerts.some(function(a){return a.k===key}))return;
+  S.alerts.unshift({k:key,at:Date.now(),t:text});S.alerts=S.alerts.slice(0,60);saveAlerts();notifyDevice(text);
+}
+function checkAlerts(){
+  var now=Date.now();
+  // results that existed before alerts were turned on are not announced
+  if(!S.alertInit){S.alertInit=true;var done=false;try{done=localStorage.getItem('hitboard.alerts.init')==='1';localStorage.setItem('hitboard.alerts.init','1')}catch(e){}
+    if(!done)S.mine.forEach(function(x){if(x.res)x.alerted=true})}
+  S.mine.forEach(function(x){
+    var ids=(x.games||[]).concat(x.gid?[x.gid]:[]);
+    if(!x.res){
+      ids.forEach(function(id){var g=find(id);if(!g)return;
+        if(kind(g)==='up'&&g.start>now&&g.start-now<=30*60000)pushAlert('Kicks off in about '+Math.max(1,Math.round((g.start-now)/60000))+' minutes: '+g.a+' at '+g.h+' ('+x.pick+')','k30|'+x.id+'|'+id);
+        if(kind(g)==='live')pushAlert('Game started: '+g.a+' at '+g.h+'. Tracking '+x.pick+'.','live|'+x.id+'|'+id);
+      });
+      if(x.type==='parlay'&&x.legD)x.legD.forEach(function(l,i){var st=legState(l,x.games||[]);if(st.st==='hit')pushAlert('Leg hit: '+l.n+' '+l.thr+'+ '+l.stat.toLowerCase()+' ('+st.cur+')','leg|'+x.id+'|'+i);if(st.st==='miss')pushAlert('Leg missed: '+l.n+' finished '+st.cur+' of '+l.thr+'. The parlay is dead.','miss|'+x.id+'|'+i)});
+      if(x.type==='rprop'&&x.gid){var c=S.box[x.gid];if(c&&c.j){var v=boxNum(c.j,x.player,x.k);if(v!=null&&v>=x.thr)pushAlert('Hit: '+x.pick+' ('+v+')','hit|'+x.id)}}
+    }else if(!x.alerted){x.alerted=true;pushAlert((x.res==='W'?'Won: ':x.res==='L'?'Lost: ':'Push: ')+x.pick,'res|'+x.id);saveMine()}
+  });
+}
+function alertsHtml(){
+  var perm=typeof Notification==='undefined'?'unsupported':Notification.permission;
+  var h='<h3>Alerts</h3><div class="card">';
+  if(perm==='unsupported')h+='<p class="src" style="margin:0 0 8px">This browser cannot show device notifications. Alerts still appear here.</p>';
+  else if(!S.notifyOn||perm!=='granted')h+='<div class="actions" style="margin-bottom:8px"><button class="btn" data-act="notifyon">Turn on device notifications</button></div><p class="src" style="margin:0 0 8px">'+(perm==='denied'?'Notifications are blocked for this app in your phone settings. Alerts still appear here.':'You get a notification when a tracked game is 30 minutes from kickoff, starts, a leg hits, or a bet settles.')+'</p>';
+  else h+='<p class="src" style="margin:0 0 8px">Device notifications are on. <button class="linkbtn" data-act="notifyoff">Turn off</button></p>';
+  h+=S.alerts.length?'<ul class="pts" style="margin:0">'+S.alerts.slice(0,8).map(function(a){return '<li>'+esc(a.t)+' <span class="src">'+esc(fmtClock(a.at))+'</span></li>'}).join('')+'</ul>':'<p class="src" style="margin:0">No alerts yet. Track a bet and they will show up here.</p>';
+  return h+'<p class="src" style="margin:8px 0 0">The app checks every 30 seconds while it is open. It cannot wake itself when fully closed, so open it around kickoff.</p></div>';
+}
+
+/* ---------- player game logs ---------- */
+S.roster={};S.plog={};S.plSel={};
+var SLUG={nba:{GSW:'gs',NYK:'ny',SAS:'sa',NOP:'no',UTA:'utah',WAS:'wsh'}};
+function teamSlug(lg,t){t=String(t||'').toUpperCase();return ((SLUG[lg]||{})[t]||t).toLowerCase()}
+function rosterFind(lg,team,name){
+  var key=lg+'|'+team,R=S.roster[key];
+  if(R&&R.st==='ok'){var k=normName(name),hit=null;R.list.forEach(function(a){if(normName(a.n)===k)hit=a});return Promise.resolve(hit)}
+  if(R&&R.st==='load')return R.p;
+  var p=fetch('https://site.api.espn.com/apis/site/v2/sports/'+ESPN[lg]+'/teams/'+teamSlug(lg,team)+'/roster').then(function(r){if(!r.ok)throw new Error('roster HTTP '+r.status);return r.json()}).then(function(j){
+    var list=[],add=function(a){if(a&&a.id&&(a.fullName||a.displayName))list.push({id:a.id,n:a.fullName||a.displayName})};
+    (j.athletes||[]).forEach(function(a){if(a.items)a.items.forEach(add);else add(a)});
+    if(!list.length)throw new Error('empty roster');
+    S.roster[key]={st:'ok',list:list};var k=normName(name),hit=null;list.forEach(function(a){if(normName(a.n)===k)hit=a});return hit;
+  });
+  S.roster[key]={st:'load',p:p};p.catch(function(){delete S.roster[key]});return p;
+}
+function parseGamelog(j,statKey){
+  var out=[],ev=j.events||{},labels=j.labels||j.names||[];
+  var ix=function(l,labs){return (labs||labels).indexOf(l)};
+  (j.seasonTypes||[]).forEach(function(st){(st.categories||[]).forEach(function(cat){
+    var labs=cat.labels||labels;
+    (cat.events||[]).forEach(function(e){
+      var meta=ev[e.eventId]||{},stats=e.stats||[],v=null;
+      if(statKey==='pts'&&ix('PTS',labs)>=0)v=+stats[ix('PTS',labs)];
+      else if(statKey==='reb'&&ix('REB',labs)>=0)v=+stats[ix('REB',labs)];
+      else if(statKey==='ast'&&ix('AST',labs)>=0)v=+stats[ix('AST',labs)];
+      else if(statKey==='tpm'&&ix('3PT',labs)>=0)v=parseInt(String(stats[ix('3PT',labs)]).split('-')[0],10);
+      if(v==null||isNaN(v))return;
+      var mn=ix('MIN',labs)>=0?parseFloat(stats[ix('MIN',labs)]):null;
+      out.push({id:e.eventId,date:meta.gameDate||'',home:meta.atVs?meta.atVs!=='@':null,opp:(meta.opponent&&meta.opponent.abbreviation)||'',v:v,min:mn,res:meta.gameResult||''});
+    });
+  })});
+  return out;
+}
+function loadPlayer(sh){
+  var key=sh.lg+'|'+normName(sh.name),c=S.plog[key];
+  if(c&&(c.st==='load'||c.st==='ok'||c.st==='err'))return;
+  S.plog[key]={st:'load'};
+  var Y=new Date().getFullYear();
+  rosterFind(sh.lg,sh.team,sh.name).then(function(a){
+    if(!a)throw new Error('player not found on the '+sh.team+' roster');
+    var base='https://site.web.api.espn.com/apis/common/v3/sports/'+ESPN[sh.lg]+'/athletes/'+a.id+'/gamelog';
+    return Promise.all([base,base+'?season='+Y,base+'?season='+(Y+1)].map(function(u){return fetch(u).then(function(r){return r.ok?r.json():null}).catch(function(){return null})}));
+  }).then(function(js){
+    var raw=js.filter(Boolean);if(!raw.length)throw new Error('no game log returned');
+    var byStat={};['pts','reb','ast','tpm'].forEach(function(k){var seen={},rows=[];raw.forEach(function(j){parseGamelog(j,k).forEach(function(g){if(!seen[g.id]){seen[g.id]=1;rows.push(g)}})});rows.sort(function(a,b){return String(b.date).localeCompare(String(a.date))});byStat[k]=rows});
+    if(!byStat.pts.length&&!byStat.reb.length)throw new Error('the game log had no recognisable stats');
+    S.plog[key]={st:'ok',d:byStat};
+  }).catch(function(e){S.plog[key]={st:'err',e:String(e&&e.message||e)}}).then(function(){if(S.sheet&&S.sheet.type==='player')renderSheet()});
+}
+var PSTAT={pts:'Points',reb:'Rebounds',ast:'Assists',tpm:'Threes'};
+function winRow(rows,thr,n){var r=n?rows.slice(0,n):rows,h=r.filter(function(g){return g.v>=thr}).length,avg=r.length?r.reduce(function(t,g){return t+g.v},0)/r.length:0;return {n:r.length,h:h,avg:avg}}
+function playerBody(sh){
+  var key=sh.lg+'|'+normName(sh.name),c=S.plog[key];
+  if(!c||c.st==='load')return '<div class="card empty">Loading game log…</div>';
+  if(c.st==='err')return '<div class="card empty">Could not load the game log ('+esc(c.e)+'). The hit-rate tables in Props still work.</div>';
+  var rows=c.d[sh.k]||[],thr=sh.thr;
+  if(!rows.length)return '<div class="card empty">No '+esc(PSTAT[sh.k].toLowerCase())+' games in the log.</div>';
+  var h='',W=[['Last 5',5],['Last 10',10],['Last 20',20],['All games',0]];
+  h+='<h3>Hit rate for '+thr+'+ '+esc(PSTAT[sh.k].toLowerCase())+'</h3><div class="tblwrap"><table><thead><tr><th>Window</th><th>Hit rate</th><th>Average</th></tr></thead><tbody>'+W.map(function(w){var r=winRow(rows,thr,w[1]);return '<tr><td>'+w[0]+' <span class="src">'+r.n+' g</span></td><td>'+(r.n?'<span class="hrpill '+hcls(r.h,r.n)+'">'+Math.round(100*r.h/r.n)+'% ('+r.h+'/'+r.n+')</span>':'—')+'</td><td>'+(r.n?r.avg.toFixed(1):'—')+'</td></tr>'}).join('')+'</tbody></table></div>';
+  var hm=rows.filter(function(g){return g.home===true}),aw=rows.filter(function(g){return g.home===false});
+  var sp=function(r){var q=winRow(r,thr,0);return q.n?q.h+'/'+q.n+' ('+Math.round(100*q.h/q.n)+'%)':'—'};
+  var nx=sh.opp?rows.filter(function(g){return g.opp===sh.opp}):[];
+  h+='<div class="facts" style="margin-top:10px"><span>Home <b>'+sp(hm)+'</b></span><span>Away <b>'+sp(aw)+'</b></span>'+(sh.opp?'<span>Vs '+esc(sh.opp)+' <b>'+sp(nx)+'</b></span>':'')+'</div>';
+  // bars
+  var last=rows.slice(0,20).reverse(),mx=Math.max.apply(null,last.map(function(g){return g.v}).concat([thr]))*1.1||1,bw=100/last.length;
+  h+='<h3>Last '+last.length+' games</h3><svg viewBox="0 0 100 44" style="width:100%;height:150px" role="img" aria-label="Game log bars with the line at '+thr+'">'+last.map(function(g,i){var hh=Math.max(.5,34*g.v/mx);return '<rect x="'+(i*bw+bw*.12).toFixed(2)+'" y="'+(38-hh).toFixed(2)+'" width="'+(bw*.76).toFixed(2)+'" height="'+hh.toFixed(2)+'" rx=".6" fill="'+(g.v>=thr?'var(--hit,#3ecf8e)':'var(--miss,#e5604d)')+'"/><text x="'+(i*bw+bw/2).toFixed(2)+'" y="'+(37-hh).toFixed(2)+'" font-size="2.6" text-anchor="middle" fill="currentColor">'+g.v+'</text>'}).join('')+'<line x1="0" x2="100" y1="'+(38-34*thr/mx).toFixed(2)+'" y2="'+(38-34*thr/mx).toFixed(2)+'" stroke="currentColor" stroke-dasharray="1.2 1.2" stroke-width=".3"/></svg><p class="src">Oldest on the left. Green bars cleared '+thr+'. Dashed line is the target.</p>';
+  var withMin=last.filter(function(g){return g.min!=null&&!isNaN(g.min)});
+  if(withMin.length)h+='<p class="src">Minutes in these games: '+withMin.slice(-5).map(function(g){return Math.round(g.min)}).join(', ')+' (latest last). Falling minutes are the first warning sign for any prop.</p>';
+  var first=rows[rows.length-1].date;
+  return h+'<p class="src">Includes last season until this season has enough games. Oldest game in the log: '+esc(String(first).slice(0,10))+'. Source: ESPN game logs.</p>';
+}
+function playerSheet(sh){
+  var h='<div class="sh-head"><div><div class="label">'+esc(sh.team||'')+' · Game log</div><h2>'+esc(sh.name)+'</h2></div><button class="x" data-act="close" aria-label="Close">×</button></div>';
+  h+='<div class="chips" role="group" aria-label="Stat" style="margin-top:10px">'+Object.keys(PSTAT).map(function(k){return '<button class="chip" data-act="plstat" data-k="'+k+'" aria-pressed="'+(sh.k===k)+'">'+PSTAT[k]+'</button>'}).join('')+'</div>';
+  h+='<label for="pl_thr" style="margin-top:10px">Target (this many or more)</label><input type="text" inputmode="decimal" id="pl_thr" value="'+esc(sh.thr)+'" style="max-width:120px">';
+  h+='<div id="plbody">'+playerBody(sh)+'</div>';
+  return h;
+}
+function playerBtn(name,lg,team,k,thr,opp,label){return '<button class="linkbtn" data-act="player" data-n="'+esc(name)+'" data-lg="'+lg+'" data-team="'+esc(team)+'" data-k="'+k+'" data-thr="'+thr+'" data-opp="'+esc(opp||'')+'">'+(label||esc(name))+'</button>'}
+
 /* ---------- top model leans across sports ---------- */
 function discoverHtml(){
   var now=Date.now(),items=[];
@@ -1426,7 +1551,8 @@ function trackBets(){
       }
     });
     if(ch)saveMine();
-    var ae=document.activeElement;if((S.tab==='picks'||S.betTab==='mine')&&!(ae&&ae.tagName==='INPUT'))render();
+    try{checkAlerts()}catch(e){}
+    var ae=document.activeElement;if((S.tab==='picks'||S.tab==='home'||S.betTab==='mine')&&!(ae&&ae.tagName==='INPUT'))render();
   });
 }
 function liveHtml(x){
@@ -1454,6 +1580,7 @@ function gradeMine(){
   });
   if(ch)saveMine();
   trackBets();
+  try{checkAlerts()}catch(e){}
 }
 function loadTess(){
   return new Promise(function(ok,no){
@@ -1532,7 +1659,7 @@ function ocrFiles(files){
   }).catch(function(){S.scan.busy='';S.scan.msg='Could not read that image. The reader needs internet the first time and does not run in the preview copy. Fill the fields in below, or use the installed app.';render()});
 }
 function ocrFile(f){if(f)ocrFiles([f])}
-window.HB={trackBets:trackBets,legState:legState,slipGames:slipGames,parseSlip:parseSlip,analyzeBet:analyzeBet,S:S,consFor:consFor,find:find,discoverHtml:discoverHtml,upGames:upGames};
+window.HB={checkAlerts:checkAlerts,trackBets:trackBets,legState:legState,slipGames:slipGames,parseSlip:parseSlip,analyzeBet:analyzeBet,S:S,consFor:consFor,find:find,discoverHtml:discoverHtml,upGames:upGames};
 function vPicks(){
   var ps=S.picks;
   if(!ps.length)return '<h2>My picks</h2>'+scanHtml()+'<h3>Prop slip</h3><div class="card empty">No picks yet. Open a player in Props, enter your line and odds, then save the side you like.</div>'+trackHtml()+foot();
@@ -1560,7 +1687,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v28, Oct 20';
+var BUILD='v29, Oct 20';
 function foot(){return '<p class="foot"><button class="linkbtn" data-act="tab" data-t="about">How the model works</button> · <span class="src">Build '+BUILD+'</span></p><p class="foot">For entertainment and research only, not betting advice. Probabilities are estimates and can be wrong. If gambling is a problem for you or someone you know, call 1-800-GAMBLER.</p>'}
 
 /* ---------- sheets ---------- */
@@ -1835,7 +1962,7 @@ function trackBtn(src,i,b){
 }
 function betCard(b,i,src){
   return '<div class="card bcard"><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><div><div class="label">'+esc(b.label)+'</div><div class="teams" style="font-size:16px">'+esc(b.title)+'</div><div class="src">'+esc(b.sub)+'</div></div><span class="hrpill '+(b.p>=.7?'hi':b.p<.5?'lo':'mid')+'">'+Math.round(b.p*100)+'%</span></div>'+
-   (b.pro?'<div class="src" style="margin-top:8px"><b>Why it can hit</b></div><ul class="pts" style="margin-top:2px">'+b.pro.map(function(w){return '<li>'+esc(w)+'</li>'}).join('')+'</ul><div class="src"><b>Why it might not</b></div><ul class="pts" style="margin-top:2px">'+b.con.map(function(w){return '<li>'+esc(w)+'</li>'}).join('')+'</ul>':'<ul class="pts" style="margin-top:8px">'+b.why.map(function(w){return '<li>'+esc(w)+'</li>'}).join('')+'</ul>')+'<div class="facts"><span>Fair odds <b>'+fairOdds(b.p)+'</b></span></div>'+(src?trackBtn(src,i,b):'')+'</div>';
+   (b.pro?'<div class="src" style="margin-top:8px"><b>Why it can hit</b></div><ul class="pts" style="margin-top:2px">'+b.pro.map(function(w){return '<li>'+esc(w)+'</li>'}).join('')+'</ul><div class="src"><b>Why it might not</b></div><ul class="pts" style="margin-top:2px">'+b.con.map(function(w){return '<li>'+esc(w)+'</li>'}).join('')+'</ul>':'<ul class="pts" style="margin-top:8px">'+b.why.map(function(w){return '<li>'+esc(w)+'</li>'}).join('')+'</ul>')+'<div class="facts"><span>Fair odds <b>'+fairOdds(b.p)+'</b></span></div>'+(src?trackBtn(src,i,b):'')+(b.rec&&b.rec.t==='rprop'&&b.rec.lg==='nba'?'<div style="margin-top:6px">'+playerBtn(b.rec.name,'nba',b.rec.team,b.rec.k,b.rec.thr,'','Game log, splits and charts')+'</div>':'')+'</div>';
 }
 function straightList(lg){
   var out=[],now=Date.now();
@@ -1883,7 +2010,7 @@ function straightList(lg){
       if(lg==='nba')stat=/Point/i.test(l.mk)?'pts':/Reb/i.test(l.mk)?'reb':/Ast|Assist/i.test(l.mk)?'ast':/Three/i.test(l.mk)?'tpm':null;
       else stat=/rush/i.test(l.mk)?'rush':/pass/i.test(l.mk)?'pass':/rec/i.test(l.mk)?'rec':null;
       var gid=feedGidFor(lg,l.team);
-      if(stat&&gid)rec={t:'rprop',name:l.name,k:stat,thr:/over/.test(l.mk)?Math.ceil(parseFloat(mm[1])):parseFloat(mm[1]),gid:gid,lg:lg,key:lg+'-prop'};
+      if(stat&&gid)rec={t:'rprop',team:l.team,name:l.name,k:stat,thr:/over/.test(l.mk)?Math.ceil(parseFloat(mm[1])):parseFloat(mm[1]),gid:gid,lg:lg,key:lg+'-prop'};
     }
     out.push({label:'Player prop',title:l.name+' '+l.mk,sub:(l.nx&&l.nx.txt||'')+' · '+l.team,p:pAdj,why:why,pro:pr2.pro,con:pr2.con,rec:rec||{t:'manual',key:lg+'-prop'}});
   });
@@ -2640,6 +2767,7 @@ function renderSheet(){
   if(s.type==='game')inner=gameSheet(gameById(s.id));
   else if(s.type==='fgame'){var fg=find(s.id);inner=fg?feedSheet(fg):'<p class="note">That game is no longer in the feed.</p>'}
   else if(s.type==='team')inner=teamSheet(s.lg,s.n);
+  else if(s.type==='player')inner=playerSheet(s);
   else inner=propSheet(propById(s.id));
   root.innerHTML='<div class="scrim" data-act="scrim"><div class="sheet" role="dialog" aria-modal="true">'+inner+'</div></div>';
   if(s.type==='prop')propOut();
@@ -2796,6 +2924,15 @@ document.addEventListener('click',function(e){
     save();renderNav();propOut();
   }
   else if(act==='rm'){S.picks.splice(+el.dataset.i,1);save();render()}
+  else if(act==='player'){
+    var d=el.dataset;S.sheet={type:'player',name:d.n,lg:d.lg,team:d.team,k:d.k,thr:parseFloat(d.thr),opp:d.opp||''};renderSheet();loadPlayer(S.sheet);
+  }
+  else if(act==='plstat'){if(S.sheet&&S.sheet.type==='player'){S.sheet.k=el.dataset.k;var dflt={pts:20,reb:8,ast:5,tpm:2};S.sheet.thr=dflt[el.dataset.k];renderSheet()}}
+  else if(act==='notifyon'){
+    if(typeof Notification==='undefined')return;
+    Notification.requestPermission().then(function(p){S.notifyOn=p==='granted';try{localStorage.setItem('hitboard.notify',S.notifyOn?'1':'0')}catch(e){}if(S.notifyOn)notifyDevice('Notifications are on. You will hear about tracked bets here.');render()});
+  }
+  else if(act==='notifyoff'){S.notifyOn=false;try{localStorage.setItem('hitboard.notify','0')}catch(e){}render()}
   else if(act==='trackrec'){
     var lst=el.dataset.src==='h'?S.homeRecs:S.recList,b0=lst[+el.dataset.i];if(!b0)return;
     var inp=document.getElementById('ro_'+el.dataset.src+el.dataset.i),od0=inp?parseFloat(String(inp.value).replace(/[−–]/g,'-')):NaN;
@@ -2842,7 +2979,7 @@ document.addEventListener('change',function(e){
   if(f==='type'){if(t.value==='sp'||t.value==='ml')S.scan.side='h';else S.scan.side=t.value==='tot'?'over':(S.scan.side==='under'?'under':'over')}
   render();
 });
-document.addEventListener('input',function(e){var t=e.target,f=t.dataset&&t.dataset.sf;if(!f||t.tagName==='SELECT')return;S.scan[f]=t.value;var r=$('#scanres');if(r)r.innerHTML=scanRes()});
+document.addEventListener('input',function(e){var t0=e.target;if(t0&&t0.id==='pl_thr'&&S.sheet&&S.sheet.type==='player'){var v0=parseFloat(String(t0.value).replace(',','.'));if(isFinite(v0)){S.sheet.thr=v0;var pb=document.getElementById('plbody');if(pb)pb.innerHTML=playerBody(S.sheet)}return}var t=e.target,f=t.dataset&&t.dataset.sf;if(!f||t.tagName==='SELECT')return;S.scan[f]=t.value;var r=$('#scanres');if(r)r.innerHTML=scanRes()});
 document.addEventListener('keydown',function(e){if(e.key==='Escape'&&S.sheet){S.sheet=null;renderSheet()}});
 render();
 setTimeout(function(){doRefresh(true)},600);
