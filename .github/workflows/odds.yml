@@ -1,0 +1,29 @@
+name: Fetch DraftKings odds
+on:
+  schedule:
+    # 9am, 1pm, 5pm and 9pm Eastern (UTC-4). Free plan = about 500 credits a month, so keep this light.
+    - cron: '15 13,17,21,1 * * *'
+  workflow_dispatch: {}
+permissions:
+  contents: write
+concurrency:
+  group: odds
+  cancel-in-progress: false
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Fetch odds
+        env:
+          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+        run: node scripts/fetch-odds.mjs
+      - name: Commit if changed
+        run: |
+          git config user.name "hitboard-odds"
+          git config user.email "actions@users.noreply.github.com"
+          git add odds.json
+          git diff --cached --quiet || (git commit -m "Update DraftKings odds" && git push)
