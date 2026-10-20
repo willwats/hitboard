@@ -39,6 +39,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-siz
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 96px}
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
 .linkbtn{background:none;border:0;color:var(--hit);text-decoration:underline;padding:0;font-size:inherit;font-weight:inherit;text-align:left}
+.chips+.chips{margin-top:8px}
 .foot .linkbtn{font-size:13px}
 .scan label{display:block;font-size:12px;color:var(--muted);margin:10px 0 3px}
 .scan select,.scan input[type=text]{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--surface2);color:var(--ink);min-height:42px}
@@ -586,7 +587,7 @@ function feedCard(g){
   return h+'</div></article>';
 }
 function modeSwitch(cur){
-  return '<div class="chips" role="group" aria-label="Section">'+[['games','Games'],['scores','Scores'],['div','Divisions'],['props','Props'],['parlay','Parlays'],['record','Record']].map(function(m){return '<button class="chip" data-act="tab" data-t="'+m[0]+'" aria-pressed="'+(cur===m[0])+'">'+m[1]+'</button>'}).join('')+'</div>';
+  return '<div class="chips" role="group" aria-label="Section">'+[['games','Games'],['scores','Scores'],['div','Divisions'],['props','Props'],['parlay','Bets'],['record','Record']].map(function(m){return '<button class="chip" data-act="tab" data-t="'+m[0]+'" aria-pressed="'+(cur===m[0])+'">'+m[1]+'</button>'}).join('')+'</div>';
 }
 function sportChips(){
   return '<div class="chips" role="group" aria-label="Sport">'+LG.map(function(l){return '<button class="chip" data-act="sport" data-v="'+l[0]+'" aria-pressed="'+(S.sport===l[0])+'">'+l[1]+'</button>'}).join('')+'</div>';
@@ -1353,11 +1354,56 @@ function parlayCard(title,desc,legs){
    '<ul class="pts" style="margin-top:8px">'+corrNote(legs).map(function(n){return '<li>'+esc(n)+'</li>'}).join('')+'</ul>'+
    '<p class="src">Bet it only if your book pays better than the fair odds above.</p></div>';
 }
+S.betTab='straight';
+function betTabs(){return '<div class="chips" role="group" aria-label="Bet type">'+[['straight','Straight bets'],['parlays','Parlays']].map(function(m){return '<button class="chip" data-act="set" data-k="betTab" data-v="'+m[0]+'" aria-pressed="'+(S.betTab===m[0])+'">'+m[1]+'</button>'}).join('')+'</div>'}
+function betCard(b){
+  return '<div class="card bcard"><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><div><div class="label">'+esc(b.label)+'</div><div class="teams" style="font-size:16px">'+esc(b.title)+'</div><div class="src">'+esc(b.sub)+'</div></div><span class="hrpill '+(b.p>=.7?'hi':b.p<.5?'lo':'mid')+'">'+Math.round(b.p*100)+'%</span></div>'+
+   '<ul class="pts" style="margin-top:8px">'+b.why.map(function(w){return '<li>'+esc(w)+'</li>'}).join('')+'</ul><div class="facts"><span>Fair odds <b>'+fairOdds(b.p)+'</b></span></div></div>';
+}
+function straightList(lg){
+  var out=[],now=Date.now();
+  if(lg==='mlb'){
+    var pool=mlbPool();
+    pool.bats.slice().sort(function(a,b){return mlbRates(b).hr-mlbRates(a).hr}).slice(0,3).forEach(function(b){var r=mlbRates(b);out.push({label:'Home run',title:b.n+' to homer',sub:b.t+' · '+oppTxt(b.t),p:r.hr,why:[b.hr+' home runs in '+b.g+' games this season, about one every '+(b.g/Math.max(b.hr,1)).toFixed(1)+' games.','Chance is for one typical game from season rate. It ignores the opposing pitcher and park.']})});
+    pool.bats.slice().sort(function(a,b){return mlbRates(b).sb-mlbRates(a).sb}).slice(0,2).forEach(function(b){var r=mlbRates(b);out.push({label:'Stolen base',title:b.n+' to steal a base',sub:b.t+' · '+oppTxt(b.t),p:r.sb,why:[b.sb+' steals in '+b.g+' games this season.','Speed props depend on getting on base, so check the lineup spot before betting.']})});
+    pool.bats.filter(function(b){return b.avg>=.28}).sort(function(a,b){return mlbRates(b).h1-mlbRates(a).h1}).slice(0,3).forEach(function(b){var r=mlbRates(b);out.push({label:'Hits',title:b.n+' 1+ hit',sub:b.t+' · '+oppTxt(b.t),p:r.h1,why:['Hitting '+String(b.avg.toFixed(3)).replace(/^0/,'')+' with about '+Math.round(b.ab/b.g)+' at-bats a game.','Most reliable hit market because one hit in four at-bats is enough.']})});
+    pool.pits.slice().sort(function(a,b){return pitMu(b)-pitMu(a)}).slice(0,4).forEach(function(p){var k=pitK(p),line=Math.max(3,Math.floor(k.mu)-1);out.push({label:'Strikeouts',title:p.n+' '+line+'+ strikeouts',sub:p.t+' · '+oppTxt(p.t),p:k.ge(line),why:['Projects '+k.mu.toFixed(1)+' strikeouts a start from '+p.so+' strikeouts in '+p.ip+' innings.','Line sits about one strikeout under his average to leave room for a short outing.']})});
+    return out;
+  }
+  // game picks, best two per game
+  (S.feed[lg]||[]).forEach(function(g){
+    if(kind(g)==='final'||g.start>now+5*864e5)return;
+    var b=picksFor(g);if(!b)return;var ps=projScore(g);
+    b.filter(function(x){return x.p>=.5}).sort(function(a,c){return c.p-a.p}).slice(0,2).forEach(function(x){
+      var why=[(x.mk?x.mk+'. ':'')+'The model gives this '+Math.round(x.p*100)+'%.'];
+      if(ps)why.push('Projected score '+g.a+' '+ps.a.toFixed(1)+', '+g.h+' '+ps.h.toFixed(1)+' (total '+ps.total.toFixed(1)+').');
+      var sa=standOf(lg,g.a),sh=standOf(lg,g.h);
+      if(sa&&sh&&(sa.t.w+sa.t.l)>0)why.push(g.a+' are '+sa.t.w+'-'+sa.t.l+' and '+g.h+' are '+sh.t.w+'-'+sh.t.l+' this season.');
+      out.push({label:'Game bet',title:x.pick,sub:g.a+' @ '+g.h+' · '+gTime(g),p:x.p,why:why});
+    });
+  });
+  var legs=legList(lg).filter(function(l){return l.p>=.6});
+  var best={};legs.forEach(function(l){var k=l.name;if(!best[k]||l.p>best[k].p)best[k]=l});
+  Object.keys(best).map(function(k){return best[k]}).sort(function(a,b){return b.p-a.p}).slice(0,10).forEach(function(l){
+    var why=['Cleared this line in '+l.src+'.'];
+    if(lg==='nfl'&&l.nx&&l.nx.opp&&TS[nt(l.nx.opp)]&&l.kind==='yds'){var o=nt(l.nx.opp),rush=/rush/i.test(l.mk),m=rush?'drush':'dpass',rk=mrank(o,m);why.push(o+' rank '+ordn(rk)+' against the '+(rush?'run':'pass')+' ('+MET[m].fm(mv(o,m))+'), '+(rk>=22?'a weak spot to attack.':rk<=10?'a tough matchup, which is why this is not higher.':'about average.'))}
+    else if(l.kind==='td')why.push('Anytime touchdown prices run long, so a 40% or better last-10 rate is a real edge.');
+    else if(lg!=='nfl')why.push('From last-ten-game hit rates in the table. Check injuries and minutes first.');
+    out.push({label:'Player prop',title:l.name+' '+l.mk,sub:(l.nx&&l.nx.txt||'')+' · '+l.team,p:l.p,why:why});
+  });
+  return out;
+}
 function vParlay(){
   var lg=S.sport,name=LG.filter(function(l){return l[0]===lg})[0][1];
-  var h='<h2>'+name+' parlays</h2>'+sportChips()+modeSwitch('parlay');
-  if(lg==='mlb')return h+'<div class="card empty">The parlay builder does not cover baseball yet. Use the MLB props boards and Cheatsheet.</div>'+foot();
-  if(lg==='ncaamb')return h+'<div class="card empty">No college basketball data is available yet, so no parlay can be built.</div>'+foot();
+  var h='<h2>'+name+' bets</h2>'+sportChips()+modeSwitch('parlay')+betTabs();
+  if(lg==='ncaamb')return h+'<div class="card empty">No college basketball data is available yet, so no bets can be built.</div>'+foot();
+  if(S.betTab!=='parlays'){
+    var L0=straightList(lg).sort(function(a,b){return b.p-a.p}),gm=L0.filter(function(x){return x.label==='Game bet'}).slice(0,5),L=gm.concat(L0.filter(function(x){return gm.indexOf(x)<0})).slice(0,12).sort(function(a,b){return b.p-a.p});
+    if(!L.length)return h+'<div class="card empty">No straight bets with a game still to play in the data.</div>'+foot();
+    var top=L;
+    return h+'<p class="lede">The '+top.length+' strongest single bets right now, with the reason behind each. Chances come from this app’s model and hit-rate data. Sportsbook prices were not readable, so compare the fair odds with your book and only bet where it pays more.</p>'+top.map(betCard).join('')+'<p class="note" style="margin-top:12px">Sorted by chance, not by value. A high chance at short odds can still be a poor bet. Check injuries before placing anything.</p>'+foot();
+  }
+  if(lg==='mlb')return h+'<div class="card empty">The parlay builder does not cover baseball yet. Use the straight bets tab or the MLB props boards.</div>'+foot();
   var all=legList(lg);
   if(!all.length)return h+'<div class="card empty">No legs with a game still to play in the data.</div>'+foot();
   var nfl=lg==='nfl';
