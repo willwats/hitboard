@@ -1085,29 +1085,65 @@ S.scan={type:'ml',gid:'',side:'h',player:'',pk:'rec',line:'',odds:'-110',busy:''
 function upGames(){var out=[];['nfl','nba','ncaafb'].forEach(function(lg){(S.feed[lg]||[]).forEach(function(g){if(kind(g)!=='final')out.push(g)})});out.sort(function(a,b){return a.start-b.start});return out}
 function gTime(g){return new Date(g.start).toLocaleString('en-US',{weekday:'short',hour:'numeric',minute:'2-digit'})}
 var NBA_STATS=[[/three\s*pointers?\s*made|threes|3-?pt|3pm/i,'tpm','Threes'],[/rebounds?/i,'reb','Rebounds'],[/assists?/i,'ast','Assists'],[/points?/i,'pts','Points']];
+var TAB={PHO:'PHX',GS:'GSW',NY:'NYK',SA:'SAS',NO:'NOP',BK:'BKN',CHO:'CHA',WSH:'WAS',UTAH:'UTA',LVR:'LV',KAN:'KC',TAM:'TB',GNB:'GB',NWE:'NE',NOR:'NO',SFO:'SF'};
+function tabb(x){x=String(x||'').toUpperCase();return TAB[x]||x}
+var STAT_RE=/(.*?)\s*(three\s*pointers?\s*made|3-?\s*pointers?\s*made|threes|rebounds?|assists?|points?)\s*$/i;
+function knownNames(){
+  var m={};
+  try{DATA.hit.nba.tables.forEach(function(t){t.rows.forEach(function(r){m[normName(r[0])]=1})})}catch(e){}
+  try{DEEP.forEach(function(d){m[normName(d.n)]=1})}catch(e){}
+  return m;
+}
+function cleanName(raw){
+  var toks=raw.replace(/[^A-Za-z0-9.'\- ]/g,' ').split(/\s+/).filter(function(t){return /[A-Za-z]/.test(t)}),K=knownNames();
+  for(var d=0;d<=3&&d<toks.length;d++){var c=toks.slice(d).join(' ');if(K[normName(c)])return c}
+  while(toks.length>2&&toks[0].length<=2)toks.shift();
+  return toks.join(' ');
+}
 function parseLegs(raw){
-  var lines=String(raw||'').split(/\n+/).map(function(x){return x.replace(/^[^A-Za-z0-9+]+/,'').trim()}).filter(Boolean),legs=[];
-  for(var i=0;i<lines.length;i++){
-    var m=lines[i].match(/^(?:[OoQ0©®@]\s+)?(\d{1,3}(?:\.5)?)\s*\+\s*(.*)$/);if(!m)continue;
-    var nx=m[2]&&m[2].length>2?m[2]:(lines[i+1]||''),st=null;
-    NBA_STATS.forEach(function(x){if(!st&&x[0].test(nx))st=x});
-    if(!st)continue;
-    var name=nx.replace(/\s*(three\s*pointers?\s*made|rebounds?|assists?|points?)\s*$/i,'').trim();
-    if(name.length<3)continue;
-    legs.push({n:name,thr:parseFloat(m[1]),k:st[1],stat:st[2]});
-  }
-  return legs;
+  var lines=String(raw||'').split(/\n+/).map(function(x){return x.trim()}).filter(Boolean),legs=[],used={};
+  // header like "2+, 2+, 2+, 2+"
+  var hdr=null;lines.forEach(function(l){if(!hdr&&/^(?:\d{1,3}(?:\.5)?\s*\+\s*,?\s*){2,}$/.test(l))hdr=l.match(/\d{1,3}(?:\.5)?(?=\s*\+)/g).map(parseFloat)});
+  var lodds=[];lines.forEach(function(l){if(/^[-+−]\d{3,4}$/.test(l.replace(/[−–]/,'-')))lodds.push(parseInt(l.replace(/[−–]/,'-'),10))});
+  lines.forEach(function(ln,i){
+    var m=ln.match(STAT_RE);if(!m)return;
+    var st=null;NBA_STATS.forEach(function(x){if(!st&&x[0].test(m[2]))st=x});if(!st)return;
+    var rawName=m[1],thr=null,leadThr=ln.match(/^(?:\S{1,2}\s+)?(\d{1,3}(?:\.5)?)\s*\+\s*(.+)$/);
+    if(leadThr){thr=parseFloat(leadThr[1]);rawName=leadThr[2].replace(STAT_RE,'$1')}
+    var name=cleanName(rawName);if(name.length<3||!/[A-Za-z]{2}/.test(name))return;
+    var lodd=null;
+    if(thr==null){
+      for(var k=i-1;k>=Math.max(0,i-4);k--){
+        if(used[k])continue;var mm=lines[k].match(/(?:^|[^\d.+])(\d{1,3}(?:\.5)?)\s*\+(?!\s*,)/);
+        if(mm&&!/^(?:\d{1,3}(?:\.5)?\s*\+\s*,?\s*){2,}$/.test(lines[k])){thr=parseFloat(mm[1]);used[k]=1;var oo=lines[k].match(/([-+−]\d{3,4})\s*$/);if(oo)lodd=parseInt(oo[1].replace('−','-'),10);break}
+      }
+    }
+    legs.push({n:name,thr:thr,k:st[1],stat:st[2]==='Threes'?'Threes':st[2],odds:lodd});
+  });
+  if(hdr&&hdr.length===legs.length)legs.forEach(function(l,i){if(l.thr==null)l.thr=hdr[i]});
+  else if(hdr&&hdr.every(function(v){return v===hdr[0]}))legs.forEach(function(l){if(l.thr==null)l.thr=hdr[0]});
+  if(lodds.length===legs.length)legs.forEach(function(l,i){if(l.odds==null)l.odds=lodds[i]});
+  // a leg whose threshold the reader missed takes the most common threshold for its stat when the others agree
+  var by={};legs.forEach(function(l){if(l.thr!=null)(by[l.k]=by[l.k]||[]).push(l.thr)});
+  legs.forEach(function(l){if(l.thr==null&&by[l.k]&&by[l.k].length>=2&&by[l.k].every(function(v){return v===by[l.k][0]}))l.thr=by[l.k][0]});
+  return legs.filter(function(l){return l.thr!=null});
 }
 function slipGames(raw){
-  var out=[],seen={};
-  String(raw||'').split(/\n+/).forEach(function(ln){
+  var out=[],seen={},txt=String(raw||'');
+  var toks={};(txt.match(/\b[A-Z]{2,4}\b/g)||[]).forEach(function(x){toks[tabb(x)]=1});
+  var nicks=[];
+  txt.split(/\n+/).forEach(function(ln){
     var m=ln.match(/([A-Za-z0-9.' ]{3,}?)\s*@\s*([A-Za-z0-9.' ]{3,}?)\s*(?:[-+·•»]|$)/);if(!m)return;
-    var an=normName(m[1]).split(' ').pop(),hn=normName(m[2]).split(' ').pop();
-    LG.forEach(function(l){(S.feed[l[0]]||[]).forEach(function(g){
-      if(kind(g)==='final'&&g.start<Date.now()-864e5)return;
-      var a2=normName(g.an).split(' ').pop(),h2=normName(g.hn).split(' ').pop();
-      if(a2===an&&h2===hn&&!seen[g.id]){seen[g.id]=1;out.push(g.id)}})});
+    nicks.push([normName(m[1]).split(' ').pop(),normName(m[2]).split(' ').pop()]);
   });
+  LG.forEach(function(l){(S.feed[l[0]]||[]).forEach(function(g){
+    if(kind(g)==='final'&&g.start<Date.now()-864e5)return;
+    if(g.start>Date.now()+4*864e5)return;
+    var a2=normName(g.an).split(' ').pop(),h2=normName(g.hn).split(' ').pop(),hit=false;
+    nicks.forEach(function(n){if(n[0]===a2&&n[1]===h2)hit=true});
+    if(!hit&&toks[tabb(g.a)]&&toks[tabb(g.h)]&&l[0]!=='mlb')hit=true;
+    if(hit&&!seen[g.id]){seen[g.id]=1;out.push(g.id)}
+  })});
   return out;
 }
 function amFromDec(d){return d>=2?Math.round((d-1)*100):-Math.round(100/(d-1))}
@@ -1126,11 +1162,13 @@ function parseSlip(raw){
   var legs0=parseLegs(raw);
   if(legs0.length>=2){
     R.type='parlay';R.legs=legs0;R.games=slipGames(raw);
-    var w=t.match(/wager(?:\s*amount)?:?\s*\$?\s*([\d,]+(?:\.\d\d)?)/i),py=t.match(/(?:total\s*)?payout:?\s*\$?\s*([\d,]+(?:\.\d\d)?)/i);
+    var w=t.match(/wager(?:\s*amount)?:?\s*\$?\s*([\d,]+(?:\.\d\d)?)/i),py=t.match(/(?:total\s*payout|to\s*pay|payout)\s*:?\s*\$?\s*([\d,]+(?:\.\d\d)?)/i);
     var am=(t.match(/\$\s*[\d,]+\.\d\d/g)||[]).map(function(x){return parseFloat(x.replace(/[$,\s]/g,''))}),stk=w?parseFloat(w[1].replace(/,/g,'')):null,pay=py?parseFloat(py[1].replace(/,/g,'')):null;
     if((stk==null||pay==null)&&am.length>=2&&am[am.length-1]>am[am.length-2]){stk=am[am.length-2];pay=am[am.length-1]}
     if(stk!=null)R.stake=stk;
-    if(stk&&pay&&pay/stk>1)R.odds=amFromDec(pay/stk);
+    var ho=t.match(/pick\s*parlay\s*[|!Il]?\s*([+-]\d{3,4})\b/i);
+    if(ho)R.odds=parseInt(ho[1],10);
+    else if(stk&&pay&&pay/stk>1)R.odds=amFromDec(pay/stk);
     return R;
   }
   var nl=' '+normName(t)+' ';
@@ -1172,7 +1210,7 @@ function parseSlip(raw){
 function analyzeBet(b){
   var line=parseFloat(b.line),od=parseFloat(b.odds),out={p:null,note:''};
   if(b.type==='parlay'){
-    var L=(b.legs||[]).map(function(l){var r=legPrice(l);return {n:l.n,thr:l.thr,k:l.k,stat:l.stat,p:r.p,basis:r.basis,mean:r.mean}});
+    var L=(b.legs||[]).map(function(l){var r=legPrice(l);return {n:l.n,thr:l.thr,k:l.k,stat:l.stat,odds:l.odds,p:r.p,basis:r.basis,mean:r.mean}});
     var kn=L.filter(function(l){return l.p!=null}),pr=1;kn.forEach(function(l){pr*=l.p});
     return {p:kn.length?pr:null,legs:L,known:kn.length,total:L.length,unknown:L.length-kn.length,note:'',game:'Parlay'};
   }
@@ -1200,7 +1238,7 @@ function analyzeBet(b){
 }
 function parlayRes(b,a){
   var od=parseFloat(b.odds),bk=isFinite(od)&&Math.abs(od)>=100?1/dec(od):null,h='';
-  h+='<div class="tblwrap"><table><thead><tr><th>Leg</th><th>Chance</th></tr></thead><tbody>'+a.legs.map(function(l){return '<tr><td><b>'+esc(l.n)+'</b> '+l.thr+'+ '+esc(l.stat.toLowerCase())+'<br><span class="src">'+esc(l.basis)+'</span></td><td>'+(l.p!=null?'<span class="hrpill '+(l.p>=.75?'hi':l.p<.5?'lo':'mid')+'">'+Math.round(l.p*100)+'%</span>':'<span class="src">no data</span>')+'</td></tr>'}).join('')+'</tbody></table></div>';
+  h+='<div class="tblwrap"><table><thead><tr><th>Leg</th><th>Chance</th></tr></thead><tbody>'+a.legs.map(function(l){return '<tr><td><b>'+esc(l.n)+'</b> '+l.thr+'+ '+esc(l.stat.toLowerCase())+'<br><span class="src">'+esc(l.basis)+(l.odds?'<br><span class="src">Book price '+fo(l.odds)+', implies '+Math.round(100/dec(l.odds))+'% (model '+(l.p!=null?Math.round(l.p*100)+'%':'no data')+')</span>':'')+'</span></td><td>'+(l.p!=null?'<span class="hrpill '+(l.p>=.75?'hi':l.p<.5?'lo':'mid')+'">'+Math.round(l.p*100)+'%</span>':'<span class="src">no data</span>')+'</td></tr>'}).join('')+'</tbody></table></div>';
   if(a.p==null)return h+'<p class="note">None of these players are in the app’s NBA data, so there is no chance to show. You can still save it to track.</p>';
   var lo=a.p*Math.pow(.5,a.unknown),hi=a.p*Math.pow(.8,a.unknown);
   h+='<div class="big">'+(a.unknown?(lo*100).toFixed(1)+'–'+(hi*100).toFixed(1)+'%':(a.p*100).toFixed(1)+'%')+'</div><div class="src">model chance all '+a.total+' legs hit'+(a.unknown?' (range, '+a.unknown+' leg'+(a.unknown>1?'s':'')+' without data counted at 50–80% each)':'')+'</div>';
@@ -1209,6 +1247,7 @@ function parlayRes(b,a){
   h+='<div class="src" style="margin-top:8px"><b>Why it can hit</b></div><ul class="pts" style="margin-top:2px">'+strong.map(function(l){return '<li>'+esc(l.n)+' '+l.thr+'+ '+esc(l.stat.toLowerCase())+' is one of the safer legs ('+Math.round(l.p*100)+'%). '+esc(l.basis)+'.</li>'}).join('')+'</ul>';
   h+='<div class="src"><b>Why it might not</b></div><ul class="pts" style="margin-top:2px">'+weak.map(function(l){return '<li><b>'+esc(l.n)+' '+l.thr+'+ '+esc(l.stat.toLowerCase())+'</b> is a weak spot at '+Math.round(l.p*100)+'%'+(l.mean!=null&&l.thr>l.mean?', above his average of '+l.mean.toFixed(1)+', so he needs a better-than-usual night':'')+'.</li>'}).join('')+
     (weak.length?'':'<li>No single leg looks weak on its own, but the parlay is only as strong as all of them together.</li>')+'<li>All '+a.total+' legs must win. Even if every leg is 80%, '+a.total+' of them together hit only about '+(Math.pow(.8,a.total)*100).toFixed(0)+'%.</li>'+
+    (function(){var g=a.legs.filter(function(l){return l.p!=null&&l.odds});if(!g.length)return '';var gap=g.reduce(function(t,l){return t+l.p-1/dec(l.odds)},0)/g.length;return gap>.08?'<li>The book prices these legs about '+Math.round(gap*100)+' points lower than my numbers on average. My data is last season’s, and the book knows this season’s lineups and minutes, so trust the book’s price more where we disagree widely.</li>':''})()+
     (a.unknown?'<li>'+a.unknown+' leg'+(a.unknown>1?'s have':' has')+' no data in the app, so the true chance is lower than the priced legs alone.</li>':'')+
     '<li>Minutes limits, rest days and injuries are not in the data. A player who sits out or is on restrictions loses the whole slip, or the leg is voided depending on the book.</li>'+
     '<li>If several legs are from the same game, they move together. Books price that in, so the payout is smaller than the legs multiplied.</li></ul>';
@@ -1438,7 +1477,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v24, Oct 20';
+var BUILD='v25, Oct 20';
 function foot(){return '<p class="foot"><button class="linkbtn" data-act="tab" data-t="about">How the model works</button> · <span class="src">Build '+BUILD+'</span></p><p class="foot">For entertainment and research only, not betting advice. Probabilities are estimates and can be wrong. If gambling is a problem for you or someone you know, call 1-800-GAMBLER.</p>'}
 
 /* ---------- sheets ---------- */
