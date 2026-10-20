@@ -1395,6 +1395,19 @@ function discoverHtml(){
 /* ---------- bet slip scanner: read a screenshot, estimate the chance, track the bet ---------- */
 S.mine=[];
 try{var rm0=localStorage.getItem('hitboard.mine.v1');if(rm0){var am0=JSON.parse(rm0);if(Array.isArray(am0))S.mine=am0}}catch(e){}
+function repairMine(){
+  var KM={points:['pts','Points'],rebounds:['reb','Rebounds'],assists:['ast','Assists'],threes:['tpm','Threes']};
+  S.mine.forEach(function(x){
+    if(x.type!=='parlay'||(x.legD&&x.legD.length)||!Array.isArray(x.legs))return;
+    var d=[];
+    x.legs.forEach(function(t){
+      var m=String(t).match(/^(\d+(?:\.5)?)\s*\+\s+(.+?)\s+(points|rebounds|assists|threes)(?:\s*\(\d+%\))?\s*$/i);
+      if(m){var k=KM[m[3].toLowerCase()];d.push({n:m[2],thr:parseFloat(m[1]),k:k[0],stat:k[1]})}
+    });
+    if(d.length)x.legD=d;
+  });
+}
+repairMine();
 function saveMine(){try{localStorage.setItem('hitboard.mine.v1',JSON.stringify(S.mine.slice(-300)))}catch(e){}}
 S.scan={type:'ml',gid:'',side:'h',player:'',pk:'rec',line:'',odds:'-110',busy:'',msg:'',raw:'',note:''};
 function upGames(){var out=[];['nfl','nba','ncaafb','nhl'].forEach(function(lg){(S.feed[lg]||[]).forEach(function(g){if(kind(g)!=='final')out.push(g)})});out.sort(function(a,b){return a.start-b.start});return out}
@@ -1823,7 +1836,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v33, Oct 20';
+var BUILD='v34, Oct 20';
 function foot(){return '<p class="foot"><button class="linkbtn" data-act="tab" data-t="about">How the model works</button> · <span class="src">Build '+BUILD+'</span></p><p class="foot">For entertainment and research only, not betting advice. Probabilities are estimates and can be wrong. If gambling is a problem for you or someone you know, call 1-800-GAMBLER.</p>'}
 
 /* ---------- sheets ---------- */
@@ -3301,6 +3314,7 @@ function mineWhy(x){
   }
   if(x.type==='parlay'){
     var legs=x.legD||[],games=x.games||[],pr=1,known=0,weak=null,byGame={};
+    if(!legs.length)R.note.push('The legs of this slip were not saved in a form the app can break down. Delete it and upload the slip again to get a leg-by-leg reason.');
     R.legs=legs.map(function(l){
       var r=legPrice(l),Q={title:l.n+' '+l.thr+'+ '+l.stat.toLowerCase(),p:r.p,pro:[],con:[],note:[]};
       if(r.p==null){Q.note.push(r.basis+', so this leg has no model number.');return Q}
