@@ -1081,7 +1081,7 @@ function discoverHtml(){
 S.mine=[];
 try{var rm0=localStorage.getItem('hitboard.mine.v1');if(rm0){var am0=JSON.parse(rm0);if(Array.isArray(am0))S.mine=am0}}catch(e){}
 function saveMine(){try{localStorage.setItem('hitboard.mine.v1',JSON.stringify(S.mine.slice(-300)))}catch(e){}}
-S.scan={type:'ml',gid:'',side:'h',player:'',pk:'rec',line:'',odds:'-110',busy:'',msg:'',raw:''};
+S.scan={type:'ml',gid:'',side:'h',player:'',pk:'rec',line:'',odds:'-110',busy:'',msg:'',raw:'',note:''};
 function upGames(){var out=[];['nfl','nba','ncaafb'].forEach(function(lg){(S.feed[lg]||[]).forEach(function(g){if(kind(g)!=='final')out.push(g)})});out.sort(function(a,b){return a.start-b.start});return out}
 function gTime(g){return new Date(g.start).toLocaleString('en-US',{weekday:'short',hour:'numeric',minute:'2-digit'})}
 function parseSlip(raw){
@@ -1173,7 +1173,8 @@ function scanHtml(){
   }
   if(b.type!=='ml')h+='<div class="two"><div><label for="sf_line">'+(b.type==='sp'?'Spread (like -3.5)':'Line')+'</label><input type="text" inputmode="decimal" id="sf_line" data-sf="line" value="'+esc(b.line)+'"></div><div><label for="sf_odds">Odds</label><input type="text" inputmode="numeric" id="sf_odds" data-sf="odds" value="'+esc(b.odds)+'"></div></div>';
   else h+='<label for="sf_odds">Odds</label><input type="text" inputmode="numeric" id="sf_odds" data-sf="odds" value="'+esc(b.odds)+'">';
-  h+='<div id="scanres" style="margin-top:12px">'+scanRes()+'</div><div class="actions" style="margin-top:10px"><button class="btn" data-act="mysave">Save to my bets</button></div></div>';
+  h+='<div id="scanres" style="margin-top:12px">'+scanRes()+'</div><div class="actions" style="margin-top:10px"><button class="btn" data-act="mysave">Save to my bets</button></div>'+
+    '<label for="sf_note" style="margin-top:14px">Or save it as a note (for slips the reader cannot match, like parlays or other sports)</label><input type="text" id="sf_note" data-sf="note" placeholder="Example: Bills ML + Chiefs -3, 2-leg parlay" value="'+esc(b.note||'')+'"><div class="actions" style="margin-top:8px"><button class="btn" data-act="mynote">Save note as bet</button></div></div>';
   return h+mineHtml();
 }
 function betDesc(b,g){
@@ -1190,14 +1191,14 @@ function mineHtml(){
   var h='<h3>My bets</h3><div class="facts"><span>Record <b>'+w+'-'+(D.length-w)+'</b></span><span>Hit <b>'+(D.length?Math.round(100*w/D.length)+'%':'—')+'</b></span><span>Model said <b>'+(np?Math.round(100*ap/np)+'%':'—')+'</b></span><span>1u bets <b>'+(u>=0?'+':'')+u.toFixed(1)+' u</b></span></div><div class="list" style="margin-top:8px">';
   h+=M.slice().reverse().map(function(x){var i=M.indexOf(x);
     return '<div class="card bcard"><div class="teams">'+esc(x.pick)+'</div><div class="src">'+esc(x.game||'')+' · '+fo(x.odds)+' · '+(x.p!=null?'model '+(x.p*100).toFixed(1)+'%':'no model chance')+'</div>'+(x.score?'<div class="src">Final '+esc(x.score)+'</div>':'')+
-      '<div class="facts">'+(x.res?'<span>Result <b>'+(x.res==='W'?'Won':x.res==='L'?'Lost':'Push')+'</b></span>':(x.type==='prop'?'<button class="btn" data-act="mres" data-i="'+i+'" data-r="W">Won</button><button class="btn" data-act="mres" data-i="'+i+'" data-r="L">Lost</button><button class="btn" data-act="mres" data-i="'+i+'" data-r="P">Push</button>':'<span>Waiting for the game to end</span>'))+'<button class="btn" data-act="mydel" data-i="'+i+'">Remove</button></div></div>';
+      '<div class="facts">'+(x.res?'<span>Result <b>'+(x.res==='W'?'Won':x.res==='L'?'Lost':'Push')+'</b></span>':(x.type==='prop'||x.type==='manual'?'<button class="btn" data-act="mres" data-i="'+i+'" data-r="W">Won</button><button class="btn" data-act="mres" data-i="'+i+'" data-r="L">Lost</button><button class="btn" data-act="mres" data-i="'+i+'" data-r="P">Push</button>':'<span>Waiting for the game to end</span>'))+'<button class="btn" data-act="mydel" data-i="'+i+'">Remove</button></div></div>';
   }).join('')+'</div>';
   return h;
 }
 function gradeMine(){
   var ch=false;
   S.mine.forEach(function(x){
-    if(x.res||x.type==='prop')return;var g=find(x.gid);if(!g||kind(g)!=='final'||g.sa==null)return;
+    if(x.res||x.type==='prop'||x.type==='manual')return;var g=find(x.gid);if(!g||kind(g)!=='final'||g.sa==null)return;
     var mh=g.sh-g.sa,r=null;
     if(x.type==='ml')r=mh===0?'P':((x.side==='h')===(mh>0)?'W':'L');
     else if(x.type==='sp'){var tm=x.side==='h'?mh:-mh,v=tm+x.line;r=v===0?'P':v>0?'W':'L'}
@@ -1221,7 +1222,13 @@ function ocrFile(f){
     var P=parseSlip(r.data.text);S.scan.raw=r.data.text;
     var keep=S.scan;S.scan={type:P.type,gid:P.gid||'',side:P.side||'h',player:P.player||'',pk:P.pk||'rec',line:P.line!=null?String(P.line):'',odds:P.odds!=null?String(P.odds):'-110',busy:'',msg:'',raw:r.data.text};
     var got=[];if(P.gid||P.player)got.push(P.player||'game');if(P.line!=null)got.push('line');if(P.odds!=null)got.push('odds');
-    S.scan.msg=got.length?'Read the slip and filled in: '+got.join(', ')+'. Check every field before saving.':'Could not find a bet in that image. Fill the fields in below.';
+    S.scan.msg=got.length?'Read the slip and filled in: '+got.join(', ')+'. Check every field before saving.':'Could not find a bet in that image. Fill the fields in below, or save it as a typed note.';
+    var sc=S.scan,full=P.odds!=null&&(sc.type==='prop'?(sc.player&&sc.line!==''):(sc.gid&&(sc.type==='ml'||sc.line!=='')));
+    if(full){
+      var a2=analyzeBet(sc),g2=sc.type==='prop'?null:find(sc.gid);
+      S.mine.push({id:String(Date.now()),at:Date.now(),type:sc.type,side:sc.side,pk:sc.pk,player:sc.player,gid:sc.gid,lg:g2?g2.lg:'nfl',line:sc.type==='ml'?null:parseFloat(sc.line),odds:parseFloat(sc.odds),p:a2.p,pick:betDesc({type:sc.type,side:sc.side,pk:sc.pk,player:sc.player,line:parseFloat(sc.line)},g2),game:g2?g2.a+' @ '+g2.h:(a2.game||''),res:null,auto:true});
+      saveMine();S.scan={type:'ml',gid:'',side:'h',player:'',pk:'rec',line:'',odds:'-110',busy:'',msg:'Read the slip and saved it to My bets below. Check the pick and odds, and remove it if the reader got something wrong.',raw:r.data.text,note:''};
+    }
     render();
   }).catch(function(){S.scan.busy='';S.scan.msg='Could not read that image. The reader needs internet the first time and does not run in the preview copy. Fill the fields in below, or use the installed app.';render()});
 }
@@ -1432,10 +1439,85 @@ function parlayCard(title,desc,legs){
    '<p class="src">Bet it only if your book pays better than the fair odds above.</p></div>';
 }
 S.betTab='straight';
-function betTabs(){return '<div class="chips" role="group" aria-label="Bet type">'+[['straight','Straight bets'],['parlays','Parlays']].map(function(m){return '<button class="chip" data-act="set" data-k="betTab" data-v="'+m[0]+'" aria-pressed="'+(S.betTab===m[0])+'">'+m[1]+'</button>'}).join('')+'</div>'}
+function betTabs(){return '<div class="chips" role="group" aria-label="Bet type">'+[['straight','Straight bets'],['parlays','Parlays'],['mine','My bets'+(S.mine.length?' ('+S.mine.length+')':'')]].map(function(m){return '<button class="chip" data-act="set" data-k="betTab" data-v="'+m[0]+'" aria-pressed="'+(S.betTab===m[0])+'">'+m[1]+'</button>'}).join('')+'</div>'}
+function fx(n,d){return (n>=0?'+':'')+n.toFixed(d==null?1:d)}
+function gameReasons(lg,g,x,ps){
+  var pro=[],con=[],homePick=x.side==='h',p=x.p;
+  var pickT=homePick?g.h:g.a,oppT=homePick?g.a:g.h;
+  if(x.why&&typeof x.why==='string')pro.push(x.why);
+  var nflOK=lg==='nfl'&&TS[nt(g.a)]&&TS[nt(g.h)];
+  if(x.t==='ml'||x.t==='sp'){
+    if(ps){var mg=homePick?ps.margin:-ps.margin;
+      if(x.t==='sp'){var cush=mg+x.num;
+        if(cush>=1)pro.push('Model margin is '+pickT+' by '+fx(mg)+' against a line of '+fx(x.num)+', a cushion of '+cush.toFixed(1)+' points.');
+        else con.push('Model margin ('+fx(mg)+' for '+pickT+') barely clears the line of '+fx(x.num)+', so a single score can flip it.');
+        if(Math.abs(x.num)<=3.5)con.push('Small spreads sit on key numbers (3 and 7 in football), so a late field goal or a half-point of line movement matters.')}
+      else{if(mg>=3)pro.push('Model has '+pickT+' winning by about '+mg.toFixed(1)+' points.');else if(mg>0)con.push('Model edge is only '+mg.toFixed(1)+' points, close to a coin flip in a single game.');else con.push('Model actually has '+oppT+' ahead on points, so this is a value pick on price rather than a projected winner.')}}
+    if(nflOK){var a=nt(homePick?g.h:g.a),o=nt(homePick?g.a:g.h),n=Object.keys(TS).length;
+      var ro=mrank(a,'ppg'),rd=mrank(o,'papg'),roo=mrank(o,'ppg'),rdd=mrank(a,'papg');
+      if(ro<=10||rd>=22)pro.push(a+' scoring offense ranks '+ordn(ro)+' ('+mv(a,'ppg').toFixed(1)+'), facing a defense that ranks '+ordn(rd)+' in points allowed.');
+      if(roo<=10)con.push(o+' scores '+mv(o,'ppg').toFixed(1)+' a game ('+ordn(roo)+'), so they can keep pace.');
+      if(rdd>=22)con.push(a+' allow '+mv(a,'papg').toFixed(1)+' points a game ('+ordn(rdd)+'), a leaky defense.');
+      else if(rdd<=8)pro.push(a+' defense is '+ordn(rdd)+' in points allowed ('+mv(a,'papg').toFixed(1)+').')}
+    var sp=standOf(lg,pickT)||standOf(lg,pickT.length<5?g[homePick?'hn':'an']:pickT),so=standOf(lg,oppT);
+    var stP=standOf(lg,homePick?g.hn:g.an),stO=standOf(lg,homePick?g.an:g.hn);
+    if(stP&&stO&&(stP.t.w+stP.t.l+stO.t.w+stO.t.l)>0){var wp1=wpct(stP.t),wp2=wpct(stO.t);
+      if(wp1>wp2+.1)pro.push((homePick?g.hn:g.an)+' are '+stP.t.w+'-'+stP.t.l+' versus '+stO.t.w+'-'+stO.t.l+' for the opponent.');
+      else if(wp2>wp1+.1)con.push('The opponent has the better record, '+stO.t.w+'-'+stO.t.l+' versus '+stP.t.w+'-'+stP.t.l+'.')}
+    if(homePick)pro.push(pickT+' are at home, worth roughly 2 to 3 points in football and basketball.');else con.push(pickT+' travel, and road teams cover less often than their price suggests.');
+    if(x.t==='ml'&&p>=.72)con.push('Heavy favorites usually come with prices of -300 or worse, so the payout is small for the risk, and one turnover-heavy game can lose it.');
+    if(x.t==='ml'&&p<.62)con.push('A single-game moneyline on a team that is not a clear favorite loses roughly '+Math.round((1-p)*10)+' times in 10 at this chance.');
+  }else if(x.t==='tot'){
+    var over=x.over;
+    if(ps){var dt=ps.total-x.num;
+      if(over?dt>=1.5:dt<=-1.5)pro.push('Model total is '+ps.total.toFixed(1)+' against a line of '+x.num+', '+Math.abs(dt).toFixed(1)+' points '+(over?'above':'below')+' it.');
+      else con.push('Model total ('+ps.total.toFixed(1)+') is within '+Math.abs(dt).toFixed(1)+' points of the line '+x.num+', which is inside normal game-to-game noise.')}
+    if(nflOK){var ra=mrank(nt(g.a),'ppg'),rh=mrank(nt(g.h),'ppg');
+      if(over&&(ra<=12||rh<=12))pro.push('Offense ranks: '+nt(g.a)+' '+ordn(ra)+', '+nt(g.h)+' '+ordn(rh)+' in points per game.');
+      if(!over&&(mrank(nt(g.a),'papg')<=12||mrank(nt(g.h),'papg')<=12))pro.push('At least one defense is top 12 in points allowed, which supports an under.');
+      if(over&&ra>20&&rh>20)con.push('Both offenses rank below 20th in scoring, which makes a high total harder.')}
+    con.push('Totals swing 10 or more points on turnovers, wind, injuries and garbage-time scoring, so even a good lean misses often.');
+  }
+  con.push('Injury news and line movement after this was built can change it. Check the report before you bet.');
+  con.push('The model gives it '+Math.round(p*100)+'%, so it should lose about '+Math.round((1-p)*100)+' times in 100. A fair price is '+fairOdds(p)+'; shorter than that is not worth it.');
+  return {pro:pro,con:con};
+}
+function propReasons(lg,l){
+  var pro=[],con=[],m=(l.src||'').match(/(\d+) of (?:last )?(\d+)/),h=m?+m[1]:null,n=m?+m[2]:null;
+  if(h!=null){pro.push('Hit this mark in '+h+' of '+n+' recent games ('+Math.round(100*h/n)+'%).');
+    if(n<=6)con.push('Only '+n+' games of data. One bad game or a role change would drop the rate fast.');
+    if(h===n)con.push('A perfect run in a small sample is partly luck. The chance shown is already pulled toward 50% for that reason.')}
+  var tm=null;
+  if(lg==='nfl'&&l.nx&&l.nx.id){try{var r=GAMES.filter(function(x){return x.id===l.nx.id})[0],mm=r&&model(r);if(mm){var home=r.h===nt(l.team);tm=home?mm.margin:-mm.margin}}catch(e){}}
+  if(lg==='nfl'&&l.nx&&l.nx.opp&&TS[nt(l.nx.opp)]&&l.kind==='yds'){
+    var o=nt(l.nx.opp),rush=/rush/i.test(l.mk),mt=rush?'drush':'dpass',rk=mrank(o,mt);
+    if(rk>=22)pro.push(o+' rank '+ordn(rk)+' against the '+(rush?'run':'pass')+' ('+MET[mt].fm(mv(o,mt))+'), a matchup to attack.');
+    else if(rk<=10)con.push(o+' rank '+ordn(rk)+' against the '+(rush?'run':'pass')+' ('+MET[mt].fm(mv(o,mt))+'), a tougher matchup than the hit rate shows.');
+    else pro.push(o+' are about average against the '+(rush?'run':'pass')+' ('+ordn(rk)+'), so the hit rate should carry over.');
+    if(tm!=null){
+      if(!rush&&tm>=6)con.push('The model has '+nt(l.team)+' winning by about '+tm.toFixed(0)+', and teams that lead big often run the ball late, which caps passing and receiving yards.');
+      if(!rush&&tm<=-4)pro.push('The model has '+nt(l.team)+' trailing by about '+Math.abs(tm).toFixed(0)+', which usually means more passes.');
+      if(rush&&tm>=4)pro.push('The model has '+nt(l.team)+' ahead by about '+tm.toFixed(0)+', which usually means more carries to finish the game.');
+      if(rush&&tm<=-6)con.push('The model has '+nt(l.team)+' trailing by about '+Math.abs(tm).toFixed(0)+', which tends to cut the run game short.')}
+    var av=avail(l.name,l.team);if(av&&av.badge)con.push('Injury report: '+av.badge+'.');
+    con.push('This does not know the snap share or weather for this week. A rain or wind game cuts passing yardage.');
+  }else if(l.kind==='td'){
+    pro.push('Touchdown scorers at a 40% or better rate in their last ten are a genuine edge if the price is plus money.');
+    con.push('Touchdowns are the most random prop. Goal-line carries can switch to another back, and one fumble or a blowout changes who scores.');
+  }else if(lg==='nba'){
+    con.push('These are last season’s last-ten rates. Minutes, roster and role change in a new season, and early games are volatile.');
+    con.push('Check the injury report and minutes. A player who sits out or is on a minutes limit makes the bet void or a loser.');
+    pro.push('Players in this table hit the mark often enough that it is a regular part of their game, not a hot week.');
+  }else{
+    con.push('College workloads swing with blowouts and rotation, and the table covers only a handful of recent games.');
+    con.push('Check the status of the player and the weather. A backup playing the second half can end the bet early.');
+  }
+  con.push('The model gives it '+Math.round(l.p*100)+'%, so it should lose about '+Math.round((1-l.p)*100)+' times in 100. Fair odds are '+fairOdds(l.p)+'.');
+  return {pro:pro,con:con};
+}
 function betCard(b){
   return '<div class="card bcard"><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><div><div class="label">'+esc(b.label)+'</div><div class="teams" style="font-size:16px">'+esc(b.title)+'</div><div class="src">'+esc(b.sub)+'</div></div><span class="hrpill '+(b.p>=.7?'hi':b.p<.5?'lo':'mid')+'">'+Math.round(b.p*100)+'%</span></div>'+
-   '<ul class="pts" style="margin-top:8px">'+b.why.map(function(w){return '<li>'+esc(w)+'</li>'}).join('')+'</ul><div class="facts"><span>Fair odds <b>'+fairOdds(b.p)+'</b></span></div></div>';
+   (b.pro?'<div class="src" style="margin-top:8px"><b>Why it can hit</b></div><ul class="pts" style="margin-top:2px">'+b.pro.map(function(w){return '<li>'+esc(w)+'</li>'}).join('')+'</ul><div class="src"><b>Why it might not</b></div><ul class="pts" style="margin-top:2px">'+b.con.map(function(w){return '<li>'+esc(w)+'</li>'}).join('')+'</ul>':'<ul class="pts" style="margin-top:8px">'+b.why.map(function(w){return '<li>'+esc(w)+'</li>'}).join('')+'</ul>')+'<div class="facts"><span>Fair odds <b>'+fairOdds(b.p)+'</b></span></div></div>';
 }
 function straightList(lg){
   var out=[],now=Date.now();
@@ -1445,6 +1527,15 @@ function straightList(lg){
     pool.bats.slice().sort(function(a,b){return mlbRates(b).sb-mlbRates(a).sb}).slice(0,6).forEach(function(b){var r=mlbRates(b);out.push({label:'Stolen base',title:b.n+' to steal a base',sub:b.t+' · '+oppTxt(b.t),p:r.sb,why:[b.sb+' steals in '+b.g+' games this season.','Speed props depend on getting on base, so check the lineup spot before betting.']})});
     pool.bats.filter(function(b){return b.avg>=.28}).sort(function(a,b){return mlbRates(b).h1-mlbRates(a).h1}).slice(0,8).forEach(function(b){var r=mlbRates(b);out.push({label:'Hits',title:b.n+' 1+ hit',sub:b.t+' · '+oppTxt(b.t),p:r.h1,why:['Hitting '+String(b.avg.toFixed(3)).replace(/^0/,'')+' with about '+Math.round(b.ab/b.g)+' at-bats a game.','Most reliable hit market because one hit in four at-bats is enough.']})});
     pool.pits.slice().sort(function(a,b){return pitMu(b)-pitMu(a)}).slice(0,8).forEach(function(p){var k=pitK(p),line=Math.max(3,Math.floor(k.mu)-1);out.push({label:'Strikeouts',title:p.n+' '+line+'+ strikeouts',sub:p.t+' · '+oppTxt(p.t),p:k.ge(line),why:['Projects '+k.mu.toFixed(1)+' strikeouts a start from '+p.so+' strikeouts in '+p.ip+' innings.','Line sits about one strikeout under his average to leave room for a short outing.']})});
+    out.forEach(function(b){
+      b.pro=b.why.slice();
+      var lose=Math.round((1-b.p)*100);
+      b.con=({'Home run':['Even the best power hitters leave the park in under a quarter of games. At this chance it should miss about '+lose+' times in 100.','The chance ignores the opposing pitcher, the ballpark and the wind, all of which move home run odds a lot.'],
+        'Stolen base':['A stolen base needs the player to reach base first, then a green light. A day off, a left-handed pitcher with a good pickoff move, or a big lead removes the chance.','The chance ignores the opposing catcher and pitcher.'],
+        'Hits':['Even a .300 hitter goes hitless about one game in four. This should miss about '+lose+' times in 100.','Lineup spot, platoon matchups and a strong starter can cut at-bats and contact.'],
+        'Strikeouts':['An early hook, a pitch limit or a bad start cuts strikeouts quickly. This should miss about '+lose+' times in 100.','The projection uses his season rate and does not adjust for how often this opponent strikes out.']})[b.label]||[];
+      b.con.push('Fair odds are '+fairOdds(b.p)+'. Check the lineup and the probable starter before betting, since I do not have either confirmed.');
+    });
     return out;
   }
   // game picks, best two per game
@@ -1456,7 +1547,8 @@ function straightList(lg){
       if(ps)why.push('Projected score '+g.a+' '+ps.a.toFixed(1)+', '+g.h+' '+ps.h.toFixed(1)+' (total '+ps.total.toFixed(1)+').');
       var sa=standOf(lg,g.a),sh=standOf(lg,g.h);
       if(sa&&sh&&(sa.t.w+sa.t.l)>0)why.push(g.a+' are '+sa.t.w+'-'+sa.t.l+' and '+g.h+' are '+sh.t.w+'-'+sh.t.l+' this season.');
-      out.push({label:'Game bet',title:x.pick,sub:g.a+' @ '+g.h+' · '+gTime(g),p:x.p,why:why});
+      var rs=gameReasons(lg,g,x,ps);
+      out.push({label:'Game bet',title:x.pick,sub:g.a+' @ '+g.h+' · '+gTime(g),p:x.p,why:why,pro:rs.pro,con:rs.con});
     });
   });
   var legs=legList(lg).filter(function(l){return l.p>=.55});
@@ -1466,13 +1558,15 @@ function straightList(lg){
     if(lg==='nfl'&&l.nx&&l.nx.opp&&TS[nt(l.nx.opp)]&&l.kind==='yds'){var o=nt(l.nx.opp),rush=/rush/i.test(l.mk),m=rush?'drush':'dpass',rk=mrank(o,m);why.push(o+' rank '+ordn(rk)+' against the '+(rush?'run':'pass')+' ('+MET[m].fm(mv(o,m))+'), '+(rk>=22?'a weak spot to attack.':rk<=10?'a tough matchup, which is why this is not higher.':'about average.'))}
     else if(l.kind==='td')why.push('Anytime touchdown prices run long, so a 40% or better last-10 rate is a real edge.');
     else if(lg!=='nfl')why.push('From last-ten-game hit rates in the table. Check injuries and minutes first.');
-    out.push({label:'Player prop',title:l.name+' '+l.mk,sub:(l.nx&&l.nx.txt||'')+' · '+l.team,p:l.p,why:why});
+    var pr2=propReasons(lg,l);
+    out.push({label:'Player prop',title:l.name+' '+l.mk,sub:(l.nx&&l.nx.txt||'')+' · '+l.team,p:l.p,why:why,pro:pr2.pro,con:pr2.con});
   });
   return out;
 }
 function vParlay(){
   var lg=S.sport,name=LG.filter(function(l){return l[0]===lg})[0][1];
   var h='<h2>'+name+' bets</h2>'+sportChips()+modeSwitch('parlay')+betTabs();
+  if(S.betTab==='mine')return h+scanHtml()+foot();
   if(lg==='ncaamb')return h+'<div class="card empty">No college basketball data is available yet, so no bets can be built.</div>'+foot();
   if(S.betTab!=='parlays'){
     var L0=straightList(lg).sort(function(a,b){return b.p-a.p}),gm=L0.filter(function(x){return x.label==='Game bet'}).slice(0,8),L=gm.concat(L0.filter(function(x){return gm.indexOf(x)<0})).slice(0,S.betMore?45:24).sort(function(a,b){return b.p-a.p}),more=L0.length>24;
@@ -2363,6 +2457,13 @@ document.addEventListener('click',function(e){
     save();renderNav();propOut();
   }
   else if(act==='rm'){S.picks.splice(+el.dataset.i,1);save();render()}
+  else if(act==='mynote'){
+    var nb=S.scan,txt=(nb.note||'').trim()||String(nb.raw||'').replace(/\s+/g,' ').trim().slice(0,90);
+    if(!txt){S.scan.msg='Type a short description of the bet first.';render();return}
+    var od2=parseFloat(nb.odds);
+    S.mine.push({id:String(Date.now()),at:Date.now(),type:'manual',side:null,lg:S.sport,line:null,odds:isFinite(od2)&&Math.abs(od2)>=100?od2:-110,p:null,pick:txt,game:'Added by hand',res:null});
+    saveMine();S.scan={type:'ml',gid:'',side:'h',player:'',pk:'rec',line:'',odds:'-110',busy:'',msg:'Saved. Mark it Won or Lost when it settles.',raw:'',note:''};render();
+  }
   else if(act==='mysave'){
     var b=S.scan,od=parseFloat(b.odds);if(!isFinite(od)||Math.abs(od)<100){S.scan.msg='Enter the odds first, like -110.';render();return}
     if(b.type==='prop'&&!b.player){S.scan.msg='Enter the player first.';render();return}
