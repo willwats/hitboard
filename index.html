@@ -644,7 +644,7 @@ function refreshBar(){
 function miniRow(g){
   var k=kind(g),tag=LG.filter(function(l){return l[0]===g.lg})[0][1],right=k==='up'?'<span class="src">'+esc(gTime(g))+'</span>':(g.sa!=null?'<b>'+esc(g.a)+' '+g.sa+'</b> <b>'+esc(g.h)+' '+g.sh+'</b>':'<span class="src">Played</span>');
   var st=k==='live'?'<span class="pill live" style="margin-left:6px">'+(g.q&&g.lg!=='mlb'?(g.lg==='nhl'?periodLabel('nhl',+g.q):'Q'+g.q)+' ':'')+esc(g.clock||'Live')+'</span>':k==='final'&&g.sa!=null?'<span class="pill final" style="margin-left:6px">Final</span>':'';
-  return '<div class="card" style="padding:10px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px"><span style="min-width:0"><span class="label">'+esc(tag)+'</span><br>'+teamBtn(g.lg,g.an,g.a)+' <span class="src">at</span> '+teamBtn(g.lg,g.hn,g.h)+'</span><span style="text-align:right;white-space:nowrap">'+right+st+'</span></div>';
+  return '<div class="card" role="button" tabindex="0" data-act="fgame" data-id="'+esc(g.id)+'" style="padding:10px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer"><span style="min-width:0"><span class="label">'+esc(tag)+'</span><br>'+teamBtn(g.lg,g.an,g.a)+' <span class="src">at</span> '+teamBtn(g.lg,g.hn,g.h)+'</span><span style="text-align:right;white-space:nowrap">'+right+st+'</span></div>';
 }
 function homeRecs(){
   var key=S.feedAt+'|'+S.mine.length+'|'+Object.keys(S.tracked).length;
@@ -1823,7 +1823,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v32, Oct 20';
+var BUILD='v33, Oct 20';
 function foot(){return '<p class="foot"><button class="linkbtn" data-act="tab" data-t="about">How the model works</button> · <span class="src">Build '+BUILD+'</span></p><p class="foot">For entertainment and research only, not betting advice. Probabilities are estimates and can be wrong. If gambling is a problem for you or someone you know, call 1-800-GAMBLER.</p>'}
 
 /* ---------- sheets ---------- */
@@ -2898,10 +2898,46 @@ function vScores(){
   fin.slice(0,15).concat(live).forEach(function(g){loadStats(g)});
   return h+foot();
 }
+function pickState(g,x){
+  if(g.sa==null||g.sh==null)return null;
+  var k=kind(g),fin=k==='final',mh=g.sh-g.sa,tot=g.sa+g.sh,txt='',cls='';
+  if(x.t==='ml'){
+    var lead=mh===0?0:((x.side==='h')===(mh>0)?1:-1);
+    if(fin)return lead===1?{txt:'Hit',cls:'hi'}:lead===-1?{txt:'Missed',cls:'lo'}:{txt:'Push',cls:''};
+    return lead===1?{txt:'Winning now',cls:'hi'}:lead===-1?{txt:'Trailing now',cls:'lo'}:{txt:'Tied now',cls:''};
+  }
+  if(x.t==='sp'){
+    var v=(x.side==='h'?mh:-mh)+x.num;
+    if(fin)return v>0?{txt:'Hit',cls:'hi'}:v<0?{txt:'Missed',cls:'lo'}:{txt:'Push',cls:''};
+    return v>0?{txt:'Covering by '+v.toFixed(1).replace(/\.0$/,''),cls:'hi'}:v<0?{txt:'Behind by '+Math.abs(v).toFixed(1).replace(/\.0$/,''),cls:'lo'}:{txt:'On the number',cls:''};
+  }
+  if(x.t==='tot'){
+    if(fin)return tot===x.num?{txt:'Push',cls:''}:((tot>x.num)===x.over?{txt:'Hit',cls:'hi'}:{txt:'Missed',cls:'lo'});
+    if(x.over)return tot>x.num?{txt:'Over already cleared',cls:'hi'}:{txt:'Total '+tot+', needs '+(Math.floor(x.num)+1),cls:''};
+    return tot>x.num?{txt:'Already lost, total '+tot,cls:'lo'}:{txt:'Total '+tot+', must stay under '+x.num,cls:tot>x.num-2?'lo':'hi'};
+  }
+  return null;
+}
+function gamePicksHtml(g){
+  var k=kind(g),h='',pk=null;
+  try{pk=picksFor(g)}catch(e){pk=null}
+  var mine=S.mine.filter(function(x){return x.gid===g.id&&x.type!=='parlay'});
+  if(!pk&&!mine.length)return '';
+  h+='<h3>Picks for this game</h3>';
+  if(pk&&pk.length){
+    h+='<ul class="pts">'+pk.map(function(b){
+      var st=pickState(g,b);
+      return '<li><b>'+esc(b.pick)+'</b> <span class="src">'+esc(b.mk||'')+' · model '+pc(b.p)+'%</span>'+(st?' <span class="hrpill '+(st.cls||'mid')+'" style="display:inline-block">'+esc(st.txt)+'</span>':'')+'</li>';
+    }).join('')+'</ul><p class="src">'+(k==='up'?'These are the model’s picks. Once the game starts, each one shows whether it is winning.':k==='live'?'Status uses the current score and updates when you refresh.':'Final result against the pre-game picks.')+'</p>';
+  }
+  if(mine.length)h+='<div class="src"><b>Your bets on this game</b></div><ul class="pts">'+mine.map(function(x){return '<li><b>'+esc(x.pick)+'</b> <span class="src">'+fo(x.odds)+(x.p!=null?' · model '+Math.round(x.p*100)+'%':'')+(x.res?' · '+(x.res==='W'?'won':x.res==='L'?'lost':'push'):'')+'</span>'+(x.res?'':liveHtml(x))+'</li>'}).join('')+'</ul>';
+  return h;
+}
 function feedSheet(g){
   if(g.lg==='mlb')return mlbSheet(g);
   var k=kind(g),h='<div class="sh-head"><div><div class="label">'+esc(fmtTime(g.start))+(g.title?' · '+esc(g.title):'')+'</div><h2>'+esc(g.an)+' @ '+esc(g.hn)+'</h2></div><button class="x" data-act="close" aria-label="Close">×</button></div>';
   if(k!=='up')h+=statsBlock(g);
+  h+=gamePicksHtml(g);
   if(k==='up'){
     if(g.pa!=null&&g.ph!=null){var s=g.pa+g.ph;h+='<h3>Win probability</h3>'+barHtml(g.a,g.h,100*g.pa/s,100*g.ph/s,'Data feed model, '+fmtClock(S.feedAt))}
     else h+='<p class="note" style="margin-top:14px">The feed has no win probability for this game yet, so the prediction below uses team stats only.</p>';
@@ -3531,7 +3567,7 @@ document.addEventListener('change',function(e){
   render();
 });
 document.addEventListener('input',function(e){var t0=e.target;if(t0&&t0.id==='pl_thr'&&S.sheet&&S.sheet.type==='player'){var v0=parseFloat(String(t0.value).replace(',','.'));if(isFinite(v0)){S.sheet.thr=v0;var pb=document.getElementById('plbody');if(pb)pb.innerHTML=playerBody(S.sheet)}return}var t=e.target,f=t.dataset&&t.dataset.sf;if(!f||t.tagName==='SELECT')return;S.scan[f]=t.value;var r=$('#scanres');if(r)r.innerHTML=scanRes()});
-document.addEventListener('keydown',function(e){if(e.key==='Escape'&&S.sheet){S.sheet=null;renderSheet()}});
+document.addEventListener('keydown',function(e){if(e.key==='Escape'&&S.sheet){S.sheet=null;renderSheet()}else if((e.key==='Enter'||e.key===' ')&&e.target&&e.target.getAttribute&&e.target.getAttribute('role')==='button'&&e.target.dataset.act){e.preventDefault();e.target.click()}});
 render();
 setTimeout(function(){doRefresh(true)},600);
 if(!(window.claude&&window.claude.use)){setInterval(function(){if(document.visibilityState==='visible')doRefresh(true)},30000);document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')doRefresh(true)})}
