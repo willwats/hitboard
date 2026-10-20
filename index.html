@@ -653,9 +653,9 @@ function nflCalc(){
   '<div class="list">'+propRows(list)+'</div>';
 }
 var CATS={
-  nfl:[['deep','All players'],['pass','Passing'],['rush','Rushing'],['rec','Receiving'],['td','Touchdowns'],['trend','Team trends'],['calc','Calculator']],
+  nfl:[['deep','All players'],['pass','Passing'],['rush','Rushing'],['rec','Receiving'],['td','Touchdowns'],['kick','Kickers'],['trend','Team trends'],['calc','Calculator']],
   nba:[['Points','Points'],['Rebounds','Rebounds'],['Assists','Assists'],['Threes','Threes'],['lines','Game lines']],
-  ncaafb:[['Passing yards','Passing'],['Rushing yards','Rushing'],['Receiving yards','Receiving']],
+  ncaafb:[['Passing yards','Passing'],['Rushing yards','Rushing'],['Receiving yards','Receiving'],['kick','Kickers']],
   ncaamb:[],
   mlb:[['hr','Home runs'],['sb','Stolen bases'],['hit','Hits'],['pit','Pitchers'],['cheat','Cheatsheet']]
 };
@@ -697,7 +697,7 @@ function vProps(){
   h+='<div class="chips" role="group" aria-label="Prop type">'+CATS[lg].map(function(c){return '<button class="chip" data-act="cat" data-v="'+c[0]+'" aria-pressed="'+(cat===c[0])+'">'+c[1]+'</button>'}).join('')+'</div>';
   if(lg!=='mlb')h+='<div class="card empty" style="margin-bottom:12px;text-align:left">DraftKings and other sportsbook prop lines sit behind logins and could not be read. Every threshold here is the source’s own mark.</div>';
   if(lg==='nfl'){
-    h+=cat==='deep'?nflDeep():cat==='pass'?nflLadders([0]):cat==='rush'?nflLadders([1]):cat==='rec'?nflLadders([2,3]):cat==='td'?nflTD():cat==='trend'?nflTrends():nflCalc();
+    h+=cat==='deep'?nflDeep():cat==='pass'?nflLadders([0]):cat==='rush'?nflLadders([1]):cat==='rec'?nflLadders([2,3]):cat==='td'?nflTD():cat==='kick'?nflKick():cat==='trend'?nflTrends():nflCalc();
   }else if(lg==='mlb'){
     h+=mlbProps(cat);
   }else if(lg==='nba'){
@@ -709,6 +709,7 @@ function vProps(){
     }
   }else{
     var c=DATA.hit.ncaafb;
+    if(cat==='kick')return h+ckKick()+foot();
     h+='<p class="lede">'+esc(c.asOf)+'</p>'+c.tables.filter(function(t){return t.stat===cat}).map(hrTable).join('')+'<p class="note" style="margin-top:12px">No college touchdown hit-rate data was available from the sources.</p>';
   }
   return h+foot();
@@ -984,6 +985,82 @@ function teamSheet(lg,name){
   }
   h+='<p class="src" style="margin-top:12px">Projections are estimates from season averages and opponent rankings. They can be wrong, especially early in a season or with injuries.</p>';
   return h;
+}
+
+
+/* ---------- kickers ---------- */
+var KICK_TXT="Spencer Shrader|IND|6|18|18|58|13|12|6|6|6|6\nChris Boswell|PIT|6|17|13|58|12|12|6|4|5|3\nChad Ryland|ARI|6|16|14|60|12|12|3|1|5|5\nDominic Zvada|NYG|6|16|13|56|9|9|7|5|2|1\nMatt Gay|LV|6|15|14|59|14|14|1|1|7|6\nWill Reichard|MIN|5|15|15|56|8|8|5|5|5|5\nKa'imi Fairbairn|HOU|6|14|13|58|15|15|5|4|3|3\nChase McLaughlin|TB|6|14|14|59|11|11|4|4|4|4\nTyler Bass|BUF|6|13|13|49|20|18|0|0|5|5\nHarrison Butker|KC|5|13|10|50|15|14|4|1|3|3\nTyler Loop|BAL|6|13|10|64|16|16|5|5|5|2\nJason Myers|SEA|6|13|12|57|15|14|3|3|5|4\nJason Sanders|NYJ|6|13|12|54|9|8|4|3|3|3\nTrey Smack|GB|6|13|10|59|13|11|2|2|5|2\nAndre Szmyt|CLE|6|13|12|56|9|8|2|2|6|5\nBrandon Aubrey|DAL|6|12|9|60|15|14|5|2|2|2\nNick Folk|ATL|6|12|9|51|13|13|3|1|5|4\nCam Little|JAX|6|12|10|60|17|16|6|4|3|3\nWil Lutz|DEN|6|12|9|53|9|9|3|2|4|2\nCameron Dicker|LAC|6|11|9|42|9|9|1|0|3|2\nRyan Fitzgerald|CAR|5|11|11|53|15|11|2|2|4|4\nCairo Santos|CHI|6|11|8|50|18|18|3|2|3|2\nDrew Stevens|WAS|5|11|9|57|11|8|4|2|2|2\nAndres Borregales|NE|6|10|8|50|15|14|1|1|3|2\nDaniel Carlson|NO|6|10|7|58|17|15|6|3|1|1\nEvan McPherson|CIN|5|10|10|58|14|14|5|5|0|0\nJoey Slye|TEN|6|10|9|56|7|7|2|1|3|3\nHarrison Mevis|LAR|5|9|5|48|14|14|1|0|6|3\nRiley Patterson|MIA|5|9|7|41|6|5|1|0|2|1\nJake Bates|DET|5|8|8|54|20|20|1|1|3|3\nEddy Pineiro|SF|5|8|5|57|19|17|5|2|1|1\nJake Elliott|PHI|6|5|5|58|13|13|2|2|1|1";
+var KICKERS=KICK_TXT.split('\n').map(function(l){var p=l.split('|');return {n:p[0],t:p[1],g:+p[2],fa:+p[3],fm:+p[4],lng:+p[5],xa:+p[6],xm:+p[7],a50:+p[8],m50:+p[9],a40:+p[10],m40:+p[11]}});
+function pois(l,k){var f=1;for(var i=2;i<=k;i++)f*=i;return Math.exp(-l)*Math.pow(l,k)/f}
+function kickProj(fgG,xpG,adj){
+  var lf=fgG*adj,lx=xpG*adj,p1=1-pois(lf,0),p2=p1-pois(lf,1),p3=p2-pois(lf,2),pts=3*lf+lx,ge={7:0,9:0};
+  for(var f=0;f<=9;f++)for(var x=0;x<=8;x++){var pr=pois(lf,f)*pois(lx,x),t=3*f+x;if(t>=7)ge[7]+=pr;if(t>=9)ge[9]+=pr}
+  return {p1:p1,p2:p2,p3:p3,pts:pts,p7:ge[7],p9:ge[9]};
+}
+function kickCtx(t){
+  var n=nflNext(t);if(!n)return {adj:1,txt:'No game this week'};
+  var adj=1,r=GAMES.filter(function(x){return x.a===t||x.h===t})[0],tot=null;
+  try{var m=model(r);if(m)tot=m.total}catch(e){}
+  if(tot){adj=Math.max(.85,Math.min(1.15,tot/45))}
+  return {adj:adj,txt:n.txt+(tot?' · total '+tot.toFixed(1):''),tot:tot};
+}
+function kickHead(){return '<thead><tr><th>Kicker</th><th>FG</th><th>Proj pts</th><th class="lc">1+ FG</th><th class="lc">2+ FG</th><th class="lc">3+ FG</th><th class="lc">7+ pts</th></tr></thead>'}
+function kickRow(o){
+  var pc2=function(x){return '<td class="lc"><span class="hrpill '+(x>=.7?'hi':x<.4?'lo':'mid')+'">'+Math.round(x*100)+'%</span></td>'};
+  return '<tr><td><b>'+esc(o.n)+'</b> <span class="src">'+esc(o.t)+'</span><br><span class="src">'+esc(o.ctx)+'</span></td><td>'+o.fm+'/'+o.fa+'<br><span class="src">'+Math.round(o.fm/Math.max(o.fa,1)*100)+'%, long '+o.lng+'</span></td><td><b>'+o.pr.pts.toFixed(1)+'</b></td>'+pc2(o.pr.p1)+pc2(o.pr.p2)+pc2(o.pr.p3)+pc2(o.pr.p7)+'</tr>';
+}
+function nflKick(){
+  var rows=KICKERS.map(function(k){
+    var c=kickCtx(k.t),pr=kickProj(k.fm/k.g,k.xm/k.g,c.adj);
+    return {n:k.n,t:k.t,fm:k.fm,fa:k.fa,lng:k.lng,ctx:c.txt,pr:pr,k:k,tot:c.tot};
+  }).sort(function(a,b){return b.pr.pts-a.pr.pts});
+  var h='<p class="lede">Kicker props from 2026 season totals (Pro Football Reference, read Oct 20). Projected points are field goals times three plus extra points, per game, scaled up or down by up to 15% by the game total (45 is average). Chances come from a Poisson count of field goals.</p>';
+  h+='<div class="tblwrap"><table>'+kickHead()+'<tbody>'+rows.map(kickRow).join('')+'</tbody></table></div>';
+  var lng=rows.filter(function(r){return r.k.a50>=3}).sort(function(a,b){return b.k.m50/b.k.a50-a.k.m50/a.k.a50}).slice(0,6);
+  h+='<h3>Range and accuracy</h3><ul class="pts">'+rows.slice().sort(function(a,b){return b.lng-a.lng}).slice(0,5).map(function(r){return '<li><b>'+esc(r.n)+'</b> ('+esc(r.t)+') long of '+r.lng+', '+r.k.m50+' of '+r.k.a50+' from 50+</li>'}).join('')+'</ul>';
+  if(lng.length)h+='<p class="src">Best from 50+ with 3 or more tries: '+lng.map(function(r){return esc(r.n)+' '+r.k.m50+'/'+r.k.a50}).join(', ')+'.</p>';
+  return h+'<p class="note" style="margin-top:12px">Sportsbook kicker lines were not readable, so these are model chances. A kicker’s volume depends on how often his offense stalls near field goal range, which the season rate captures only roughly. Check weather (wind) and the active list before betting. Sample is five or six games.</p>';
+}
+S.ck={rows:null,busy:false,err:''};
+var CKURL='https://site.web.api.espn.com/apis/common/v3/sports/football/college-football/statistics/byathlete?region=us&lang=en&contentorigin=espn&isqualified=false&limit=120&category=kicking&sort=kicking.fieldGoalsMade%3Adesc';
+function parseCk(j){
+  var out=[];
+  (j&&j.athletes||[]).forEach(function(a){
+    var m={};(a.categories||[]).forEach(function(c){(c.names||[]).forEach(function(nm,i){if(m[nm]==null)m[nm]=c.values?c.values[i]:null})});
+    var get=function(re){for(var k in m)if(re.test(k)&&m[k]!=null&&!isNaN(+m[k]))return +m[k];return null};
+    var fa=get(/^fieldGoalAttempts$|^fieldGoalsAttempted$/i),fm=get(/^fieldGoalsMade$/i),g=get(/^gamesPlayed$/i);
+    if(fa==null||fm==null||!fa)return;
+    var ath=a.athlete||{};
+    out.push({n:ath.displayName||'',t:ath.teamName||ath.teamShortDisplayName||'',g:g||Math.max(1,6),fm:fm,fa:fa,lng:get(/^longFieldGoalMade$|^longFieldGoal$/i)||0,xm:get(/^extraPointsMade$|^extraPointMade$|^kickExtraPointsMade$/i)||0});
+  });
+  return out.filter(function(r){return r.n&&r.t});
+}
+function fetchCk(){
+  S.ck.busy=true;S.ck.err='';
+  fetch(CKURL).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}).then(function(j){
+    var rows=parseCk(j);if(rows.length<10)throw new Error('The response had too few kickers');
+    S.ck.rows=rows;S.ck.busy=false;S.ck.at=Date.now();render();
+  }).catch(function(e){S.ck.busy=false;S.ck.err=String(e&&e.message||e);render()});
+}
+function ckNext(team){
+  var key=normName(team),best=null;
+  (S.feed.ncaafb||[]).forEach(function(g){if(kind(g)==='final')return;var a=normName(g.an),h=normName(g.hn);
+    if(a.indexOf(key)===0||h.indexOf(key)===0){if(!best||g.start<best.start)best=g}});
+  return best;
+}
+function ckKick(){
+  var h='<p class="lede">College kicker props from ESPN season statistics, loaded when you open this tab. Chances use field goals per game, scaled up or down by up to 15% by the game total (52 is average).</p>';
+  if(!S.ck.rows&&!S.ck.busy&&!S.ck.err)fetchCk();
+  if(S.ck.busy)return h+'<div class="card empty">Loading kickers from ESPN…</div>';
+  if(!S.ck.rows)return h+'<div class="card empty">Could not load college kickers right now'+(S.ck.err?' ('+esc(S.ck.err)+')':'')+'.</div><button class="chip" style="margin-top:10px" data-act="ckretry">Try again</button>';
+  var rows=S.ck.rows.map(function(k){
+    var g=ckNext(k.t),ctx='No game found this week',adj=1;
+    if(g){var ps=projScore(g);if(ps){adj=Math.max(.85,Math.min(1.15,ps.total/52))}
+      ctx=(normName(g.an).indexOf(normName(k.t))===0?'at '+g.h:'vs '+g.a)+', '+gTime(g)+(ps?' · total '+ps.total.toFixed(1):'')}
+    return {n:k.n,t:k.t,fm:k.fm,fa:k.fa,lng:k.lng,ctx:ctx,pr:kickProj(k.fm/k.g,k.xm/k.g,adj),g:!!g};
+  }).sort(function(a,b){return (b.g-a.g)||(b.pr.pts-a.pr.pts)});
+  h+='<div class="tblwrap"><table>'+kickHead()+'<tbody>'+rows.slice(0,60).map(kickRow).join('')+'</tbody></table></div>';
+  return h+'<p class="note" style="margin-top:12px">Kickers with a game still to play this week are listed first. Totals come from the app’s game model where one exists. Loaded '+esc(fmtClock(S.ck.at))+'. Sportsbook kicker lines were not readable.</p>';
 }
 
 /* ---------- top model leans across sports ---------- */
@@ -2266,6 +2343,7 @@ document.addEventListener('click',function(e){
   else if(act==='sport'){S.sport=el.dataset.v;S.cat=null;render()}
   else if(act==='refresh'){doRefresh()}
   else if(act==='cat'){S.cat=el.dataset.v;render()}
+  else if(act==='ckretry'){S.ck.err='';render()}
   else if(act==='set'){S[el.dataset.k]=el.dataset.v;render()}
   else if(act==='team'){S.sheet={type:'team',lg:el.dataset.lg,n:el.dataset.n};renderSheet()}
   else if(act==='gf'){S.gf=el.dataset.v;render()}
