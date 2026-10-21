@@ -1462,6 +1462,44 @@ function parseLegs(raw){
   legs.forEach(function(l){if(l.thr==null&&by[l.k]&&by[l.k].length>=2&&by[l.k].every(function(v){return v===by[l.k][0]}))l.thr=by[l.k][0]});
   return legs.filter(function(l){return l.thr!=null});
 }
+
+/* ---------- block35: team legs (moneyline, spread, puck line, total) in scanned parlays ---------- */
+function parseGameLegs(raw){
+  var lines=String(raw||'').replace(/[−–—]/g,'-').split(/\n+/).map(function(x){return x.trim()}).filter(Boolean),out=[],now=Date.now();
+  var pool=[];LG.forEach(function(l){(S.feed[l[0]]||[]).forEach(function(g){if(g.start>=now-14*36e5&&g.start<=now+5*864e5)pool.push(g)})});
+  var nick=function(n){var w=normName(n).split(' ');return w[w.length-1]};
+  lines.forEach(function(ln,i){
+    var mk=ln.match(/^(money\s*line|spread|point\s*spread|puck\s*line|run\s*line|total(?:\s*points|\s*goals|\s*runs)?|game\s*total)$/i);
+    if(!mk||i<1)return;
+    var kd=/money/i.test(mk[1])?'ml':/total/i.test(mk[1])?'tot':'sp';
+    var head=lines[i-1].replace(/^[^A-Za-z0-9+-]+\s*/,'').replace(/^[Oo0]\s+(?=[A-Z])/,'').trim();
+    var mu=(lines[i+1]||'').match(/^(.+?)\s*@\s*(.+?)\s*(?:[·•+\-»]|$)/);
+    var nm=head.match(/\s([+-]\d{1,2}(?:\.\d)?)$/),ov=head.match(/^(over|under)\s+(\d{1,3}(?:\.\d)?)/i);
+    var team=head.replace(/\s[+-]\d{1,2}(?:\.\d)?$/,'').trim(),leg={t:kd,gid:null,side:null,num:null,over:null,pick:head+' '+mk[1].replace(/\s+/g,' ')};
+    if(kd==='sp'&&nm)leg.num=parseFloat(nm[1]);
+    if(kd==='tot'&&ov){leg.over=/over/i.test(ov[1]);leg.num=parseFloat(ov[2])}
+    if(mu){
+      var an=nick(mu[1]),hn=nick(mu[2]);
+      var g=pool.filter(function(q){return nick(q.an)===an&&nick(q.hn)===hn})[0];
+      if(g){
+        leg.gid=g.id;leg.lg=g.lg;
+        if(kd!=='tot')leg.side=nick(team)===hn?'h':nick(team)===an?'a':null;
+        if(kd!=='tot'&&!leg.side)leg.gid=null;
+      }
+    }
+    out.push(leg);
+  });
+  return out;
+}
+function glegPrice(l){
+  if(!l.gid)return {p:null,basis:'Game not found in the feed'};
+  var g=find(l.gid);if(!g)return {p:null,basis:'Game not found in the feed'};
+  try{
+    var b={type:l.t,gid:l.gid,side:l.t==='tot'?(l.over?'over':'under'):l.side,line:l.num==null?'':String(l.num),odds:'-110'};
+    var a=analyzeBet(b);
+    return {p:a.p,basis:a.note||('Model chance for '+g.a+' @ '+g.h)};
+  }catch(e){return {p:null,basis:'No model numbers for this game yet'}}
+}
 function slipGames(raw){
   var out=[],seen={},txt=String(raw||'');
   var toks={};(txt.match(/\b[A-Z]{2,4}\b/g)||[]).forEach(function(x){toks[tabb(x)]=1});
@@ -1493,15 +1531,16 @@ function legPrice(l){
 }
 function parseSlip(raw){
   var t=String(raw||'').replace(/[−–—]/g,'-'),R={type:'ml',side:null};
-  var legs0=parseLegs(raw);
-  if(legs0.length>=2){
-    R.type='parlay';R.legs=legs0;R.games=slipGames(raw);
+  var legs0=parseLegs(raw),gl0=parseGameLegs(raw);
+  if(legs0.length+gl0.length>=2){
+    R.type='parlay';R.legs=legs0;R.glegs=gl0;R.games=slipGames(raw);
+    gl0.forEach(function(l){if(l.gid&&R.games.indexOf(l.gid)<0)R.games.push(l.gid)});
     var ex=t.match(/(\d{1,2})\s*pick\s*parlay/i);if(ex)R.expect=parseInt(ex[1],10);
     var w=t.match(/wager(?:\s*amount)?:?\s*\$?\s*([\d,]+(?:\.\d\d)?)/i),py=t.match(/(?:total\s*payout|to\s*pay|payout)\s*:?\s*\$?\s*([\d,]+(?:\.\d\d)?)/i);
     var am=(t.match(/\$\s*[\d,]+\.\d\d/g)||[]).map(function(x){return parseFloat(x.replace(/[$,\s]/g,''))}),stk=w?parseFloat(w[1].replace(/,/g,'')):null,pay=py?parseFloat(py[1].replace(/,/g,'')):null;
     if((stk==null||pay==null)&&am.length>=2&&am[am.length-1]>am[am.length-2]){stk=am[am.length-2];pay=am[am.length-1]}
     if(stk!=null)R.stake=stk;
-    var ho=t.match(/pick\s*parlay\s*[|!Il]?\s*([+-]\d{3,4})\b/i);
+    var ho=t.match(/pick\s*parlay\s*[|!Il]?\s*([+-]\d{3,4})\b/i)||t.match(/pick\s*parlay[^\n]*?([+-]\d{3,4})\s*$/im);
     if(ho)R.odds=parseInt(ho[1],10);
     else if(stk&&pay&&pay/stk>1)R.odds=amFromDec(pay/stk);
     return R;
@@ -1546,6 +1585,7 @@ function analyzeBet(b){
   var line=parseFloat(b.line),od=parseFloat(b.odds),out={p:null,note:''};
   if(b.type==='parlay'){
     var L=(b.legs||[]).map(function(l){var r=legPrice(l);return {n:l.n,thr:l.thr,k:l.k,stat:l.stat,odds:l.odds,p:r.p,basis:r.basis,mean:r.mean}});
+    (b.glegs||[]).forEach(function(l){var r=glegPrice(l);L.push({n:l.pick,g:1,thr:'',stat:'',odds:null,p:r.p,basis:r.basis,mean:null})});
     var kn=L.filter(function(l){return l.p!=null}),pr=1;kn.forEach(function(l){pr*=l.p});
     return {p:kn.length?pr:null,legs:L,known:kn.length,total:L.length,unknown:L.length-kn.length,note:'',game:'Parlay'};
   }
@@ -1573,14 +1613,14 @@ function analyzeBet(b){
 }
 function parlayRes(b,a){
   var od=parseFloat(b.odds),bk=isFinite(od)&&Math.abs(od)>=100?1/dec(od):null,h='';
-  h+='<div class="tblwrap"><table><thead><tr><th>Leg</th><th>Chance</th></tr></thead><tbody>'+a.legs.map(function(l){return '<tr><td><b>'+esc(l.n)+'</b> '+l.thr+'+ '+esc(l.stat.toLowerCase())+'<br><span class="src">'+esc(l.basis)+(l.odds?'<br><span class="src">Book price '+fo(l.odds)+', implies '+Math.round(100/dec(l.odds))+'% (model '+(l.p!=null?Math.round(l.p*100)+'%':'no data')+')</span>':'')+'</span></td><td>'+(l.p!=null?'<span class="hrpill '+(l.p>=.75?'hi':l.p<.5?'lo':'mid')+'">'+Math.round(l.p*100)+'%</span>':'<span class="src">no data</span>')+'</td></tr>'}).join('')+'</tbody></table></div>';
-  if(a.p==null)return h+'<p class="note">None of these players are in the app’s NBA data, so there is no chance to show. You can still save it to track.</p>';
+  h+='<div class="tblwrap"><table><thead><tr><th>Leg</th><th>Chance</th></tr></thead><tbody>'+a.legs.map(function(l){return '<tr><td><b>'+esc(l.n)+'</b>'+(l.g?'':' '+l.thr+'+ '+esc(l.stat.toLowerCase()))+'<br><span class="src">'+esc(l.basis)+(l.odds?'<br><span class="src">Book price '+fo(l.odds)+', implies '+Math.round(100/dec(l.odds))+'% (model '+(l.p!=null?Math.round(l.p*100)+'%':'no data')+')</span>':'')+'</span></td><td>'+(l.p!=null?'<span class="hrpill '+(l.p>=.75?'hi':l.p<.5?'lo':'mid')+'">'+Math.round(l.p*100)+'%</span>':'<span class="src">no data</span>')+'</td></tr>'}).join('')+'</tbody></table></div>';
+  if(a.p==null)return h+'<p class="note">The app has no model numbers for these legs, so there is no chance to show. You can still save it to track.</p>';
   var lo=a.p*Math.pow(.5,a.unknown),hi=a.p*Math.pow(.8,a.unknown);
   h+='<div class="big">'+(a.unknown?(lo*100).toFixed(1)+'–'+(hi*100).toFixed(1)+'%':(a.p*100).toFixed(1)+'%')+'</div><div class="src">model chance all '+a.total+' legs hit'+(a.unknown?' (range, '+a.unknown+' leg'+(a.unknown>1?'s':'')+' without data counted at 50–80% each)':'')+'</div>';
   h+='<div class="facts"><span>Legs priced <b>'+a.known+' of '+a.total+'</b></span>'+(a.unknown?'<span>Priced legs only <b>'+(a.p*100).toFixed(1)+'%</b></span>':'')+(bk!=null?'<span>Book break-even <b>'+(bk*100).toFixed(1)+'%</b></span>':'')+(b.stake&&bk!=null?'<span>Payout <b>$'+(b.stake*dec(od)).toFixed(2)+'</b></span>':'')+'</div>';
   var sorted=a.legs.filter(function(l){return l.p!=null}).sort(function(x,y){return x.p-y.p}),strong=sorted.slice(-2).reverse(),weak=sorted.slice(0,3).filter(function(l){return l.p<.75&&strong.indexOf(l)<0});
-  h+='<div class="src" style="margin-top:8px"><b>Why it can hit</b></div><ul class="pts" style="margin-top:2px">'+strong.map(function(l){return '<li>'+esc(l.n)+' '+l.thr+'+ '+esc(l.stat.toLowerCase())+' is one of the safer legs ('+Math.round(l.p*100)+'%). '+esc(l.basis)+'.</li>'}).join('')+'</ul>';
-  h+='<div class="src"><b>Why it might not</b></div><ul class="pts" style="margin-top:2px">'+weak.map(function(l){return '<li><b>'+esc(l.n)+' '+l.thr+'+ '+esc(l.stat.toLowerCase())+'</b> is a weak spot at '+Math.round(l.p*100)+'%'+(l.mean!=null&&l.thr>l.mean?', above his average of '+l.mean.toFixed(1)+', so he needs a better-than-usual night':'')+'.</li>'}).join('')+
+  h+='<div class="src" style="margin-top:8px"><b>Why it can hit</b></div><ul class="pts" style="margin-top:2px">'+strong.map(function(l){return '<li>'+esc(l.n)+(l.g?'':' '+l.thr+'+ '+esc(l.stat.toLowerCase()))+' is one of the safer legs ('+Math.round(l.p*100)+'%). '+esc(l.basis)+'.</li>'}).join('')+'</ul>';
+  h+='<div class="src"><b>Why it might not</b></div><ul class="pts" style="margin-top:2px">'+weak.map(function(l){return '<li><b>'+esc(l.n)+(l.g?'':' '+l.thr+'+ '+esc(l.stat.toLowerCase()))+'</b> is a weak spot at '+Math.round(l.p*100)+'%'+(l.mean!=null&&l.thr>l.mean?', above his average of '+l.mean.toFixed(1)+', so he needs a better-than-usual night':'')+'.</li>'}).join('')+
     (weak.length?'':'<li>No single leg looks weak on its own, but the parlay is only as strong as all of them together.</li>')+'<li>All '+a.total+' legs must win. Even if every leg is 80%, '+a.total+' of them together hit only about '+(Math.pow(.8,a.total)*100).toFixed(0)+'%.</li>'+
     (function(){var g=a.legs.filter(function(l){return l.p!=null&&l.odds});if(!g.length)return '';var gap=g.reduce(function(t,l){return t+l.p-1/dec(l.odds)},0)/g.length;return gap>.08?'<li>The book prices these legs about '+Math.round(gap*100)+' points lower than my numbers on average. My data is last season’s, and the book knows this season’s lineups and minutes, so trust the book’s price more where we disagree widely.</li>':''})()+
     (a.unknown?'<li>'+a.unknown+' leg'+(a.unknown>1?'s have':' has')+' no data in the app, so the true chance is lower than the priced legs alone.</li>':'')+
@@ -1645,7 +1685,14 @@ function mineHtml(){
   }).join('')+'</div>';
   return h;
 }
-function parlayEntry(b,a){return {id:String(Date.now())+Math.floor(Math.random()*1000),at:Date.now(),type:'parlay',legD:(b.legs||[]).map(function(l){return {n:l.n,thr:l.thr,k:l.k,stat:l.stat}}),games:b.games||[],side:null,lg:'nba',line:null,odds:parseFloat(b.odds),stake:parseFloat(b.stake)||null,p:a.p,partial:a.unknown>0,legs:(b.legs||[]).map(function(l,i){return l.thr+'+ '+l.n+' '+l.stat.toLowerCase()+(a.legs[i]&&a.legs[i].p!=null?' ('+Math.round(a.legs[i].p*100)+'%)':'')}),pick:(b.legs||[]).length+'-leg parlay',game:'Parlay'+(b.stake?', $'+parseFloat(b.stake).toFixed(2)+' wager':''),res:null}}
+function parlayEntry(b,a){
+  if((b.glegs||[]).length){
+    var ent={id:String(Date.now())+Math.floor(Math.random()*1000),at:Date.now(),type:'parlay',builder:true,lg:'mixed',side:null,line:null,odds:parseFloat(b.odds),stake:parseFloat(b.stake)||null,p:a.p,partial:a.unknown>0,legs:[],pick:((b.legs||[]).length+b.glegs.length)+'-leg parlay',game:'Parlay'+(b.stake?', $'+parseFloat(b.stake).toFixed(2)+' wager':''),res:null,legD:[],glegs:[],manual:[],games:(b.games||[]).slice(),whyLegs:[]};
+    (b.legs||[]).forEach(function(l,i){ent.legs.push(l.thr+'+ '+l.n+' '+l.stat.toLowerCase()+(a.legs[i]&&a.legs[i].p!=null?' ('+Math.round(a.legs[i].p*100)+'%)':''));ent.legD.push({n:l.n,thr:l.thr,k:l.k,stat:l.stat});ent.whyLegs.push({title:l.n+' '+l.thr+'+ '+l.stat,p:a.legs[i]?a.legs[i].p:null,pro:[],con:[],note:[]})});
+    b.glegs.forEach(function(l,j){var r=a.legs[(b.legs||[]).length+j];ent.legs.push(l.pick+(r&&r.p!=null?' ('+Math.round(r.p*100)+'%)':''));ent.whyLegs.push({title:l.pick,p:r?r.p:null,pro:[],con:[],note:[]});if(l.gid)ent.glegs.push({gid:l.gid,t:l.t,side:l.side,num:l.num,over:l.over,pick:l.pick});else ent.manual.push(l.pick)});
+    return ent;
+  }
+  return {id:String(Date.now())+Math.floor(Math.random()*1000),at:Date.now(),type:'parlay',legD:(b.legs||[]).map(function(l){return {n:l.n,thr:l.thr,k:l.k,stat:l.stat}}),games:b.games||[],side:null,lg:'nba',line:null,odds:parseFloat(b.odds),stake:parseFloat(b.stake)||null,p:a.p,partial:a.unknown>0,legs:(b.legs||[]).map(function(l,i){return l.thr+'+ '+l.n+' '+l.stat.toLowerCase()+(a.legs[i]&&a.legs[i].p!=null?' ('+Math.round(a.legs[i].p*100)+'%)':'')}),pick:(b.legs||[]).length+'-leg parlay',game:'Parlay'+(b.stake?', $'+parseFloat(b.stake).toFixed(2)+' wager':''),res:null}}
 S.box={};
 function boxNum(j,player,stat){
   var key=normName(player),out=null;
@@ -1764,8 +1811,8 @@ function recOne(f,label){
 }
 function saveParsed(P,text,dry){
   // returns true when the slip was complete and saved
-  var sc={type:P.type,gid:P.gid||'',side:P.side||'h',player:P.player||'',pk:P.pk||'rec',line:P.line!=null?String(P.line):'',odds:P.odds!=null?String(P.odds):(P.type==='parlay'?'':'-110'),legs:P.legs||[],games:P.games||[],stake:P.stake!=null?String(P.stake):''};
-  var full=P.odds!=null&&(sc.type==='parlay'?(sc.legs.length>=2&&(!P.expect||sc.legs.length>=P.expect)):sc.type==='prop'?(sc.player&&sc.line!==''):(sc.gid&&(sc.type==='ml'||sc.line!=='')));
+  var sc={type:P.type,gid:P.gid||'',side:P.side||'h',player:P.player||'',pk:P.pk||'rec',line:P.line!=null?String(P.line):'',odds:P.odds!=null?String(P.odds):(P.type==='parlay'?'':'-110'),legs:P.legs||[],glegs:P.glegs||[],games:P.games||[],stake:P.stake!=null?String(P.stake):''};
+  var full=P.odds!=null&&(sc.type==='parlay'?(sc.legs.length+sc.glegs.length>=2&&(!P.expect||sc.legs.length+sc.glegs.length>=P.expect)):sc.type==='prop'?(sc.player&&sc.line!==''):(sc.gid&&(sc.type==='ml'||sc.line!=='')));
   if(!full)return null;
   if(dry)return true;
   var a=analyzeBet(sc);
@@ -1774,7 +1821,7 @@ function saveParsed(P,text,dry){
   S.mine.push({id:String(Date.now())+Math.floor(Math.random()*1000),at:Date.now(),type:sc.type,side:sc.side,pk:sc.pk,player:sc.player,gid:sc.type==='prop'?propGame(sc.player,sc.pk):sc.gid,lg:g?g.lg:'nfl',line:sc.type==='ml'?null:parseFloat(sc.line),odds:parseFloat(sc.odds),p:a.p,pick:betDesc({type:sc.type,side:sc.side,pk:sc.pk,player:sc.player,line:parseFloat(sc.line)},g),game:g?g.a+' @ '+g.h:(a.game||''),res:null,auto:true});
   return sc.type;
 }
-function parseScore(P){return (P.type==='parlay'?(P.legs||[]).length*2+(P.expect&&(P.legs||[]).length>=P.expect?5:0):(P.gid?2:0)+(P.player?2:0)+(P.line!=null?1:0))+(P.odds!=null?3:0)}
+function parseScore(P){return (P.type==='parlay'?((P.legs||[]).length+(P.glegs||[]).length)*2+(P.expect&&(P.legs||[]).length+(P.glegs||[]).length>=P.expect?5:0):(P.gid?2:0)+(P.player?2:0)+(P.line!=null?1:0))+(P.odds!=null?3:0)}
 function preCanvas(f){
   return (window.createImageBitmap?createImageBitmap(f):Promise.reject()).then(function(bm){
     var sc=bm.width<1600?1600/bm.width:1,c=document.createElement('canvas');c.width=Math.round(bm.width*sc);c.height=Math.round(bm.height*sc);
@@ -1817,7 +1864,7 @@ function ocrFiles(files){
     var base={type:'ml',gid:'',side:'h',player:'',pk:'rec',line:'',odds:'-110',busy:'',msg:'',raw:'',note:'',legs:[],games:[],stake:''};
     if(left.length){
       var L=left[0],P=L.P;
-      base={type:P.type,gid:P.gid||'',side:P.side||'h',player:P.player||'',pk:P.pk||'rec',line:P.line!=null?String(P.line):'',odds:P.odds!=null?String(P.odds):(P.type==='parlay'?'':'-110'),busy:'',msg:'',raw:L.text,note:'',legs:P.legs||[],games:P.games||[],stake:P.stake!=null?String(P.stake):''};
+      base={type:P.type,gid:P.gid||'',side:P.side||'h',player:P.player||'',pk:P.pk||'rec',line:P.line!=null?String(P.line):'',odds:P.odds!=null?String(P.odds):(P.type==='parlay'?'':'-110'),busy:'',msg:'',raw:L.text,note:'',legs:P.legs||[],glegs:P.glegs||[],games:P.games||[],stake:P.stake!=null?String(P.stake):''};
       msg+=(left.length>1?left.length+' screenshots could not be read completely. The first is filled in below; ':'One screenshot could not be read completely. It is filled in below; ')+'check the fields and save it, or save it as a note.';
     }
     base.msg=msg||'Could not find a bet in that image.';
@@ -1854,7 +1901,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v46, Oct 21';
+var BUILD='v47, Oct 21';
 function foot(){return '<p class="foot"><button class="linkbtn" data-act="tab" data-t="about">How the model works</button> · <span class="src">Build '+BUILD+'</span></p><p class="foot">For entertainment and research only, not betting advice. Probabilities are estimates and can be wrong. If gambling is a problem for you or someone you know, call 1-800-GAMBLER.</p>'}
 
 /* ---------- sheets ---------- */
