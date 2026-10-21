@@ -1853,7 +1853,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v39, Oct 20';
+var BUILD='v40, Oct 21';
 function foot(){return '<p class="foot"><button class="linkbtn" data-act="tab" data-t="about">How the model works</button> · <span class="src">Build '+BUILD+'</span></p><p class="foot">For entertainment and research only, not betting advice. Probabilities are estimates and can be wrong. If gambling is a problem for you or someone you know, call 1-800-GAMBLER.</p>'}
 
 /* ---------- sheets ---------- */
@@ -3092,6 +3092,82 @@ function pxAdd(o){
   });
   try{var raw3=localStorage.getItem('hitboard.picks.v2');if(raw3){var a3=JSON.parse(raw3);if(Array.isArray(a3))S.picks=a3.filter(function(x){return propById(x.pid)&&(x.side==='over'||x.side==='under')})}}catch(e){}
 })();
+/* ---------- full-roster player averages from ESPN (NBA, college football) ---------- */
+S.rsAt=0;
+function rsSeason(){var d=new Date(),m=d.getMonth()+1,y=d.getFullYear(),cur=m>=8?y+1:y;return m>=8&&m<=11?cur-1:cur}
+function rsApply(D){
+  for(var i=PROPS.length-1;i>=0;i--)if(PROPS[i].rs)PROPS.splice(i,1);
+  var have={};PROPS.forEach(function(p){have[p.lg+'|'+p.kind+'|'+normName(p.name)]=1});
+  var lab=(D.sy-1)+'-'+String(D.sy).slice(2);
+  (D.nba||[]).forEach(function(r){
+    [['npts','Points',r.pts,6,1],['nreb','Rebounds',r.reb,3,1],['nast','Assists',r.ast,2,1],['ntpm','Threes',r.tpm,.8,2]].forEach(function(m){
+      if(!(m[2]>=m[3])||have['nba|'+m[0]+'|'+normName(r.n)])return;
+      pxAdd({lg:'nba',kind:m[0],name:r.n,team:r.t,stat:m[1],g:r.g,avg:m[2],total:Math.round(m[2]*r.g),rs:1,
+        note:m[2].toFixed(m[4])+' '+m[1].toLowerCase()+' a game over '+r.g+' games in '+lab+' (ESPN), about '+Math.round(r.mpg)+' minutes. This is last season’s full-year average, so check this season’s role and minutes. Replace the line with the one at your book.'});
+    });
+  });
+  (D.cfb||[]).forEach(function(r){
+    [['cpass','Pass Yds',r.pass,100],['crush','Rush Yds',r.rush,20],['crec','Rec Yds',r.rec,20]].forEach(function(m){
+      if(!(m[2]>=m[3])||have['ncaafb|'+m[0]+'|'+normName(r.n)])return;
+      pxAdd({lg:'ncaafb',kind:m[0],name:r.n,team:r.t,stat:m[1],g:r.g,avg:m[2],total:Math.round(m[2]*r.g),rs:1,
+        note:m[2].toFixed(1)+' yards a game over '+r.g+' games this season (ESPN). Replace the line with the one at your book.'});
+    });
+  });
+  if(typeof _pxAt==='object'&&_pxAt){delete _pxAt.nba;delete _pxAt.ncaafb}
+  try{var raw=localStorage.getItem('hitboard.picks.v2');if(raw){var a=JSON.parse(raw);if(Array.isArray(a)){var ids={};S.picks.forEach(function(x){ids[x.pid+x.side+x.line]=1});a.forEach(function(x){if(propById(x.pid)&&(x.side==='over'||x.side==='under')&&!ids[x.pid+x.side+x.line])S.picks.push(x)})}}}catch(e){}
+}
+function rsFetchJson(url){return fetch(url,{cache:'no-store'}).then(function(r){if(!r.ok)throw 0;return r.json()})}
+function rsCols(j,cat){var c=(j.categories||[]).filter(function(x){return x.name===cat})[0];return c?c.names||[]:[]}
+function rsVal(a,j,cat,name){
+  var ix=rsCols(j,cat).indexOf(name);if(ix<0)return null;
+  var c=(a.categories||[]).filter(function(x){return x.name===cat})[0];if(!c||!c.values)return null;
+  var v=c.values[ix];return typeof v==='number'?v:null;
+}
+function rsTeam(a,lg){
+  var at=a.athlete||{},ab=String(at.teamShortName||'').toUpperCase(),want=tabb(ab),nm=String(at.teamName||'').toLowerCase();
+  var found=null;
+  (S.feed[lg]||[]).forEach(function(g){
+    if(found)return;
+    if(tabb(g.a)===want)found=g.a;else if(tabb(g.h)===want)found=g.h;
+    else if(nm.length>2&&String(g.an||'').toLowerCase().indexOf(nm)===0)found=g.a;
+    else if(nm.length>2&&String(g.hn||'').toLowerCase().indexOf(nm)===0)found=g.h;
+  });
+  return found||ab;
+}
+function loadStatAvgs(){
+  if(window.claude||typeof fetch!=='function'||S.rsBusy)return;
+  var now=Date.now();if(now-S.rsAt<6*3600e3)return;
+  S.rsBusy=true;var sy=rsSeason(),out={sy:sy,nba:[],cfb:[]};
+  var nba=[1,2,3].reduce(function(pr,pg){return pr.then(function(){
+    if(pg>1&&out._stop)return;
+    return rsFetchJson('https://site.web.api.espn.com/apis/common/v3/sports/basketball/nba/statistics/byathlete?region=us&lang=en&contentorigin=espn&isqualified=false&page='+pg+'&limit=100&sort=general.avgMinutes%3Adesc&season='+sy+'&seasontype=2').then(function(j){
+      (j.athletes||[]).forEach(function(a){
+        var g=rsVal(a,j,'general','gamesPlayed'),mp=rsVal(a,j,'general','avgMinutes');
+        if(!(g>=15)||!(mp>=14)){if(mp!=null&&mp<14)out._stop=1;return}
+        out.nba.push({n:a.athlete.displayName,t:rsTeam(a,'nba'),g:g,mpg:mp,pts:rsVal(a,j,'offensive','avgPoints'),reb:rsVal(a,j,'general','avgRebounds'),ast:rsVal(a,j,'offensive','avgAssists'),tpm:rsVal(a,j,'offensive','avgThreePointFieldGoalsMade')});
+      });
+    }).catch(function(){out._stop=1});
+  })},Promise.resolve());
+  var cfb=[1,2].reduce(function(pr,pg){return pr.then(function(){
+    return rsFetchJson('https://site.web.api.espn.com/apis/common/v3/sports/football/college-football/statistics/byathlete?region=us&lang=en&contentorigin=espn&page='+pg+'&limit=100').then(function(j){
+      (j.athletes||[]).forEach(function(a){
+        var g=rsVal(a,j,'general','gamesPlayed');if(!(g>=3))return;
+        var o={n:a.athlete.displayName,t:rsTeam(a,'ncaafb'),g:g,pass:rsVal(a,j,'passing','passingYardsPerGame'),rush:rsVal(a,j,'rushing','rushingYardsPerGame'),rec:rsVal(a,j,'receiving','receivingYardsPerGame')};
+        if(o.pass>0||o.rush>0||o.rec>0)out.cfb.push(o);
+      });
+    }).catch(function(){});
+  })},Promise.resolve());
+  Promise.all([nba,cfb]).then(function(){
+    S.rsBusy=false;delete out._stop;
+    if(!out.nba.length&&!out.cfb.length)return;
+    S.rsAt=Date.now();
+    try{localStorage.setItem('hitboard.rs.v1',JSON.stringify({at:S.rsAt,d:out}))}catch(e){}
+    rsApply(out);
+    var ae=document.activeElement;if(!(ae&&ae.tagName==='INPUT')){render();if(S.sheet&&S.sheet.type==='fgame')renderSheet()}
+  }).catch(function(){S.rsBusy=false});
+}
+try{var rsC=JSON.parse(localStorage.getItem('hitboard.rs.v1')||'null');if(rsC&&rsC.d){S.rsAt=rsC.at||0;rsApply(rsC.d)}}catch(e){}
+
 function nhlLegs(L){
   pxRefresh('nhl');
   PROPS.forEach(function(p){
@@ -3813,7 +3889,7 @@ function doRefresh(silent){
       var hasUp=o.games.some(function(g){return kind(g)==='up'});
       if(!hasUp){var keep=(S.feed[o.lg]||[]).filter(function(g){return kind(g)==='up'&&g.start>Date.now()&&!o.games.some(function(n){return n.id===g.id})});if(keep.length)o.games=o.games.concat(keep)}
       S.feed[o.lg]=o.games});
-    if(ok.length){setTimeout(function(){fetchStand(S.sport)},0);setTimeout(loadAvail,0);setTimeout(trackPicks,50)}
+    if(ok.length){setTimeout(function(){fetchStand(S.sport)},0);setTimeout(loadAvail,0);setTimeout(loadStatAvgs,100);setTimeout(trackPicks,50)}
     if(ok.length){S.feedAt=Date.now();S.live=true;S.src=srcName;preloadWx()}
     var fm=failMsg&&bad.length&&bad[0].e&&bad[0].e.detail?failMsg+' ('+bad[0].e.detail+')':failMsg;
     if(!ok.length){if(silent&&S.live){done('', '')}else{silent=false;done(fm||errMsg(bad[0].e),'warn')}}
@@ -3934,6 +4010,7 @@ document.addEventListener('change',function(e){
 });
 document.addEventListener('input',function(e){var t0=e.target;if(t0&&t0.id==='pl_thr'&&S.sheet&&S.sheet.type==='player'){var v0=parseFloat(String(t0.value).replace(',','.'));if(isFinite(v0)){S.sheet.thr=v0;var pb=document.getElementById('plbody');if(pb)pb.innerHTML=playerBody(S.sheet)}return}var t=e.target,f=t.dataset&&t.dataset.sf;if(!f||t.tagName==='SELECT')return;S.scan[f]=t.value;var r=$('#scanres');if(r)r.innerHTML=scanRes()});
 document.addEventListener('keydown',function(e){if(e.key==='Escape'&&S.sheet){S.sheet=null;renderSheet()}else if((e.key==='Enter'||e.key===' ')&&e.target&&e.target.getAttribute&&e.target.getAttribute('role')==='button'&&e.target.dataset.act){e.preventDefault();e.target.click()}});
+setTimeout(loadStatAvgs,400);
 render();
 setTimeout(function(){doRefresh(true)},600);
 if(!(window.claude&&window.claude.use)){setInterval(function(){if(document.visibilityState==='visible')doRefresh(true)},30000);document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')doRefresh(true)})}
