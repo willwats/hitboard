@@ -1854,7 +1854,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v41, Oct 21';
+var BUILD='v42, Oct 21';
 function foot(){return '<p class="foot"><button class="linkbtn" data-act="tab" data-t="about">How the model works</button> · <span class="src">Build '+BUILD+'</span></p><p class="foot">For entertainment and research only, not betting advice. Probabilities are estimates and can be wrong. If gambling is a problem for you or someone you know, call 1-800-GAMBLER.</p>'}
 
 /* ---------- sheets ---------- */
@@ -2165,7 +2165,7 @@ function straightList(lg){
   }
   // game picks, best two per game
   (S.feed[lg]||[]).forEach(function(g){
-    if(kind(g)==='final'||g.start>now+5*864e5)return;
+    if(kind(g)!=='up'||g.start>now+5*864e5)return;
     var b=picksFor(g);if(!b)return;var ps=projScore(g);
     b.filter(function(x){return x.p>=.5}).sort(function(a,c){return c.p-a.p}).slice(0,3).forEach(function(x){
       var why=[(x.mk?x.mk+'. ':'')+'The model gives this '+Math.round(x.p*100)+'%.'];
@@ -2215,21 +2215,53 @@ S.mtop='1';
 function mbChips(){
   return '<div class="chips" role="group" aria-label="Sport">'+'<button class="chip" data-act="set" data-k="mtop" data-v="1" aria-pressed="'+(!!S.mtop)+'">Best today</button>'+LG.map(function(l){return '<button class="chip" data-act="sport" data-m="1" data-v="'+l[0]+'" aria-pressed="'+(!S.mtop&&S.sport===l[0])+'">'+l[1]+'</button>'}).join('')+'</div>';
 }
-var _mbK='',_mbL=[];
+var _mbK='',_mbL=[],_mbG=[];
+function mbBets(g){
+  var b=null;try{b=picksFor(g)}catch(e){}
+  if(!b)return [];
+  var ord={ml:0,sp:1,tot:2},ps=null;try{ps=projScore(g)}catch(e){}
+  return b.filter(function(x){return x.t==='ml'||x.t==='sp'||x.t==='tot'}).sort(function(a,c){return ord[a.t]-ord[c.t]}).map(function(x){
+    var why=[(x.mk?x.mk+'. ':'')+'The model gives this '+Math.round(x.p*100)+'%.'];
+    if(ps)why.push('Projected score '+g.a+' '+ps.a.toFixed(1)+', '+g.h+' '+ps.h.toFixed(1)+' (total '+ps.total.toFixed(1)+').');
+    var rs={pro:[],con:[]};try{rs=gameReasons(g.lg,g,x,ps)}catch(e){}
+    return {label:x.t==='ml'?'Moneyline':x.t==='sp'?'Spread':'Total',title:x.pick,sub:g.a+' @ '+g.h+' · '+gTime(g),p:x.p,why:why,pro:rs.pro,con:rs.con,lgKey:g.lg,mk:x.mk||'',
+      rec:{t:x.t,side:x.side||null,over:x.over,num:x.num==null?null:x.num,gid:g.id,lg:g.lg,key:'game-'+x.t}};
+  });
+}
+function mbRow(b,i){
+  var k=b.title+'|'+b.sub;if(!(k in S.bci))S.bci[k]=S.bcl.push(b)-1;
+  var tracked=S.tracked[k]||S.mine.some(function(x){return x.rec&&x.pick===b.title&&x.game===b.sub});
+  return '<div style="padding:8px 0;border-top:1px solid var(--line)"><div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><div style="min-width:0"><div class="label">'+esc(b.label)+'</div><div class="teams" style="font-size:15px">'+esc(b.title)+'</div><div class="src">'+esc(b.mk)+' · fair '+fairOdds(b.p)+'</div></div><span class="hrpill '+(b.p>=.7?'hi':b.p<.5?'lo':'mid')+'">'+pc(b.p)+'%</span></div>'+
+   '<div style="display:flex;gap:8px;margin-top:6px;align-items:center">'+slipBtnHtml('bcadd','data-i="'+S.bci[k]+'"',inSlip('rec|'+k))+(tracked?'<span class="src"><b>✓ Tracking</b></span>':'<button class="btn" style="flex:none;padding:8px 12px" data-act="trackrec" data-src="b" data-i="'+i+'">Track bet</button>')+'</div>'+
+   '<details class="why" style="margin-top:4px"><summary class="src">Why it may hit or miss</summary><ul class="pts"><li>'+b.pro.slice(0,3).map(esc).join('</li><li>')+'</li></ul><div class="src"><b>Against</b></div><ul class="pts"><li>'+b.con.slice(0,3).map(esc).join('</li><li>')+'</li></ul></details></div>';
+}
 function vBestBets(){
   var h='<h2>Best bets today</h2>'+mbChips()+modeSwitch('parlay')+refreshBar();
-  var key=S.feedAt+'|'+S.mine.length;
+  var key=S.feedAt+'|'+S.mine.length+'|'+Math.floor(Date.now()/60000);
   if(_mbK!==key){
-    var all=[];
+    var now=Date.now(),games=[],props=[];
     ['nfl','nba','ncaafb','mlb','nhl'].forEach(function(lg){
-      var n=0,L=[];try{L=straightList(lg).slice().sort(function(a,b){return b.p-a.p})}catch(e){}
-      L.forEach(function(b){if(n>=6)return;n++;var c=Object.assign({},b);c.label=lgName(lg)+' · '+b.label;c.lgKey=lg;all.push(c)});
+      if(lg!=='mlb'||true)(S.feed[lg]||[]).forEach(function(g){
+        if(kind(g)!=='up'||g.start>now+36*36e5)return;
+        var bs=mbBets(g);if(bs.length)games.push({g:g,bets:bs,best:Math.max.apply(null,bs.map(function(x){return x.p}))});
+      });
+      var n=0,L=[];try{L=straightList(lg).filter(function(b){return b.label!=='Game bet'}).sort(function(a,b){return b.p-a.p})}catch(e){}
+      L.forEach(function(b){if(n>=5)return;n++;var c=Object.assign({},b);c.label=lgName(lg)+' · '+b.label;c.lgKey=lg;props.push(c)});
     });
-    all.sort(function(a,b){return b.p-a.p});_mbK=key;_mbL=all.slice(0,30);
+    games.sort(function(a,b){return b.best-a.best});games=games.slice(0,12);
+    props.sort(function(a,b){return b.p-a.p});props=props.slice(0,20);
+    var rl=[];games.forEach(function(x){x.bets.forEach(function(b){b.ri=rl.push(b)-1})});
+    props.forEach(function(b){b.ri=rl.push(b)-1});
+    _mbK=key;_mbL=rl;_mbG={games:games,props:props};
   }
   S.recList=_mbL;
-  if(!_mbL.length)return h+'<div class="card empty">No bets with a game still to play. Tap Refresh, or pick a sport above.</div>'+foot();
-  return h+'<p class="lede">The strongest model bets across every sport right now, best chance first (up to six per sport), with the reason behind each. Sportsbook prices were not readable, so compare the fair odds with your book. Pick a sport above for its full list, ready-made parlays and your saved bets.</p>'+_mbL.map(function(b,i){return betCard(b,i,'b')}).join('')+foot();
+  var G=_mbG.games,P=_mbG.props;
+  if(!G.length&&!P.length)return h+'<div class="card empty">No games left to bet on in the next day and a half. Finished and started games are removed. Tap Refresh, or pick a sport above.</div>'+foot();
+  h+='<p class="lede">Games that have not started, with the model’s moneyline, spread and total for each. Games that have started or finished are removed. Chances are the model’s; sportsbook prices were not readable, so compare the fair odds with your book.</p>';
+  h+='<h3>Game bets, next 36 hours</h3>';
+  h+=G.length?G.map(function(x){return '<div class="card bcard"><div class="label">'+esc(lgName(x.g.lg))+' · '+esc(gTime(x.g))+'</div><div class="teams">'+esc(x.g.a)+' <i>@</i> '+esc(x.g.h)+'</div>'+x.bets.map(function(b){return mbRow(b,b.ri)}).join('')+'</div>'}).join(''):'<div class="card empty">No upcoming games in the next 36 hours.</div>';
+  if(P.length)h+='<h3>Best player props</h3>'+P.map(function(b){return betCard(b,b.ri,'b')}).join('');
+  return h+foot();
 }
 function parlaysBody(lg){
   var h='';S.sugList=[];_pcLg=lg;
