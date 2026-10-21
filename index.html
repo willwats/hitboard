@@ -1836,7 +1836,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v34, Oct 20';
+var BUILD='v35, Oct 20';
 function foot(){return '<p class="foot"><button class="linkbtn" data-act="tab" data-t="about">How the model works</button> · <span class="src">Build '+BUILD+'</span></p><p class="foot">For entertainment and research only, not betting advice. Probabilities are estimates and can be wrong. If gambling is a problem for you or someone you know, call 1-800-GAMBLER.</p>'}
 
 /* ---------- sheets ---------- */
@@ -2946,11 +2946,23 @@ function gamePicksHtml(g){
   if(mine.length)h+='<div class="src"><b>Your bets on this game</b></div><ul class="pts">'+mine.map(function(x){return '<li><b>'+esc(x.pick)+'</b> <span class="src">'+fo(x.odds)+(x.p!=null?' · model '+Math.round(x.p*100)+'%':'')+(x.res?' · '+(x.res==='W'?'won':x.res==='L'?'lost':'push'):'')+'</span>'+(x.res?'':liveHtml(x))+'</li>'}).join('')+'</ul>';
   return h;
 }
+S.gpk=null;
+function gamePropsHtml(g){
+  var lg=g.lg;if(!PXK[lg]||kind(g)==='final')return '';
+  var h='<h3>Player props for this game</h3>';
+  if(kind(g)!=='up')return h+'<p class="note" style="margin-top:0">This game has started, so its props are closed here. Check Props for the next slate.</p>';
+  pxRefresh(lg);
+  var ks=PXK[lg],kd=ks.some(function(k){return k[0]===S.gpk})?S.gpk:ks[0][0];
+  var list=PROPS.filter(function(p){if(p.lg!==lg||p.game!==g.id||!p.ok||p.kind!==kd)return false;var it=pxStat(p);return !(it&&OUT_RE.test(it.st))}).sort(function(a,b){return b.avg-a.avg});
+  h+='<div class="chips" role="group" aria-label="Prop stat">'+ks.map(function(k){return '<button class="chip" data-act="gpk" data-v="'+k[0]+'" aria-pressed="'+(kd===k[0])+'">'+k[1]+'</button>'}).join('')+'</div>';
+  if(!list.length)return h+'<p class="note" style="margin-top:0">No players with '+esc(ks.filter(function(k){return k[0]===kd})[0][1].toLowerCase())+' data are listed for this game.'+(lg==='nba'?' The NBA table only holds the leaders in each stat.':'')+'</p>';
+  return h+'<p class="src" style="margin-top:0">Tap a player to enter your book’s line and see the edge. '+(list.length>14?'Top 14 of '+list.length+' by season average. See Props for the rest.':'')+'</p><div class="list">'+propRows(list.slice(0,14))+'</div>';
+}
 function feedSheet(g){
-  if(g.lg==='mlb')return mlbSheet(g);
+  if(g.lg==='mlb')return mlbSheet(g)+gamePropsHtml(g);
   var k=kind(g),h='<div class="sh-head"><div><div class="label">'+esc(fmtTime(g.start))+(g.title?' · '+esc(g.title):'')+'</div><h2>'+esc(g.an)+' @ '+esc(g.hn)+'</h2></div><button class="x" data-act="close" aria-label="Close">×</button></div>';
   if(k!=='up')h+=statsBlock(g);
-  h+=gamePicksHtml(g);
+  h+=gamePicksHtml(g)+gamePropsHtml(g);
   if(k==='up'){
     if(g.pa!=null&&g.ph!=null){var s=g.pa+g.ph;h+='<h3>Win probability</h3>'+barHtml(g.a,g.h,100*g.pa/s,100*g.ph/s,'Data feed model, '+fmtClock(S.feedAt))}
     else h+='<p class="note" style="margin-top:14px">The feed has no win probability for this game yet, so the prediction below uses team stats only.</p>';
@@ -3506,6 +3518,7 @@ document.addEventListener('click',function(e){
   else if(act==='refresh'){doRefresh()}
   else if(act==='cat'){S.cat=el.dataset.v;render()}
   else if(act==='ckretry'){S.ck.err='';render()}
+  else if(act==='gpk'){S.gpk=el.dataset.v;renderSheet()}
   else if(act==='set'){S[el.dataset.k]=el.dataset.v;render()}
   else if(act==='team'){S.sheet={type:'team',lg:el.dataset.lg,n:el.dataset.n};renderSheet()}
   else if(act==='gf'){S.gf=el.dataset.v;render()}
