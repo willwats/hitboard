@@ -35,7 +35,8 @@
   color-scheme:dark;
 }
 *{box-sizing:border-box}
-body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.45;
+html{height:100%}
+body{margin:0;min-height:100vh;min-height:100dvh;background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.45;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 96px}
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
 .linkbtn{background:none;border:0;color:var(--hit);text-decoration:underline;padding:0;font-size:inherit;font-weight:inherit;text-align:left}
@@ -1853,7 +1854,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v40, Oct 21';
+var BUILD='v41, Oct 21';
 function foot(){return '<p class="foot"><button class="linkbtn" data-act="tab" data-t="about">How the model works</button> · <span class="src">Build '+BUILD+'</span></p><p class="foot">For entertainment and research only, not betting advice. Probabilities are estimates and can be wrong. If gambling is a problem for you or someone you know, call 1-800-GAMBLER.</p>'}
 
 /* ---------- sheets ---------- */
@@ -2198,7 +2199,8 @@ function straightList(lg){
 }
 function vParlay(){
   var lg=S.sport,name=LG.filter(function(l){return l[0]===lg})[0][1];
-  var h='<h2>'+name+' bets</h2>'+sportChips()+modeSwitch('parlay')+betTabs();
+  if(S.mtop)return vBestBets();
+  var h='<h2>'+name+' bets</h2>'+mbChips()+modeSwitch('parlay')+betTabs();
   if(S.betTab==='mine')return h+scanHtml()+foot();
   if(lg==='ncaamb')return h+'<div class="card empty">No college basketball data is available yet, so no bets can be built.</div>'+foot();
   if(S.betTab!=='parlays'){
@@ -2208,6 +2210,26 @@ function vParlay(){
     return h+'<p class="lede">The '+top.length+' strongest single bets right now, with the reason behind each. Chances come from this app’s model and hit-rate data. Sportsbook prices were not readable, so compare the fair odds with your book and only bet where it pays more.</p>'+(S.recList=top,top.map(function(b,i){return betCard(b,i,'b')}).join(''))+(more?'<button class="chip" style="margin-top:10px" data-act="set" data-k="betMore" data-v="'+(S.betMore?'':'1')+'">'+(S.betMore?'Show fewer':'Show more bets')+'</button>':'')+'<p class="note" style="margin-top:12px">Sorted by chance, not by value. A high chance at short odds can still be a poor bet. Check injuries before placing anything.</p>'+foot();
   }
   return h+parlaysBody(lg)+foot();
+}
+S.mtop='1';
+function mbChips(){
+  return '<div class="chips" role="group" aria-label="Sport">'+'<button class="chip" data-act="set" data-k="mtop" data-v="1" aria-pressed="'+(!!S.mtop)+'">Best today</button>'+LG.map(function(l){return '<button class="chip" data-act="sport" data-m="1" data-v="'+l[0]+'" aria-pressed="'+(!S.mtop&&S.sport===l[0])+'">'+l[1]+'</button>'}).join('')+'</div>';
+}
+var _mbK='',_mbL=[];
+function vBestBets(){
+  var h='<h2>Best bets today</h2>'+mbChips()+modeSwitch('parlay')+refreshBar();
+  var key=S.feedAt+'|'+S.mine.length;
+  if(_mbK!==key){
+    var all=[];
+    ['nfl','nba','ncaafb','mlb','nhl'].forEach(function(lg){
+      var n=0,L=[];try{L=straightList(lg).slice().sort(function(a,b){return b.p-a.p})}catch(e){}
+      L.forEach(function(b){if(n>=6)return;n++;var c=Object.assign({},b);c.label=lgName(lg)+' · '+b.label;c.lgKey=lg;all.push(c)});
+    });
+    all.sort(function(a,b){return b.p-a.p});_mbK=key;_mbL=all.slice(0,30);
+  }
+  S.recList=_mbL;
+  if(!_mbL.length)return h+'<div class="card empty">No bets with a game still to play. Tap Refresh, or pick a sport above.</div>'+foot();
+  return h+'<p class="lede">The strongest model bets across every sport right now, best chance first (up to six per sport), with the reason behind each. Sportsbook prices were not readable, so compare the fair odds with your book. Pick a sport above for its full list, ready-made parlays and your saved bets.</p>'+_mbL.map(function(b,i){return betCard(b,i,'b')}).join('')+foot();
 }
 function parlaysBody(lg){
   var h='';S.sugList=[];_pcLg=lg;
@@ -3918,7 +3940,7 @@ document.addEventListener('click',function(e){
   var act=el.dataset.act;
   if(act==='scrim'){if(e.target!==el)return;S.sheet=null;renderSheet();return}
   if(act==='tab'){S.tab=el.dataset.t;render();window.scrollTo(0,0)}
-  else if(act==='sport'){S.ptop='';S.sport=el.dataset.v;S.cat=null;S.gv='up';S.xk=null;S.xg='All';render()}
+  else if(act==='sport'){if(el.dataset.m)S.mtop='';else S.ptop='';S.sport=el.dataset.v;S.cat=null;S.gv='up';S.xk=null;S.xg='All';render()}
   else if(act==='refresh'){doRefresh()}
   else if(act==='brm'){S.slip.splice(+el.dataset.i,1);saveSlip();if(!S.slip.length&&S.sheet&&S.sheet.type==='slip'){S.sheet=null;renderSheet()}reslip()}
   else if(act==='slipopen'){if(S.slip.length){S.sheet={type:'slip'};renderSheet()}}
