@@ -1664,16 +1664,24 @@ function boxFetch(g){
   S.box[g.id]={t:now,busy:true,j:c&&c.j,fin:c&&c.fin};
   return fetch('https://site.api.espn.com/apis/site/v2/sports/'+ESPN[g.lg]+'/summary?event='+encodeURIComponent(g.sid),{cache:'no-store'}).then(function(r){if(!r.ok)throw 0;return r.json()}).then(function(j){S.box[g.id]={t:Date.now(),j:j,fin:kind(g)==='final'}}).catch(function(){S.box[g.id]={t:Date.now(),j:c&&c.j,fin:false}});
 }
+function ensureGames(x){
+  if(x.res||x.type!=='parlay'||!x.legD||!x.legD.length)return false;
+  var lg=x.lg||'nba',t=x.at||Date.now(),lo=t-8*36e5,hi=t+30*36e5,cur=x.games||[],add=[];
+  (S.feed[lg]||[]).forEach(function(g){if(g.start>=lo&&g.start<=hi&&cur.indexOf(g.id)<0)add.push(g.id)});
+  if(add.length){x.games=cur.concat(add);x.auto=true;return true}
+  return false;
+}
 function legState(l,gids){
-  var best=null,anyStarted=false,allFinal=true,found=false;
-  gids.forEach(function(id){var g=find(id);if(!g)return;var started=kind(g)!=='up';if(started)anyStarted=true;if(kind(g)!=='final')allFinal=false;
-    var c=S.box[id];if(c&&c.j){var v=boxNum(c.j,l.n,l.k);if(v!=null){found=true;best=v}}});
   if(!gids.length)return {st:'none'};
+  var anyStarted=false,allFinal=true,found=null,gs=gids.map(find).filter(Boolean).sort(function(a,b){return a.start-b.start});
+  gs.forEach(function(g){var k=kind(g);if(k!=='up')anyStarted=true;if(k!=='final')allFinal=false;
+    if(found)return;var c=S.box[g.id];if(c&&c.j){var v=boxNum(c.j,l.n,l.k);if(v!=null)found={v:v,fin:k==='final'}}});
   if(!anyStarted)return {st:'wait'};
-  if(found){if(best>=l.thr)return {st:'hit',cur:best};return allFinal?{st:'miss',cur:best}:{st:'live',cur:best}}
+  if(found){if(found.v>=l.thr)return {st:'hit',cur:found.v};return found.fin?{st:'miss',cur:found.v}:{st:'live',cur:found.v}}
   return allFinal?{st:'dnp'}:{st:'live',cur:null};
 }
 function trackBets(){
+  var chg0=false;S.mine.forEach(function(x){if(ensureGames(x))chg0=true});if(chg0)saveMine();
   var pend=S.mine.filter(function(x){return !x.res&&((x.games&&x.games.length)||x.gid)});
   if(!pend.length||(window.claude&&window.claude.use))return;
   var ids={};pend.forEach(function(x){(x.games||[]).concat(x.gid?[x.gid]:[]).forEach(function(id){ids[id]=1})});
@@ -1705,11 +1713,13 @@ function trackBets(){
   });
 }
 function liveHtml(x){
+  ensureGames(x);
   if(window.claude&&window.claude.use)return x.type==='parlay'||x.type==='prop'||x.type==='rprop'?'<div class="src">Live stat tracking runs in the installed app, not this preview.</div>':'';
   if(x.type==='parlay'&&x.legD&&x.games&&x.games.length){
     var rows=x.legD.map(function(l){var s2=legState(l,x.games),txt=s2.st==='wait'?'Not started':s2.st==='hit'?'Hit '+s2.cur+'/'+l.thr:s2.st==='miss'?'Missed '+s2.cur+'/'+l.thr:s2.st==='dnp'?'No stats, may not have played':s2.st==='live'?(s2.cur!=null?s2.cur+' of '+l.thr:'Waiting for stats'):'No game matched';
       return '<li>'+(s2.st==='hit'?'✓ ':s2.st==='miss'||s2.st==='dnp'?'✗ ':'')+esc(l.n)+' '+l.thr+'+ '+esc(l.stat.toLowerCase())+': <b>'+esc(txt)+'</b></li>'});
-    return '<div class="src" style="margin-top:6px"><b>Live tracking</b> (checks every 30 seconds while the app is open)</div><ul class="pts" style="margin:2px 0">'+rows.join('')+'</ul>';
+    var sts=x.legD.map(function(l){return legState(l,x.games).st}),nh=sts.filter(function(v){return v==='hit'}).length,nm=sts.filter(function(v){return v==='miss'}).length,sum=nm?'Slip is dead: '+nm+' leg'+(nm>1?'s':'')+' missed.':nh===sts.length?'Every leg has hit.':nh+' of '+sts.length+' legs hit so far.';
+    return '<div class="src" style="margin-top:6px"><b>Live tracking: '+sum+'</b> (checks every 30 seconds while the app is open)</div><ul class="pts" style="margin:2px 0">'+rows.join('')+'</ul>';
   }
   if(x.type==='parlay')return '<div class="src">The games for this slip could not be matched, so stats will not track. Mark it yourself when it settles.</div>';
   if(x.type==='rprop'&&x.gid){var g4=find(x.gid),c4=S.box[x.gid];if(g4&&kind(g4)==='up')return '<div class="src">Tracks automatically at kickoff, '+esc(gTime(g4))+'.</div>';var v4=c4&&c4.j?boxNum(c4.j,x.player,x.k):null;return '<div class="src"><b>Live:</b> '+(v4!=null?v4+' of '+x.thr+' needed':'waiting for stats')+'</div>'}
@@ -1836,7 +1846,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v35, Oct 20';
+var BUILD='v36, Oct 20';
 function foot(){return '<p class="foot"><button class="linkbtn" data-act="tab" data-t="about">How the model works</button> · <span class="src">Build '+BUILD+'</span></p><p class="foot">For entertainment and research only, not betting advice. Probabilities are estimates and can be wrong. If gambling is a problem for you or someone you know, call 1-800-GAMBLER.</p>'}
 
 /* ---------- sheets ---------- */
@@ -3325,6 +3335,7 @@ function mineWhy(x){
     priceLine(R,x.p,x.odds);return R;
   }
   if(x.type==='parlay'){
+    ensureGames(x);
     var legs=x.legD||[],games=x.games||[],pr=1,known=0,weak=null,byGame={};
     if(!legs.length)R.note.push('The legs of this slip were not saved in a form the app can break down. Delete it and upload the slip again to get a leg-by-leg reason.');
     R.legs=legs.map(function(l){
