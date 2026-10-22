@@ -1928,7 +1928,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v60, Oct 22';
+var BUILD='v61, Oct 22';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -2754,7 +2754,7 @@ try{var rl=localStorage.getItem('hitboard.log.v1');if(rl){var al=JSON.parse(rl);
 function saveLog(){try{localStorage.setItem('hitboard.log.v1',JSON.stringify(S.log.slice(-1500)))}catch(e){}}
 function picksFor(g){
   try{
-    if(g.lg==='nfl'){var r=research(g);if(r){var m=model(r);return m?straightBets(r,m):null}}
+    if(g.lg==='nfl'&&!lineFor(g)){var r=research(g);if(r){var m=model(r);return m?straightBets(r,m):null}}
     if(g.lg==='ncaamb'||g.lg==='mlb')return null;
     var fc=feedCalc(g);return fc?fc.bets:null;
   }catch(e){return null}
@@ -2900,37 +2900,24 @@ function feedCalc(g){
   var A=T.A,H=T.H;
   var sa=(A.pf+H.pa)/2-T.he/2,sh=(H.pf+A.pa)/2+T.he/2;
   var stP=Phi((sh-sa)/T.sdM),fp=(g.pa!=null&&g.ph!=null)?g.ph/(g.pa+g.ph):null;
-  var p=fp!=null?0.3*stP+0.7*fp:stP,ln=null;
-  if(g.lg==='nba')ln=DATA.nbaLines.games.filter(function(x){return x.a===g.a&&x.h===g.h})[0]||null;
-  if(g.dk&&g.dk.sp&&g.dk.tt!=null)ln={a:g.a,h:g.h,fav:g.dk.sp.fav,pts:g.dk.sp.pts,tt:g.dk.tt,src:g.dk.src||'DraftKings'};
-  try{var ko=(g.dk&&g.dk.sp&&g.dk.tt!=null)?null:kalFor(g);if(ko&&ko.sp&&!ko.sp.pk&&ko.tt&&!ko.thin&&Date.now()-ko.at<10*60000)ln={a:g.a,h:g.h,fav:ko.sp.fav,pts:ko.sp.pts,tt:ko.tt,src:'Kalshi'}}catch(e){}
-  var wxa=g.lg==='nfl'?wxAdj(T.H.k,g.start):{adj:0,pu:0},mkM=ln?(ln.fav==='h'?ln.pts:-ln.pts):null,total=sa+sh;if(ln)total=0.1*total+0.9*ln.tt;total+=wxa.adj;
+  var p=fp!=null?0.3*stP+0.7*fp:stP,ln=lineFor(g);
+  if(ln&&ln.mlP!=null)p=0.75*ln.mlP+0.25*p;
+  if(false)ln={a:g.a,h:g.h,fav:g.dk.sp.fav,pts:g.dk.sp.pts,tt:g.dk.tt,src:g.dk.src||'DraftKings'};
+  var wxa=g.lg==='nfl'?wxAdj(T.H.k,g.start):{adj:0,pu:0},mkM=(ln&&ln.pts!=null)?(ln.fav==='h'?ln.pts:-ln.pts):null,total=sa+sh;if(ln&&ln.tt!=null)total=0.1*total+0.9*ln.tt;total+=wxa.adj;
   var margin=mkM!=null?(0.3*(sh-sa)+0.7*mkM):T.sdM*invPhi(p);
   if(mkM!=null)p=Phi(margin/T.sdM);
   var rawM=margin,rawT=total,LN=learn(g.lg);
   if(LN.n){margin+=LN.dm;total+=LN.dt;p=Phi(margin/T.sdM)}
   var bets=[],ws=p>=.5?g.h:g.a,wpp=p>=.5?p:1-p;
   bets.push({t:'ml',side:p>=.5?'h':'a',mk:'Moneyline',pick:ws+' to win',p:wpp,conf:wpp>=.7?'high':wpp>=.6?'medium':'low',why:'Blended win chance '+pc(wpp)+'%'+(fp!=null?'; the feed alone says '+pc(p>=.5?fp:1-fp)+'%.':'. No feed win probability, so this is team stats only.')});
-  if(ln){
+  if(ln&&ln.pts!=null){
     var edge=margin-mkM,side=edge>=0?g.h:g.a,mm=Math.abs(mkM);
     var lineTxt=edge>=0?(mkM>=0?'-':'+')+mm.toFixed(1):(mkM>=0?'+':'-')+mm.toFixed(1);
-    bets.push({t:'sp',side:edge>=0?'h':'a',num:parseFloat(lineTxt),mk:'Spread',pick:side+' '+lineTxt,p:calibCover(Phi(Math.abs(edge)/T.sdM)),conf:confOf(edge/(T.sdM/13.5)),why:'Blended margin '+(margin>=0?g.h:g.a)+' by '+Math.abs(margin).toFixed(1)+' versus the listed '+ln.sp+'.'});
+    bets.push({t:'sp',side:edge>=0?'h':'a',num:parseFloat(lineTxt),mk:g.lg==='nhl'?'Puck line':'Spread',pick:side+' '+lineTxt,p:calibCover(Phi(Math.abs(edge)/T.sdM)),conf:confOf(edge/(T.sdM/13.5)),why:'Blended margin '+(margin>=0?g.h:g.a)+' by '+Math.abs(margin).toFixed(1)+' versus the listed '+ln.sp+'.'});
+  }
+  if(ln&&ln.tt!=null){
     var te=total-ln.tt;
     bets.push({t:'tot',over:te>=0,num:ln.tt,mk:'Total',pick:(te>=0?'Over ':'Under ')+ln.tt,p:calibTotal(Phi(Math.abs(te)/T.sdT),te<0,wxa),conf:'low',why:'Blended total '+total.toFixed(1)+' versus the listed '+ln.tt+'.'});
-  }else{
-    var fm=Math.abs(margin),fav=margin>=0?g.h:g.a,x=Math.max(.5,Math.floor(fm-1)+.5);
-    bets.push({t:'sp',side:margin>=0?'h':'a',num:-x,mk:'Spread',pick:fav+' -'+x.toFixed(1)+' or shorter',p:calibCover(Phi((fm-x)/T.sdM)),conf:'low',why:'No sportsbook spread was read. The model makes '+fav+' a '+fm.toFixed(1)+'-point favorite, so '+fav+' is a bet at -'+x.toFixed(1)+' or any shorter number. If your book lays more than that, skip it or take the other side.'});
-    var lt=leagueTotal(g.lg),over=lt==null?true:total>=lt,tx=Math.round((over?total-1.5:total+1.5)*2)/2;
-    bets.push({t:'tot',over:over,num:tx,mk:'Total',pick:(over?'Over '+tx.toFixed(1)+' or lower':'Under '+tx.toFixed(1)+' or higher'),p:calibTotal(over?Phi((total-tx)/T.sdT):Phi((tx-total)/T.sdT),!over,wxa),conf:'low',why:'No sportsbook total was read. The model total is '+total.toFixed(1)+(lt!=null?' versus a league average game of about '+lt.toFixed(1):'')+', so the lean is '+(over?'over':'under')+'. Take it only at '+tx.toFixed(1)+' or '+(over?'lower':'higher')+'; skip it at a worse number.'});
-  }
-  if(g.lg==='nhl'&&!ln){
-    bets=bets.filter(function(b){return b.t==='ml'});
-    var fmN=Math.abs(margin),favN=margin>=0?g.h:g.a,dogN=margin>=0?g.a:g.h,favS=margin>=0?'h':'a',dogS=margin>=0?'a':'h';
-    var pFav=Phi((fmN-1.5)/T.sdM),pDog=Phi((1.5-fmN)/T.sdM);
-    if(pFav>=.5)bets.push({t:'sp',side:favS,num:-1.5,mk:'Puck line',pick:favN+' -1.5',p:Math.min(.7,.5+.8*(pFav-.5)),conf:'low',why:'No sportsbook puck line was read. The model makes '+favN+' a '+fmN.toFixed(1)+'-goal favorite, so -1.5 needs a win by two or more. Take it only if your book pays at least the fair odds shown.'});
-    else bets.push({t:'sp',side:dogS,num:1.5,mk:'Puck line',pick:dogN+' +1.5',p:Math.min(.78,.5+.85*(pDog-.5)),conf:'low',why:'No sportsbook puck line was read. The model makes '+favN+' only a '+fmN.toFixed(1)+'-goal favorite, so '+dogN+' +1.5 wins unless they lose by two or more. That side usually carries a short price, so take it only if your book pays at least the fair odds shown.'});
-    var ltN=leagueTotal('nhl'),overN=total>=ltN,txN=Math.floor(overN?total-1:total+1)+.5;
-    bets.push({t:'tot',over:overN,num:txN,mk:'Total',pick:(overN?'Over ':'Under ')+txN.toFixed(1),p:calibTotal(overN?Phi((total-txN)/T.sdT):Phi((txN-total)/T.sdT),!overN,{adj:0,pu:0}),conf:'low',why:'No sportsbook total was read. The model total is '+total.toFixed(1)+' goals versus a league average game of about '+ltN.toFixed(1)+', so the lean is '+(overN?'over':'under')+'. Take it at '+txN.toFixed(1)+' or '+(overN?'lower':'higher')+'; skip it at a worse number.'});
   }
   bets.forEach(function(b){b.p0=b.p;b.p=(g.lg==='nhl'&&b.t==='sp')?Math.max(.3,Math.min(.8,b.p+(LN.dp.sp||0))):learnP(LN,b.t,b.p);b.rm=rawM;b.rt=rawT});
   return {T:T,p:p,fp:fp,ln:ln,total:total,margin:margin,bets:bets,LN:LN};
@@ -2991,7 +2978,7 @@ function feedAnalyst(g){
   }else h+='<h3>Projection table</h3><p class="note" style="margin-top:0">No player hit-rate data for these teams in the sources.</p>';
   var bets=feedCalc(g).bets;
   h+='<h3>Best straight bets</h3><div class="list">'+bets.map(function(b){return '<div class="card bcard"><div class="label">'+b.mk+(b.conf!=='n/a'?' · confidence '+b.conf:'')+'</div><div class="teams">'+esc(b.pick)+'</div>'+(b.p!=null?'<div class="facts"><span>Est. chance <b>'+pc(b.p)+'%</b></span><span>Fair odds <b>'+fairOdds(b.p)+'</b></span><span>Break-even at -110 <b>52.4%</b></span>'+(b.mk!=='Moneyline'?'<span>Stake at -110 <b>'+kelly(b.p)+'</b></span>':'')+'</div>':'')+'<p class="src" style="margin-top:6px">'+esc(b.why)+'</p></div>'}).join('')+'</div>';
-  h+='<h3>Line movement</h3><p class="note" style="margin-top:0">'+(ln?'Listed line: '+esc(ln.sp)+', total '+esc(ln.tot)+', moneyline '+esc(ln.ml)+'. '+esc(DATA.nbaLines.src)+' No opening-versus-current history is available.':'No sportsbook line was available for this game. Public betting percentages and sharp-money indicators are not available from free sources.')+'</p>';
+  h+='<h3>Line movement</h3><p class="note" style="margin-top:0">'+(ln?'Listed line: '+esc(ln.sp)+', total '+esc(ln.tot)+', moneyline '+esc(ln.ml)+'. '+esc(ln.srcTxt)+' No opening-versus-current history is available.':'No DraftKings or Kalshi line was available for this game, so no spread or total pick is shown. Public betting percentages and sharp-money indicators are not available from free sources.')+'</p>';
   h+='<h3>Uncertainty</h3><ul class="pts"><li><b>Solid:</b> '+(g.lg==='nhl'?'goal and shot rates over the first 8 to 11 games, blended with the league average, and the feed’s win probability.':g.lg==='nfl'?'team stats through five or six games and the feed’s win probability.':g.lg==='nba'?'last season’s scoring numbers and the feed’s win probability.':'this season’s scoring numbers through about six or seven games.')+'</li><li><b>Volatile:</b> '+(g.lg==='nhl'?'the starting goalie (not confirmed here), line changes, injuries and a sample of only 8 to 11 games per team. Hockey is low scoring, so one bounce decides many games.':g.lg==='nfl'?'injuries (no verified list for this game), weather and a small sample. No sportsbook line was read for this game, so the fair spread and total above are numbers to compare with your book.':g.lg==='nba'?'rosters, trades, minutes and injuries for the new season. Last season’s teams are only a rough guide.':'schedule strength is not adjusted, injuries and weather are unknown, and one blowout moves a six-game average a lot.')+'</li><li><b>Props:</b> '+(g.lg==='nfl'?'season averages swing a lot game to game, so use them as context.':g.lg==='nhl'?'player rates are season averages from 8 to 11 games, steadied toward typical rates, so treat them as context rather than a forecast.':'hit rates here come from short samples ('+(g.lg==='nba'?'10':'5')+' games), so treat them as context rather than a forecast.')+'</li></ul>';
   return h;
 }
@@ -4308,6 +4295,21 @@ function parseDK(odds,rawA,rawH){
   if((mh==null||ma==null)&&o.moneyline){mh=num(((o.moneyline.home||{}).close||(o.moneyline.home||{}).open||{}).odds);ma=num(((o.moneyline.away||{}).close||(o.moneyline.away||{}).open||{}).odds)}
   if(mh!=null&&ma!=null)out.ml={a:ma,h:mh};
   return (out.sp||out.tt!=null||out.ml)?out:null;
+}
+function lineFor(g){
+  var d=g.dk||{},k=null;try{k=kalFor(g)}catch(e){}
+  if(k&&Date.now()-k.at>15*60000)k=null;
+  var L={fav:null,pts:null,tt:null,mlP:null,srcs:[]};
+  if(d.sp){L.fav=d.sp.fav;L.pts=d.sp.pts;L.srcs.push('spread '+(d.src||'DraftKings'))}
+  else if(k&&k.sp&&!k.sp.pk){L.fav=k.sp.fav;L.pts=k.sp.pts;L.srcs.push('spread Kalshi')}
+  if(d.tt!=null){L.tt=d.tt;L.srcs.push('total '+(d.src||'DraftKings'))}
+  else if(k&&k.tt){L.tt=k.tt;L.srcs.push('total Kalshi')}
+  if(d.ml){L.mlP=1-nov(d.ml.a,d.ml.h);L.srcs.push('moneyline '+(d.src||'DraftKings'))}
+  else if(k&&k.ml){L.mlP=k.ml.h;L.srcs.push('moneyline Kalshi')}
+  if(L.pts==null&&L.tt==null&&L.mlP==null)return null;
+  L.a=g.a;L.h=g.h;
+  L.sp=L.pts==null?'n/a':(L.pts===0?'pick’em':(L.fav==='h'?g.h:g.a)+' -'+L.pts);L.tot=L.tt==null?'n/a':L.tt;L.ml=L.mlP==null?'n/a':g.h+' '+Math.round(L.mlP*100)+'% / '+g.a+' '+Math.round((1-L.mlP)*100)+'%';L.srcTxt='Sources: '+L.srcs.join(', ')+'.';
+  return L;
 }
 function dkLine(g){
   var d=g.dk;if(!d)return '';
