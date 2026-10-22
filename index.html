@@ -674,9 +674,9 @@ function vHome(){
   if(done.length)h+='<h3>Just finished</h3>'+done.map(miniRow).join('');
   h+=alertsHtml();
   // tracker
-  var M=S.mine,D=M.filter(function(x){return x.res&&x.res!=='P'}),w=D.filter(function(x){return x.res==='W'}).length,u=0,ap=0,np=0,open=M.filter(function(x){return !x.res});
+  var M=S.mine.filter(function(x){return srcOf(x)===S.mineView}),D=M.filter(function(x){return x.res&&x.res!=='P'}),w=D.filter(function(x){return x.res==='W'}).length,u=0,ap=0,np=0,open=M.filter(function(x){return !x.res});
   D.forEach(function(x){if(hasOd(x))u+=x.res==='W'?dec(x.odds)-1:-1;if(x.p!=null){ap+=x.p;np++}});
-  h+='<h3>Your tracker</h3><div class="card"><div class="facts"><span>Record <b>'+w+'-'+(D.length-w)+'</b></span><span>Hit <b>'+(D.length?Math.round(100*w/D.length)+'%':'—')+'</b></span><span>Model said <b>'+(np?Math.round(100*ap/np)+'%':'—')+'</b></span><span>1u bets <b>'+(u>=0?'+':'')+u.toFixed(1)+' u</b></span><span>Open <b>'+open.length+'</b></span></div>';
+  h+='<h3>Your tracker</h3>'+mineTabs()+'<div class="card"><div class="facts"><span>Record <b>'+w+'-'+(D.length-w)+'</b></span><span>Hit <b>'+(D.length?Math.round(100*w/D.length)+'%':'—')+'</b></span><span>Model said <b>'+(np?Math.round(100*ap/np)+'%':'—')+'</b></span><span>1u bets <b>'+(u>=0?'+':'')+u.toFixed(1)+' u</b></span><span>Open <b>'+open.length+'</b></span></div>';
   if(open.length)h+='<ul class="pts" style="margin-top:8px">'+open.slice(-5).reverse().map(function(x){return '<li><b>'+esc(x.pick)+'</b> <span class="src">'+fo(x.odds)+(x.p!=null?' · model '+Math.round(x.p*100)+'%':'')+'</span>'+liveHtml(x)+'</li>'}).join('')+'</ul>';
   else h+='<p class="src" style="margin:8px 0 0">No open bets. Track a recommended bet below, or upload a slip in My picks.</p>';
   h+='<div class="actions" style="margin-top:8px"><button class="btn" data-act="tab" data-t="picks">All my bets</button></div></div>';
@@ -1676,12 +1676,20 @@ function betDesc(b,g){
   if(b.type==='sp')return tm+' '+(b.line>0?'+':'')+b.line;
   return (b.side==='over'?'Over':'Under')+' '+b.line+' total';
 }
+function srcOf(x){return x.src||((x.builder||x.rec)?'app':'slip')}
+S.mineView='slip';
+function mineTabs(){
+  var na=S.mine.filter(function(x){return srcOf(x)==='app'}).length,ns=S.mine.length-na;
+  return '<div class="chips" role="group" aria-label="Which bets">'+[['slip','My slips ('+ns+')'],['app','App picks ('+na+')']].map(function(c){return '<button class="chip" data-act="mview" data-v="'+c[0]+'" aria-pressed="'+(S.mineView===c[0])+'">'+c[1]+'</button>'}).join('')+'</div>';
+}
 function mineHtml(){
-  var M=S.mine;if(!M.length)return '<h3>My bets</h3><p class="note" style="margin-top:0">Bets you save appear here and are graded when the game ends. Player bets you mark yourself.</p>';
+  var M=S.mine.filter(function(x){return srcOf(x)===S.mineView}),all=S.mine;
+  var tabs=mineTabs(),blurb=S.mineView==='app'?'<p class="note" style="margin:6px 0">Picks you tracked inside the app, no money involved. They are only here to show whether the bet would have won. Slips you upload are kept separately under My slips.</p>':'<p class="note" style="margin:6px 0">Real bets from slips you upload or enter by hand. Picks you track inside the app are kept under App picks.</p>';
+  if(!M.length)return '<h3>My bets</h3>'+tabs+blurb+'<p class="note" style="margin-top:0">'+(S.mineView==='app'?'Nothing tracked yet. Tap Track bet on any pick, or add legs to the betslip and track it.':'No slips yet. Upload a screenshot above.')+'</p>';
   var D=M.filter(function(x){return x.res&&x.res!=='P'}),w=D.filter(function(x){return x.res==='W'}).length,u=0,ap=0,np=0;
   D.forEach(function(x){if(hasOd(x))u+=x.res==='W'?dec(x.odds)-1:-1;if(x.p!=null){ap+=x.p;np++}});
-  var h='<h3>My bets</h3><div class="facts"><span>Record <b>'+w+'-'+(D.length-w)+'</b></span><span>Hit <b>'+(D.length?Math.round(100*w/D.length)+'%':'—')+'</b></span><span>Model said <b>'+(np?Math.round(100*ap/np)+'%':'—')+'</b></span><span>1u bets <b>'+(u>=0?'+':'')+u.toFixed(1)+' u</b></span></div><div class="list" style="margin-top:8px">';
-  h+=M.slice().reverse().map(function(x){var i=M.indexOf(x);
+  var h='<h3>My bets</h3>'+tabs+blurb+'<div class="facts"><span>Record <b>'+w+'-'+(D.length-w)+'</b></span><span>Hit <b>'+(D.length?Math.round(100*w/D.length)+'%':'—')+'</b></span><span>Model said <b>'+(np?Math.round(100*ap/np)+'%':'—')+'</b></span><span>1u bets <b>'+(u>=0?'+':'')+u.toFixed(1)+' u</b></span></div><div class="list" style="margin-top:8px">';
+  h+=M.slice().reverse().map(function(x){var i=all.indexOf(x);
     return '<div class="card bcard"><div class="teams">'+esc(x.pick)+'</div>'+(x.legs?'<ul class="pts" style="margin:4px 0">'+x.legs.map(function(l){return '<li>'+esc(l)+'</li>'}).join('')+'</ul>':'')+'<div class="src">'+esc(x.game||'')+' · '+fo(x.odds)+' · '+(x.p!=null?'model '+(x.p*100).toFixed(1)+'%'+(x.partial?' (priced legs only)':''):'no model chance')+'</div>'+liveHtml(x)+mineWhyHtml(x)+(x.score?'<div class="src">Final '+esc(x.score)+'</div>':'')+
       '<div class="facts">'+(x.res?'<span>Result <b>'+(x.res==='W'?'Won':x.res==='L'?'Lost':'Push')+'</b></span>':(x.type==='prop'||x.type==='manual'||x.type==='parlay'||x.type==='rprop'?'<button class="btn" data-act="mres" data-i="'+i+'" data-r="W">Won</button><button class="btn" data-act="mres" data-i="'+i+'" data-r="L">Lost</button><button class="btn" data-act="mres" data-i="'+i+'" data-r="P">Push</button>':'<span>Waiting for the game to end</span>'))+'<button class="btn" data-act="mydel" data-i="'+i+'">Remove</button></div></div>';
   }).join('')+'</div>';
@@ -1903,7 +1911,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v57, Oct 22';
+var BUILD='v58, Oct 22';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -4438,6 +4446,7 @@ document.addEventListener('click',function(e){
     S.mine.push({id:String(Date.now()),at:Date.now(),type:b.type,side:b.side,pk:b.pk,player:b.player,gid:b.type==='prop'?propGame(b.player,b.pk):b.gid,lg:g?g.lg:'nfl',line:b.type==='ml'?null:parseFloat(b.line),odds:od,oddsGiven:od!=null,p:a.p,pick:betDesc({type:b.type,side:b.side,pk:b.pk,player:b.player,line:parseFloat(b.line)},g),game:g?g.a+' @ '+g.h:(a.game||''),res:null});
     saveMine();S.scan={type:'ml',gid:'',side:'h',player:'',pk:'rec',line:'',odds:'',busy:'',msg:'Saved. It will be graded when the game ends.',raw:''};render();
   }
+  else if(act==='mview'){S.mineView=el.dataset.v;render()}
   else if(act==='mydel'){S.mine.splice(+el.dataset.i,1);saveMine();render()}
   else if(act==='mres'){var mx=S.mine[+el.dataset.i];if(mx){mx.res=el.dataset.r;saveMine();render()}}
 });
