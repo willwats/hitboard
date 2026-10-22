@@ -1902,7 +1902,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v53, Oct 22';
+var BUILD='v54, Oct 22';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -2619,22 +2619,16 @@ function nflDeep(){
   games.sort(function(a,b){return a.s-b.s});
   var seen={},opts=['All'].concat(games.filter(function(x){if(seen[x.k])return false;seen[x.k]=1;return true}).map(function(x){return x.k}));
   var h='<p class="lede">Every player with real volume this season, not only the top few. Each row shows the next opponent, how often that defense plays man and zone, and the chance of clearing three yardage marks against that defense.</p>';
+  h+='<div class="chips" role="group" aria-label="Stat">'+kinds.map(function(k){return '<button class="chip" data-act="dk" data-v="'+k[0]+'" aria-pressed="'+(S.dk===k[0])+'">'+k[1]+'</button>'}).join('')+'</div>';
   h+='<div class="chips" role="group" aria-label="Game">'+opts.map(function(o){return '<button class="chip" data-act="dgm" data-v="'+o+'" aria-pressed="'+(S.dgm===o)+'">'+(o==='All'?'All games':o)+'</button>'}).join('')+'</div>';
-  var dk0=S.dk,secs='',more=0;
-  kinds.forEach(function(kk){
-  S.dk=kk[0];var rows=deepRows(),cap=S.dmore?rows.length:15;
-  if(!rows.length)return;
-  secs+='<h3>'+kk[1]+'</h3><div class="tblwrap"><table><thead><tr><th>Player and matchup</th><th>Proj.</th><th>Chance to clear</th></tr></thead><tbody>'+rows.slice(0,cap).map(function(r){
+  var rows=deepRows(),cap=S.dmore?rows.length:60;
+  if(!rows.length)return h+'<div class="card empty">No players match. Teams on a bye or already finished this week are left out.</div>';
+  h+='<div class="tblwrap"><table><thead><tr><th>Player and matchup</th><th>Proj.</th><th>Chance to clear</th></tr></thead><tbody>'+rows.slice(0,cap).map(function(r){
     var d=r.d,c=COV[r.nx.opp];
     return '<tr><td><b>'+esc(d.n)+'</b>'+badge(d.n,d.t)+' <span class="src">'+d.t+' '+d.pos+'</span><br><span class="src">'+esc(r.nx.txt)+'</span><br><span class="src">'+r.nx.opp+(c?' plays man '+Math.round(c[0])+'% / zone '+Math.round(c[1])+'% · '+covLabel(c[0]):'')+'</span><br><span class="src">'+r.nx.opp+' allows '+r.allow.toFixed(0)+' '+(d.kind==='rush'?'rush':'pass')+' yds/g ('+ordn(r.rk)+' best)</span></td>'+
       '<td>'+r.proj.toFixed(1)+'<br><span class="src">avg '+d.avg.toFixed(1)+'</span></td><td>'+r.marks.map(function(m){return '<span class="hrpill '+(m[1]>=.7?'hi':m[1]<.4?'lo':'mid')+'" style="display:inline-block;margin:0 0 3px 0">'+m[0].toFixed(1)+'+ · '+Math.round(m[1]*100)+'%</span>'}).join('<br>')+'</td></tr>';
   }).join('')+'</tbody></table></div>';
-  if(rows.length>cap)more=Math.max(more,rows.length);
-  });
-  S.dk=dk0;
-  if(!secs)return h+'<div class="card empty">No players match. Teams on a bye or already finished this week are left out.</div>';
-  h+=secs;
-  if(more&&!S.dmore)h+='<div class="actions"><button class="btn" data-act="dmore">Show every player</button></div>';
+  if(rows.length>cap)h+='<div class="actions"><button class="btn" data-act="dmore">Show all '+rows.length+' players</button></div>';
   h+='<p class="note" style="margin-top:12px">Chances use the player’s 2026 per-game average, pulled toward the average for his position group (a few games is a noisy sample) and shifted up to 12% by how the opponent’s pass or run defense ranks, with the same normal-curve spread as the calculator. They are not sportsbook lines, so compare each mark with your book. '+esc(COV_SRC)+' Man-versus-zone splits for individual players are behind paywalls (PFF, Fantasy Points), so the chances above are not split by coverage; use the man and zone rates to judge which receivers the scheme helps. Stats: '+esc(DEEPSRC.asOf)+'.</p>';
   return h;
 }
@@ -3666,8 +3660,8 @@ function pxGames(lg){
   if(S.xg!=='All'&&ids.indexOf(S.xg)<0)S.xg='All';
   return {ids:ids,lab:gm};
 }
-function pxChips(lg,G,kd,noStat){
-  var h=noStat?'':'<div class="chips" role="group" aria-label="Stat">'+PXK[lg].map(function(k){return '<button class="chip" data-act="set" data-k="xk" data-v="'+k[0]+'" aria-pressed="'+(kd===k[0])+'">'+k[1]+'</button>'}).join('')+'</div>';
+function pxChips(lg,G,kd){
+  var h='<div class="chips" role="group" aria-label="Stat">'+PXK[lg].map(function(k){return '<button class="chip" data-act="set" data-k="xk" data-v="'+k[0]+'" aria-pressed="'+(kd===k[0])+'">'+k[1]+'</button>'}).join('')+'</div>';
   if(G.ids.length>1)h+='<div class="chips" role="group" aria-label="Game">'+['All'].concat(G.ids).map(function(o){return '<button class="chip" data-act="set" data-k="xg" data-v="'+o+'" aria-pressed="'+(S.xg===o)+'">'+(o==='All'?'All games':G.lab[o])+'</button>'}).join('')+'</div>';
   return h;
 }
@@ -3680,26 +3674,19 @@ function pxEmpty(lg){
 }
 function pxDeep(lg){
   pxRefresh(lg);
-  var kd=pxKind(lg),G=pxGames(lg),multi=lg!=='nhl';
+  var kd=pxKind(lg),G=pxGames(lg);
   var h=pxAvailNote(lg)+'<p class="lede">A matchup board like the NFL one, now for '+esc(LG.filter(function(l){return l[0]===lg})[0][1])+'. Each row shows the next opponent, how that defense has done, a projection, and the chance of clearing three marks. Tap a player to enter your book’s line and see the edge, then save it to My picks.</p>';
-  h+=pxChips(lg,G,kd,multi);
-  var secs='',more=0;
-  (multi?PXK[lg]:[[kd,'']]).forEach(function(kk){
-    var kd=kk[0],kl=kk[1];
-    var rows=pxList(lg,kd).map(function(p){var pct=pxAdj(p),mu=p.avg*(1+pct/100);return {p:p,pct:pct,mu:mu,marks:pxMarks(p,mu).map(function(l){return [l,calc(p,l,-110,-110,pct).po]})}});
+  h+=pxChips(lg,G,kd);
+  var rows=pxList(lg,kd).map(function(p){var pct=pxAdj(p),mu=p.avg*(1+pct/100);return {p:p,pct:pct,mu:mu,marks:pxMarks(p,mu).map(function(l){return [l,calc(p,l,-110,-110,pct).po]})}});
   rows.sort(function(a,b){return b.mu-a.mu});
-  if(!rows.length){secs+=(multi?'<h3>'+esc(kl)+'</h3>':'')+pxEmpty(lg);return}
-    var cap=S.dmore?rows.length:(multi?15:60);
-    secs+=(multi?'<h3>'+esc(kl)+'</h3>':'')+'<div class="tblwrap"><table><thead><tr><th>Player and matchup</th><th>Proj.</th><th>Chance to clear</th></tr></thead><tbody>'+rows.slice(0,cap).map(function(r){
+  if(!rows.length)return h+pxEmpty(lg);
+  var cap=S.dmore?rows.length:60;
+  h+='<div class="tblwrap"><table><thead><tr><th>Player and matchup</th><th>Proj.</th><th>Chance to clear</th></tr></thead><tbody>'+rows.slice(0,cap).map(function(r){
     var p=r.p,cx=pxCtx(p),c2=pxCtx2(p),pos=p.pos||PXPOS[p.kind]||'';
     return '<tr><td><button class="pxname" data-act="prop" data-id="'+p.id+'"><b>'+esc(p.name)+'</b></button>'+pxBadge(p)+' <span class="src">'+esc(p.team)+(pos?' '+pos:'')+'</span><br><span class="src">'+esc(p.mt)+'</span>'+(cx?'<br><span class="src">'+esc(cx)+'</span>':'')+(c2?'<br><span class="src">'+esc(c2)+'</span>':'')+(p.hits!=null?'<br><span class="src">Cleared '+p.mark+' in '+p.hits+' of '+p.g+' games</span>':'')+'</td>'+
       '<td>'+r.mu.toFixed(PXPOIS[p.kind]&&r.mu<3?2:1)+'<br><span class="src">avg '+p.avg.toFixed(PXPOIS[p.kind]&&p.avg<3?2:1)+(p.implied?' (implied)':'')+'</span></td><td>'+r.marks.map(function(m){return '<span class="hrpill '+(m[1]>=.7?'hi':m[1]<.4?'lo':'mid')+'" style="display:inline-block;margin:0 0 3px 0">'+m[0].toFixed(1)+'+ · '+Math.round(m[1]*100)+'%</span>'}).join('<br>')+'</td></tr>';
   }).join('')+'</tbody></table></div>';
-    if(rows.length>cap)more=Math.max(more,rows.length);
-    if(false)h+='<div class="actions"><button class="btn" data-act="dmore">Show all '+rows.length+' players</button></div>';
-  });
-  h+=secs;
-  if(more&&!S.dmore)h+='<div class="actions"><button class="btn" data-act="dmore">Show every player</button></div>';
+  if(rows.length>cap)h+='<div class="actions"><button class="btn" data-act="dmore">Show all '+rows.length+' players</button></div>';
   var nt2=lg==='nhl'?'Chances use season goal, assist and shot rates through 8 to 11 games, steadied toward a typical rate for each player’s ice time, and shift up to 15% by how much the opponent allows. They ignore line combinations, power-play time and the opposing goalie.':lg==='nba'?'Chances use each player’s last-10 average from last season and shift up to 10% by how the opponent defended last season. Rosters, minutes and roles change, so early-season games are noisy.':lg==='ncaafb'?'The source gives a hit rate at one mark, so the average is backed out of that rate and may be rough. Chances shift up to 12% by how many points the opponent allows.':'Chances use season rates for one typical game. They ignore the opposing pitcher, ballpark and lineup spot.';
   return h+'<p class="note" style="margin-top:12px">'+nt2+' They are not sportsbook lines, so compare each mark with your book.</p>';
 }
