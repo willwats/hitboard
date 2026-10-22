@@ -163,7 +163,7 @@ details.bcard summary{cursor:pointer;min-height:32px;display:flex;align-items:ce
 @media (prefers-reduced-motion: no-preference){.sheet{animation:up .18s ease-out}@keyframes up{from{transform:translateY(24px);opacity:.6}to{transform:none;opacity:1}}}
 /* v48: the page scrolls inside .wrap and the nav is a normal bottom row, so iOS can never detach it */
 html,body{height:100%;overflow:hidden;overscroll-behavior:none}
-body{min-height:0;display:flex;flex-direction:column;padding-left:0;padding-right:0;padding-block:0}
+body{position:fixed;top:0;left:0;right:0;bottom:0;height:auto;min-height:0;display:flex;flex-direction:column;padding-left:0;padding-right:0;padding-block:0}
 .wrap{flex:1 1 auto;min-height:0;width:100%;max-width:672px;margin:0 auto;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:0 max(16px,env(safe-area-inset-right,0px)) 28px max(16px,env(safe-area-inset-left,0px))}
 nav{position:relative;flex:none;left:auto;right:auto;bottom:auto;width:100%}
 </style>
@@ -1906,7 +1906,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v48, Oct 22';
+var BUILD='v49, Oct 22';
 function foot(){return '<p class="foot"><button class="linkbtn" data-act="tab" data-t="about">How the model works</button> · <span class="src">Build '+BUILD+'</span></p><p class="foot">For entertainment and research only, not betting advice. Probabilities are estimates and can be wrong. If gambling is a problem for you or someone you know, call 1-800-GAMBLER.</p>'}
 
 /* ---------- sheets ---------- */
@@ -2309,8 +2309,8 @@ function vBestBets(){
       var n=0,L=[];try{L=straightList(lg).filter(function(b){return b.label!=='Game bet'}).sort(function(a,b){return b.p-a.p})}catch(e){}
       L.forEach(function(b){if(n>=5)return;n++;var c=Object.assign({},b);c.label=lgName(lg)+' · '+b.label;c.lgKey=lg;props.push(c)});
     });
-    games.sort(function(a,b){return b.best-a.best});games=games.slice(0,12);
-    props.sort(function(a,b){return b.p-a.p});props=props.slice(0,20);
+    games.sort(function(a,b){return b.best-a.best});var cg={};games=games.filter(function(x){cg[x.g.lg]=(cg[x.g.lg]||0)+1;return cg[x.g.lg]<=4});
+    props.sort(function(a,b){return b.p-a.p});
     var rl=[];games.forEach(function(x){x.bets.forEach(function(b){b.ri=rl.push(b)-1})});
     props.forEach(function(b){b.ri=rl.push(b)-1});
     _mbK=key;_mbL=rl;_mbG={games:games,props:props};
@@ -2319,9 +2319,13 @@ function vBestBets(){
   var G=_mbG.games,P=_mbG.props;
   if(!G.length&&!P.length)return h+'<div class="card empty">No games left to bet on in the next day and a half. Finished and started games are removed. Tap Refresh, or pick a sport above.</div>'+foot();
   h+='<p class="lede">Games that have not started, with the model’s moneyline, spread and total for each. Games that have started or finished are removed. Chances are the model’s; sportsbook prices were not readable, so compare the fair odds with your book.</p>';
-  h+='<h3>Game bets, next 36 hours</h3>';
-  h+=G.length?G.map(function(x){return '<div class="card bcard"><div class="label">'+esc(lgName(x.g.lg))+' · '+esc(gTime(x.g))+'</div><div class="teams">'+esc(x.g.a)+' <i>@</i> '+esc(x.g.h)+'</div>'+x.bets.map(function(b){return mbRow(b,b.ri)}).join('')+'</div>'}).join(''):'<div class="card empty">No upcoming games in the next 36 hours.</div>';
-  if(P.length)h+='<h3>Best player props</h3>'+P.map(function(b){return betCard(b,b.ri,'b')}).join('');
+  ['nfl','nba','ncaafb','nhl','mlb'].forEach(function(lg){
+    var gs=G.filter(function(x){return x.g.lg===lg}),ps2=P.filter(function(b){return b.lgKey===lg});
+    if(!gs.length&&!ps2.length)return;
+    h+='<h2 style="margin-top:22px">'+esc(lgName(lg))+' · best of today</h2>';
+    if(gs.length)h+='<h3>Game bets</h3>'+gs.map(function(x){return '<div class="card bcard"><div class="label">'+esc(gTime(x.g))+'</div><div class="teams">'+esc(x.g.a)+' <i>@</i> '+esc(x.g.h)+'</div>'+x.bets.map(function(b){return mbRow(b,b.ri)}).join('')+'</div>'}).join('');
+    if(ps2.length)h+='<h3>Player props</h3>'+ps2.map(function(b){return betCard(b,b.ri,'b')}).join('');
+  });
   return h+foot();
 }
 function parlaysBody(lg){
@@ -3925,11 +3929,11 @@ function vPropsTop(){
       var n=0;
       try{straightList(lg).filter(function(b){return b.label!=='Game bet'}).sort(function(a,b){return b.p-a.p}).forEach(function(b){if(n>=7)return;n++;var c=Object.assign({},b);c.label=lgName(lg)+' · '+b.label;c.lgKey=lg;all.push(c)})}catch(e){}
     });
-    all.sort(function(a,b){return b.p-a.p});_topK=key;_topL=all.slice(0,30);
+    _topK=key;_topL=all;
   }
   S.recList=_topL;
   if(!_topL.length)return h+'<div class="card empty">No player props with a game still to play. Tap Refresh, or pick a sport above.</div>'+foot();
-  return h+'<p class="lede">The strongest player props across every sport right now, best chance first (up to seven per sport). Chances come from this app’s model. Sportsbook prices were not readable, so compare the fair odds with your book. Pick a sport above for the full board.</p>'+_topL.map(function(b,i){return betCard(b,i)}).join('')+foot();
+  return h+'<p class="lede">The strongest player props for each sport that has games coming up, best chance first (up to seven per sport). Chances come from this app’s model. Sportsbook prices were not readable, so compare the fair odds with your book. Pick a sport above for the full board.</p>'+(function(){var o='',cur='';_topL.forEach(function(b,i){if(b.lgKey!==cur){cur=b.lgKey;o+='<h2 style="margin-top:22px">'+esc(lgName(cur))+' · best of today</h2>'}o+=betCard(b,i)});return o})()+foot();
 }
 function vMore(){
   var items=[['div','Standings','Every division with points or win percentage and each team’s next game. Tap a team for its page, stats and next matchup.'],
