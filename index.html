@@ -161,6 +161,11 @@ td.lc{text-align:center} td.lc.hi{background:var(--hit-bg);color:var(--hit)} td.
 details.bcard{margin-bottom:8px}
 details.bcard summary{cursor:pointer;min-height:32px;display:flex;align-items:center;gap:8px}
 @media (prefers-reduced-motion: no-preference){.sheet{animation:up .18s ease-out}@keyframes up{from{transform:translateY(24px);opacity:.6}to{transform:none;opacity:1}}}
+/* v48: the page scrolls inside .wrap and the nav is a normal bottom row, so iOS can never detach it */
+html,body{height:100%;overflow:hidden;overscroll-behavior:none}
+body{min-height:0;display:flex;flex-direction:column;padding-left:0;padding-right:0;padding-block:0}
+.wrap{flex:1 1 auto;min-height:0;width:100%;max-width:672px;margin:0 auto;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:0 max(16px,env(safe-area-inset-right,0px)) 28px max(16px,env(safe-area-inset-left,0px))}
+nav{position:relative;flex:none;left:auto;right:auto;bottom:auto;width:100%}
 </style>
 </head><body>
 
@@ -1901,7 +1906,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v47, Oct 21';
+var BUILD='v48, Oct 22';
 function foot(){return '<p class="foot"><button class="linkbtn" data-act="tab" data-t="about">How the model works</button> · <span class="src">Build '+BUILD+'</span></p><p class="foot">For entertainment and research only, not betting advice. Probabilities are estimates and can be wrong. If gambling is a problem for you or someone you know, call 1-800-GAMBLER.</p>'}
 
 /* ---------- sheets ---------- */
@@ -4114,7 +4119,7 @@ function builderSave(){
   });
   S.mine.push(ent);saveMine();S.slip=[];saveSlip();S.bo='';S.bmsg='';S.bb=null;S.tab='picks';S.sheet=null;renderSheet();
   try{trackBets()}catch(e){}
-  render();window.scrollTo(0,0);
+  render();scTop();
 }
 
 function modeSwitch(cur){
@@ -4171,12 +4176,16 @@ var NAVG={home:['home'],games:['games','scores'],props:['props','parlay'],picks:
 function renderNav(){
   $('#nav').innerHTML=TABS.map(function(t){return '<button data-act="tab" data-t="'+t[0]+'"'+(NAVG[t[0]].indexOf(S.tab)>=0?' aria-current="page"':'')+'><svg viewBox="0 0 24 24" aria-hidden="true">'+t[2]+'</svg>'+t[1]+(t[0]==='picks'&&S.picks.length?'<span class="badge">'+S.picks.length+'</span>':'')+'</button>'}).join('');
 }
+function scEl(){return document.querySelector('.wrap')}
+function scY(){var e=scEl();return e?e.scrollTop:0}
+function scSet(y){var e=scEl();if(e)e.scrollTop=y}
+function scTop(){scSet(0)}
 function render(){
-  var _y=window.pageYOffset||0;
+  var _y=scY();
   $('#view').innerHTML={home:vHome,games:vGames,scores:vScores,div:vDiv,record:vRecord,props:vProps,parlay:vParlay,picks:vPicks,about:vAbout,more:vMore,builder:vBuilder}[S.tab]();
   $('#stamp').innerHTML='Feed '+esc(fmtClock(S.feedAt))+'<br>'+(S.live?'live':'snapshot');
   renderNav();updateSlipBar();
-  if(_y&&Math.abs((window.pageYOffset||0)-_y)>2)window.scrollTo(0,_y);
+  if(_y&&Math.abs(scY()-_y)>2)scSet(_y);
 }
 function openProp(id){var p=propById(id);S.sheet={type:'prop',id:id,line:defLine(p),oo:-110,uo:-110,adj:p.lg?Math.round(pxAdj(p)):0};renderSheet()}
 
@@ -4298,12 +4307,12 @@ document.addEventListener('click',function(e){
   var act=el.dataset.act;
   if(act==='scrim'){if(e.target!==el)return;S.sheet=null;renderSheet();return}
   if(act==='wxretry'){wxRetry();return}
-  if(act==='tab'){S.tab=el.dataset.t;render();window.scrollTo(0,0)}
+  if(act==='tab'){S.tab=el.dataset.t;render();scTop()}
   else if(act==='sport'){if(el.dataset.m)S.mtop='';else S.ptop='';S.sport=el.dataset.v;S.cat=null;S.gv='up';S.xk=null;S.xg='All';render()}
   else if(act==='refresh'){doRefresh()}
   else if(act==='brm'){S.slip.splice(+el.dataset.i,1);saveSlip();if(!S.slip.length&&S.sheet&&S.sheet.type==='slip'){S.sheet=null;renderSheet()}reslip()}
   else if(act==='slipopen'){if(S.slip.length){S.sheet={type:'slip'};renderSheet()}}
-  else if(act==='bgoadd'){S.sheet=null;renderSheet();S.tab='builder';S.bb='add';render();window.scrollTo(0,0)}
+  else if(act==='bgoadd'){S.sheet=null;renderSheet();S.tab='builder';S.bb='add';render();scTop()}
   else if(act==='bcadd'){var bb0=S.bcl[+el.dataset.i];if(bb0){var lg0=recLeg(bb0);if(slipToggle(lg0)||true){el.className='btn'+(inSlip(lg0.key)?'':' primary');el.textContent=inSlip(lg0.key)?'In slip ✓':'+ Add to slip'}}}
   else if(act==='gsadd'){var gg=find(el.dataset.id),pk0=gg&&picksFor(gg);if(pk0){var px=pk0.filter(function(q){return q.pick===el.dataset.pk})[0];if(px){var gl0=gameLeg(gg,px);slipToggle(gl0);el.className='btn'+(inSlip(gl0.key)?'':' primary');el.textContent=inSlip(gl0.key)?'In slip ✓':'+ Add to slip'}}}
   else if(act==='badd'){var bl0=S.bl[+el.dataset.i];if(bl0){var ix=-1;S.slip.forEach(function(q,qi){if(q.key===bl0.key)ix=qi});if(ix>=0)S.slip.splice(ix,1);else if(S.slip.length<15)S.slip.push(toSlipLeg(bl0,bl0.lg));saveSlip();updateSlipBar();var bq0=document.getElementById('bl');if(bq0){bq0.innerHTML=addList(builderLegs(S.sport))}var chp=document.querySelector('[data-k="bb"][data-v="slip"]');if(chp)chp.textContent='Your slip ('+S.slip.length+')'}}
@@ -4311,7 +4320,7 @@ document.addEventListener('click',function(e){
   else if(act==='bex'){var gx=S.bg[+el.dataset.i];if(gx){S.bex=S.bex===gx.k?null:gx.k;var bl1=document.getElementById('bl');if(bl1)bl1.innerHTML=addList(builderLegs(S.sport))}}
   else if(act==='bclear'){S.slip=[];saveSlip();S.bb='add';S.sheet=null;renderSheet();render()}
   else if(act==='btrack'){builderSave()}
-  else if(act==='useparlay'){var sg=S.sugList[+el.dataset.i];if(sg){S.slip=sg.legs.map(function(l){return toSlipLeg(l,sg.lg)});saveSlip();S.bb='slip';S.tab='builder';render();window.scrollTo(0,0)}}
+  else if(act==='useparlay'){var sg=S.sugList[+el.dataset.i];if(sg){S.slip=sg.legs.map(function(l){return toSlipLeg(l,sg.lg)});saveSlip();S.bb='slip';S.tab='builder';render();scTop()}}
   else if(act==='cat'){S.cat=el.dataset.v;render()}
   else if(act==='ckretry'){S.ck.err='';render()}
   else if(act==='gpk'){S.gpk=el.dataset.v;renderSheet()}
@@ -4322,7 +4331,7 @@ document.addEventListener('click',function(e){
   else if(act==='dk'){S.dk=el.dataset.v;S.dmore=false;render()}
   else if(act==='dgm'){S.dgm=el.dataset.v;S.dmore=false;render()}
   else if(act==='dmore'){S.dmore=true;render()}
-  else if(act==='gprops'){S.gf=el.dataset.id;S.tab='props';S.sport='nfl';S.cat='calc';render();window.scrollTo(0,0)}
+  else if(act==='gprops'){S.gf=el.dataset.id;S.tab='props';S.sport='nfl';S.cat='calc';render();scTop()}
   else if(act==='game'){S.sheet={type:'game',id:el.dataset.id};var gw=gameById(el.dataset.id),fw=gw&&feedFor(gw);if(gw)loadWx(gw.h).then(function(){if(S.sheet&&S.sheet.id===gw.id)renderSheet()});renderSheet()}
   else if(act==='fgame'){S.sheet={type:'fgame',id:el.dataset.id};var fg0=find(el.dataset.id);if(fg0)loadStats(fg0);if(fg0&&kind(fg0)!=='final')trendEnsure(fg0);if(fg0&&wxLeagueOn(fg0.lg))wxEnsure(fg0).then(function(){if(S.sheet&&S.sheet.id===fg0.id)renderSheet()});renderSheet()}
   else if(act==='prop'){openProp(el.dataset.id)}
