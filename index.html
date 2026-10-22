@@ -1456,6 +1456,14 @@ function parseLegs(raw){
     }
     legs.push({n:name,thr:thr,k:st[1],stat:st[2]==='Threes'?'Threes':st[2],odds:lodd});
   });
+  lines.forEach(function(ln,i){
+    var m0=ln.match(/^(.*?)\s*(passing|rushing|receiving|pass|rush|rec)\s*(?:yards|yds)\s*$/i);if(!m0)return;
+    var m=[m0[0],m0[1],'',m0[2]];
+    var kk=/^pas/i.test(m[3])?'pass':/^rus/i.test(m[3])?'rush':'rec',nm=m[1].replace(/\(.*?\)/g,'').replace(/[^A-Za-z.'\- ]/g,' ').replace(/\s+/g,' ').trim(),team=(ln.match(/\(([A-Z]{2,4})\)/)||[])[1]||'',thr=null;
+    for(var k=i-1;k>=Math.max(0,i-3);k--){var mm=lines[k].match(/^\W{0,3}[A-Za-z]?\s?(\d{1,4}(?:\.5)?)\s*\+\s*$/);if(mm){thr=parseFloat(mm[1]);break}}
+    if(!nm||nm.length<3||thr==null)return;
+    legs.push({n:cleanName(nm)||nm,thr:thr,k:kk,stat:({pass:'passing yards',rush:'rushing yards',rec:'receiving yards'})[kk],team:team,fb:1,odds:null});
+  });
   if(hdr&&hdr.length===legs.length)legs.forEach(function(l,i){if(l.thr==null)l.thr=hdr[i]});
   else if(hdr&&hdr.every(function(v){return v===hdr[0]}))legs.forEach(function(l){if(l.thr==null)l.thr=hdr[0]});
   if(lodds.length===legs.length)legs.forEach(function(l,i){if(l.odds==null)l.odds=lodds[i]});
@@ -1508,20 +1516,29 @@ function slipGames(raw){
   var nicks=[];
   txt.split(/\n+/).forEach(function(ln){
     var m=ln.match(/([A-Za-z0-9.' ]{3,}?)\s*@\s*([A-Za-z0-9.' ]{3,}?)\s*(?:[-+·•»]|$)/);if(!m)return;
-    nicks.push([normName(m[1]).split(' ').pop(),normName(m[2]).split(' ').pop()]);
+    nicks.push([normName(m[1]).split(' ').pop(),normName(m[2]).split(' ').pop(),normName(m[1]),normName(m[2])]);
   });
   LG.forEach(function(l){(S.feed[l[0]]||[]).forEach(function(g){
     if(kind(g)==='final'&&g.start<Date.now()-864e5)return;
     if(g.start>Date.now()+4*864e5)return;
     var a2=normName(g.an).split(' ').pop(),h2=normName(g.hn).split(' ').pop(),hit=false;
-    nicks.forEach(function(n){if(n[0]===a2&&n[1]===h2)hit=true});
+    nicks.forEach(function(n){if(n[0]===a2&&n[1]===h2)hit=true;if(n[2]&&n[3]&&n[2].length>3&&n[3].length>3&&normName(g.an).indexOf(n[2])===0&&normName(g.hn).indexOf(n[3])===0)hit=true});
     if(!hit&&toks[tabb(g.a)]&&toks[tabb(g.h)]&&l[0]!=='mlb')hit=true;
     if(hit&&!seen[g.id]){seen[g.id]=1;out.push(g.id)}
   })});
   return out;
 }
 function amFromDec(d){return d>=2?Math.round((d-1)*100):-Math.round(100/(d-1))}
+function footPrice(l){
+  var thr=l.thr-.5,key=normName(l.n),nflK={pass:'pass',rush:'rush',rec:'rec'},cK={pass:'cpass',rush:'crush',rec:'crec'};
+  var d=(typeof DEEP!=='undefined'?DEEP:[]).filter(function(x){return normName(x.n)===key&&x.kind===l.k})[0];
+  if(d){var a=analyzeBet({type:'prop',player:d.n,pk:l.k,line:String(thr),side:'over',odds:''});return {p:a.p,basis:a.note||('NFL: '+d.n+' averages '+d.avgS.toFixed(1)+' yards'),mean:a.proj,team:d.t,odds:l.odds}}
+  var q=PROPS.filter(function(x){return x.lg==='ncaafb'&&x.kind===cK[l.k]&&normName(x.name)===key})[0];
+  if(q){var c=calc(q,thr,-110,-110,pxAdj(q));return {p:c.po,basis:'College: '+q.name+' averages '+q.avg.toFixed(1)+' yards a game over '+q.g+' games, model projects '+c.mu.toFixed(1)+' against '+(q.mt||'this opponent'),mean:c.mu,team:q.team}}
+  return {p:null,basis:'No yardage data in the app for this player'};
+}
 function legPrice(l){
+  if(l.fb)return footPrice(l);
   var tb=DATA.hit.nba.tables.filter(function(t){return t.stat===l.stat})[0],key=normName(l.n),row=null;
   if(tb)tb.rows.forEach(function(r){if(normName(r[0])===key)row=r});
   if(!row)return {p:null,basis:'No last-10 data in the app for this player'};
@@ -1586,7 +1603,7 @@ function parseSlip(raw){
 function analyzeBet(b){
   var line=parseFloat(b.line),od=parseFloat(b.odds),out={p:null,note:''};
   if(b.type==='parlay'){
-    var L=(b.legs||[]).map(function(l){var r=legPrice(l);return {n:l.n,thr:l.thr,k:l.k,stat:l.stat,odds:l.odds,p:r.p,basis:r.basis,mean:r.mean}});
+    var L=(b.legs||[]).map(function(l){var r=legPrice(l);return {n:l.n,thr:l.thr,k:l.k,stat:l.stat,odds:l.odds,p:r.p,basis:r.basis,mean:r.mean,fb:l.fb}});
     (b.glegs||[]).forEach(function(l){var r=glegPrice(l);L.push({n:l.pick,g:1,thr:'',stat:'',odds:null,p:r.p,basis:r.basis,mean:null})});
     var kn=L.filter(function(l){return l.p!=null}),pr=1;kn.forEach(function(l){pr*=l.p});
     return {p:kn.length?pr:null,legs:L,known:kn.length,total:L.length,unknown:L.length-kn.length,note:'',game:'Parlay'};
@@ -1702,7 +1719,7 @@ function parlayEntry(b,a){
     b.glegs.forEach(function(l,j){var r=a.legs[(b.legs||[]).length+j];ent.legs.push(l.pick+(r&&r.p!=null?' ('+Math.round(r.p*100)+'%)':''));ent.whyLegs.push({title:l.pick,p:r?r.p:null,pro:[],con:[],note:[]});if(l.gid)ent.glegs.push({gid:l.gid,t:l.t,side:l.side,num:l.num,over:l.over,pick:l.pick});else ent.manual.push(l.pick)});
     return ent;
   }
-  return {id:String(Date.now())+Math.floor(Math.random()*1000),at:Date.now(),type:'parlay',legD:(b.legs||[]).map(function(l){return {n:l.n,thr:l.thr,k:l.k,stat:l.stat}}),games:b.games||[],side:null,lg:'nba',line:null,odds:(Math.abs(parseFloat(b.odds))>=100?parseFloat(b.odds):null),oddsGiven:Math.abs(parseFloat(b.odds))>=100,stake:parseFloat(b.stake)||null,p:a.p,partial:a.unknown>0,legs:(b.legs||[]).map(function(l,i){return l.thr+'+ '+l.n+' '+l.stat.toLowerCase()+(a.legs[i]&&a.legs[i].p!=null?' ('+Math.round(a.legs[i].p*100)+'%)':'')}),pick:(b.legs||[]).length+'-leg parlay',game:'Parlay'+(b.stake?', $'+parseFloat(b.stake).toFixed(2)+' wager':''),res:null}}
+  return {id:String(Date.now())+Math.floor(Math.random()*1000),at:Date.now(),type:'parlay',legD:(b.legs||[]).map(function(l){return {n:l.n,thr:l.thr,k:l.k,stat:l.stat}}),games:b.games||[],side:null,lg:((b.legs||[]).some(function(l){return l.fb})?'mixed':'nba'),line:null,odds:(Math.abs(parseFloat(b.odds))>=100?parseFloat(b.odds):null),oddsGiven:Math.abs(parseFloat(b.odds))>=100,stake:parseFloat(b.stake)||null,p:a.p,partial:a.unknown>0,legs:(b.legs||[]).map(function(l,i){return l.thr+'+ '+l.n+' '+l.stat.toLowerCase()+(a.legs[i]&&a.legs[i].p!=null?' ('+Math.round(a.legs[i].p*100)+'%)':'')}),pick:(b.legs||[]).length+'-leg parlay',game:'Parlay'+(b.stake?', $'+parseFloat(b.stake).toFixed(2)+' wager':''),res:null}}
 S.box={};
 function boxNum(j,player,stat){
   var key=normName(player),out=null;
@@ -1911,7 +1928,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v58, Oct 22';
+var BUILD='v59, Oct 22';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
