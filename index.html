@@ -1928,7 +1928,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v59, Oct 22';
+var BUILD='v60, Oct 22';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -2902,7 +2902,8 @@ function feedCalc(g){
   var stP=Phi((sh-sa)/T.sdM),fp=(g.pa!=null&&g.ph!=null)?g.ph/(g.pa+g.ph):null;
   var p=fp!=null?0.3*stP+0.7*fp:stP,ln=null;
   if(g.lg==='nba')ln=DATA.nbaLines.games.filter(function(x){return x.a===g.a&&x.h===g.h})[0]||null;
-  try{var ko=kalFor(g);if(ko&&ko.sp&&!ko.sp.pk&&ko.tt&&!ko.thin&&Date.now()-ko.at<10*60000)ln={a:g.a,h:g.h,fav:ko.sp.fav,pts:ko.sp.pts,tt:ko.tt,src:'Kalshi'}}catch(e){}
+  if(g.dk&&g.dk.sp&&g.dk.tt!=null)ln={a:g.a,h:g.h,fav:g.dk.sp.fav,pts:g.dk.sp.pts,tt:g.dk.tt,src:g.dk.src||'DraftKings'};
+  try{var ko=(g.dk&&g.dk.sp&&g.dk.tt!=null)?null:kalFor(g);if(ko&&ko.sp&&!ko.sp.pk&&ko.tt&&!ko.thin&&Date.now()-ko.at<10*60000)ln={a:g.a,h:g.h,fav:ko.sp.fav,pts:ko.sp.pts,tt:ko.tt,src:'Kalshi'}}catch(e){}
   var wxa=g.lg==='nfl'?wxAdj(T.H.k,g.start):{adj:0,pu:0},mkM=ln?(ln.fav==='h'?ln.pts:-ln.pts):null,total=sa+sh;if(ln)total=0.1*total+0.9*ln.tt;total+=wxa.adj;
   var margin=mkM!=null?(0.3*(sh-sa)+0.7*mkM):T.sdM*invPhi(p);
   if(mkM!=null)p=Phi(margin/T.sdM);
@@ -4291,12 +4292,38 @@ function espnUrl(lg){
   var q=lg==='ncaafb'?'?groups=80&limit=400'+dr:lg==='ncaamb'?'?groups=50&limit=400'+dr:'?limit=200'+dr;
   return 'https://site.api.espn.com/apis/site/v2/sports/'+ESPN[lg]+'/scoreboard'+q;
 }
+function parseDK(odds,rawA,rawH){
+  var o=odds&&odds[0];if(!o)return null;
+  var num=function(v){if(v==null)return null;var n=parseFloat(String(v).replace(/[^0-9.+-]/g,''));return isFinite(n)?n:null};
+  var out={src:(o.provider&&o.provider.name)||'DraftKings'};
+  var tt=num(o.overUnder);if(tt==null&&o.total&&o.total.over)tt=num((o.total.over.close||o.total.over.open||{}).line);
+  if(tt!=null)out.tt=tt;
+  var fav=null,pts=null,d=String(o.details||'').trim(),m=d.match(/^([A-Za-z.]+)\s*([+-]?\d+(?:\.\d+)?)$/);
+  if(m){fav=m[1]===rawH?'h':m[1]===rawA?'a':null;pts=Math.abs(parseFloat(m[2]))}
+  else if(/^(even|pk|pick)/i.test(d)){fav='h';pts=0}
+  if((fav==null||pts==null)&&o.pointSpread&&o.pointSpread.home){var hl=num((o.pointSpread.home.close||o.pointSpread.home.open||{}).line);if(hl!=null){fav=hl<=0?'h':'a';pts=Math.abs(hl)}}
+  if((fav==null||pts==null)&&o.spread!=null){var sp=num(o.spread);if(sp!=null&&o.homeTeamOdds&&o.homeTeamOdds.favorite!=null){fav=o.homeTeamOdds.favorite?'h':'a';pts=Math.abs(sp)}}
+  if(fav&&pts!=null)out.sp={fav:fav,pts:pts};
+  var mh=num(o.homeTeamOdds&&o.homeTeamOdds.moneyLine),ma=num(o.awayTeamOdds&&o.awayTeamOdds.moneyLine);
+  if((mh==null||ma==null)&&o.moneyline){mh=num(((o.moneyline.home||{}).close||(o.moneyline.home||{}).open||{}).odds);ma=num(((o.moneyline.away||{}).close||(o.moneyline.away||{}).open||{}).odds)}
+  if(mh!=null&&ma!=null)out.ml={a:ma,h:mh};
+  return (out.sp||out.tt!=null||out.ml)?out:null;
+}
+function dkLine(g){
+  var d=g.dk;if(!d)return '';
+  var t=[];
+  if(d.ml)t.push('moneyline '+esc(g.a)+' '+fo(d.ml.a)+' / '+esc(g.h)+' '+fo(d.ml.h));
+  if(d.sp)t.push('spread '+(d.sp.pts===0?'pick’em':esc(d.sp.fav==='h'?g.h:g.a)+' -'+d.sp.pts));
+  if(d.tt!=null)t.push('total '+d.tt);
+  return t.length?'<div class="src" style="margin-top:8px"><b>'+esc(d.src)+' (via ESPN)</b>: '+t.join(' · ')+'</div>':'';
+}
 function espnNorm(lg,events){
   var out=[];
   (events||[]).forEach(function(e){
     var c=e.competitions&&e.competitions[0];if(!c||!c.competitors)return;
     var aw=c.competitors.filter(function(x){return x.homeAway==='away'})[0],hm=c.competitors.filter(function(x){return x.homeAway==='home'})[0];
     if(!aw||!hm)return;
+    var rawA=aw.team.abbreviation,rawH=hm.team.abbreviation;
     var st=e.status&&e.status.type||{},state=st.state;
     var status=state==='post'?'closed':state==='in'?'inprogress':'scheduled';
     var hasScore=state!=='pre';
@@ -4308,6 +4335,7 @@ function espnNorm(lg,events){
     var clk=state==='in'?(st.shortDetail&&/half|end/i.test(st.shortDetail)?st.shortDetail:(e.status.displayClock||null)):null;
     if(lg==='mlb')clk=state==='in'?(st.shortDetail||null):null;
     var rr=(row(lg,status,e.date,aw.team.abbreviation,hm.team.abbreviation,aw.team.displayName||aw.team.abbreviation,hm.team.displayName||hm.team.abbreviation,sc(aw),sc(hm),null,null,clk,state==='in'?e.status.period:null,title,e.id));
+    try{var dk=parseDK(c.odds,rawA,rawH);if(dk)rr.dk=dk}catch(e2){}
     var vn=c.venue;if(vn)rr.ven={n:vn.fullName||'',c:(vn.address&&vn.address.city)||'',s:(vn.address&&vn.address.state)||'',i:!!vn.indoor};
     if(lg==='mlb'){var pp=function(x){var q=x&&x.probables&&x.probables[0];return q&&q.athlete&&(q.athlete.displayName||q.athlete.fullName)||null};rr.pit={a:pp(aw),h:pp(hm)}}
     out.push(rr);
@@ -4487,8 +4515,8 @@ document.addEventListener('change',function(e){
 document.addEventListener('input',function(e){var t0=e.target;if(t0&&t0.id==='pl_thr'&&S.sheet&&S.sheet.type==='player'){var v0=parseFloat(String(t0.value).replace(',','.'));if(isFinite(v0)){S.sheet.thr=v0;var pb=document.getElementById('plbody');if(pb)pb.innerHTML=playerBody(S.sheet)}return}var t=e.target,f=t.dataset&&t.dataset.sf;if(!f||t.tagName==='SELECT')return;S.scan[f]=t.value;var r=$('#scanres');if(r)r.innerHTML=scanRes()});
 document.addEventListener('keydown',function(e){if(e.key==='Escape'&&S.sheet){S.sheet=null;renderSheet()}else if((e.key==='Enter'||e.key===' ')&&e.target&&e.target.getAttribute&&e.target.getAttribute('role')==='button'&&e.target.dataset.act){e.preventDefault();e.target.click()}});
 /*B34*/
-function feedCard(g){var h=feedCardK0(g);if(kind(g)!=='up')return h;var kl=kalLine(g);if(!kl)return h;var i=h.indexOf('<div class="cap" style="margin-top:10px">Model picks');return i>0?h.slice(0,i)+kl+h.slice(i):h.replace(/<\/article>\s*$/,kl+'</article>')}
-function feedSheet(g){var h=feedSheetK0(g);if(kind(g)!=='up')return h;var kl=kalLine(g);if(!kl)return h;var i=h.indexOf('</div></div>');var j=h.indexOf('<h3');return j>0?h.slice(0,j)+kl+h.slice(j):h+kl}
+function feedCard(g){var h=feedCardK0(g);if(kind(g)!=='up')return h;var kl=dkLine(g)+kalLine(g);if(!kl)return h;var i=h.indexOf('<div class="cap" style="margin-top:10px">Model picks');return i>0?h.slice(0,i)+kl+h.slice(i):h.replace(/<\/article>\s*$/,kl+'</article>')}
+function feedSheet(g){var h=feedSheetK0(g);if(kind(g)!=='up')return h;var kl=dkLine(g)+kalLine(g);if(!kl)return h;var i=h.indexOf('</div></div>');var j=h.indexOf('<h3');return j>0?h.slice(0,j)+kl+h.slice(j):h+kl}
 
 /* ---------- block34: fetch timeout, lazy weather, live Kalshi lines ---------- */
 function fetchT(url,ms){
