@@ -165,7 +165,9 @@ details.bcard summary{cursor:pointer;min-height:32px;display:flex;align-items:ce
 html,body{height:100%;overflow:hidden;overscroll-behavior:none}
 body{position:fixed;top:0;left:0;right:0;bottom:0;height:auto;min-height:0;display:flex;flex-direction:column;padding-left:0;padding-right:0;padding-block:0}
 .wrap{flex:1 1 auto;min-height:0;width:100%;max-width:672px;margin:0 auto;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:0 max(16px,env(safe-area-inset-right,0px)) 28px max(16px,env(safe-area-inset-left,0px))}
+html{background:var(--surface)}
 nav{position:relative;flex:none;left:auto;right:auto;bottom:auto;width:100%}
+html.fs nav{padding-bottom:max(calc(6px + env(safe-area-inset-bottom,0px)),26px)}
 </style>
 </head><body>
 
@@ -1906,7 +1908,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v49, Oct 22';
+var BUILD='v50, Oct 22';
 function foot(){return '<p class="foot"><button class="linkbtn" data-act="tab" data-t="about">How the model works</button> · <span class="src">Build '+BUILD+'</span></p><p class="foot">For entertainment and research only, not betting advice. Probabilities are estimates and can be wrong. If gambling is a problem for you or someone you know, call 1-800-GAMBLER.</p>'}
 
 /* ---------- sheets ---------- */
@@ -4552,6 +4554,16 @@ function kalLine(g){
   return '<div class="src" style="margin-top:8px"><b>Kalshi live</b> ('+esc(fmtClock(o.at))+'): '+t.join(' · ')+(o.thin?' <i>(thin market, treat as rough)</i>':'')+'</div>';
 }
 
+function fitScreen(){
+  try{
+    var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches),b=document.body;
+    var portrait=window.innerHeight>=window.innerWidth,h=0;
+    if(st&&portrait&&window.screen&&screen.height>window.innerHeight&&screen.height-window.innerHeight<140)h=screen.height;
+    if(h){b.style.bottom='auto';b.style.height=h+'px';document.documentElement.classList.add('fs')}
+    else{b.style.bottom='';b.style.height='';document.documentElement.classList.remove('fs')}
+  }catch(e){}
+}
+fitScreen();window.addEventListener('resize',fitScreen);window.addEventListener('orientationchange',function(){setTimeout(fitScreen,300)});document.addEventListener('visibilitychange',fitScreen);setTimeout(fitScreen,400);setTimeout(fitScreen,1500);
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
 setTimeout(function(){doRefresh(true)},600);
