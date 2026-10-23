@@ -1930,7 +1930,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v67, Oct 23';
+var BUILD='v68, Oct 23';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -2331,7 +2331,7 @@ function mbRow(b,i){
 }
 function vBestBets(){
   var h='<h2>Best bets today</h2>'+mbChips()+modeSwitch('parlay')+refreshBar();
-  var key=S.feedAt+'|'+S.mine.length+'|'+Math.floor(Date.now()/60000);
+  var key=stableKey(_mbL.length);
   if(_mbK!==key){
     var now=Date.now(),games=[],props=[];
     ['nfl','nba','ncaafb','mlb','nhl'].forEach(function(lg){
@@ -3163,7 +3163,7 @@ function scoreCard(g){
 function vScores(){
   var lg=S.sport,name=LG.filter(function(l){return l[0]===lg})[0][1],all=S.feed[lg];
   var live=all.filter(function(g){return kind(g)==='live'}).sort(function(a,b){return a.start-b.start});
-  var fin=all.filter(function(g){return kind(g)==='final'}).sort(function(a,b){return b.start-a.start}).slice(0,40);
+  var fdesc=function(a,b){return b.start-a.start},fin=S.gs==='all'?LG.reduce(function(a,l){return a.concat(all.filter(function(g){return g.lg===l[0]&&kind(g)==='final'}).sort(fdesc).slice(0,10))},[]).sort(fdesc):all.filter(function(g){return kind(g)==='final'}).sort(fdesc).slice(0,40);
   var h='<h2>'+name+' scoreboard</h2>'+sportChips()+modeSwitch('scores')+refreshBar();
   h+='<p class="lede" style="margin-top:0">Finished games, newest first. Each has the final, a line score, team stats and a short recap. Tap a game for scoring plays and the full pre-game breakdown.</p>';
   if(!live.length&&!fin.length)h+='<div class="card empty">No finished '+name+' games in the data feed right now.'+(lg==='nba'?' The 2026-27 season starts Oct 20.':lg==='ncaamb'?' College basketball has not started yet.':'')+' Tap Refresh to check again.</div>';
@@ -3267,7 +3267,7 @@ function propSheet(p){
 }
 function renderSheet(){
   var s=S.sheet,root=$('#sheetRoot');
-  if(!s){root.innerHTML='';return}
+  if(!s){root.innerHTML='';root.__h=null;root.__k=null;return}
   var inner;
   if(s.type==='game')inner=gameSheet(gameById(s.id));
   else if(s.type==='fgame'){var fg=find(s.id);inner=fg?feedSheet(fg):'<p class="note">That game is no longer in the feed.</p>'}
@@ -3275,7 +3275,10 @@ function renderSheet(){
   else if(s.type==='player')inner=playerSheet(s);
   else if(s.type==='slip')inner=slipSheet();
   else inner=propSheet(propById(s.id));
-  root.innerHTML='<div class="scrim" data-act="scrim"><div class="sheet" role="dialog" aria-modal="true">'+inner+'</div></div>';
+  var mk='<div class="scrim" data-act="scrim"><div class="sheet" role="dialog" aria-modal="true">'+inner+'</div></div>',key=s.type+'|'+(s.id||s.n||s.name||''),old=root.querySelector('.sheet'),st=old?old.scrollTop:0,same=root.__k===key&&!!old;
+  if(root.__h===mk&&same)return;
+  root.innerHTML=mk;root.__h=mk;root.__k=key;
+  if(same&&st){var nw=root.querySelector('.sheet');if(nw)nw.scrollTop=st}
   if(s.type==='prop')propOut();
 }
 
@@ -3618,13 +3621,14 @@ function pxRefresh(lg){
   var key=S.feedAt+'|'+(S.feed[lg]||[]).length+'|'+S.rosLAt;if(_pxAt[lg]===key)return;_pxAt[lg]=key;
   PROPS.forEach(function(p){
     if(p.lg!==lg)return;
-    var g=pxNext(lg,p.team);
+    if(lg!=='nfl')roFix(p);
+    var g=p.off?null:pxNext(lg,p.team);
     if(g){
       var home=lg==='mlb'?g.h===p.team:tabb(g.h)===tabb(p.team);
       p.g1=g;p.game=g.id;p.home=home;p.opp=home?g.a:g.h;p.oppName=home?g.an:g.hn;p.gm={a:g.a,h:g.h,day:gTime(g)};
       p.mt=(home?'vs ':'at ')+p.opp+', '+fmtTime(g.start);p.ok=true;
-      if(lg!=='nfl'&&!onRoster(lg,p.team,p.name)){p.ok=false;p.mt='Not on the current '+p.team+' roster'}
-    }else{p.g1=null;p.game=null;p.ok=false;p.mt='No game found in the feed';p.gm={a:p.team,h:'TBD',day:''}}
+      if(p.moved)p.mt+=' · now with '+p.team+', was '+p.moved;
+    }else{p.g1=null;p.game=null;p.ok=false;p.mt=p.off?'Not on the current '+(p.team0||p.team)+' roster':'No game found in the feed';p.gm={a:p.team,h:'TBD',day:''}}
   });
 }
 function nbaT(abbr,name){return NBAT[tabb(abbr)]||NBAT[teamAbbr('nba',name||'')||'']||null}
@@ -3933,6 +3937,8 @@ function vGames(){
   h+='<div class="chips" role="group" aria-label="Day">'+[['today','Today'],['tomorrow','Tomorrow'],['week','This week']].map(function(m){return '<button class="chip" data-act="set" data-k="gd" data-v="'+m[0]+'" aria-pressed="'+(sel===m[0])+'">'+m[1]+' ('+cnt[m[0]]+')</button>'}).join('')+'</div>';
   if(!all.length)return h+'<div class="card empty">No games in the data feed for this selection. Tap Refresh to check again.</div>'+foot();
   if(live.length)h+='<h3>Live now</h3><div class="feed">'+live.map(feedCard).join('')+'</div>';
+  var fin0=all.filter(function(g){return kind(g)==='final'&&g.sa!=null&&g.start>now-36*36e5}).sort(function(a,b){return b.start-a.start}).slice(0,10);
+  if(fin0.length)h+='<h3>Final scores · last day</h3><div class="feed">'+fin0.map(feedCard).join('')+'</div>';
   if(S.gs==='all'||(S.gs!=='mlb'&&S.gs!=='ncaamb'))h+=discoverHtml();
   if(list.length)h+='<p class="lede" style="margin-top:12px">'+list.length+' game'+(list.length>1?'s':'')+' '+(sel==='today'?'still to play today':sel==='tomorrow'?'tomorrow':'in the next week')+'. Tap a game for the model’s picks, player props and a full breakdown. Finished games are under Final scores.</p>'+groupDays(list,feedCard);
   else if(!live.length)h+='<div class="card empty">No games '+(sel==='today'?'left today':sel==='tomorrow'?'tomorrow':'this week')+' for this selection. Try another day, or open Final scores.</div>';
@@ -3942,7 +3948,7 @@ function vScores(){
   var all=[];
   LG.forEach(function(l){if(S.gs==='all'||S.gs===l[0])(S.feed[l[0]]||[]).forEach(function(g){all.push(g)})});
   var live=all.filter(function(g){return kind(g)==='live'}).sort(function(a,b){return a.start-b.start});
-  var fin=all.filter(function(g){return kind(g)==='final'}).sort(function(a,b){return b.start-a.start}).slice(0,40);
+  var fdesc=function(a,b){return b.start-a.start},fin=S.gs==='all'?LG.reduce(function(a,l){return a.concat(all.filter(function(g){return g.lg===l[0]&&kind(g)==='final'}).sort(fdesc).slice(0,10))},[]).sort(fdesc):all.filter(function(g){return kind(g)==='final'}).sort(fdesc).slice(0,40);
   var h='<h2>Final scores</h2>'+gsChips()+modeSwitch('scores')+refreshBar();
   h+='<p class="lede" style="margin-top:0">Finished games, newest first. Each has the final, a line score, team stats and a short recap. Tap a game for scoring plays and the full pre-game breakdown.</p>';
   if(!live.length&&!fin.length)h+='<div class="card empty">No finished games in the data feed for this selection. Tap Refresh to check again.</div>';
@@ -3988,7 +3994,7 @@ function bestMeta(lg,b,rank,total,day){
 }
 function vPropsTop(){
   var h='<h2>Best chances today</h2>'+propsChips()+modeSwitch('props')+refreshBar();
-  var key=S.feedAt+'|'+S.mine.length+'|'+Math.floor(Date.now()/60000);
+  var key=stableKey(_topL.length);
   if(_topK!==key){
     var all=[],later=[];
     ['nfl','nba','ncaafb','mlb','nhl'].forEach(function(lg){
@@ -4266,8 +4272,8 @@ function scY(){return window.pageYOffset||0}
 function scSet(y){window.scrollTo(0,y)}
 function scTop(){scSet(0)}
 function render(){
-  var _y=scY();
-  $('#view').innerHTML={home:vHome,games:vGames,scores:vScores,div:vDiv,record:vRecord,props:vProps,parlay:vParlay,picks:vPicks,about:vAbout,more:vMore,builder:vBuilder}[S.tab]();
+  var _y=scY(),_h={home:vHome,games:vGames,scores:vScores,div:vDiv,record:vRecord,props:vProps,parlay:vParlay,picks:vPicks,about:vAbout,more:vMore,builder:vBuilder}[S.tab](),_v=$('#view');
+  if(_v.__h!==_h){_v.innerHTML=_h;_v.__h=_h}
   $('#stamp').innerHTML='Feed '+esc(fmtClock(S.feedAt))+'<br>'+(S.live?'live':'snapshot');
   renderNav();updateSlipBar();
   if(_y&&Math.abs(scY()-_y)>2)scSet(_y);
@@ -4381,7 +4387,7 @@ function fetchEspn(lg){
       var ev=j.events||(j.content&&j.content.sbData&&j.content.sbData.events);
       if(!ev)throw new Error('no games in reply');
       var gm=espnNorm(lg,ev),hasUp=gm.some(function(g){return g.status==='scheduled'&&g.start>Date.now()});
-      if(hasUp||lg==='mlb'&&gm.length)return {lg:lg,games:gm};
+      if(hasUp||lg==='mlb'&&gm.length)return withFinals(lg,gm).then(function(g2){return {lg:lg,games:g2}});
       // the range request returned nothing upcoming: ask day by day for the next week
       var qs=lg==='ncaafb'?'&groups=80&limit=300':lg==='ncaamb'?'&groups=50&limit=300':'&limit=100',ps=[];
       for(var d=0;d<8;d++){var dt=new Date(Date.now()+d*864e5).toISOString().slice(0,10).replace(/-/g,'');
@@ -4389,7 +4395,7 @@ function fetchEspn(lg){
       return Promise.all(ps).then(function(js){
         var seen={};gm.forEach(function(g){seen[g.id]=1});
         js.forEach(function(j){if(j&&j.events)espnNorm(lg,j.events).forEach(function(g){if(!seen[g.id]){seen[g.id]=1;gm.push(g)}})});
-        return {lg:lg,games:gm};
+        return withFinals(lg,gm).then(function(g2){return {lg:lg,games:g2}});
       });
     }).catch(function(e){last=(e&&e.message)||'network error';return next()});
   }
@@ -4400,7 +4406,7 @@ var ESPN_MSG='Could not reach ESPN. Check your connection and tap Refresh again.
 function doRefresh(silent){
   if(S.busy)return;
   silent=silent===true;
-  if(!silent){S.busy=true;S.msg='';S.msgKind='';render()}
+  if(!silent){S.userRefreshAt=Date.now();S.busy=true;S.msg='';S.msgKind='';render()}
   else S.busy=true;
   var done=function(msg,k){
     S.busy=false;if(!silent||msg){S.msg=silent?'':msg;S.msgKind=k||''}
@@ -4984,12 +4990,12 @@ function espnOddsHtml(g){
   return h+'<p class="src">Taken from ESPN’s odds feed, checked '+esc(fmtClock(S.feedAt||Date.now()))+' and again every 30 seconds while the app is open.'+(bits.length?' Earlier: '+bits.join('; ')+'.':'')+'</p>';
 }
 /* ----- rosters for every pro league ----- */
-S.rosL={};S.rosLAt=0;S.rosTeams={};
+S.rosL={};S.rosLAt=0;S.rosTeams={};S.rosWho={};
 var NBAX2={NY:'NYK',GS:'GSW',SA:'SAS',NO:'NOP',UTAH:'UTA',WSH:'WAS'};
 function rosTeamKeys(lg,ab){var k=[ab];if(lg==='nba')k.push(NBAX2[ab]||ab);if(lg==='nhl')k.push(nhlK(ab));return k}
 function loadRostersL(){
   if(window.claude||typeof fetch!=='function')return Promise.resolve();
-  var now=Date.now();if(S.rosLBusy||now-S.rosLAt<3*3600e3)return Promise.resolve();
+  var now=Date.now();if(S.rosLBusy||now-S.rosLAt<2*3600e3)return Promise.resolve();
   S.rosLBusy=true;
   var path={nba:'basketball/nba',nhl:'hockey/nhl',mlb:'baseball/mlb'},minN={nba:10,nhl:15,mlb:20};
   return Promise.all(['nba','nhl','mlb'].map(function(lg){
@@ -5006,6 +5012,7 @@ function loadRostersL(){
           if(names.length<minN[lg])return;
           var R={};names.forEach(function(n){nameKeys(n).forEach(function(x){R[x]=1})});
           keys.forEach(function(k){S.rosL[lg+'|'+k]=R});
+          var tk=keys[keys.length-1];Object.keys(R).forEach(function(x){if(x.indexOf('|')<0)S.rosWho[lg+'|'+x]=tk});
         }).catch(function(){});
       }));
     }).catch(function(){});
@@ -5117,6 +5124,28 @@ function dkCompact(g){
   if(d.tt!=null)t.push('total '+d.tt+(p.to!=null?' (o '+prc(p.to)+' / u '+prc(p.tu)+')':''));
   if(d.ml)t.push('ML '+esc(g.a)+' '+prc(d.ml.a)+' / '+esc(g.h)+' '+prc(d.ml.h));
   return t.length?'<div class="src" style="margin-top:8px"><b>'+esc(d.src||'DraftKings')+' (via ESPN)</b>: '+t.join(' · ')+'</div>':'';
+}
+
+
+function roFix(p){
+  if(!S.rosLAt)return;
+  var base=p.team0||p.team,lg=p.lg;
+  if(onRoster(lg,base,p.name)){if(p.team0){p.team=p.team0;delete p.team0;delete p.moved}p.off=false;return}
+  var t=S.rosWho[lg+'|'+normName(p.name)];
+  p.team0=base;
+  if(t&&t!==base){p.team=t;p.moved=base;p.off=false}else{p.team=base;p.off=true;delete p.moved}
+}
+function stableKey(n){var c=0;LG.forEach(function(l){c+=(S.feed[l[0]]||[]).length});return (S.userRefreshAt||0)+'|'+S.mine.length+'|'+c+'|'+S.rosLAt+'|'+dayKey(Date.now())+'|'+(S.glV||0)+'|'+(S.rsAt||0)+(n?'':'|e')}
+function withFinals(lg,gm){
+  if(lg==='ncaamb'||gm.some(function(g){return kind(g)==='final'&&g.sa!=null}))return Promise.resolve(gm);
+  var qs=lg==='ncaafb'?'&groups=80&limit=300':'&limit=100',ps=[];
+  for(var d=1;d<=4;d++){var dt=new Date(Date.now()-d*864e5).toISOString().slice(0,10).replace(/-/g,'');
+    ps.push(fetch('https://site.api.espn.com/apis/site/v2/sports/'+ESPN[lg]+'/scoreboard?dates='+dt+qs,{cache:'no-store'}).then(function(r){return r.ok?r.json():null}).catch(function(){return null}))}
+  return Promise.all(ps).then(function(js){
+    var seen={};gm.forEach(function(g){seen[g.id]=1});
+    js.forEach(function(j){if(j&&j.events)espnNorm(lg,j.events).forEach(function(g){if(!seen[g.id]){seen[g.id]=1;gm.push(g)}})});
+    return gm;
+  });
 }
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
