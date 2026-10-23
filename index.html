@@ -1933,7 +1933,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v74, Oct 23';
+var BUILD='v75, Oct 23';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -3207,6 +3207,7 @@ function gameLeg(g,x){
 function gamePicksHtml(g){
   var k=kind(g),h='',pk=null;
   try{pk=picksFor(g)}catch(e){pk=null}
+  if(k!=='up'){var lp=loggedPicks(g);if(lp.length)pk=lp}
   var mine=S.mine.filter(function(x){return x.gid===g.id&&x.type!=='parlay'});
   if(!pk&&!mine.length)return '';
   h+='<h3>Picks for this game</h3>';
@@ -3940,12 +3941,13 @@ function vGames(){
   var up=all.filter(function(g){return kind(g)==='up'}).sort(function(a,b){return a.start-b.start});
   var cnt={today:up.filter(function(g){return dayKey(g.start)===k0}).length,tomorrow:up.filter(function(g){return dayKey(g.start)===k1}).length,week:up.length};
   var prevL=all.filter(function(g){return kind(g)==='final'&&g.sa!=null}),sel=S.gd||(cnt.today?'today':cnt.tomorrow?'tomorrow':'week');cnt.prev=prevL.length;
-  if(sel==='prev'){var hp='<h2>Games</h2>'+gsChips()+modeSwitch('games')+refreshBar()+'<div class="chips" role="group" aria-label="Day">'+[['prev','Previous'],['today','Today'],['tomorrow','Tomorrow'],['week','This week']].map(function(m){return '<button class="chip" data-act="set" data-k="gd" data-v="'+m[0]+'" aria-pressed="'+(sel===m[0])+'">'+m[1]+' ('+cnt[m[0]]+')</button>'}).join('')+'</div>';return hp+finalsBySport(all,sel)+foot()}
+  if(sel==='prev'){var hp='<h2>Games</h2>'+gsChips()+modeSwitch('games')+refreshBar()+'<div class="chips" role="group" aria-label="Day">'+[['prev','Previous'],['today','Today'],['tomorrow','Tomorrow'],['week','This week']].map(function(m){return '<button class="chip" data-act="set" data-k="gd" data-v="'+m[0]+'" aria-pressed="'+(sel===m[0])+'">'+m[1]+' ('+cnt[m[0]]+')</button>'}).join('')+'</div>';return hp+picksSummary(prevL.filter(function(g){return g.start>now-7*864e5}))+finalsBySport(all,sel)+foot()}
   var list=sel==='today'?up.filter(function(g){return dayKey(g.start)===k0}):sel==='tomorrow'?up.filter(function(g){return dayKey(g.start)===k1}):up;
   var h='<h2>Games</h2>'+gsChips()+modeSwitch('games')+refreshBar();
   h+='<div class="chips" role="group" aria-label="Day">'+[['prev','Previous'],['today','Today'],['tomorrow','Tomorrow'],['week','This week']].map(function(m){return '<button class="chip" data-act="set" data-k="gd" data-v="'+m[0]+'" aria-pressed="'+(sel===m[0])+'">'+m[1]+' ('+cnt[m[0]]+')</button>'}).join('')+'</div>';
   if(!all.length)return h+'<div class="card empty">No games in the data feed for this selection. Tap Refresh to check again.</div>'+foot();
   if(live.length)h+='<h3>Live now</h3><div class="feed">'+live.map(feedCard).join('')+'</div>';
+  h+=picksSummary(all.filter(function(g){return dayKey(g.start)===k0}));
   if(S.gs==='all'||(S.gs!=='mlb'&&S.gs!=='ncaamb'))h+=discoverHtml();
   if(list.length)h+='<p class="lede" style="margin-top:12px">'+list.length+' game'+(list.length>1?'s':'')+' '+(sel==='today'?'still to play today':sel==='tomorrow'?'tomorrow':'in the next week')+'. Tap a game for the model’s picks, player props and a full breakdown. Finished games are under Final scores.</p>'+groupDays(list,feedCard);
   else if(!live.length)h+='<div class="card empty">No games '+(sel==='today'?'left today':sel==='tomorrow'?'tomorrow':'this week')+' for this selection. Try another day, or open Final scores.</div>';
@@ -4551,7 +4553,7 @@ document.addEventListener('change',function(e){
 document.addEventListener('input',function(e){var t0=e.target;if(t0&&t0.id==='pl_thr'&&S.sheet&&S.sheet.type==='player'){var v0=parseFloat(String(t0.value).replace(',','.'));if(isFinite(v0)){S.sheet.thr=v0;var pb=document.getElementById('plbody');if(pb)pb.innerHTML=playerBody(S.sheet)}return}var t=e.target,f=t.dataset&&t.dataset.sf;if(!f||t.tagName==='SELECT')return;S.scan[f]=t.value;var r=$('#scanres');if(r)r.innerHTML=scanRes()});
 document.addEventListener('keydown',function(e){if(e.key==='Escape'&&S.sheet){S.sheet=null;renderSheet()}else if((e.key==='Enter'||e.key===' ')&&e.target&&e.target.getAttribute&&e.target.getAttribute('role')==='button'&&e.target.dataset.act){e.preventDefault();e.target.click()}});
 /*B34*/
-function feedCard(g){var h=feedCardK0(g);if(kind(g)!=='up')return h;var kl=dkCompact(g)+(g.dk?'':kalLine(g));if(!kl)return h;var i=h.indexOf('<div class="cap" style="margin-top:10px">Model picks');return i>0?h.slice(0,i)+kl+h.slice(i):h.replace(/<\/article>\s*$/,kl+'</article>')}
+function feedCard(g){var h=feedCardK0(g);if(kind(g)!=='up'){if(g.lg==='mlb'||g.lg==='ncaamb')return h;var pb=pickBlockHtml(g),ia=h.indexOf('<div class="actions">');return ia>0?h.slice(0,ia)+pb+h.slice(ia):h.replace(/<\/article>\s*$/,pb+'</article>')}var kl=dkCompact(g)+(g.dk?'':kalLine(g));if(!kl)return h;var i=h.indexOf('<div class="cap" style="margin-top:10px">Model picks');return i>0?h.slice(0,i)+kl+h.slice(i):h.replace(/<\/article>\s*$/,kl+'</article>')}
 function feedSheet(g){var h=feedSheetK0(g);if(kind(g)!=='up')return h;var kl=dkLine(g)+lineMoveHtml(g)+pvHtml(g)+((g.lg==='mlb'||g.lg==='ncaamb')?'':coverBreakdown(g))+(g.dk?'':kalLine(g));if(!kl)return h;var i=h.indexOf('</div></div>');var j=h.indexOf('<h3');return j>0?h.slice(0,j)+kl+h.slice(j):h+kl}
 
 /* ---------- block34: fetch timeout, lazy weather, live Kalshi lines ---------- */
@@ -5164,6 +5166,45 @@ function finalsBySport(all){
     out+='<h3>'+esc(l[1])+' · previous games</h3><div class="feed">'+f.map(feedCard).join('')+'</div>';
   });
   return any?'<p class="lede" style="margin-top:12px">Finished games, newest first, grouped by sport. Tap one for its stats and the pre-game breakdown.</p>'+out:'<div class="card empty">No finished games in the feed for this selection. Tap Refresh.</div>';
+}
+
+
+/* ---------- block43: model picks tracked on game cards, live and final ---------- */
+var MKT={ml:'Moneyline',sp:'Spread',tot:'Total'};
+function loggedPicks(g){
+  var o={ml:0,sp:1,tot:2};
+  return S.log.filter(function(x){return x.gid===g.id}).sort(function(a,b){return o[a.t]-o[b.t]}).map(function(x){return {t:x.t,side:x.side,num:x.num,over:x.over,pick:x.pick,p:x.p,mk:MKT[x.t]}});
+}
+function pickBlockHtml(g){
+  var k=kind(g);if(k==='up')return '';
+  var pk=loggedPicks(g);
+  if(!pk.length)return '<div class="src" style="margin-top:8px">No model picks were saved for this game before it started (the app saves them when it is open before kickoff).</div>';
+  var hit=0,miss=0,push=0,live=0,u=0;
+  var rows=pk.map(function(b){
+    var st=pickState(g,b);
+    if(st){if(k==='final'){if(st.txt==='Hit'){hit++;if(b.t!=='ml')u+=100/110}else if(st.txt==='Missed'){miss++;if(b.t!=='ml')u-=1}else push++}else live++}
+    return '<span>'+esc(b.mk)+' <b>'+esc(b.pick)+'</b> '+Math.round(b.p*100)+'%'+(st?' <span class="hrpill '+(st.cls||'mid')+'" style="display:inline-block">'+esc(st.txt)+'</span>':'')+'</span>';
+  }).join('');
+  var sum='';
+  if(k==='final'){
+    var n=hit+miss;
+    sum='<div class="src" style="margin-top:6px">'+(n?'Model picks went <b>'+hit+' of '+n+'</b>.':'No graded picks.')+' '+(n&&(hit||miss)?(hit>=miss?'You would have come out ahead following them.':'Following them would have lost this game.'):'')+'</div>';
+  }
+  return '<div class="cap" style="margin-top:10px">Model picks'+(k==='final'?' · result':' · live')+'</div><div class="facts">'+rows+'</div>'+sum;
+}
+function picksSummary(games){
+  var hit=0,miss=0,inplay=0,wait=0;
+  games.forEach(function(g){
+    var k=kind(g);
+    loggedPicks(g).forEach(function(b){
+      if(k==='up'){wait++;return}
+      var st=pickState(g,b);if(!st)return;
+      if(k==='live'){inplay++;return}
+      if(st.txt==='Hit')hit++;else if(st.txt==='Missed')miss++;
+    });
+  });
+  if(!(hit+miss+inplay+wait))return '';
+  return '<h3>Model picks tracker</h3><div class="facts"><span>Hit <b>'+hit+'</b></span><span>Missed <b>'+miss+'</b></span><span>Hit rate <b>'+((hit+miss)?Math.round(100*hit/(hit+miss))+'%':'—')+'</b></span><span>In play <b>'+inplay+'</b></span><span>Not started <b>'+wait+'</b></span></div>';
 }
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
