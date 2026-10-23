@@ -1933,7 +1933,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v75, Oct 23';
+var BUILD='v76, Oct 23';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -5205,6 +5205,65 @@ function picksSummary(games){
   });
   if(!(hit+miss+inplay+wait))return '';
   return '<h3>Model picks tracker</h3><div class="facts"><span>Hit <b>'+hit+'</b></span><span>Missed <b>'+miss+'</b></span><span>Hit rate <b>'+((hit+miss)?Math.round(100*hit/(hit+miss))+'%':'—')+'</b></span><span>In play <b>'+inplay+'</b></span><span>Not started <b>'+wait+'</b></span></div>';
+}
+
+
+/* ---------- block44: sturdier team-leg reading (matchup row without '@', abbreviations, odds on the leg line) ---------- */
+function parseGameLegs(raw){
+  var lines=String(raw||'').replace(/[−–—]/g,'-').split(/\n+/).map(function(x){return x.trim()}).filter(Boolean),out=[],now=Date.now();
+  var pool=[];LG.forEach(function(l){(S.feed[l[0]]||[]).forEach(function(g){if(g.start>=now-14*36e5&&g.start<=now+5*864e5)pool.push(g)})});
+  var nick=function(n){var w=normName(n).split(' ');return w[w.length-1]};
+  var MKR=/^(money\s*line|spread|point\s*spread|puck\s*line|run\s*line|total(?:\s*points|\s*goals|\s*runs)?|game\s*total)$/i;
+  var usedG={};
+  var sideOf=function(g,team){
+    var t=normName(team),tn=nick(team),ta=tabb(team.replace(/[^A-Za-z]/g,''));
+    var sc=function(full,ab){var f=normName(full),b=f.split(' ');
+      if(f===t)return 3;if(t&&(f.indexOf(t+' ')===0||t.indexOf(f+' ')===0))return 3;
+      if(tn&&b[b.length-1]===tn)return 2;
+      var first=t.split(' ')[0];if(first&&first.length>2&&b[0]===first)return 2;
+      if(ab&&tabb(ab)===ta&&ta.length>=2)return 2;
+      var ft=t.split(' ')[0].toUpperCase();if(ab&&tabb(ab)===tabb(ft))return 2;
+      return 0};
+    var a=sc(g.an,g.a),h=sc(g.hn,g.h);
+    return a>h?'a':h>a?'h':null;
+  };
+  lines.forEach(function(ln,i){
+    var mk=ln.match(MKR),head=null,inl=null;
+    if(!mk){
+      inl=ln.match(/^(.*?[+-]\d{1,2}(?:\.\d)?)\s+(money\s*line|spread|point\s*spread|puck\s*line|run\s*line)\s*$/i);
+      if(inl){mk=[inl[2],inl[2]];head=inl[1]}
+    }
+    if(!mk)return;
+    if(head==null){if(i<1)return;head=lines[i-1];if(/^[+-]\d{3,4}$/.test(head)&&i>=2)head=lines[i-2]}
+    var kd=/money/i.test(mk[1])?'ml':/total/i.test(mk[1])?'tot':'sp';
+    head=head.replace(/\s+[+-]\d{3,4}$/,'').replace(/^[^A-Za-z0-9+-]+\s*/,'').replace(/^[Oo0]\s+(?=[A-Z])/,'').trim();
+    // matchup: "A @ B", or "AFA  Today 9:00 PM  WYO" within the next three lines
+    var mu=null,ab=null;
+    for(var k=i+1;k<=Math.min(i+3,lines.length-1)&&!mu&&!ab;k++){
+      var L=lines[k];if(MKR.test(L))break;
+      var m1=L.match(/^(.+?)\s*@\s*(.+?)\s*(?:[·•+\-»]|$)/);
+      if(m1&&m1[1].trim().length>1){mu=m1;break}
+      var m2=L.match(/^\W{0,3}([A-Z]{2,5})\b.*?\b(?:today|tomorrow|mon|tue|wed|thu|fri|sat|sun)\w*\b.*?\b([A-Z]{2,5})\W{0,3}$/i);
+      if(m2&&m2[1]===m2[1].toUpperCase()&&m2[2]===m2[2].toUpperCase()){ab=[m2[1],m2[2]];break}
+    }
+    var nm=head.match(/\s([+-]\d{1,2}(?:\.\d)?)$/),ov=head.match(/^(over|under)\s+(\d{1,3}(?:\.\d)?)/i);
+    var team=head.replace(/\s[+-]\d{1,2}(?:\.\d)?$/,'').trim(),leg={t:kd,gid:null,side:null,num:null,over:null,pick:head+' '+mk[1].replace(/\s+/g,' ')};
+    if(kd==='sp'&&nm)leg.num=parseFloat(nm[1]);
+    if(kd==='tot'&&ov){leg.over=/over/i.test(ov[1]);leg.num=parseFloat(ov[2])}
+    var g=null;
+    if(mu){var an=nick(mu[1]),hn=nick(mu[2]);g=pool.filter(function(q){return nick(q.an)===an&&nick(q.hn)===hn})[0]}
+    if(!g&&ab){g=pool.filter(function(q){return tabb(q.a)===tabb(ab[0])&&tabb(q.h)===tabb(ab[1])})[0]}
+    if(!g&&kd!=='tot'&&team){ // fall back to the team name alone, nearest start
+      var c=pool.filter(function(q){return sideOf(q,team)}).sort(function(a,b){return Math.abs(a.start-now)-Math.abs(b.start-now)});
+      if(c.length&&(c.length===1||Math.abs(c[0].start-now)<Math.abs(c[1].start-now)))g=c[0];
+    }
+    if(g){
+      leg.gid=g.id;leg.lg=g.lg;
+      if(kd!=='tot'){leg.side=sideOf(g,team);if(!leg.side)leg.gid=null}
+    }
+    out.push(leg);
+  });
+  return out;
 }
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
