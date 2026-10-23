@@ -1930,7 +1930,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v64, Oct 23';
+var BUILD='v65, Oct 23';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -2983,9 +2983,10 @@ function feedAnalyst(g){
   }else if(rows.length){
     h+='<h3>Projection table</h3><div class="tblwrap"><table><thead><tr><th>Player</th><th>Stat</th><th>Hit rate</th><th>Avg</th></tr></thead><tbody>'+rows.map(function(r){var rt=Math.round(100*r.h/r.n);return '<tr><td>'+esc(r.p)+' <span class="src">'+r.t+'</span></td><td>'+r.st+' over '+r.l+'</td><td><span class="hrpill '+hcls(r.h,r.n)+'">'+rt+'% ('+r.h+'/'+r.n+')</span></td><td>'+(r.u?r.a.toFixed(1):r.a)+'</td></tr>'}).join('')+'</tbody></table></div><p class="src">'+(g.lg==='nba'?'Last 10 games of last season.':'Last 5 games.')+' Marks are the source’s own, not sportsbook lines. Opponent-allowed averages by position are not in the sources.</p>';
   }else h+='<h3>Projection table</h3><p class="note" style="margin-top:0">No player hit-rate data for these teams in the sources.</p>';
+  h+=coverBreakdown(g);
   var bets=feedCalc(g).bets;
   h+='<h3>Best straight bets</h3><div class="list">'+bets.map(function(b){return '<div class="card bcard"><div class="label">'+b.mk+(b.conf!=='n/a'?' · confidence '+b.conf:'')+'</div><div class="teams">'+esc(b.pick)+'</div>'+(b.p!=null?'<div class="facts"><span>Est. chance <b>'+pc(b.p)+'%</b></span><span>Fair odds <b>'+fairOdds(b.p)+'</b></span><span>Break-even at -110 <b>52.4%</b></span>'+(b.mk!=='Moneyline'?'<span>Stake at -110 <b>'+kelly(b.p)+'</b></span>':'')+'</div>':'')+'<p class="src" style="margin-top:6px">'+esc(b.why)+'</p></div>'}).join('')+'</div>';
-  h+='<h3>Line movement</h3><p class="note" style="margin-top:0">'+(ln?'Listed line: '+esc(ln.sp)+', total '+esc(ln.tot)+', moneyline '+esc(ln.ml)+'. '+esc(ln.srcTxt)+' No opening-versus-current history is available.':'No DraftKings or Kalshi line was available for this game, so no spread or total pick is shown. Public betting percentages and sharp-money indicators are not available from free sources.')+'</p>';
+  h+=lineMoveHtml(g);
   h+='<h3>Uncertainty</h3><ul class="pts"><li><b>Solid:</b> '+(g.lg==='nhl'?'goal and shot rates over the first 8 to 11 games, blended with the league average, and the feed’s win probability.':g.lg==='nfl'?'team stats through five or six games and the feed’s win probability.':g.lg==='nba'?'last season’s scoring numbers and the feed’s win probability.':'this season’s scoring numbers through about six or seven games.')+'</li><li><b>Volatile:</b> '+(g.lg==='nhl'?'the starting goalie (not confirmed here), line changes, injuries and a sample of only 8 to 11 games per team. Hockey is low scoring, so one bounce decides many games.':g.lg==='nfl'?'injuries (no verified list for this game), weather and a small sample. No sportsbook line was read for this game, so the fair spread and total above are numbers to compare with your book.':g.lg==='nba'?'rosters, trades, minutes and injuries for the new season. Last season’s teams are only a rough guide.':'schedule strength is not adjusted, injuries and weather are unknown, and one blowout moves a six-game average a lot.')+'</li><li><b>Props:</b> '+(g.lg==='nfl'?'season averages swing a lot game to game, so use them as context.':g.lg==='nhl'?'player rates are season averages from 8 to 11 games, steadied toward typical rates, so treat them as context rather than a forecast.':'hit rates here come from short samples ('+(g.lg==='nba'?'10':'5')+' games), so treat them as context rather than a forecast.')+'</li></ul>';
   return h;
 }
@@ -3002,6 +3003,7 @@ function gameSheet(g){
   h+='<h3>Line</h3><div class="facts" style="margin:0"><span><b>'+g.favT+' -'+g.pts+'</b></span><span>O/U <b>'+g.total+'</b></span><span>ML <b>'+mlText(g)+'</b></span></div><p class="src">Implied score: '+g.favT+' '+g.fs.toFixed(1)+', '+g.dogT+' '+g.ds.toFixed(1)+'. Source: '+esc(g.src)+'.'+(g.alt?' '+esc(g.alt):'')+'</p>';
   if(g.note)h+='<p class="note">'+esc(g.note)+'</p>';
   h+=analystSections(g);
+  if(fg){try{h+=coverBreakdown(fg)+lineMoveHtml(fg)}catch(e){}}
   if(d){
     h+='<h3>Team comparison</h3><div class="tblwrap"><table><thead><tr><th></th><th>'+g.a+'</th><th>'+g.h+'</th></tr></thead><tbody>'+d.rows.map(function(r){return '<tr><td>'+esc(r[0])+'</td><td>'+esc(r[1])+'</td><td>'+esc(r[2])+'</td></tr>'}).join('')+'</tbody></table></div><p class="src">'+esc(d.basis)+'</p>';
     var ihl=injHtml('nfl',[[g.a,g.a],[g.h,g.h]]);
@@ -4679,18 +4681,6 @@ try{var rl2=localStorage.getItem('hitboard.lines.v1');if(rl2){var al2=JSON.parse
 function saveLines(){try{
   var cut=Date.now()-21*864e5;Object.keys(S.lines).forEach(function(k){if((S.lines[k].st||0)<cut)delete S.lines[k]});
   localStorage.setItem('hitboard.lines.v1',JSON.stringify(S.lines))}catch(e){}}
-function snapLines(){
-  var now=Date.now(),ch=false;
-  ['nfl','nba','ncaafb','nhl','mlb','ncaamb'].forEach(function(lg){(S.feed[lg]||[]).forEach(function(g){
-    if(kind(g)!=='up'||!(g.start>now))return;
-    var ln=null;try{ln=lineFor(g)}catch(e){}
-    if(!ln)return;
-    var s={at:now,fav:ln.fav,pts:ln.pts,tt:ln.tt,mlP:ln.mlP,src:ln.srcs.join(', ')},L=S.lines[g.id];
-    if(!L){S.lines[g.id]={lg:lg,st:g.start,a:g.a,h:g.h,first:s,last:s};ch=true;return}
-    if(L.last.pts!==s.pts||L.last.tt!==s.tt||L.last.mlP!==s.mlP||L.last.fav!==s.fav||now-L.last.at>30*60000){L.last=s;ch=true}
-  })});
-  if(ch)saveLines();
-}
 function clamp1(v,a,b){return Math.max(a,Math.min(b,v))}
 var _mwK='',_mwV={};
 function mktW(lg){
@@ -4854,6 +4844,86 @@ function coverSection(lgs,withML,showLg){
   var sp=coverRows(lgs,'sp',showLg?10:6),h='<h3>Most likely to cover the spread</h3>'+coverTable(sp,'sp',showLg)+'<p class="src">Spread is the DraftKings line from ESPN, with Kalshi only where DraftKings has none. The chance is the app’s blended estimate of covering that exact number, not a guarantee.</p>';
   if(withML){var ml=coverRows(lgs,'ml',showLg?10:6);h+='<h3>Most likely to win outright (moneyline)</h3>'+coverTable(ml,'ml',showLg)+'<p class="src">Ranked by win chance after blending the DraftKings price with the app’s model. Heavy favorites win often but pay little, so check the price.</p>'}
   return h;
+}
+
+
+/* ---------- block39: daily line history with reasons, and a cover breakdown per matchup ---------- */
+function injKey(g,side){return g.lg==='nfl'?nt(side==='h'?g.h:g.a):(side==='h'?g.h:g.a)}
+function injOut(g,side){
+  try{var I=S.inj[g.lg];if(!I||!I.by)return null;
+    return (I.by[injKey(g,side)]||[]).filter(function(x){var s=String(x.st||'').toLowerCase();return OUT_RE.test(s)||/doubtful/.test(s)}).map(function(x){return x.n}).slice(0,15)}catch(e){return null}
+}
+function wxNow(g){try{if(g.lg!=='nfl')return null;var w=wxAdj(nt(g.h),g.start);return w?w.adj:null}catch(e){return null}}
+function snapLines(){
+  var now=Date.now(),ch=false,day=new Date().toDateString();
+  ['nfl','nba','ncaafb','nhl','mlb','ncaamb'].forEach(function(lg){(S.feed[lg]||[]).forEach(function(g){
+    if(kind(g)!=='up'||!(g.start>now))return;
+    var ln=null;try{ln=lineFor(g)}catch(e){}
+    if(!ln)return;
+    var s={at:now,d:day,fav:ln.fav,pts:ln.pts,tt:ln.tt,mlP:ln.mlP,src:ln.srcs.join(', '),io:{a:injOut(g,'a'),h:injOut(g,'h')},wx:wxNow(g)},L=S.lines[g.id];
+    if(!L){S.lines[g.id]={lg:lg,st:g.start,a:g.a,h:g.h,first:s,last:s,hist:[s]};ch=true;return}
+    var l=L.last,chg=l.pts!==s.pts||l.tt!==s.tt||l.mlP!==s.mlP||l.fav!==s.fav;
+    if(chg||now-l.at>30*60000){
+      L.last=s;ch=true;
+      if(!L.hist)L.hist=[L.first];
+      var h=L.hist,t=h[h.length-1];
+      if(chg&&(t.pts!==s.pts||t.tt!==s.tt||t.mlP!==s.mlP||t.fav!==s.fav||t.d!==s.d))h.push(s);
+      else if(t.d!==s.d)h.push(s);
+      if(h.length>14)L.hist=h.slice(-14);
+    }
+  })});
+  if(ch)saveLines();
+}
+function homeSp(s){return s.pts==null?null:(s.pts===0?0:(s.fav==='h'?-s.pts:s.pts))}
+function lineMoveHtml(g){
+  var L=S.lines[g.id],h='<h3>Line movement</h3>';
+  var cur=null;try{cur=lineFor(g)}catch(e){}
+  if(!L||!L.first){return h+'<p class="note" style="margin-top:0">'+(cur?'Current: '+esc(cur.sp)+', total '+esc(cur.tot)+', moneyline '+esc(cur.ml)+'. '+esc(cur.srcTxt)+' The app saves each line the first time it sees it and updates it every time you open it, so movement shows from your next visit.':'No DraftKings or Kalshi line yet for this game.')+'</p>'}
+  var f=L.first,l=cur?{pts:cur.pts,fav:cur.fav,tt:cur.tt,mlP:cur.mlP,at:Date.now(),io:{a:injOut(g,'a'),h:injOut(g,'h')},wx:wxNow(g)}:L.last;
+  var hist=(L.hist||[f]).slice();if(hist[hist.length-1]!==l&&(hist[hist.length-1].pts!==l.pts||hist[hist.length-1].tt!==l.tt||hist[hist.length-1].mlP!==l.mlP))hist.push(Object.assign({},l,{d:'Now'}));
+  var spTxt=function(s){return s.pts==null?'—':s.pts===0?'Pick’em':(s.fav==='h'?g.h:g.a)+' -'+s.pts},mlTxt=function(s){return s.mlP==null?'—':g.h+' '+Math.round(s.mlP*100)+'%'};
+  h+='<div class="tblwrap"><table><thead><tr><th>Seen</th><th>Spread</th><th>Total</th><th>Win chance</th></tr></thead><tbody>'+hist.map(function(s,i){
+    return '<tr><td>'+(i===0?'Opening · ':'')+esc(s.d==='Now'?'Now':new Date(s.at).toLocaleDateString(undefined,{month:'short',day:'numeric'})+' '+new Date(s.at).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}))+'</td><td>'+esc(spTxt(s))+'</td><td>'+(s.tt==null?'—':s.tt)+'</td><td>'+esc(mlTxt(s))+'</td></tr>'}).join('')+'</tbody></table></div>';
+  var fs=homeSp(f),ls=homeSp(l),why=[],moved=false;
+  var dS=(fs!=null&&ls!=null)?ls-fs:0,dT=(f.tt!=null&&l.tt!=null)?l.tt-f.tt:0,dM=(f.mlP!=null&&l.mlP!=null)?l.mlP-f.mlP:0;
+  if(Math.abs(dS)>=.25){moved=true;h+='<p class="note" style="margin-top:8px"><b>Spread:</b> moved '+Math.abs(dS).toFixed(1)+' points toward '+esc(dS<0?g.h:g.a)+' since the first line this device saw ('+esc(spTxt(f))+' to '+esc(spTxt(l))+').</p>'}
+  if(Math.abs(dT)>=.25){moved=true;h+='<p class="note" style="margin-top:4px"><b>Total:</b> moved '+(dT>0?'up ':'down ')+Math.abs(dT).toFixed(1)+' points ('+f.tt+' to '+l.tt+').</p>'}
+  if(Math.abs(dM)>=.015){moved=true;h+='<p class="note" style="margin-top:4px"><b>Win chance:</b> '+esc(g.h)+' '+(dM>0?'up ':'down ')+Math.round(Math.abs(dM)*100)+' points.</p>'}
+  if(!moved)h+='<p class="note" style="margin-top:8px">No change since the first line this device saw. It re-checks each time you open the app.</p>';
+  else{
+    var fi=f.io||{},li=l.io||{},team=function(side){return side==='h'?g.h:g.a};
+    ['a','h'].forEach(function(sd){
+      if(!fi[sd]||!li[sd])return;
+      var nw=li[sd].filter(function(n){return fi[sd].indexOf(n)<0}),bk=fi[sd].filter(function(n){return li[sd].indexOf(n)<0});
+      if(nw.length)why.push(esc(nw.slice(0,4).join(', '))+' newly listed Out or Doubtful for '+esc(team(sd))+'. Books usually shorten the line against a team that loses key players'+(dS?(((sd==='h')===(dS>0))?', which matches this move.':', though this move went the other way, so it was not the main driver.'):'.'));
+      if(bk.length)why.push(esc(bk.slice(0,4).join(', '))+' came off the Out or Doubtful list for '+esc(team(sd))+', which tends to firm up their price.');
+    });
+    if(f.wx!=null&&l.wx!=null&&Math.abs(l.wx-f.wx)>=.5)why.push('The weather adjustment changed from '+f.wx.toFixed(1)+' to '+l.wx.toFixed(1)+' points, and wind pushes totals down'+(dT?(((l.wx<f.wx)===(dT<0))?', in line with the total move.':'.'):'.'));
+    if(dS&&dT&&Math.abs(dT)>=1.5)why.push('The total also moved '+Math.abs(dT).toFixed(1)+' points, so books changed their scoring expectation for the game, not only who is ahead.');
+    if(!why.length)why.push('No injury or weather change was recorded between those snapshots. A move with no news is usually betting volume on one side or books copying each other. Free sources do not show bet counts, so the exact reason is not available.');
+    h+='<ul class="pts" style="margin-top:8px">'+why.map(function(w){return '<li>'+w+'</li>'}).join('')+'</ul>';
+  }
+  return h+'<p class="src">Lines come from '+esc(cur?cur.srcs.join(', '):L.last.src)+'. Sportsbooks do not publish why a line moves, so these are the changes the app could measure (injury list and weather) between its own snapshots, not confirmed causes. History starts when this device first saw the game.</p>';
+}
+function coverBreakdown(g){
+  var C=null;try{C=feedCalc(g)}catch(e){}
+  var h='<h3>Will the spread cover?</h3>';
+  if(!C||!C.ln||C.ln.pts==null)return h+'<p class="note" style="margin-top:0">No DraftKings or Kalshi spread is posted for this game yet, so there is nothing to cover. The app will fill this in once a line appears.</p>';
+  var sp=C.bets.filter(function(b){return b.t==='sp'})[0];if(!sp)return h;
+  var ps=null;try{ps=projScore(g)}catch(e){}
+  var home=sp.side==='h',pickT=home?g.h:g.a,oppT=home?g.a:g.h,rs={pro:[],con:[]},ro={pro:[],con:[]};
+  try{rs=gameReasons(g.lg,g,sp,ps)}catch(e){}
+  try{ro=gameReasons(g.lg,g,{t:'sp',side:home?'a':'h',num:-sp.num,p:1-sp.p,why:''},ps)}catch(e){}
+  var edge=C.margin-((C.ln.fav==='h')?C.ln.pts:-C.ln.pts);
+  var src=C.ln.srcs.filter(function(s){return /^spread/.test(s)})[0]||'';
+  h+='<div class="card bcard"><div class="label">Best side of the spread</div><div class="teams">'+esc(sp.pick)+'</div><div class="facts"><span>Cover chance <b>'+Math.round(sp.p*100)+'%</b></span><span>Line <b>'+esc(C.ln.sp)+'</b></span><span>Model margin <b>'+esc(C.margin>=0?g.h:g.a)+' by '+Math.abs(C.margin).toFixed(1)+'</b></span><span>Edge <b>'+Math.abs(edge).toFixed(1)+' pts</b></span></div><div class="src">'+esc(src||C.ln.srcTxt)+'</div></div>';
+  var li=function(a){return a.length?'<ul class="pts" style="margin-top:2px">'+a.map(function(w){return '<li>'+esc(w)+'</li>'}).join('')+'</ul>':'<p class="src">Nothing notable.</p>'};
+  h+='<div class="src"><b>Why '+esc(pickT)+' may cover</b></div>'+li(rs.pro.filter(function(w,i){return !(i===0&&w===sp.why)}));
+  h+='<div class="src" style="margin-top:8px"><b>Why '+esc(pickT)+' may not cover</b></div>'+li(rs.con);
+  h+='<div class="src" style="margin-top:8px"><b>Why '+esc(oppT)+' could cover instead</b></div>'+li(ro.pro);
+  var ioa=injOut(g,'a'),ioh=injOut(g,'h');
+  if(ioa||ioh)h+='<div class="src" style="margin-top:8px"><b>Availability</b></div><ul class="pts" style="margin-top:2px"><li>'+esc(g.a)+': '+(ioa&&ioa.length?esc(ioa.slice(0,6).join(', '))+' Out or Doubtful':'no one Out or Doubtful on the ESPN list')+'</li><li>'+esc(g.h)+': '+(ioh&&ioh.length?esc(ioh.slice(0,6).join(', '))+' Out or Doubtful':'no one Out or Doubtful on the ESPN list')+'</li></ul>';
+  return h+'<p class="src" style="margin-top:8px">The cover chance blends the DraftKings line with the app’s team ratings and is shrunk toward 50% because spreads are close to coin flips. Check injuries again near kickoff.</p>';
 }
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
