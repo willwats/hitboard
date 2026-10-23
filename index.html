@@ -1930,7 +1930,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v65, Oct 23';
+var BUILD='v66, Oct 23';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -2983,7 +2983,7 @@ function feedAnalyst(g){
   }else if(rows.length){
     h+='<h3>Projection table</h3><div class="tblwrap"><table><thead><tr><th>Player</th><th>Stat</th><th>Hit rate</th><th>Avg</th></tr></thead><tbody>'+rows.map(function(r){var rt=Math.round(100*r.h/r.n);return '<tr><td>'+esc(r.p)+' <span class="src">'+r.t+'</span></td><td>'+r.st+' over '+r.l+'</td><td><span class="hrpill '+hcls(r.h,r.n)+'">'+rt+'% ('+r.h+'/'+r.n+')</span></td><td>'+(r.u?r.a.toFixed(1):r.a)+'</td></tr>'}).join('')+'</tbody></table></div><p class="src">'+(g.lg==='nba'?'Last 10 games of last season.':'Last 5 games.')+' Marks are the source’s own, not sportsbook lines. Opponent-allowed averages by position are not in the sources.</p>';
   }else h+='<h3>Projection table</h3><p class="note" style="margin-top:0">No player hit-rate data for these teams in the sources.</p>';
-  h+=coverBreakdown(g);
+  h+=coverBreakdown(g)+coversHtml(g);
   var bets=feedCalc(g).bets;
   h+='<h3>Best straight bets</h3><div class="list">'+bets.map(function(b){return '<div class="card bcard"><div class="label">'+b.mk+(b.conf!=='n/a'?' · confidence '+b.conf:'')+'</div><div class="teams">'+esc(b.pick)+'</div>'+(b.p!=null?'<div class="facts"><span>Est. chance <b>'+pc(b.p)+'%</b></span><span>Fair odds <b>'+fairOdds(b.p)+'</b></span><span>Break-even at -110 <b>52.4%</b></span>'+(b.mk!=='Moneyline'?'<span>Stake at -110 <b>'+kelly(b.p)+'</b></span>':'')+'</div>':'')+'<p class="src" style="margin-top:6px">'+esc(b.why)+'</p></div>'}).join('')+'</div>';
   h+=lineMoveHtml(g);
@@ -3003,7 +3003,7 @@ function gameSheet(g){
   h+='<h3>Line</h3><div class="facts" style="margin:0"><span><b>'+g.favT+' -'+g.pts+'</b></span><span>O/U <b>'+g.total+'</b></span><span>ML <b>'+mlText(g)+'</b></span></div><p class="src">Implied score: '+g.favT+' '+g.fs.toFixed(1)+', '+g.dogT+' '+g.ds.toFixed(1)+'. Source: '+esc(g.src)+'.'+(g.alt?' '+esc(g.alt):'')+'</p>';
   if(g.note)h+='<p class="note">'+esc(g.note)+'</p>';
   h+=analystSections(g);
-  if(fg){try{h+=coverBreakdown(fg)+lineMoveHtml(fg)}catch(e){}}
+  if(fg){try{h+=coverBreakdown(fg)+coversHtml(fg)+lineMoveHtml(fg)}catch(e){}}
   if(d){
     h+='<h3>Team comparison</h3><div class="tblwrap"><table><thead><tr><th></th><th>'+g.a+'</th><th>'+g.h+'</th></tr></thead><tbody>'+d.rows.map(function(r){return '<tr><td>'+esc(r[0])+'</td><td>'+esc(r[1])+'</td><td>'+esc(r[2])+'</td></tr>'}).join('')+'</tbody></table></div><p class="src">'+esc(d.basis)+'</p>';
     var ihl=injHtml('nfl',[[g.a,g.a],[g.h,g.h]]);
@@ -4924,6 +4924,38 @@ function coverBreakdown(g){
   var ioa=injOut(g,'a'),ioh=injOut(g,'h');
   if(ioa||ioh)h+='<div class="src" style="margin-top:8px"><b>Availability</b></div><ul class="pts" style="margin-top:2px"><li>'+esc(g.a)+': '+(ioa&&ioa.length?esc(ioa.slice(0,6).join(', '))+' Out or Doubtful':'no one Out or Doubtful on the ESPN list')+'</li><li>'+esc(g.h)+': '+(ioh&&ioh.length?esc(ioh.slice(0,6).join(', '))+' Out or Doubtful':'no one Out or Doubtful on the ESPN list')+'</li></ul>';
   return h+'<p class="src" style="margin-top:8px">The cover chance blends the DraftKings line with the app’s team ratings and is shrunk toward 50% because spreads are close to coin flips. Check injuries again near kickoff.</p>';
+}
+
+
+/* ---------- block40: Covers.com (Odds Shark) NFL week snapshot: spread, consensus, records, ATS ---------- */
+var COVERS_NFL={asOf:'Oct 23, before the week’s games',src:'Covers.com NFL matchups page',
+ g:[['PIT','NO',-3.5,45,50,'4-2','2-4','4-2','3-3'],['SF','ATL',-2.5,50,56,'6-0','2-4','4-2','2-4'],['IND','MIN',6.5,41.5,34,'2-4','5-0','3-3','4-1'],['CIN','BAL',1.5,49,72,'3-2','4-2','3-2','2-4'],
+ ['MIA','NYJ',4.5,39,19,'0-5','2-4','1-4','4-2'],['CLE','TEN',-1.5,37.5,70,'4-2','1-5','4-2','3-3'],['NYG','HOU',10.5,42.5,53,'3-2','2-4','4-2','2-4'],['TB','CAR',2.5,44.5,24,'1-5','3-2','1-5','3-2'],
+ ['DEN','ARI',-4.5,43,51,'4-2','2-4','4-2','3-3'],['GB','DET',3.5,53.5,32,'4-2','3-2','3-3','2-3'],['LAR','LV',-3.5,48.5,28,'2-4','3-3','2-4','5-1'],['KC','SEA',2.5,42.5,60,'5-0','3-3','3-2','2-4'],['DAL','PHI',-3.5,44,71,'2-4','2-4','3-3','1-5']]};
+function covFor(g){
+  if(g.lg!=='nfl')return null;
+  var a=nt(g.a),h=nt(g.h),r=null;
+  COVERS_NFL.g.forEach(function(x){if(nt(x[0])===a&&nt(x[1])===h)r=x});
+  return r;
+}
+function rec2(s){var m=String(s).match(/(\d+)-(\d+)/);return m?{w:+m[1],l:+m[2],n:+m[1]+ +m[2],p:(+m[1])/Math.max(1,+m[1]+ +m[2])}:null}
+function coversHtml(g){
+  var r=covFor(g);if(!r)return '';
+  var sA=r[2],sH=-r[2],c=r[4],ca=rec2(r[7]),ch=rec2(r[8]),wa=r[5],wh=r[6];
+  var fmt=function(v){return (v>0?'+':'')+v};
+  var h='<h3>Covers.com view (Odds Shark)</h3><div class="tblwrap"><table><thead><tr><th></th><th>'+esc(g.a)+'</th><th>'+esc(g.h)+'</th></tr></thead><tbody>'+
+   '<tr><td>Spread</td><td>'+fmt(sA)+'</td><td>'+fmt(sH)+'</td></tr><tr><td>Public consensus</td><td>'+c+'%</td><td>'+(100-c)+'%</td></tr><tr><td>Record</td><td>'+wa+'</td><td>'+wh+'</td></tr><tr><td>Against the spread</td><td>'+r[7]+'</td><td>'+r[8]+'</td></tr></tbody></table></div><ul class="pts">';
+  var pts=[],hs=(g.dk&&g.dk.sp)?(g.dk.sp.fav==='h'?-g.dk.sp.pts:g.dk.sp.pts):null;
+  pts.push('Total on Covers: '+r[3]+'.');
+  if(hs!=null){var d=Math.abs(hs-sH);pts.push(d<.5?'The Covers spread matches the DraftKings line the app is using.':'Covers lists '+g.h+' '+fmt(sH)+' while DraftKings via ESPN has '+g.h+' '+fmt(hs)+', a '+d.toFixed(1)+' point difference. Lines move and sources update at different times, so use the current one.')}
+  if(ca&&ch){
+    var better=ca.p>ch.p+.15?g.a:ch.p>ca.p+.15?g.h:null;
+    pts.push(better?esc(better)+' has covered more often this season ('+(better===g.a?r[7]:r[8])+' against '+(better===g.a?r[8]:r[7])+'). Only '+Math.min(ca.n,ch.n)+' to '+Math.max(ca.n,ch.n)+' games each, so treat it as a lean, not a rule.':'Both teams have covered at a similar rate ('+r[7]+' and '+r[8]+'), so the season record does not separate them.')}
+  var side=c>=50?g.a:g.h,pct=Math.max(c,100-c);
+  if(pct>=65)pts.push(esc(side)+' has '+pct+'% of public picks. A lopsided crowd on one side is a caution flag, not a reason to bet it: books shade lines toward the popular side, and the other side often carries the better price.');
+  else if(pct<=55)pts.push('The public is split ('+c+'/'+(100-c)+'), so there is no crowd signal either way.');
+  else pts.push(esc(side)+' has '+pct+'% of public picks, a mild lean.');
+  return h+pts.map(function(w){return '<li>'+w+'</li>'}).join('')+'</ul><p class="src">'+esc(COVERS_NFL.src)+', read '+esc(COVERS_NFL.asOf)+'. This is a saved snapshot, not live, and it is context only: it does not change the app’s model chances. Column order on the page was read as away team first.</p>';
 }
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
