@@ -1930,7 +1930,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v63, Oct 22';
+var BUILD='v64, Oct 23';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -2301,7 +2301,7 @@ function vParlay(){
     var L0=straightList(lg).sort(function(a,b){return b.p-a.p}),gm=L0.filter(function(x){return x.label==='Game bet'}).slice(0,8),L=gm.concat(L0.filter(function(x){return gm.indexOf(x)<0})).slice(0,S.betMore?45:24).sort(function(a,b){return b.p-a.p}),more=L0.length>24;
     if(!L.length)return h+'<div class="card empty">No straight bets with a game still to play in the data.</div>'+foot();
     var top=L;
-    return h+'<p class="lede">The '+top.length+' strongest single bets right now, with the reason behind each. Chances come from this app’s model and hit-rate data. Sportsbook prices were not readable, so compare the fair odds with your book and only bet where it pays more.</p>'+(S.recList=top,top.map(function(b,i){return betCard(b,i,'b')}).join(''))+(more?'<button class="chip" style="margin-top:10px" data-act="set" data-k="betMore" data-v="'+(S.betMore?'':'1')+'">'+(S.betMore?'Show fewer':'Show more bets')+'</button>':'')+'<p class="note" style="margin-top:12px">Sorted by chance, not by value. A high chance at short odds can still be a poor bet. Check injuries before placing anything.</p>'+foot();
+    return h+(lg==='mlb'?'':'<div class="card" style="padding:4px 12px">'+coverSection([lg],false,false)+'</div>')+'<p class="lede">The '+top.length+' strongest single bets right now, with the reason behind each. Chances come from this app’s model and hit-rate data. Sportsbook prices were not readable, so compare the fair odds with your book and only bet where it pays more.</p>'+(S.recList=top,top.map(function(b,i){return betCard(b,i,'b')}).join(''))+(more?'<button class="chip" style="margin-top:10px" data-act="set" data-k="betMore" data-v="'+(S.betMore?'':'1')+'">'+(S.betMore?'Show fewer':'Show more bets')+'</button>':'')+'<p class="note" style="margin-top:12px">Sorted by chance, not by value. A high chance at short odds can still be a poor bet. Check injuries before placing anything.</p>'+foot();
   }
   return h+parlaysBody(lg)+foot();
 }
@@ -2351,8 +2351,10 @@ function vBestBets(){
   }
   S.recList=_mbL;
   var G=_mbG.games,P=_mbG.props;
-  if(!G.length&&!P.length)return h+'<div class="card empty">No games left to bet on today. Finished and started games are removed. Tap Refresh, or pick a sport above.</div>'+foot();
+  var CV='<h2 style="margin-top:18px">All sports · covers and winners</h2><div class="card" style="padding:4px 12px">'+coverSection(['nfl','nba','ncaafb','nhl'],true,true)+'</div>';
+  if(!G.length&&!P.length)return h+CV+'<div class="card empty">No games left to bet on today. Finished and started games are removed. Tap Refresh, or pick a sport above.</div>'+foot();
   h+='<p class="lede">Games on today’s slate that have not started, with the model’s moneyline, spread and total for each. Games that have started or finished are removed. Chances are the model’s; sportsbook prices were not readable, so compare the fair odds with your book.</p>';
+  h+=CV;
   ['nfl','nba','ncaafb','nhl','mlb'].forEach(function(lg){
     var gs=G.filter(function(x){return x.g.lg===lg}),ps2=P.filter(function(b){return b.lgKey===lg});
     if(!gs.length&&!ps2.length)return;
@@ -4820,6 +4822,38 @@ function gameRecLine(lg){
   var D=gameEntries(lg).filter(function(x){return x.res==='W'||x.res==='L'}),w=D.filter(function(x){return x.res==='W'}).length;
   if(!D.length)return null;
   return 'The app’s own '+lgName(lg)+' game picks so far: '+w+'-'+(D.length-w)+' on '+D.length+' graded'+(D.length<20?'. That is too few to call an edge yet.':(w/D.length>=.55?', ahead of break-even.':', no proven edge yet.'));
+}
+
+
+/* ---------- block38: most likely spread covers and moneyline winners from DraftKings lines ---------- */
+function coverRows(lgs,t,max,todayOnly){
+  var now=Date.now(),out=[];
+  lgs.forEach(function(lg){(S.feed[lg]||[]).forEach(function(g){
+    if(kind(g)!=='up'||!(g.start>now))return;
+    if(todayOnly&&!isToday(g.start))return;
+    if(g.start>now+8*864e5)return;
+    var b=null;try{b=picksFor(g)}catch(e){}if(!b)return;
+    var x=b.filter(function(y){return y.t===t})[0];if(!x||x.p==null)return;
+    var ln=null;try{ln=lineFor(g)}catch(e){}
+    var dk=!!(g.dk&&(t==='sp'?g.dk.sp:g.dk.ml));
+    if(t==='sp'&&!(ln&&ln.pts!=null))return;
+    var odds=null;if(t==='ml'&&g.dk&&g.dk.ml)odds=x.side==='h'?g.dk.ml.h:g.dk.ml.a;
+    out.push({g:g,lg:lg,x:x,p:x.p,dk:dk,odds:odds});
+  })});
+  out.sort(function(a,b){return b.p-a.p});
+  return out.slice(0,max);
+}
+function coverTable(rows,t,showLg){
+  if(!rows.length)return '<p class="note" style="margin-top:0">'+(t==='sp'?'No upcoming game has a spread yet. DraftKings (via ESPN) or Kalshi lines show up closer to game day. Tap Refresh.':'No upcoming game has a moneyline yet.')+'</p>';
+  return '<div class="tblwrap"><table><thead><tr><th>Pick</th><th>'+(t==='sp'?'Cover':'Win')+' chance</th><th>'+(t==='sp'?'Line':'DraftKings price')+'</th><th>Game</th></tr></thead><tbody>'+rows.map(function(r){
+    var g=r.g,ln=null;try{ln=lineFor(g)}catch(e){}
+    var cell=t==='sp'?(r.dk?'DraftKings':'Kalshi (no DraftKings line)'):(r.odds!=null?fo(r.odds):(r.dk?'DraftKings':'Kalshi'));
+    return '<tr><td><b>'+esc(r.x.pick)+'</b>'+(showLg?' <span class="src">'+esc(lgName(r.lg))+'</span>':'')+'</td><td>'+Math.round(r.p*100)+'%</td><td>'+esc(cell)+'</td><td>'+esc(g.a)+' @ '+esc(g.h)+'<br><span class="src">'+esc(gTime(g))+'</span></td></tr>'}).join('')+'</tbody></table></div>';
+}
+function coverSection(lgs,withML,showLg){
+  var sp=coverRows(lgs,'sp',showLg?10:6),h='<h3>Most likely to cover the spread</h3>'+coverTable(sp,'sp',showLg)+'<p class="src">Spread is the DraftKings line from ESPN, with Kalshi only where DraftKings has none. The chance is the app’s blended estimate of covering that exact number, not a guarantee.</p>';
+  if(withML){var ml=coverRows(lgs,'ml',showLg?10:6);h+='<h3>Most likely to win outright (moneyline)</h3>'+coverTable(ml,'ml',showLg)+'<p class="src">Ranked by win chance after blending the DraftKings price with the app’s model. Heavy favorites win often but pay little, so check the price.</p>'}
+  return h;
 }
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
