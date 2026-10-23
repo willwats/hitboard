@@ -162,7 +162,7 @@ details.bcard{margin-bottom:8px}
 details.bcard summary{cursor:pointer;min-height:32px;display:flex;align-items:center;gap:8px}
 @media (prefers-reduced-motion: no-preference){.sheet{animation:up .18s ease-out}@keyframes up{from{transform:translateY(24px);opacity:.6}to{transform:none;opacity:1}}}
 nav{-webkit-transform:translateZ(0);transform:translateZ(0)}
-</style>
+details.more{margin-top:16px;border-top:1px solid rgba(128,128,128,.3)}details.more>summary{cursor:pointer;font-weight:600;padding:14px 0;list-style:none}details.more>summary::-webkit-details-marker{display:none}details.more>summary::after{content:' ›';opacity:.6}details.more[open]>summary::after{content:' ⌄'}</style>
 </head><body>
 
 <div class="wrap">
@@ -585,7 +585,7 @@ function normFeed(lg,games){
 }
 
 /* ---------- state ---------- */
-var S={cat:null,tab:'home',sport:'nfl',gf:'All',sheet:null,picks:[],stake:10,feed:SNAP.feed,feedAt:SNAP.at,live:false,src:'the data feed',busy:false,msg:'',msgKind:'',stats:{}};
+var S={cat:null,tab:'games',sport:'nfl',gf:'All',sheet:null,picks:[],stake:10,feed:SNAP.feed,feedAt:SNAP.at,live:false,src:'the data feed',busy:false,msg:'',msgKind:'',stats:{}};
 try{var raw=localStorage.getItem('hitboard.picks.v2');if(raw){var a=JSON.parse(raw);if(Array.isArray(a))S.picks=a.filter(function(x){return propById(x.pid)&&(x.side==='over'||x.side==='under')})}}catch(e){}
 function save(){try{localStorage.setItem('hitboard.picks.v2',JSON.stringify(S.picks))}catch(e){}}
 var $=function(s){return document.querySelector(s)};
@@ -761,12 +761,12 @@ function nflCalc(){
   '<div class="list">'+propRows(list)+'</div>';
 }
 var CATS={
-  nfl:[['deep','All players'],['pass','Passing'],['rush','Rushing'],['rec','Receiving'],['td','Touchdowns'],['kick','Kickers'],['trend','Team trends'],['calc','Calculator']],
-  nba:[['xdeep','All players'],['Points','Points'],['Rebounds','Rebounds'],['Assists','Assists'],['Threes','Threes'],['xcalc','Calculator'],['lines','Game lines']],
-  ncaafb:[['xdeep','All players'],['Passing yards','Passing'],['Rushing yards','Rushing'],['Receiving yards','Receiving'],['kick','Kickers'],['xcalc','Calculator']],
+  nfl:[['deep','All players'],['trend','Team trends']],
+  nba:[['xdeep','All players']],
+  ncaafb:[['xdeep','All players']],
   ncaamb:[],
-  nhl:[['xdeep','All players'],['xcalc','Calculator']],
-  mlb:[['xdeep','All players'],['hr','Home runs'],['sb','Stolen bases'],['hit','Hits'],['pit','Pitchers'],['cheat','Cheatsheet'],['xcalc','Calculator']]
+  nhl:[['xdeep','All players']],
+  mlb:[['xdeep','All players'],['pit','Pitchers']]
 };
 function curCat(){var l=CATS[S.sport];if(!l.length)return null;var ok=l.some(function(c){return c[0]===S.cat});return ok?S.cat:l[0][0]}
 function ladderHtml(L){
@@ -1930,7 +1930,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v68, Oct 23';
+var BUILD='v69, Oct 23';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -2827,7 +2827,7 @@ function vRecord(){
   h+='<h3>What the app has learned from this record</h3><ul class="pts">'+
    '<li><b>Score bias:</b> '+(L.n?'from '+L.n+' graded games the model now shifts margins by '+(L.dm>=0?'+':'')+L.dm.toFixed(1)+' and totals by '+(L.dt>=0?'+':'')+L.dt.toFixed(1)+' points (capped at 3, and weighted down until there are many games).':'no adjustment yet. It needs graded games with a saved projection.')+'</li>'+
    ['ml','sp','tot'].map(function(t){return '<li><b>'+T[t]+' chances:</b> '+(L.cnt[t]>=20?'shifted '+(L.dp[t]>=0?'+':'')+(L.dp[t]*100).toFixed(1)+' points from '+L.cnt[t]+' graded picks.':'no adjustment until 20 graded picks ('+(L.cnt[t]||0)+' so far).')+'</li>'}).join('')+'</ul>';
-  h+=analysisSection(lg);
+  h+='<details class="more"><summary>Insights: closing line, model vs market, teams and matchups</summary>'+analysisSection(lg)+'</details>';
   // per-game list
   var byG={};E.forEach(function(x){(byG[x.gid]=byG[x.gid]||[]).push(x)});
   var games=Object.keys(byG).map(function(k){return byG[k]}).sort(function(a,b){return b[0].at-a[0].at});
@@ -2983,10 +2983,8 @@ function feedAnalyst(g){
   }else if(rows.length){
     h+='<h3>Projection table</h3><div class="tblwrap"><table><thead><tr><th>Player</th><th>Stat</th><th>Hit rate</th><th>Avg</th></tr></thead><tbody>'+rows.map(function(r){var rt=Math.round(100*r.h/r.n);return '<tr><td>'+esc(r.p)+' <span class="src">'+r.t+'</span></td><td>'+r.st+' over '+r.l+'</td><td><span class="hrpill '+hcls(r.h,r.n)+'">'+rt+'% ('+r.h+'/'+r.n+')</span></td><td>'+(r.u?r.a.toFixed(1):r.a)+'</td></tr>'}).join('')+'</tbody></table></div><p class="src">'+(g.lg==='nba'?'Last 10 games of last season.':'Last 5 games.')+' Marks are the source’s own, not sportsbook lines. Opponent-allowed averages by position are not in the sources.</p>';
   }else h+='<h3>Projection table</h3><p class="note" style="margin-top:0">No player hit-rate data for these teams in the sources.</p>';
-  h+=coverBreakdown(g)+coversHtml(g);
   var bets=feedCalc(g).bets;
   h+='<h3>Best straight bets</h3><div class="list">'+bets.map(function(b){return '<div class="card bcard"><div class="label">'+b.mk+(b.conf!=='n/a'?' · confidence '+b.conf:'')+'</div><div class="teams">'+esc(b.pick)+'</div>'+(b.p!=null?'<div class="facts"><span>Est. chance <b>'+pc(b.p)+'%</b></span><span>Fair odds <b>'+fairOdds(b.p)+'</b></span><span>Break-even at -110 <b>52.4%</b></span>'+(b.mk!=='Moneyline'?'<span>Stake at -110 <b>'+kelly(b.p)+'</b></span>':'')+'</div>':'')+'<p class="src" style="margin-top:6px">'+esc(b.why)+'</p></div>'}).join('')+'</div>';
-  h+=lineMoveHtml(g);
   h+='<h3>Uncertainty</h3><ul class="pts"><li><b>Solid:</b> '+(g.lg==='nhl'?'goal and shot rates over the first 8 to 11 games, blended with the league average, and the feed’s win probability.':g.lg==='nfl'?'team stats through five or six games and the feed’s win probability.':g.lg==='nba'?'last season’s scoring numbers and the feed’s win probability.':'this season’s scoring numbers through about six or seven games.')+'</li><li><b>Volatile:</b> '+(g.lg==='nhl'?'the starting goalie (not confirmed here), line changes, injuries and a sample of only 8 to 11 games per team. Hockey is low scoring, so one bounce decides many games.':g.lg==='nfl'?'injuries (no verified list for this game), weather and a small sample. No sportsbook line was read for this game, so the fair spread and total above are numbers to compare with your book.':g.lg==='nba'?'rosters, trades, minutes and injuries for the new season. Last season’s teams are only a rough guide.':'schedule strength is not adjusted, injuries and weather are unknown, and one blowout moves a six-game average a lot.')+'</li><li><b>Props:</b> '+(g.lg==='nfl'?'season averages swing a lot game to game, so use them as context.':g.lg==='nhl'?'player rates are season averages from 8 to 11 games, steadied toward typical rates, so treat them as context rather than a forecast.':'hit rates here come from short samples ('+(g.lg==='nba'?'10':'5')+' games), so treat them as context rather than a forecast.')+'</li></ul>';
   return h;
 }
@@ -2994,27 +2992,32 @@ function feedAnalyst(g){
 function gameSheet(g){
   var d=g.dive,fg=feedFor(g);if(fg)research(fg);
   var h='<div class="sh-head"><div><div class="label">'+g.day+' · '+esc(g.venue)+'</div><h2>'+g.an+' @ '+g.hn+'</h2></div><button class="x" data-act="close" aria-label="Close">×</button></div>';
-  h+='<h3>Win probability</h3><div class="tblwrap"><table><thead><tr><th>Source</th><th>'+g.a+'</th><th>'+g.h+'</th></tr></thead><tbody>'+
+  var wp='',ln='',rest='',props='',live=!!(fg&&fg.dk);
+  wp+='<h3>Win probability</h3><div class="tblwrap"><table><thead><tr><th>Source</th><th>'+g.a+'</th><th>'+g.h+'</th></tr></thead><tbody>'+
    '<tr><td>Kalshi (Oct 16)</td><td>'+g.kal[0]+'%</td><td>'+g.kal[1]+'%</td></tr><tr><td>Polymarket US (Oct 16)</td><td>'+g.poly[0]+'%</td><td>'+g.poly[1]+'%</td></tr>'+
    '<tr><td>Market blend, normalized</td><td><b>'+pc(g.mkA)+'%</b></td><td><b>'+pc(1-g.mkA)+'%</b></td></tr>'+
    (fg&&fg.pa!=null?'<tr><td>Data feed model</td><td>'+Math.round(fg.pa)+'%</td><td>'+Math.round(fg.ph)+'%</td></tr>':'')+
    (g.bkA!=null?'<tr><td>Sportsbook moneyline, margin removed</td><td>'+pc(g.bkA)+'%</td><td>'+pc(1-g.bkA)+'%</td></tr>':'')+'</tbody></table></div>';
-  if(g.gap!=null&&g.gap>=.08)h+='<p class="note" style="margin-top:8px">The sportsbook listing and the prediction markets disagree by '+pc(g.gap)+' points, and the listing is from Oct 13. Check a live book before relying on either.</p>';
-  if(fg&&fg.dk)h+=espnOddsHtml(fg)+pvHtml(fg);
-  h+='<h3>Line</h3><div class="facts" style="margin:0"><span><b>'+g.favT+' -'+g.pts+'</b></span><span>O/U <b>'+g.total+'</b></span><span>ML <b>'+mlText(g)+'</b></span></div><p class="src">Implied score: '+g.favT+' '+g.fs.toFixed(1)+', '+g.dogT+' '+g.ds.toFixed(1)+'. Source: '+esc(g.src)+'.'+(g.alt?' '+esc(g.alt):'')+'</p>';
-  if(g.note)h+='<p class="note">'+esc(g.note)+'</p>';
-  h+=analystSections(g);
-  if(fg){try{h+=coverBreakdown(fg)+coversHtml(fg)+lineMoveHtml(fg)}catch(e){}}
+  if(g.gap!=null&&g.gap>=.08)wp+='<p class="note" style="margin-top:8px">The sportsbook listing and the prediction markets disagree by '+pc(g.gap)+' points, and the listing is from Oct 13. Check a live book before relying on either.</p>';
+  ln+='<h3>Line</h3><div class="facts" style="margin:0"><span><b>'+g.favT+' -'+g.pts+'</b></span><span>O/U <b>'+g.total+'</b></span><span>ML <b>'+mlText(g)+'</b></span></div><p class="src">Implied score: '+g.favT+' '+g.fs.toFixed(1)+', '+g.dogT+' '+g.ds.toFixed(1)+'. Source: '+esc(g.src)+'.'+(g.alt?' '+esc(g.alt):'')+'</p>';
+  if(g.note)ln+='<p class="note">'+esc(g.note)+'</p>';
+  rest+=analystSections(g);
   if(d){
-    h+='<h3>Team comparison</h3><div class="tblwrap"><table><thead><tr><th></th><th>'+g.a+'</th><th>'+g.h+'</th></tr></thead><tbody>'+d.rows.map(function(r){return '<tr><td>'+esc(r[0])+'</td><td>'+esc(r[1])+'</td><td>'+esc(r[2])+'</td></tr>'}).join('')+'</tbody></table></div><p class="src">'+esc(d.basis)+'</p>';
+    rest+='<h3>Team comparison</h3><div class="tblwrap"><table><thead><tr><th></th><th>'+g.a+'</th><th>'+g.h+'</th></tr></thead><tbody>'+d.rows.map(function(r){return '<tr><td>'+esc(r[0])+'</td><td>'+esc(r[1])+'</td><td>'+esc(r[2])+'</td></tr>'}).join('')+'</tbody></table></div><p class="src">'+esc(d.basis)+'</p>';
     var ihl=injHtml('nfl',[[g.a,g.a],[g.h,g.h]]);
-    h+=(ihl?'<h3>Injuries (live from ESPN)</h3>'+ihl+'<h3>Earlier injury notes</h3>':'<h3>Injuries and availability</h3>')+'<ul class="pts">'+d.inj.map(function(t){return '<li>'+esc(t)+'</li>'}).join('')+'</ul>';
-    h+='<h3>Matchup angles</h3><ul class="pts">'+d.angles.map(function(t){return '<li>'+esc(t)+'</li>'}).join('')+'</ul><p class="src">'+esc(d.proj)+'</p>';
+    rest+=(ihl?'<h3>Injuries (live from ESPN)</h3>'+ihl+'<h3>Earlier injury notes</h3>':'<h3>Injuries and availability</h3>')+'<ul class="pts">'+d.inj.map(function(t){return '<li>'+esc(t)+'</li>'}).join('')+'</ul>';
+    rest+='<h3>Matchup angles</h3><ul class="pts">'+d.angles.map(function(t){return '<li>'+esc(t)+'</li>'}).join('')+'</ul><p class="src">'+esc(d.proj)+'</p>';
     var ps=PR().filter(function(p){return p.game===g.id});
-    if(ps.length)h+='<h3>Player props</h3><div class="list">'+propRows(ps)+'</div>';
+    if(ps.length)props='<h3>Player props</h3><div class="list">'+propRows(ps)+'</div>';
   }else{
-    h+='<p class="note" style="margin-top:14px">No matchup deep dive for this game yet. Only lines and market odds were verified from public sources. Ask Claude to build one.</p>';
+    rest+='<p class="note" style="margin-top:14px">No matchup deep dive for this game yet. Only lines and market odds were verified from public sources. Ask Claude to build one.</p>';
   }
+
+  if(live){
+    rest=rest.replace(/<h3>Line movement<\/h3><p class="note"[^>]*>.*?<\/p>/,'');
+    try{h+=espnOddsHtml(fg)+lineMoveHtml(fg)+pvHtml(fg)+coverBreakdown(fg)}catch(e){}
+    h+=props+'<details class="more"><summary>More: ratings, injuries, matchup angles</summary>'+rest+'</details>';
+  }else h+=wp+ln+rest+props;
   return h;
 }
 /* ---------- scoreboard: stats, recap ---------- */
@@ -3234,7 +3237,7 @@ function feedSheetK0(g){
     else h+='<p class="note" style="margin-top:14px">The feed has no win probability for this game yet, so the prediction below uses team stats only.</p>';
   }
   if(k!=='up')h+='<h2 style="margin-top:22px">'+(k==='final'?'Pre-game breakdown':'Full breakdown')+'</h2><p class="src">Built from season stats before this game, so you can see how the matchup looked going in.</p>';
-  h+=g.lg==='ncaamb'?'<p class="note" style="margin-top:14px">No team ratings for college basketball yet.</p>':feedAnalyst(g);
+  h+=g.lg==='ncaamb'?'<p class="note" style="margin-top:14px">No team ratings for college basketball yet.</p>':(k==='up'?'<details class="more"><summary>More: ratings, injuries, projections</summary>'+feedAnalyst(g)+'</details>':feedAnalyst(g));
   if(k==='up')h+=consHtml(g);
   return h;
 }
@@ -4215,7 +4218,7 @@ function builderSave(){
 }
 
 function modeSwitch(cur){
-  var G=[[['games','Upcoming'],['scores','Final scores']],[['props','Player props'],['parlay','Model bets']],[['picks','My bets'],['builder','Parlay builder'],['record','Track record']],[['more','‹ More'],['div','Standings']]];
+  var G=[[['games','Upcoming'],['scores','Final scores'],['div','Standings']],[['parlay','Model bets'],['builder','Parlay builder']],[['picks','My bets'],['record','Track record']]];
   var g=null;G.forEach(function(s){if(s.some(function(m){return m[0]===cur}))g=s});
   if(!g)return '';
   return '<div class="chips" role="group" aria-label="Section">'+g.map(function(m){return '<button class="chip" data-act="tab" data-t="'+m[0]+'" aria-pressed="'+(cur===m[0])+'">'+m[1]+'</button>'}).join('')+'</div>';
@@ -4263,8 +4266,8 @@ function slipBtnHtml(act,attrs,on){
 }
 
 /* ---------- shell ---------- */
-var TABS=[['home','Home','<path d="M3 11l9-8 9 8M5 10v10h14V10"/>'],['games','Games','<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>'],['props','Props','<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'],['picks','My bets','<path d="M5 4h14v17l-7-4-7 4z"/>'],['more','More','<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>']];
-var NAVG={home:['home'],games:['games','scores'],props:['props','parlay'],picks:['picks','builder','record'],more:['more','div','about']};
+var TABS=[['games','Games','<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>'],['parlay','Picks','<path d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.5 6.7 19.4l1.2-6L3.4 9.3l6-.7z"/>'],['props','Props','<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'],['picks','My bets','<path d="M5 4h14v17l-7-4-7 4z"/>']];
+var NAVG={games:['games','scores','div','home','more','about'],parlay:['parlay','builder'],props:['props'],picks:['picks','record']};
 function renderNav(){
   $('#nav').innerHTML=TABS.map(function(t){return '<button data-act="tab" data-t="'+t[0]+'"'+(NAVG[t[0]].indexOf(S.tab)>=0?' aria-current="page"':'')+'><svg viewBox="0 0 24 24" aria-hidden="true">'+t[2]+'</svg>'+t[1]+(t[0]==='picks'&&S.picks.length?'<span class="badge">'+S.picks.length+'</span>':'')+'</button>'}).join('');
 }
@@ -4544,8 +4547,8 @@ document.addEventListener('change',function(e){
 document.addEventListener('input',function(e){var t0=e.target;if(t0&&t0.id==='pl_thr'&&S.sheet&&S.sheet.type==='player'){var v0=parseFloat(String(t0.value).replace(',','.'));if(isFinite(v0)){S.sheet.thr=v0;var pb=document.getElementById('plbody');if(pb)pb.innerHTML=playerBody(S.sheet)}return}var t=e.target,f=t.dataset&&t.dataset.sf;if(!f||t.tagName==='SELECT')return;S.scan[f]=t.value;var r=$('#scanres');if(r)r.innerHTML=scanRes()});
 document.addEventListener('keydown',function(e){if(e.key==='Escape'&&S.sheet){S.sheet=null;renderSheet()}else if((e.key==='Enter'||e.key===' ')&&e.target&&e.target.getAttribute&&e.target.getAttribute('role')==='button'&&e.target.dataset.act){e.preventDefault();e.target.click()}});
 /*B34*/
-function feedCard(g){var h=feedCardK0(g);if(kind(g)!=='up')return h;var kl=dkCompact(g)+kalLine(g);if(!kl)return h;var i=h.indexOf('<div class="cap" style="margin-top:10px">Model picks');return i>0?h.slice(0,i)+kl+h.slice(i):h.replace(/<\/article>\s*$/,kl+'</article>')}
-function feedSheet(g){var h=feedSheetK0(g);if(kind(g)!=='up')return h;var kl=dkLine(g)+pvHtml(g)+kalLine(g);if(!kl)return h;var i=h.indexOf('</div></div>');var j=h.indexOf('<h3');return j>0?h.slice(0,j)+kl+h.slice(j):h+kl}
+function feedCard(g){var h=feedCardK0(g);if(kind(g)!=='up')return h;var kl=dkCompact(g)+(g.dk?'':kalLine(g));if(!kl)return h;var i=h.indexOf('<div class="cap" style="margin-top:10px">Model picks');return i>0?h.slice(0,i)+kl+h.slice(i):h.replace(/<\/article>\s*$/,kl+'</article>')}
+function feedSheet(g){var h=feedSheetK0(g);if(kind(g)!=='up')return h;var kl=dkLine(g)+lineMoveHtml(g)+pvHtml(g)+((g.lg==='mlb'||g.lg==='ncaamb')?'':coverBreakdown(g))+(g.dk?'':kalLine(g));if(!kl)return h;var i=h.indexOf('</div></div>');var j=h.indexOf('<h3');return j>0?h.slice(0,j)+kl+h.slice(j):h+kl}
 
 /* ---------- block34: fetch timeout, lazy weather, live Kalshi lines ---------- */
 function fetchT(url,ms){
