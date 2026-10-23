@@ -761,9 +761,9 @@ function nflCalc(){
   '<div class="list">'+propRows(list)+'</div>';
 }
 var CATS={
-  nfl:[['deep','All players'],['trend','Team trends']],
+  nfl:[['deep','All players'],['td','Anytime TD'],['pass','Passing'],['rush','Rushing'],['rec','Receiving'],['kick','Kicking'],['trend','Team trends']],
   nba:[['xdeep','All players']],
-  ncaafb:[['xdeep','All players']],
+  ncaafb:[['xdeep','All players'],['Passing yards','Passing'],['Rushing yards','Rushing'],['Receiving yards','Receiving'],['kick','Kicking']],
   ncaamb:[],
   nhl:[['xdeep','All players']],
   mlb:[['xdeep','All players'],['pit','Pitchers']]
@@ -809,7 +809,7 @@ function vPropsLg(){
   }else if(lg!=='nfl'&&cat==='xcalc'){
     h+=pxCalc(lg);
   }else if(lg==='nfl'){
-    h+=cat==='deep'?nflDeep():cat==='pass'?nflLadders([0]):cat==='rush'?nflLadders([1]):cat==='rec'?nflLadders([2,3]):cat==='td'?nflTD():cat==='kick'?nflKick():cat==='trend'?nflTrends():nflCalc();
+    h+=cat==='deep'?nflDeep():cat==='pass'?nflDeep('pass'):cat==='rush'?nflDeep('rush'):cat==='rec'?nflDeep('rec'):cat==='td'?nflTD():cat==='kick'?nflKick():cat==='trend'?nflTrends():nflCalc();
   }else if(lg==='mlb'){
     h+=mlbProps(cat);
   }else if(lg==='nba'){
@@ -1930,7 +1930,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v71, Oct 23';
+var BUILD='v72, Oct 23';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -2647,8 +2647,8 @@ function deepRows(){
   out.sort(function(a,b){return b.proj-a.proj});
   return out;
 }
-function nflDeep(){
-  var kinds=[['rec','Receiving'],['rush','Rushing'],['pass','Passing']];
+function nflDeep(only){
+  var kinds=[['rec','Receiving'],['rush','Rushing'],['pass','Passing']];if(only)kinds=kinds.filter(function(k){return k[0]===only});
   var games=[];(S.feed.nfl||[]).forEach(function(g){if(kind(g)==='up')games.push({k:nt(g.a)+'@'+nt(g.h),s:g.start})});
   games.sort(function(a,b){return a.s-b.s});
   var seen={},opts=['All'].concat(games.filter(function(x){if(seen[x.k])return false;seen[x.k]=1;return true}).map(function(x){return x.k}));
