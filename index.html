@@ -1930,7 +1930,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v69, Oct 23';
+var BUILD='v70, Oct 23';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -3171,7 +3171,7 @@ function vScores(){
   h+='<p class="lede" style="margin-top:0">Finished games, newest first. Each has the final, a line score, team stats and a short recap. Tap a game for scoring plays and the full pre-game breakdown.</p>';
   if(!live.length&&!fin.length)h+='<div class="card empty">No finished '+name+' games in the data feed right now.'+(lg==='nba'?' The 2026-27 season starts Oct 20.':lg==='ncaamb'?' College basketball has not started yet.':'')+' Tap Refresh to check again.</div>';
   if(live.length)h+='<h3>In progress</h3><div class="feed">'+live.map(scoreCard).join('')+'</div>';
-  if(fin.length)h+='<h3>Final</h3><div class="feed">'+fin.map(scoreCard).join('')+'</div>';
+  if(fin.length)h+=(S.gs==='all'?LG.map(function(l){var f=fin.filter(function(g){return g.lg===l[0]});return f.length?'<h3>'+esc(l[1])+' · final</h3><div class="feed">'+f.map(scoreCard).join('')+'</div>':''}).join(''):'<h3>Final</h3><div class="feed">'+fin.map(scoreCard).join('')+'</div>');
   fin.slice(0,15).concat(live).forEach(function(g){loadStats(g)});
   return h+foot();
 }
@@ -3934,14 +3934,13 @@ function vGames(){
   var live=all.filter(function(g){return kind(g)==='live'}).sort(function(a,b){return a.start-b.start});
   var up=all.filter(function(g){return kind(g)==='up'}).sort(function(a,b){return a.start-b.start});
   var cnt={today:up.filter(function(g){return dayKey(g.start)===k0}).length,tomorrow:up.filter(function(g){return dayKey(g.start)===k1}).length,week:up.length};
-  var sel=S.gd||(cnt.today?'today':cnt.tomorrow?'tomorrow':'week');
+  var prevL=all.filter(function(g){return kind(g)==='final'&&g.sa!=null}),sel=S.gd||(cnt.today?'today':cnt.tomorrow?'tomorrow':'week');cnt.prev=prevL.length;
+  if(sel==='prev'){var hp='<h2>Games</h2>'+gsChips()+modeSwitch('games')+refreshBar()+'<div class="chips" role="group" aria-label="Day">'+[['prev','Previous'],['today','Today'],['tomorrow','Tomorrow'],['week','This week']].map(function(m){return '<button class="chip" data-act="set" data-k="gd" data-v="'+m[0]+'" aria-pressed="'+(sel===m[0])+'">'+m[1]+' ('+cnt[m[0]]+')</button>'}).join('')+'</div>';return hp+finalsBySport(all,sel)+foot()}
   var list=sel==='today'?up.filter(function(g){return dayKey(g.start)===k0}):sel==='tomorrow'?up.filter(function(g){return dayKey(g.start)===k1}):up;
   var h='<h2>Games</h2>'+gsChips()+modeSwitch('games')+refreshBar();
-  h+='<div class="chips" role="group" aria-label="Day">'+[['today','Today'],['tomorrow','Tomorrow'],['week','This week']].map(function(m){return '<button class="chip" data-act="set" data-k="gd" data-v="'+m[0]+'" aria-pressed="'+(sel===m[0])+'">'+m[1]+' ('+cnt[m[0]]+')</button>'}).join('')+'</div>';
+  h+='<div class="chips" role="group" aria-label="Day">'+[['prev','Previous'],['today','Today'],['tomorrow','Tomorrow'],['week','This week']].map(function(m){return '<button class="chip" data-act="set" data-k="gd" data-v="'+m[0]+'" aria-pressed="'+(sel===m[0])+'">'+m[1]+' ('+cnt[m[0]]+')</button>'}).join('')+'</div>';
   if(!all.length)return h+'<div class="card empty">No games in the data feed for this selection. Tap Refresh to check again.</div>'+foot();
   if(live.length)h+='<h3>Live now</h3><div class="feed">'+live.map(feedCard).join('')+'</div>';
-  var fin0=all.filter(function(g){return kind(g)==='final'&&g.sa!=null&&g.start>now-36*36e5}).sort(function(a,b){return b.start-a.start}).slice(0,10);
-  if(fin0.length)h+='<h3>Final scores · last day</h3><div class="feed">'+fin0.map(feedCard).join('')+'</div>';
   if(S.gs==='all'||(S.gs!=='mlb'&&S.gs!=='ncaamb'))h+=discoverHtml();
   if(list.length)h+='<p class="lede" style="margin-top:12px">'+list.length+' game'+(list.length>1?'s':'')+' '+(sel==='today'?'still to play today':sel==='tomorrow'?'tomorrow':'in the next week')+'. Tap a game for the model’s picks, player props and a full breakdown. Finished games are under Final scores.</p>'+groupDays(list,feedCard);
   else if(!live.length)h+='<div class="card empty">No games '+(sel==='today'?'left today':sel==='tomorrow'?'tomorrow':'this week')+' for this selection. Try another day, or open Final scores.</div>';
@@ -3956,7 +3955,7 @@ function vScores(){
   h+='<p class="lede" style="margin-top:0">Finished games, newest first. Each has the final, a line score, team stats and a short recap. Tap a game for scoring plays and the full pre-game breakdown.</p>';
   if(!live.length&&!fin.length)h+='<div class="card empty">No finished games in the data feed for this selection. Tap Refresh to check again.</div>';
   if(live.length)h+='<h3>In progress</h3><div class="feed">'+live.map(scoreCard).join('')+'</div>';
-  if(fin.length)h+='<h3>Final</h3><div class="feed">'+fin.map(scoreCard).join('')+'</div>';
+  if(fin.length)h+=(S.gs==='all'?LG.map(function(l){var f=fin.filter(function(g){return g.lg===l[0]});return f.length?'<h3>'+esc(l[1])+' · final</h3><div class="feed">'+f.map(scoreCard).join('')+'</div>':''}).join(''):'<h3>Final</h3><div class="feed">'+fin.map(scoreCard).join('')+'</div>');
   fin.slice(0,15).concat(live).forEach(function(g){loadStats(g)});
   return h+foot();
 }
@@ -5149,6 +5148,17 @@ function withFinals(lg,gm){
     js.forEach(function(j){if(j&&j.events)espnNorm(lg,j.events).forEach(function(g){if(!seen[g.id]){seen[g.id]=1;gm.push(g)}})});
     return gm;
   });
+}
+
+
+function finalsBySport(all){
+  var fd=function(a,b){return b.start-a.start},out='',any=false;
+  LG.forEach(function(l){
+    var f=all.filter(function(g){return g.lg===l[0]&&kind(g)==='final'&&g.sa!=null}).sort(fd).slice(0,10);
+    if(!f.length)return;any=true;
+    out+='<h3>'+esc(l[1])+' · previous games</h3><div class="feed">'+f.map(feedCard).join('')+'</div>';
+  });
+  return any?'<p class="lede" style="margin-top:12px">Finished games, newest first, grouped by sport. Tap one for its stats and the pre-game breakdown.</p>'+out:'<div class="card empty">No finished games in the feed for this selection. Tap Refresh.</div>';
 }
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
