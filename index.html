@@ -1627,7 +1627,7 @@ function analyzeBet(b){
   var g=find(b.gid);if(!g)return {p:null,note:'Pick the game.'};
   var bets=picksFor(g);if(!bets||!bets.length)return {p:null,note:'The model has no numbers for this game yet.'};
   var ml=bets.filter(function(x){return x.t==='ml'})[0],f0=bets.filter(function(x){return x.rm!=null})[0];
-  var L=learn(g.lg),warn=kind(g)==='live'?' The game has started, so this is the pregame chance.':'';
+  var L=learnTm(g),warn=kind(g)==='live'?' The game has started, so this is the pregame chance.':'';
   var M=f0?f0.rm+L.dm:null,TT=f0?f0.rt+L.dt:null,T=g.lg==='nfl'?null:feedTeams(g),sd=g.lg==='nfl'?13.5:((T&&T.sdM)||13.5),sdT=sd*0.78;
   var res={game:g.a+' @ '+g.h,lg:g.lg,gid:g.id};
   if(b.type==='ml'){if(!ml)return {p:null,note:'No moneyline model for this game.'};var pH=ml.side==='h'?ml.p:1-ml.p;res.p=b.side==='h'?pH:1-pH;res.note='Model moneyline chance after calibration.'+warn;return res}
@@ -1935,7 +1935,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v84, Oct 24';
+var BUILD='v85, Oct 24';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -1981,7 +1981,7 @@ function model(g){
   var fgw=feedFor(g),wa=wxAdj(h,fgw&&fgw.start),wadj=wa.adj;
   // backtest: stats model adds value on the margin (about 30% weight) but not on the total (about 10%)
   var margin=0.3*(sh-sa)+0.7*(mk_h-mk_a),total=0.1*(sa+sh)+0.9*(mk_a+mk_h)+wadj;
-  var rawM=margin,rawT=total,LN=learn('nfl');margin+=LN.dm;total+=LN.dt;
+  var rawM=margin,rawT=total,LN=learnTm(g);margin+=LN.dm;total+=LN.dt;
   return {sa:sa,sh:sh,ma:mk_a,mh:mk_h,ba:(total-margin)/2,bh:(total+margin)/2,margin:margin,total:total,rmargin:rawM,rtotal:rawT,LN:LN,wadj:wadj,wa:wa,mmargin:mk_h-mk_a,mtotal:mk_a+mk_h,smargin:sh-sa,stotal:sa+sh};
 }
 function confOf(d){d=Math.abs(d);return d>=3?'high':d>=1.5?'medium':'low'}
@@ -2920,7 +2920,7 @@ function feedCalc(g){
   var wxa=g.lg==='nfl'?wxAdj(T.H.k,g.start):{adj:0,pu:0},mkM=(ln&&ln.pts!=null)?(ln.fav==='h'?ln.pts:-ln.pts):null,total=sa+sh;if(ln&&ln.tt!=null)total=0.1*total+0.9*ln.tt;total+=wxa.adj;
   var margin=mkM!=null?(0.3*(sh-sa)+0.7*mkM):T.sdM*invPhi(p);
   if(mkM!=null)p=Phi(margin/T.sdM);
-  var rawM=margin,rawT=total,LN=learn(g.lg);
+  var rawM=margin,rawT=total,LN=learnTm(g);
   if(LN.n){margin+=LN.dm;total+=LN.dt;p=Phi(margin/T.sdM)}
   var bets=[],ws=p>=.5?g.h:g.a,wpp=p>=.5?p:1-p;
   bets.push({t:'ml',side:p>=.5?'h':'a',mk:'Moneyline',pick:ws+' to win',p:wpp,conf:wpp>=.7?'high':wpp>=.6?'medium':'low',why:'Blended win chance '+pc(wpp)+'%'+(fp!=null?'; the feed alone says '+pc(p>=.5?fp:1-fp)+'%.':'. No feed win probability, so this is team stats only.')});
@@ -4479,6 +4479,8 @@ document.addEventListener('click',function(e){
   else if(act==='gpk'){S.gpk=el.dataset.v;renderSheet()}
   else if(act==='trk'){S.trk=el.dataset.v;renderSheet()}
   else if(act==='set'){S[el.dataset.k]=el.dataset.v;render()}
+  else if(act==='hblog'){hbLog(el.dataset.gid,el.dataset.t)}
+  else if(act==='hbcopy'){hbCopy(el.dataset.lg)}
   else if(act==='team'){S.sheet={type:'team',lg:el.dataset.lg,n:el.dataset.n};renderSheet()}
   else if(act==='gf'){S.gf=el.dataset.v;render()}
   else if(act==='dk'){S.dk=el.dataset.v;S.dmore=false;render()}
@@ -5775,9 +5777,10 @@ function vHb(){
   var E=S.log.filter(function(x){return x.lg===lg}),A=S.auto.filter(function(x){return x.lg===lg});
   if(!E.length&&!A.length){
     var why=lg==='ncaamb'?'The app makes no college basketball picks yet.':lg==='mlb'?'The app makes no baseball game picks. Its best-of-day player props are recorded here once they are made.':'No '+lgName(lg)+' picks yet. The app saves its picks when you open it before games start, then grades them on the final score.';
-    return h+'<div class="card empty">'+esc(why)+'</div>'+foot();
+    return h+sheetHtml(lg)+'<div class="card empty">'+esc(why)+'</div>'+learnHtml(lg)+foot();
   }
   var D=E.filter(function(x){return x.res==='W'||x.res==='L'}),w=D.filter(function(x){return x.res==='W'}).length;
+  h+=sheetHtml(lg);
   var PD=A.filter(function(x){return x.res==='W'||x.res==='L'}),pw=PD.filter(function(x){return x.res==='W'}).length;
   var u=0;D.forEach(function(x){if(x.t!=='ml')u+=x.res==='W'?100/110:-1});
   var open=E.filter(function(x){return !x.res}).length+A.filter(function(x){return !x.res}).length;
@@ -5791,10 +5794,86 @@ function vHb(){
   if(P.length)h+='<h2 style="font-size:16px;margin-top:16px">Best props of the day</h2>'+hbList(P.slice(0,cap),hbPropRow,function(x){var g=find(x.gid);return (g&&g.start)||x.at});
   if(!G.length&&!P.length)h+='<div class="card empty">Nothing '+(f==='open'?'open':'settled')+' for '+esc(lgName(lg))+' right now.</div>';
   if(G.length>cap||P.length>cap)h+='<div class="actions"><button class="btn" data-act="set" data-k="hbmore" data-v="1">Show all</button></div>';
+  h+=learnHtml(lg);
   return h+'<p class="src" style="margin-top:12px">Live status updates every 30 seconds while the app is open. Picks the app saved before a game started are graded on the final score; a spread or total needs 52.4% to break even at -110.</p>'+foot();
 }
 TABS.push(['hb','Hitboard','<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/>']);
 NAVG.hb=['hb'];
+
+
+/* ---------- block55: per-team learning, and a bet sheet to log picks at DraftKings ---------- */
+function teamRes(lg){
+  var gm={},key=S.log.length+'|'+S.log.filter(function(x){return x.res}).length+'|'+lg;
+  if(teamRes._k===key)return teamRes._v;
+  S.log.forEach(function(x){if(x.lg===lg&&x.res&&x.rm!=null&&x.rt!=null&&x.am!=null)gm[x.gid]=x});
+  var ks=Object.keys(gm),lt=0;ks.forEach(function(k){lt+=gm[k].atot-gm[k].rt});lt=ks.length?lt/ks.length:0;
+  var T={};
+  ks.forEach(function(k){var x=gm[k],r=x.am-x.rm,tr=(x.atot-x.rt)-lt;
+    [[x.h,r],[x.a,-r]].forEach(function(p){var kk=lg==='nfl'?nt(p[0]):p[0],o=T[kk]=T[kk]||{n:0,m:0,t:0};o.n++;o.m+=p[1];o.t+=tr})});
+  var cl=function(v,c){return Math.max(-c,Math.min(c,v))};
+  Object.keys(T).forEach(function(k){var o=T[k],w=o.n/(o.n+12);o.am=cl(w*o.m/o.n,2.5);o.at=cl(w*o.t/o.n,3)});
+  teamRes._k=key;teamRes._v=T;return T;
+}
+function learnTm(g){
+  var lg=g.lg||'nfl',L=learn(lg),T=teamRes(lg),K=function(v){return lg==='nfl'?nt(v):v},h=T[K(g.h)]||{am:0,at:0,n:0},a=T[K(g.a)]||{am:0,at:0,n:0};
+  var o={n:L.n,dm:L.dm+(h.am-a.am)*.5,dt:L.dt+(h.at+a.at)*.5,dp:L.dp,cnt:L.cnt,tn:(h.n||0)+(a.n||0)};
+  return o;
+}
+function learnHtml(lg){
+  var L=learn(lg),T=teamRes(lg),ks=Object.keys(T).filter(function(k){return T[k].n>=2}).sort(function(a,b){return Math.abs(T[b].am)-Math.abs(T[a].am)}).slice(0,6);
+  var h='<h3>What the app has learned</h3><ul class="pts">'+
+   '<li><b>League bias:</b> '+(L.n?'from '+L.n+' graded games it shifts margins by '+(L.dm>=0?'+':'')+L.dm.toFixed(1)+' and totals by '+(L.dt>=0?'+':'')+L.dt.toFixed(1)+' points.':'nothing yet, it needs graded games.')+'</li>'+
+   '<li><b>Team by team:</b> '+(ks.length?ks.map(function(k){var o=T[k];return esc(k)+' '+(o.am>=0?'+':'')+o.am.toFixed(1)+' ('+o.n+' g)'}).join(', ')+'. A plus means the team has beaten the model’s margin; the shift is shrunk hard until there are many games.':'no team has two graded games yet, so no team adjustment is applied.')+'</li>'+
+   ['ml','sp','tot'].map(function(t){return '<li><b>'+HB_T[t]+' chances:</b> '+(L.cnt[t]>=20?'shifted '+(L.dp[t]>=0?'+':'')+(L.dp[t]*100).toFixed(1)+' points from '+L.cnt[t]+' graded picks.':'no shift until 20 graded picks ('+(L.cnt[t]||0)+' so far).')+'</li>'}).join('')+'</ul>'+
+   '<p class="src">It learns from graded games on this device: league and team margin and total bias, and how often its stated chances actually hit. It does not learn player behavior, and it is not a trained model. The DraftKings line is still weighted about 70-90% in every number it shows.</p>';
+  return h;
+}
+function amBe(o){return o<0?-o/(-o+100):100/(o+100)}
+function amProfit(o){return o>0?o/100:100/-o}
+function sheetItems(lg){
+  var now=Date.now(),out=[];
+  (S.feed[lg]||[]).forEach(function(g){
+    if(kind(g)!=='up'||!(g.start>now)||g.start>now+36*36e5)return;
+    var b=picksFor(g);if(!b)return;var px=(g.dk&&g.dk.px)||{},ml=(g.dk&&g.dk.ml)||{};
+    b.forEach(function(x){
+      if(!x.t||x.p==null)return;
+      var pr=x.t==='sp'?(x.side==='h'?px.sh:px.sa):x.t==='tot'?(x.over?px.to:px.tu):(x.side==='h'?ml.h:ml.a),assumed=false;
+      if(pr==null||!isFinite(pr)){if(x.t==='ml')return;pr=-110;assumed=true}
+      var be=amBe(pr),edge=x.p-be,ev=10*(x.p*amProfit(pr)-(1-x.p));
+      out.push({g:g,x:x,pr:pr,assumed:assumed,edge:edge,ev:ev});
+    });
+  });
+  return out.filter(function(i){return i.edge>=.01}).sort(function(a,b){return b.edge-a.edge}).slice(0,8);
+}
+function fmtAm(o){return (o>0?'+':'')+Math.round(o)}
+function sheetLine(i){var x=i.x,g=i.g;return lgName(g.lg)+' · '+x.pick+' ('+fmtAm(i.pr)+(i.assumed?' assumed':'')+') · '+g.a+' @ '+g.h+' · '+gTime(g)+' · model '+Math.round(x.p*100)+'% vs '+Math.round(amBe(i.pr)*100)+'% needed'}
+function sheetHtml(lg){
+  if(lg==='ncaamb'||lg==='mlb')return '';
+  var it=sheetItems(lg);
+  var h='<h3>Bet sheet, next 36 hours</h3>';
+  if(!it.length)return h+'<p class="note" style="margin-top:0">No '+esc(lgName(lg))+' pick clears break-even at DraftKings’ price right now. Skipping is a valid play. The sheet refreshes with each line update.</p>';
+  var done=function(i){return S.mine.some(function(m){return m.gid===i.g.id&&m.type===i.x.t&&(m.side||'')===(i.x.t==='tot'?(i.x.over?'over':'under'):(i.x.side||''))})};
+  h+='<p class="src" style="margin-top:0">Picks where the model’s chance beats what the DraftKings price needs. Enter them in the DraftKings app yourself, then tap <b>Log as placed</b> so the app tracks the result.</p>';
+  h+=it.map(function(i,ix){var x=i.x,lg2=i.g.lg;
+    return '<div class="card" style="margin-bottom:8px"><div class="r" style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><div><b>'+esc(x.pick)+'</b> <span class="src">'+esc(HB_T[x.t])+' · '+fmtAm(i.pr)+(i.assumed?' (price not read, -110 assumed)':'')+'</span></div>'+hbPill('Edge +'+(i.edge*100).toFixed(1)+'%','hi')+'</div>'+
+      '<div class="src">'+esc(i.g.a+' @ '+i.g.h)+' · '+esc(gTime(i.g))+'</div><div class="src">Model '+Math.round(x.p*100)+'% vs '+Math.round(amBe(i.pr)*100)+'% the price needs · about '+(i.ev>=0?'+':'')+'$'+i.ev.toFixed(2)+' per $10 if the model is right</div>'+
+      '<div class="actions" style="margin-top:6px">'+(done(i)?'<span class="src"><b>Logged</b></span>':'<button class="btn" data-act="hblog" data-gid="'+esc(i.g.id)+'" data-t="'+x.t+'">Log as placed ($10)</button>')+'</div></div>';
+  }).join('');
+  h+='<div class="actions"><button class="btn" data-act="hbcopy" data-lg="'+lg+'">'+(S.hbCopied===lg?'Copied':'Copy the sheet')+'</button><a class="btn" href="https://sportsbook.draftkings.com/" target="_blank" rel="noopener">Open DraftKings</a></div>';
+  return h+'<p class="src">The model leans on the DraftKings line for most of every number, so edges are small and the record is short. No bet is guaranteed to profit. Bet only what you can afford to lose.</p>';
+}
+function hbLog(gid,t){
+  var g=find(gid);if(!g)return;var it=sheetItems(g.lg).filter(function(i){return i.g.id===gid&&i.x.t===t})[0];if(!it)return;
+  var x=it.x,P={type:t,gid:gid,side:t==='tot'?(x.over?'over':'under'):(x.side||'h'),line:t==='ml'?null:x.num,odds:it.assumed?'':it.pr,stake:10};
+  var ok=saveParsed(P,'');if(ok){saveMine();try{trackBets()}catch(e){}}
+  S.hbS=null;render();
+}
+function hbCopy(lg){
+  var txt=sheetItems(lg).map(sheetLine).join('\n');
+  var done=function(){S.hbCopied=lg;render()};
+  try{navigator.clipboard.writeText(txt).then(done,function(){hbCopyOld(txt);done()})}catch(e){hbCopyOld(txt);done()}
+}
+function hbCopyOld(t){try{var a=document.createElement('textarea');a.value=t;a.style.position='fixed';a.style.opacity='0';document.body.appendChild(a);a.select();document.execCommand('copy');a.remove()}catch(e){}}
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
