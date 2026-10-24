@@ -1935,7 +1935,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v81, Oct 23';
+var BUILD='v82, Oct 23';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -5627,12 +5627,82 @@ function profBody(sh){
   // game log
   h+='<h3>Game log</h3><div class="tblwrap"><table><thead><tr><th>Game</th>'+cols.map(function(i){return '<th class="lc">'+lab(i)+'</th>'}).join('')+'</tr></thead><tbody>'+
     rows.slice(0,15).map(function(g){return '<tr><td>'+esc(String(g.date).slice(5,10).replace('-','/'))+' '+(g.home===false?'@':g.home===true?'vs':'')+' '+esc(g.opp)+' <span class="src">'+esc(g.res)+'</span></td>'+cols.map(function(i){return '<td class="lc">'+esc(g.stats[i]==null?'':g.stats[i])+'</td>'}).join('')+'</tr>'}).join('')+'</tbody></table></div>';
-  return h+'<p class="src">Source: ESPN game log. '+(c.seasons.length>1?'Tap a season above to switch. ':'')+'Early in a season the sample is small, so lean on last season for role and minutes.</p>';
+  return h+'<p class="src">Source: ESPN '+(c.src==='recent box scores'?'box scores from his team’s last games (newest 16 at most). ':'game log. ')+(c.seasons.length>1?'Tap a season above to switch. ':'')+'Early in a season the sample is small, so lean on last season for role and minutes.</p>';
 }
 function profSheet(sh){
   var h='<div class="sh-head"><div><div class="label">'+esc(sh.team||'')+' · Stats and trends</div><h2>'+esc(sh.name)+'</h2></div><button class="x" data-act="close" aria-label="Close">×</button></div>';
   if(sh.pid&&propById(sh.pid))h+='<p style="margin:10px 0 0"><button class="btn" data-act="prop" data-id="'+esc(sh.pid)+'">Open prop calculator</button></p>';
   return h+'<div id="plbody" style="margin-top:10px">'+profBody(sh)+'</div>';
+}
+
+
+/* ---------- block52: player stats fall back to the team's recent box scores when ESPN's game-log feed is empty or blocked ---------- */
+function profSeasonLabel(lg,d){
+  var t=new Date(d),y=t.getFullYear(),m=t.getMonth()+1;
+  if(lg==='nba'||lg==='ncaamb'||lg==='nhl'){var e=m>=8?y+1:y;return (e-1)+'-'+String(e).slice(2)}
+  return String(y);
+}
+function profBoxLine(j,name){
+  var k=normName(name),kk=nameKeys(name),out=[],team=null;
+  ((j.boxscore&&j.boxscore.players)||[]).forEach(function(tm){(tm.statistics||[]).forEach(function(cat){
+    (cat.athletes||[]).forEach(function(a){
+      var an=a.athlete&&a.athlete.displayName;if(!an)return;
+      if(normName(an)===k||nameKeys(an)[1]===kk[1]){team=tm.team&&tm.team.abbreviation;if(a.stats&&a.stats.length)out.push({name:cat.name?String(cat.displayName||cat.name).replace(/^./,function(c){return c.toUpperCase()}):'Game log',labels:cat.labels||[],stats:a.stats})}
+    })})});
+  return {lines:out,team:team};
+}
+function profFallback(sh,teamId){
+  var base='https://site.api.espn.com/apis/site/v2/sports/'+ESPN[sh.lg]+'/teams/'+teamId+'/schedule',Y=new Date().getFullYear();
+  var gj=function(u){return rosFetch(u).catch(function(){return null})};
+  return Promise.all([gj(base),gj(base+'?season='+Y),gj(base+'?season='+(Y+1))]).then(function(js){
+    var ev={};js.filter(Boolean).forEach(function(j){(j.events||[]).forEach(function(e){
+      var c=(e.competitions||[])[0]||{},done=c.status&&c.status.type&&c.status.type.completed;
+      if(done&&e.id&&!ev[e.id])ev[e.id]={id:e.id,date:e.date,c:c}})});
+    var list=Object.keys(ev).map(function(k){return ev[k]}).sort(function(a,b){return String(b.date).localeCompare(String(a.date))}).slice(0,16);
+    if(!list.length)throw new Error('no finished games found on the '+sh.team+' schedule');
+    var rows=[],i=0;
+    var batch=function(){
+      var part=list.slice(i,i+6);i+=6;if(!part.length)return Promise.resolve();
+      return Promise.all(part.map(function(g){return gj('https://site.api.espn.com/apis/site/v2/sports/'+ESPN[sh.lg]+'/summary?event='+g.id).then(function(j){
+        if(!j)return;var r=profBoxLine(j,sh.name);if(!r.lines.length)return;
+        var cs=g.c.competitors||[],me=null,op=null;
+        cs.forEach(function(c){if(r.team&&sameTm(c.team&&c.team.abbreviation,r.team))me=c;else op=c});
+        if(!me){cs.forEach(function(c){if(c.team&&sameTm(c.team.abbreviation,sh.team))me=c;else op=c})}
+        var sc=function(c){var s=c&&c.score;return s==null?'':typeof s==='object'?(s.displayValue||s.value||''):String(s)};
+        rows.push({id:g.id,date:g.date,home:me?me.homeAway==='home':null,opp:op&&op.team?op.team.abbreviation:'',res:me?((me.winner?'W ':'L ')+sc(me)+'-'+sc(op)):'',lines:r.lines});
+      })}))
+        .then(batch);
+    };
+    return batch().then(function(){
+      if(!rows.length)throw new Error('he did not appear in the last '+list.length+' box scores');
+      var seasons={},order=[];
+      rows.forEach(function(g){var lab=profSeasonLabel(sh.lg,g.date),S0=seasons[lab];if(!S0){S0=seasons[lab]={label:lab,tabs:{},ord:[]};order.push(lab)}
+        g.lines.forEach(function(ln){var key=ln.name+'|'+ln.labels.join(','),T=S0.tabs[key];if(!T){T=S0.tabs[key]={name:ln.name,labels:ln.labels,rows:[]};S0.ord.push(key)}
+          T.rows.push({id:g.id,date:g.date,home:g.home,opp:g.opp,res:g.res,stats:ln.stats})})});
+      return order.map(function(l){var s=seasons[l];s.tabsL=s.ord.map(function(x){var T=s.tabs[x];T.rows.sort(function(a,b){return String(b.date).localeCompare(String(a.date))});return T});s.latest=s.tabsL[0].rows[0].date;return s}).sort(function(a,b){return String(b.latest).localeCompare(String(a.latest))});
+    });
+  });
+}
+function loadProf(sh){
+  var key=sh.lg+'|'+normName(sh.name),c=S.profD[key];
+  if(c&&(c.st==='load'||c.st==='ok'))return;
+  S.profD[key]={st:'load'};
+  var Y=new Date().getFullYear(),why=[];
+  profAthlete(sh.lg,sh.team,sh.name).then(function(a){
+    var base='https://site.web.api.espn.com/apis/common/v3/sports/'+ESPN[sh.lg]+'/athletes/'+a.id+'/gamelog';
+    return Promise.all([base,base+'?season='+Y,base+'?season='+(Y+1)].map(function(u){return fetch(u,{cache:'no-store'}).then(function(r){if(!r.ok){why.push('game log HTTP '+r.status);return null}return r.json()}).catch(function(e){why.push('game log '+(e&&e.message||e));return null})})).then(function(js){
+      var seasons=[],seenL={};
+      js.filter(Boolean).forEach(function(j){try{profParse(j).forEach(function(s){
+        var ex=seenL[s.label];if(!ex){seenL[s.label]=s;seasons.push(s);return}
+        s.tabsL.forEach(function(T){var m=ex.tabsL.filter(function(x){return x.name===T.name&&x.labels.join()===T.labels.join()})[0];
+          if(!m){ex.tabsL.push(T);return}T.rows.forEach(function(r){if(!m.rows.some(function(q){return q.id===r.id}))m.rows.push(r)});m.rows.sort(function(a,b){return String(b.date).localeCompare(String(a.date))})});
+      })}catch(e){why.push('game log format: '+e.message)}});
+      seasons.sort(function(a,b){return String(b.tabsL[0].rows[0].date).localeCompare(String(a.tabsL[0].rows[0].date))});
+      if(seasons.length)return {id:a.id,seasons:seasons,src:'game log'};
+      if(!why.length)why.push('game log had no games');
+      return profTeamId(sh.lg,sh.team).then(function(tid){return profFallback(sh,tid)}).then(function(ss){return {id:a.id,seasons:ss,src:'recent box scores'}}).catch(function(e){throw new Error(why[0]+'; box scores: '+(e&&e.message||e))});
+    });
+  }).then(function(r){S.profD[key]={st:'ok',id:r.id,seasons:r.seasons,src:r.src}}).catch(function(e){S.profD[key]={st:'err',e:String(e&&e.message||e)}}).then(function(){if(S.sheet&&S.sheet.type==='prof')renderSheet()});
 }
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
