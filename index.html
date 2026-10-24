@@ -1933,7 +1933,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v78, Oct 23';
+var BUILD='v79, Oct 23';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -5393,6 +5393,32 @@ function loadRostersL(force){
 }
 function loadRosters(){return Promise.resolve()}
 setTimeout(function(){try{fixNflTeams()}catch(e){}},0);
+
+
+/* ---------- block48: roster status on prop boards, retry, and known offseason moves while ESPN rosters are not loaded ---------- */
+var KNOWN_MOVES={'nba|marcus smart':'HOU'};
+function rosNote(){
+  if(S.rosN)return '<p class="src" style="margin:0 0 10px">Teams are checked against ESPN’s current rosters ('+S.rosN+' teams, updated '+esc(fmtClock(S.rosLAt))+(S.rosErr?', '+S.rosErr+' failed':'')+'). A player not on his listed team is moved to his new one.</p>';
+  return '<p class="note" style="margin:0 0 10px">ESPN rosters have not loaded, so some players may show on last season’s team. Tap Refresh on the Games tab to try again.</p>';
+}
+function pxAvailNote(lg){
+  var now=Date.now();
+  if(!S.rosN&&!S.rosLBusy&&now-(S.rosTry||0)>60000){S.rosTry=now;setTimeout(function(){try{loadRostersL(true)}catch(e){}},0)}
+  var n=S.inj[lg]?'<p class="src" style="margin:0 0 10px">Players ruled out are hidden. Status tags come from the ESPN injury report at '+esc(fmtClock(S.inj[lg].at))+'. Stats are from earlier games and do not change with a player’s role.</p>':'';
+  return rosNote()+n;
+}
+function roFix(p){
+  var base=p.team0||p.team,lg=p.lg;
+  if(!S.rosLAt){
+    var km=KNOWN_MOVES[lg+'|'+normName(p.name)];
+    if(km&&km!==base){p.team0=base;p.team=km;p.moved=base}
+    return;
+  }
+  if(onRoster(lg,base,p.name)){if(p.team0){p.team=p.team0;delete p.team0;delete p.moved}p.off=false;return}
+  var t=S.rosWho[lg+'|'+normName(p.name)];
+  p.team0=base;
+  if(t&&t!==base){p.team=t;p.moved=base;p.off=false}else{p.team=base;p.off=true;delete p.moved}
+}
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
