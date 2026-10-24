@@ -1935,7 +1935,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v82, Oct 23';
+var BUILD='v83, Oct 23';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -5478,7 +5478,7 @@ setTimeout(function(){try{loadCbb()}catch(e){}},3000);
 
 /* ---------- block50: roster loader applies each league as it finishes, small batches, and says why it failed ---------- */
 S.rosEr='';
-function rosFetch(u){return fetch(u,{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json()})}
+function rosFetch(u){return fetch(u).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json()})}
 function loadRostersL(force){
   if(window.claude||typeof fetch!=='function')return Promise.resolve();
   var now=Date.now();if(S.rosLBusy)return S.rosLBusy;
@@ -5488,7 +5488,7 @@ function loadRostersL(force){
   var doLg=function(lg){
     return rosFetch('https://site.api.espn.com/apis/site/v2/sports/'+ROS_LG[lg]+'/teams?limit=100').then(function(j){
       var m=[];((j.sports||[{}])[0].leagues||[{}])[0].teams.forEach(function(t){t=t.team||t;m.push({id:t.id,ab:t.abbreviation})});S.rosTeams[lg]=m;return m;
-    }).then(function(teams){
+    },function(e){first=first||(lg+' team list: '+(e&&e.message||e));var sa={},m=[];(S.feed[lg]||[]).forEach(function(g){[g.a,g.h].forEach(function(ab){if(ab&&!sa[ab]){sa[ab]=1;m.push({id:teamSlug(lg,ab),ab:ab})}})});if(!m.length)throw e;return m}).then(function(teams){
       var got={},i=0;
       var batch=function(){
         var part=teams.slice(i,i+8);i+=8;if(!part.length)return Promise.resolve();
@@ -5574,7 +5574,7 @@ function loadProf(sh){
   var Y=new Date().getFullYear();
   profAthlete(sh.lg,sh.team,sh.name).then(function(a){
     var base='https://site.web.api.espn.com/apis/common/v3/sports/'+ESPN[sh.lg]+'/athletes/'+a.id+'/gamelog';
-    return Promise.all([base,base+'?season='+Y,base+'?season='+(Y+1)].map(function(u){return fetch(u,{cache:'no-store'}).then(function(r){return r.ok?r.json():null}).catch(function(){return null})})).then(function(js){
+    return Promise.all([base,base+'?season='+Y,base+'?season='+(Y+1)].map(function(u){return fetch(u).then(function(r){return r.ok?r.json():null}).catch(function(){return null})})).then(function(js){
       var seasons=[],seenL={};
       js.filter(Boolean).forEach(function(j){profParse(j).forEach(function(s){
         var ex=seenL[s.label];if(!ex){seenL[s.label]=s;seasons.push(s);return}
@@ -5690,7 +5690,7 @@ function loadProf(sh){
   var Y=new Date().getFullYear(),why=[];
   profAthlete(sh.lg,sh.team,sh.name).then(function(a){
     var base='https://site.web.api.espn.com/apis/common/v3/sports/'+ESPN[sh.lg]+'/athletes/'+a.id+'/gamelog';
-    return Promise.all([base,base+'?season='+Y,base+'?season='+(Y+1)].map(function(u){return fetch(u,{cache:'no-store'}).then(function(r){if(!r.ok){why.push('game log HTTP '+r.status);return null}return r.json()}).catch(function(e){why.push('game log '+(e&&e.message||e));return null})})).then(function(js){
+    return Promise.all([base,base+'?season='+Y,base+'?season='+(Y+1)].map(function(u){return fetch(u).then(function(r){if(!r.ok){why.push('game log HTTP '+r.status);return null}return r.json()}).catch(function(e){why.push('game log '+(e&&e.message||e));return null})})).then(function(js){
       var seasons=[],seenL={};
       js.filter(Boolean).forEach(function(j){try{profParse(j).forEach(function(s){
         var ex=seenL[s.label];if(!ex){seenL[s.label]=s;seasons.push(s);return}
@@ -5703,6 +5703,29 @@ function loadProf(sh){
       return profTeamId(sh.lg,sh.team).then(function(tid){return profFallback(sh,tid)}).then(function(ss){return {id:a.id,seasons:ss,src:'recent box scores'}}).catch(function(e){throw new Error(why[0]+'; box scores: '+(e&&e.message||e))});
     });
   }).then(function(r){S.profD[key]={st:'ok',id:r.id,seasons:r.seasons,src:r.src}}).catch(function(e){S.profD[key]={st:'err',e:String(e&&e.message||e)}}).then(function(){if(S.sheet&&S.sheet.type==='prof')renderSheet()});
+}
+
+
+/* ---------- block53: team lookups that use ESPN's abbreviation slug first (the path the app already uses for live rosters), then the team list; every failure names its step ---------- */
+function stepFetch(label,u){return fetch(u).then(function(r){if(!r.ok)throw new Error(label+' HTTP '+r.status);return r.json()},function(e){throw new Error(label+': '+(e&&e.message||e))})}
+function profAthlete(lg,team,name){
+  var pick=function(j){
+    var L=[];collectAth(j.athletes||j,L);var k=normName(name),hit=null;
+    L.forEach(function(a){if(!hit&&normName(a.n)===k)hit=a});
+    if(!hit){var kk=nameKeys(name);L.forEach(function(a){if(!hit&&nameKeys(a.n)[1]===kk[1])hit=a})}
+    if(!hit)throw new Error(name+' is not on the '+team+' roster at ESPN ('+L.length+' players listed)');return hit;
+  };
+  var root='https://site.api.espn.com/apis/site/v2/sports/'+ESPN[lg]+'/teams/';
+  return stepFetch('roster',root+teamSlug(lg,team)+'/roster').then(pick,function(e1){
+    return profTeamId(lg,team).then(function(id){return stepFetch('roster by id',root+id+'/roster')}).then(pick,function(e2){throw new Error(e1.message+'; '+e2.message)});
+  });
+}
+function profTeamId(lg,team){
+  var find=function(list){var hit=null;(list||[]).forEach(function(x){if(!hit&&sameTm(x.ab,team))hit=x});return hit};
+  var have=S.rosTeams[lg]?find(S.rosTeams[lg]):null;if(have)return Promise.resolve(have.id);
+  return stepFetch('team list','https://site.api.espn.com/apis/site/v2/sports/'+ESPN[lg]+'/teams?limit=100').then(function(j){
+    var m=[];((j.sports||[{}])[0].leagues||[{}])[0].teams.forEach(function(t){t=t.team||t;m.push({id:t.id,ab:t.abbreviation})});S.rosTeams[lg]=m;
+    var h=find(m);if(!h)throw new Error('team '+team+' not in ESPN list');return h.id});
 }
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
