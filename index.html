@@ -807,7 +807,9 @@ function vPropsLg(){
     return h+'<div class="card empty">No college basketball hit-rate data is available yet. The season has not started in the sources. Ask Claude to refresh Hitboard later.</div>'+foot();
   }
   h+='<div class="chips" role="group" aria-label="Prop type">'+CATS[lg].map(function(c){return '<button class="chip" data-act="cat" data-v="'+c[0]+'" aria-pressed="'+(cat===c[0])+'">'+c[1]+'</button>'}).join('')+'</div>';
-  if(lg!=='nfl'&&cat==='xdeep'){
+  if((lg==='nba'||lg==='ncaamb')&&String(cat).indexOf('xk:')===0){
+    h+=pxDeep(lg,cat.slice(3));
+  }else if(lg!=='nfl'&&cat==='xdeep'){
     h+=pxDeep(lg);
   }else if(lg!=='nfl'&&cat==='xcalc'){
     h+=pxCalc(lg);
@@ -1933,7 +1935,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v79, Oct 23';
+var BUILD='v80, Oct 23';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -3714,12 +3716,12 @@ function pxList(lg,kd){
 function pxEmpty(lg){
   return '<div class="card empty">No players match. Only players whose team has a game in the feed are shown'+(lg==='mlb'?', and MLB is in the playoffs, so just the teams still playing appear':'')+'. '+(lg==='nba'?'The table holds the leaders in each stat, not every player.':lg==='nhl'?'Skaters with at least 2 games and goalies who have started are listed.':'')+'</div>';
 }
-function pxDeep(lg){
+function pxDeep(lg,only){
   pxRefresh(lg);
-  var kd=pxKind(lg),G=pxGames(lg);
+  var kd=only||pxKind(lg),G=pxGames(lg);
   var h=pxAvailNote(lg)+'<p class="lede">A matchup board like the NFL one, now for '+esc(LG.filter(function(l){return l[0]===lg})[0][1])+'. Each row shows the next opponent, how that defense has done, a projection, and the chance of clearing three marks. Tap a player to enter your book’s line and see the edge, then save it to My picks.</p>';
-  var multi=lg!=='nhl';
-  h+=pxChips(lg,G,kd,multi);
+  var multi=lg!=='nhl'&&!only;
+  h+=pxChips(lg,G,kd,true);
   var rows=[];(multi?PXK[lg]:[[kd,'']]).forEach(function(kk){pxList(lg,kk[0]).forEach(function(p){var pct=pxAdj(p),mu=p.avg*(1+pct/100);rows.push({p:p,pct:pct,mu:mu,kl:kk[1],marks:pxMarks(p,mu).map(function(l){return [l,calc(p,l,-110,-110,pct).po]})})})});
   var rowsOld=[].map(function(p){var pct=pxAdj(p),mu=p.avg*(1+pct/100);return {p:p,pct:pct,mu:mu,marks:pxMarks(p,mu).map(function(l){return [l,calc(p,l,-110,-110,pct).po]})}});
   rows.sort(function(a,b){return multi?b.marks[1][1]-a.marks[1][1]:b.mu-a.mu});
@@ -3731,7 +3733,7 @@ function pxDeep(lg){
       '<td>'+r.mu.toFixed(PXPOIS[p.kind]&&r.mu<3?2:1)+'<br><span class="src">avg '+p.avg.toFixed(PXPOIS[p.kind]&&p.avg<3?2:1)+(p.implied?' (implied)':'')+'</span></td><td>'+r.marks.map(function(m){return '<span class="hrpill '+(m[1]>=.7?'hi':m[1]<.4?'lo':'mid')+'" style="display:inline-block;margin:0 0 3px 0">'+m[0].toFixed(1)+'+ · '+Math.round(m[1]*100)+'%</span>'}).join('<br>')+'</td></tr>';
   }).join('')+'</tbody></table></div>';
   if(rows.length>cap)h+='<div class="actions"><button class="btn" data-act="dmore">Show all '+rows.length+' players</button></div>';
-  var nt2=lg==='nhl'?'Chances use season goal, assist and shot rates through 8 to 11 games, steadied toward a typical rate for each player’s ice time, and shift up to 15% by how much the opponent allows. They ignore line combinations, power-play time and the opposing goalie.':lg==='nba'?'Chances use each player’s last-10 average from last season and shift up to 10% by how the opponent defended last season. Rosters, minutes and roles change, so early-season games are noisy.':lg==='ncaafb'?'The source gives a hit rate at one mark, so the average is backed out of that rate and may be rough. Chances shift up to 12% by how many points the opponent allows.':'Chances use season rates for one typical game. They ignore the opposing pitcher, ballpark and lineup spot.';
+  var nt2=lg==='nhl'?'Chances use season goal, assist and shot rates through 8 to 11 games, steadied toward a typical rate for each player’s ice time, and shift up to 15% by how much the opponent allows. They ignore line combinations, power-play time and the opposing goalie.':lg==='nba'?'Chances use each player’s last-10 average from last season and shift up to 10% by how the opponent defended last season. Rosters, minutes and roles change, so early-season games are noisy.':lg==='ncaafb'?'The source gives a hit rate at one mark, so the average is backed out of that rate and may be rough. Chances shift up to 12% by how many points the opponent allows.':lg==='ncaamb'?'Chances use each player’s average from last season in ESPN’s data, with no opponent adjustment yet. College rosters turn over a lot, so check each player’s role.':'Chances use season rates for one typical game. They ignore the opposing pitcher, ballpark and lineup spot.';
   return h+'<p class="note" style="margin-top:12px">'+nt2+' They are not sportsbook lines, so compare each mark with your book.</p>';
 }
 function pxCalc(lg){
@@ -5418,6 +5420,103 @@ function roFix(p){
   var t=S.rosWho[lg+'|'+normName(p.name)];
   p.team0=base;
   if(t&&t!==base){p.team=t;p.moved=base;p.off=false}else{p.team=base;p.off=true;delete p.moved}
+}
+
+
+/* ---------- block49: NCAAB props from ESPN, and per-stat boards for NBA and NCAAB ---------- */
+PXK.ncaamb=PXK.nba.slice();
+CATS.nba=[['xdeep','All players'],['xk:npts','Points'],['xk:nreb','Rebounds'],['xk:nast','Assists'],['xk:ntpm','Threes']];
+CATS.ncaamb=CATS.nba.slice();
+S.cbbAt=0;S.cbbN=0;
+function cbbApply(D){
+  for(var i=PROPS.length-1;i>=0;i--)if(PROPS[i].cbb)PROPS.splice(i,1);
+  var lab=(D.sy-1)+'-'+String(D.sy).slice(2);
+  (D.p||[]).forEach(function(r){
+    [['npts','Points',r.pts,8,1],['nreb','Rebounds',r.reb,3.5,1],['nast','Assists',r.ast,2,1],['ntpm','Threes',r.tpm,1,2]].forEach(function(m){
+      if(!(m[2]>=m[3]))return;
+      pxAdd({lg:'ncaamb',kind:m[0],name:r.n,team:r.t,stat:m[1],g:r.g,avg:m[2],total:Math.round(m[2]*r.g),cbb:1,
+        note:m[2].toFixed(m[4])+' '+m[1].toLowerCase()+' a game over '+r.g+' games in '+lab+' (ESPN). This is last season’s average, and college rosters change a lot with transfers and new players, so check his role and minutes. Replace the line with the one at your book.'});
+    });
+  });
+  if(typeof _pxAt==='object'&&_pxAt)delete _pxAt.ncaamb;
+}
+function loadCbb(force){
+  if(window.claude||typeof fetch!=='function'||S.cbbBusy)return Promise.resolve();
+  var now=Date.now();if(!force&&now-S.cbbAt<6*3600e3&&S.cbbN)return Promise.resolve();
+  S.cbbBusy=true;var sy=rsSeason(),out={sy:sy,p:[]};
+  var pages=[1,2,3,4,5].reduce(function(pr,pg){return pr.then(function(){
+    if(out._stop)return;
+    return rsFetchJson('https://site.web.api.espn.com/apis/common/v3/sports/basketball/mens-college-basketball/statistics/byathlete?region=us&lang=en&contentorigin=espn&isqualified=false&page='+pg+'&limit=100&sort=general.avgMinutes%3Adesc&season='+sy+'&seasontype=2').then(function(j){
+      (j.athletes||[]).forEach(function(a){
+        var g=rsVal(a,j,'general','gamesPlayed'),mp=rsVal(a,j,'general','avgMinutes');
+        if(!(g>=8)||!(mp>=16)){if(mp!=null&&mp<16)out._stop=1;return}
+        out.p.push({n:a.athlete.displayName,t:rsTeam(a,'ncaamb'),g:g,mpg:mp,pts:rsVal(a,j,'offensive','avgPoints'),reb:rsVal(a,j,'general','avgRebounds'),ast:rsVal(a,j,'offensive','avgAssists'),tpm:rsVal(a,j,'offensive','avgThreePointFieldGoalsMade')});
+      });
+    }).catch(function(){out._stop=1});
+  })},Promise.resolve());
+  // rosters only for teams with an upcoming game, so transfers land on the right team
+  var need={};(S.feed.ncaamb||[]).forEach(function(g){if(kind(g)==='final')return;need[g.a]=1;need[g.h]=1});
+  var ros=Object.keys(need).length?getJson('https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/teams?limit=500').then(function(j){
+    var m=[];((j.sports||[{}])[0].leagues||[{}])[0].teams.forEach(function(t){t=t.team||t;if(need[t.abbreviation])m.push({id:t.id,ab:t.abbreviation})});
+    return Promise.all(m.map(function(t){return getJson('https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/teams/'+t.id+'/roster').then(function(r){
+      var names=[];collectNames(r.athletes||r,names);if(names.length>=5){rosPut('ncaamb',t.ab,names);S.rosLAt=S.rosLAt||Date.now()}
+    }).catch(function(){})}));
+  }).catch(function(){}):Promise.resolve();
+  return Promise.all([pages,ros]).then(function(){
+    S.cbbBusy=false;delete out._stop;
+    if(out.p.length){S.cbbAt=Date.now();S.cbbN=out.p.length;try{localStorage.setItem('hitboard.cbb.v1',JSON.stringify({at:S.cbbAt,d:out}))}catch(e){}cbbApply(out)}
+    var ae=document.activeElement;if(!(ae&&ae.tagName==='INPUT'))render();
+  },function(){S.cbbBusy=false});
+}
+try{var cbC=JSON.parse(localStorage.getItem('hitboard.cbb.v1')||'null');if(cbC&&cbC.d){S.cbbAt=cbC.at||0;S.cbbN=(cbC.d.p||[]).length;cbbApply(cbC.d)}}catch(e){}
+setTimeout(function(){try{loadCbb()}catch(e){}},3000);
+
+
+/* ---------- block50: roster loader applies each league as it finishes, small batches, and says why it failed ---------- */
+S.rosEr='';
+function rosFetch(u){return fetch(u,{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json()})}
+function loadRostersL(force){
+  if(window.claude||typeof fetch!=='function')return Promise.resolve();
+  var now=Date.now();if(S.rosLBusy)return S.rosLBusy;
+  if(!force&&S.rosN>=100&&now-S.rosLAt<3*36e5)return Promise.resolve();
+  var fail=0,okN=0,first=null,fresh=!S.rosN||force;
+  var seen={};
+  var doLg=function(lg){
+    return rosFetch('https://site.api.espn.com/apis/site/v2/sports/'+ROS_LG[lg]+'/teams?limit=100').then(function(j){
+      var m=[];((j.sports||[{}])[0].leagues||[{}])[0].teams.forEach(function(t){t=t.team||t;m.push({id:t.id,ab:t.abbreviation})});S.rosTeams[lg]=m;return m;
+    }).then(function(teams){
+      var got={},i=0;
+      var batch=function(){
+        var part=teams.slice(i,i+8);i+=8;if(!part.length)return Promise.resolve();
+        return Promise.all(part.map(function(t){
+          return rosFetch('https://site.api.espn.com/apis/site/v2/sports/'+ROS_LG[lg]+'/teams/'+t.id+'/roster').then(function(j){
+            var names=[];collectNames(j.athletes||j,names);
+            if(names.length<ROS_MIN[lg]){fail++;first=first||(lg+' '+t.ab+': only '+names.length+' names');return}
+            got[t.ab]=names;
+          }).catch(function(e){fail++;first=first||(lg+' roster: '+(e&&e.message||e))});
+        })).then(batch);
+      };
+      return batch().then(function(){
+        var ks=Object.keys(got);if(!ks.length)return;
+        if(fresh&&!seen.any){S.rosWho={};seen.any=1}
+        Object.keys(S.rosWho).forEach(function(k){if(k.indexOf(lg+'|')===0)delete S.rosWho[k]});
+        ks.forEach(function(ab){rosPut(lg,ab,got[ab])});
+        okN+=ks.length;S.rosN=Object.keys(S.rosNames).length;S.rosLAt=Date.now();S.rosAt=S.rosLAt;rosSave();_pxAt={};
+        if(lg==='nfl'){try{fixNflTeams()}catch(e){}}
+        var ae=document.activeElement;if(!(ae&&ae.tagName==='INPUT')&&!S.sheet)render();
+      });
+    }).catch(function(e){first=first||(lg+': '+(e&&e.message||e))});
+  };
+  var p=['nba','nhl','mlb','nfl'].reduce(function(pr,lg){return pr.then(function(){return doLg(lg)})},Promise.resolve()).then(function(){
+    S.rosErr=fail;S.rosEr=okN?'':(first||'no response');S.rosLBusy=null;
+    var ae=document.activeElement;if(!(ae&&ae.tagName==='INPUT')&&!S.sheet)render();
+  },function(){S.rosLBusy=null});
+  S.rosLBusy=p;return p;
+}
+function rosNote(){
+  if(S.rosN)return '<p class="src" style="margin:0 0 10px">Teams are checked against ESPN’s current rosters ('+S.rosN+' teams, updated '+esc(fmtClock(S.rosLAt))+(S.rosErr?', '+S.rosErr+' failed':'')+'). A player not on his listed team is moved to his new one.</p>';
+  if(S.rosLBusy)return '<p class="note" style="margin:0 0 10px">Loading current rosters from ESPN…</p>';
+  return '<p class="note" style="margin:0 0 10px">ESPN rosters have not loaded, so some players may show on last season’s team.'+(S.rosEr?' Reason: '+esc(S.rosEr)+'.':'')+' Tap Refresh on the Games tab to try again.</p>';
 }
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
