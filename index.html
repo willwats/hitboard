@@ -1933,7 +1933,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v77, Oct 23';
+var BUILD='v78, Oct 23';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -1942,7 +1942,7 @@ function dispInfo(){
     document.body.removeChild(d);return r;
   }catch(e){return ''}
 }
-function foot(){return '<p class="foot"><button class="linkbtn" data-act="tab" data-t="about">How the model works</button> · <span class="src">Build '+BUILD+'</span><br><span class="src">'+dispInfo()+'</span></p><p class="foot">For entertainment and research only, not betting advice. Probabilities are estimates and can be wrong. If gambling is a problem for you or someone you know, call 1-800-GAMBLER.</p>'}
+function foot(){return '<p class="foot"><button class="linkbtn" data-act="tab" data-t="about">How the model works</button> · <span class="src">Build '+BUILD+'</span><br><span class="src">'+dispInfo()+'</span><br><span class="src">'+(S.rosN?'Rosters: ESPN, '+S.rosN+' teams, updated '+esc(fmtClock(S.rosLAt))+(S.rosErr?' ('+S.rosErr+' team'+(S.rosErr>1?'s':'')+' failed)':''):'Rosters: not loaded yet, tap Refresh')+'</span></p><p class="foot">For entertainment and research only, not betting advice. Probabilities are estimates and can be wrong. If gambling is a problem for you or someone you know, call 1-800-GAMBLER.</p>'}
 
 /* ---------- sheets ---------- */
 /* ---------- team model, analyst sections, parlays ---------- */
@@ -4415,7 +4415,7 @@ var ESPN_MSG='Could not reach ESPN. Check your connection and tap Refresh again.
 function doRefresh(silent){
   if(S.busy)return;
   silent=silent===true;
-  if(!silent){S.userRefreshAt=Date.now();S.busy=true;S.msg='';S.msgKind='';render()}
+  if(!silent){S.userRefreshAt=Date.now();S.busy=true;S.msg='';S.msgKind='';try{loadRostersL(true)}catch(e){}render()}
   else S.busy=true;
   var done=function(msg,k){
     S.busy=false;if(!silent||msg){S.msg=silent?'':msg;S.msgKind=k||''}
@@ -5337,6 +5337,62 @@ function bLiveHtml(x){
   });
   return '<div class="src" style="margin-top:6px"><b>Live tracking: '+sum+'</b>'+(mn?' ('+mn+' leg'+(mn>1?'s':'')+' you must check yourself)':' (checks every 30 seconds while the app is open)')+'</div><ul class="pts" style="margin:2px 0">'+rows.join('')+'</ul>';
 }
+
+
+/* ---------- block47: every team's current ESPN roster, all four pro leagues, cached ---------- */
+var ROS_LG={nfl:'football/nfl',nba:'basketball/nba',nhl:'hockey/nhl',mlb:'baseball/mlb'},ROS_MIN={nfl:30,nba:10,nhl:15,mlb:20};
+S.rosN=0;S.rosErr=0;S.rosNames={};
+function rosKeys(lg,ab){var k=[ab];if(lg==='nfl')k.push(nt(ab));if(lg==='nba')k.push(NBAX2[ab]||ab);if(lg==='nhl')k.push(nhlK(ab));return k.filter(function(v,i,a){return a.indexOf(v)===i})}
+function rosPut(lg,ab,names){
+  var R={};names.forEach(function(n){nameKeys(n).forEach(function(x){R[x]=1})});
+  var keys=rosKeys(lg,ab);
+  keys.forEach(function(k){S.rosL[lg+'|'+k]=R});
+  if(lg==='nfl')S.ros[nt(ab)]=R;
+  Object.keys(R).forEach(function(x){if(x.indexOf('|')<0)S.rosWho[lg+'|'+x]=keys[keys.length-1]});
+  S.rosNames[lg+'|'+ab]=names;
+}
+try{var rc=JSON.parse(localStorage.getItem('hitboard.ros.v2')||'null');
+  if(rc&&rc.at&&Date.now()-rc.at<12*36e5){Object.keys(rc.t).forEach(function(k){var p=k.split('|');rosPut(p[0],p[1],rc.t[k])});S.rosLAt=rc.at;S.rosAt=rc.at;S.rosN=Object.keys(rc.t).length}}catch(e){}
+function rosSave(){try{localStorage.setItem('hitboard.ros.v2',JSON.stringify({at:S.rosLAt,t:S.rosNames}))}catch(e){}}
+function fixNflTeams(){
+  var mv=function(o,tk){
+    var base=o.team0||o[tk];if(!base)return;
+    var k=nameKeys(o.name||o.n),R=S.rosL['nfl|'+base]||S.rosL['nfl|'+nt(base)];
+    if(!R||R[k[0]]||R[k[1]]){if(o.team0){o[tk]=o.team0;delete o.team0;delete o.moved}return}
+    var t=S.rosWho['nfl|'+k[0]]||S.rosWho['nfl|'+k[1]];
+    if(t&&nt(t)!==nt(base)){o.team0=base;o[tk]=t;o.moved=base}
+  };
+  PROPS.forEach(function(p){if(!p.lg)mv(p,'team')});
+  DEEP.forEach(function(d){mv(d,'t')});
+}
+function loadRostersL(force){
+  if(window.claude||typeof fetch!=='function')return Promise.resolve();
+  var now=Date.now();if(S.rosLBusy)return S.rosLBusy;
+  if(!force&&S.rosN>=100&&now-S.rosLAt<3*36e5)return Promise.resolve();
+  var got={},fail=0,tot=0;
+  var p=Promise.all(Object.keys(ROS_LG).map(function(lg){
+    var tp=getJson('https://site.api.espn.com/apis/site/v2/sports/'+ROS_LG[lg]+'/teams?limit=100').then(function(j){
+      var m=[];((j.sports||[{}])[0].leagues||[{}])[0].teams.forEach(function(t){t=t.team||t;m.push({id:t.id,ab:t.abbreviation})});S.rosTeams[lg]=m;return m});
+    return tp.then(function(teams){
+      return Promise.all(teams.map(function(t){tot++;
+        return getJson('https://site.api.espn.com/apis/site/v2/sports/'+ROS_LG[lg]+'/teams/'+t.id+'/roster').then(function(j){
+          var names=[];collectNames(j.athletes||j,names);
+          if(names.length<ROS_MIN[lg]){fail++;return}
+          got[lg+'|'+t.ab]=names;
+        }).catch(function(){fail++});
+      }));
+    }).catch(function(){});
+  })).then(function(){
+    var n=Object.keys(got).length;
+    if(n){S.rosWho={};Object.keys(got).forEach(function(k){var q=k.split('|');rosPut(q[0],q[1],got[k])});S.rosLAt=Date.now();S.rosAt=S.rosLAt;S.rosN=n;rosSave()}
+    S.rosErr=fail;S.rosLBusy=null;_pxAt={};
+    try{fixNflTeams()}catch(e){}
+    var ae=document.activeElement;if(!(ae&&ae.tagName==='INPUT')&&!S.sheet)render();
+  },function(){S.rosLBusy=null});
+  S.rosLBusy=p;return p;
+}
+function loadRosters(){return Promise.resolve()}
+setTimeout(function(){try{fixNflTeams()}catch(e){}},0);
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
