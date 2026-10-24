@@ -1935,7 +1935,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v83, Oct 23';
+var BUILD='v84, Oct 24';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -4284,7 +4284,7 @@ function scY(){return window.pageYOffset||0}
 function scSet(y){window.scrollTo(0,y)}
 function scTop(){scSet(0)}
 function render(){
-  var _y=scY(),_h={home:vHome,games:vGames,scores:vScores,div:vDiv,record:vRecord,props:vProps,parlay:vParlay,picks:vPicks,about:vAbout,more:vMore,builder:vBuilder}[S.tab](),_v=$('#view');
+  var _y=scY(),_h={home:vHome,games:vGames,scores:vScores,div:vDiv,record:vRecord,props:vProps,parlay:vParlay,picks:vPicks,about:vAbout,more:vMore,builder:vBuilder,hb:vHb}[S.tab](),_v=$('#view');
   if(_v.__h!==_h){_v.innerHTML=_h;_v.__h=_h}
   $('#stamp').innerHTML='Feed '+esc(fmtClock(S.feedAt))+'<br>'+(S.live?'live':'snapshot');
   renderNav();updateSlipBar();
@@ -5727,6 +5727,74 @@ function profTeamId(lg,team){
     var m=[];((j.sports||[{}])[0].leagues||[{}])[0].teams.forEach(function(t){t=t.team||t;m.push({id:t.id,ab:t.abbreviation})});S.rosTeams[lg]=m;
     var h=find(m);if(!h)throw new Error('team '+team+' not in ESPN list');return h.id});
 }
+
+
+/* ---------- block54: Hitboard tab, the app's own picks tracked per sport ---------- */
+S.hbs=null;S.hbf='all';S.hbmore='';
+var HB_T={ml:'Moneyline',sp:'Spread',tot:'Total'};
+function hbDay(ms){
+  var d=new Date(ms),n=new Date(),y=new Date(Date.now()-864e5),sd=function(a,b){return a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate()};
+  if(sd(d,n))return 'Today';if(sd(d,y))return 'Yesterday';
+  if(sd(d,new Date(Date.now()+864e5)))return 'Tomorrow';
+  return d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+}
+function hbPill(txt,cls){return '<span class="hrpill '+(cls||'mid')+'" style="display:inline-block">'+esc(txt)+'</span>'}
+function hbGameRow(x){
+  var g=find(x.gid),k=g?kind(g):(x.res?'final':'up'),st=null,score='';
+  if(g&&g.sa!=null&&k!=='up')score=g.a+' '+g.sa+', '+g.h+' '+g.sh+(k==='final'?' (final)':' (live)');
+  else if(x.res&&x.score)score=String(x.score);
+  var badge;
+  if(x.res)badge=hbPill(x.res==='W'?'Hit':x.res==='L'?'Missed':'Push',x.res==='W'?'hi':x.res==='L'?'lo':'mid');
+  else if(g&&k!=='up'&&g.sa!=null){st=pickState(g,{t:x.t,side:x.side,num:x.num,over:x.over});badge=st?hbPill(st.txt,st.cls||'mid'):hbPill('In play','mid')}
+  else badge=hbPill('Not started','mid');
+  var when=g?gTime(g):(x.st?fmtTime(x.st):'');
+  return '<div class="card" style="margin-bottom:8px"><div class="r" style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><div><b>'+esc(x.pick)+'</b> <span class="src">'+esc(HB_T[x.t]||x.t)+'</span></div>'+badge+'</div>'+
+    '<div class="src">'+esc(x.game||(x.a+' @ '+x.h))+' · '+esc(when)+'</div>'+
+    '<div class="src">Model chance '+Math.round(x.p*100)+'%'+(x.p0!=null&&Math.abs(x.p0-x.p)>=.005?' (first logged '+Math.round(x.p0*100)+'%)':'')+(score?' · '+esc(score):'')+'</div></div>';
+}
+function hbPropRow(x){
+  var g=find(x.gid),k=g?kind(g):'final',cur=null,badge,SN={pts:'points',reb:'rebounds',ast:'assists',tpm:'threes',rush:'rushing yards',pass:'passing yards',rec:'receiving yards',td:'anytime TD'};
+  if(x.res)badge=hbPill(x.res==='W'?'Hit':x.res==='L'?'Missed':'No stats',x.res==='W'?'hi':x.res==='L'?'lo':'mid');
+  else if(g&&k!=='up'){var s=legState({n:x.name,k:x.stat,thr:x.thr},[x.gid]);cur=s.cur;badge=hbPill(s.cur!=null?s.cur+' of '+x.thr:'In play','mid')}
+  else badge=hbPill('Not started','mid');
+  return '<div class="card" style="margin-bottom:8px"><div class="r" style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><div><b>'+esc(x.name)+'</b> <span class="src">'+esc(x.team)+' · '+esc((SN[x.stat]||x.stat))+' '+x.thr+'+</span></div>'+badge+'</div>'+
+    '<div class="src">'+(x.opp?(x.home?'vs ':'at ')+esc(x.opp)+' · ':'')+esc(g?gTime(g):'')+'</div>'+
+    '<div class="src">Model chance '+Math.round(x.p*100)+'% · ranked #'+x.rank+' of the day'+(x.res&&x.v!=null?' · he had '+x.v:'')+'</div></div>';
+}
+function hbList(items,rowFn,keyFn){
+  var by={},ord=[];items.forEach(function(x){var d=hbDay(keyFn(x));if(!by[d]){by[d]=[];ord.push(d)}by[d].push(x)});
+  return ord.map(function(d){return '<h3>'+esc(d)+'</h3>'+by[d].map(rowFn).join('')}).join('');
+}
+function vHb(){
+  var lgs=LG.map(function(l){return l[0]});
+  var cnt=function(lg){return S.log.filter(function(x){return x.lg===lg}).length+S.auto.filter(function(x){return x.lg===lg}).length};
+  if(!S.hbs||lgs.indexOf(S.hbs)<0)S.hbs=lgs.filter(function(l){return cnt(l)>0})[0]||lgs[0];
+  var lg=S.hbs;
+  var h='<h2>Hitboard picks</h2><p class="lede">Every pick the app made for a sport, tracked live and graded on the final. One sport at a time.</p>'+
+    '<div class="chips" role="group" aria-label="Sport">'+LG.map(function(l){return '<button class="chip" data-act="set" data-k="hbs" data-v="'+l[0]+'" aria-pressed="'+(lg===l[0])+'">'+esc(l[1])+(cnt(l[0])?' ('+cnt(l[0])+')':'')+'</button>'}).join('')+'</div>';
+  var E=S.log.filter(function(x){return x.lg===lg}),A=S.auto.filter(function(x){return x.lg===lg});
+  if(!E.length&&!A.length){
+    var why=lg==='ncaamb'?'The app makes no college basketball picks yet.':lg==='mlb'?'The app makes no baseball game picks. Its best-of-day player props are recorded here once they are made.':'No '+lgName(lg)+' picks yet. The app saves its picks when you open it before games start, then grades them on the final score.';
+    return h+'<div class="card empty">'+esc(why)+'</div>'+foot();
+  }
+  var D=E.filter(function(x){return x.res==='W'||x.res==='L'}),w=D.filter(function(x){return x.res==='W'}).length;
+  var PD=A.filter(function(x){return x.res==='W'||x.res==='L'}),pw=PD.filter(function(x){return x.res==='W'}).length;
+  var u=0;D.forEach(function(x){if(x.t!=='ml')u+=x.res==='W'?100/110:-1});
+  var open=E.filter(function(x){return !x.res}).length+A.filter(function(x){return !x.res}).length;
+  h+='<div class="facts" style="margin-top:6px"><span>Game picks <b>'+w+'-'+(D.length-w)+'</b></span><span>Hit <b>'+(D.length?pct1(w/D.length):'—')+'</b></span><span>Props <b>'+pw+'-'+(PD.length-pw)+'</b></span><span>Flat 1u spread/total <b>'+(u>=0?'+':'')+u.toFixed(1)+'</b></span><span>Open <b>'+open+'</b></span></div>';
+  if(D.length&&D.length<20)h+='<p class="src">'+D.length+' graded game pick'+(D.length>1?'s':'')+', too few to call an edge yet.</p>';
+  h+='<div class="chips" role="group" aria-label="Show" style="margin-top:8px">'+[['all','All'],['open','Open'],['done','Settled']].map(function(c){return '<button class="chip" data-act="set" data-k="hbf" data-v="'+c[0]+'" aria-pressed="'+(S.hbf===c[0])+'">'+c[1]+'</button>'}).join('')+'</div>';
+  var f=S.hbf,sel=function(x){return f==='all'||(f==='open'?!x.res:!!x.res)};
+  var G=E.filter(sel).sort(function(a,b){return (b.st||0)-(a.st||0)}),P=A.filter(sel).sort(function(a,b){var ga=find(a.gid),gb=find(b.gid);return ((gb&&gb.start)||b.at)-((ga&&ga.start)||a.at)});
+  var cap=S.hbmore?1000:30;
+  if(G.length)h+='<h2 style="font-size:16px;margin-top:16px">Game picks</h2>'+hbList(G.slice(0,cap),hbGameRow,function(x){return x.st||x.at});
+  if(P.length)h+='<h2 style="font-size:16px;margin-top:16px">Best props of the day</h2>'+hbList(P.slice(0,cap),hbPropRow,function(x){var g=find(x.gid);return (g&&g.start)||x.at});
+  if(!G.length&&!P.length)h+='<div class="card empty">Nothing '+(f==='open'?'open':'settled')+' for '+esc(lgName(lg))+' right now.</div>';
+  if(G.length>cap||P.length>cap)h+='<div class="actions"><button class="btn" data-act="set" data-k="hbmore" data-v="1">Show all</button></div>';
+  return h+'<p class="src" style="margin-top:12px">Live status updates every 30 seconds while the app is open. Picks the app saved before a game started are graded on the final score; a spread or total needs 52.4% to break even at -110.</p>'+foot();
+}
+TABS.push(['hb','Hitboard','<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/>']);
+NAVG.hb=['hb'];
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
