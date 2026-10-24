@@ -1935,7 +1935,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v86, Oct 24';
+var BUILD='v87, Oct 24';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -2644,7 +2644,7 @@ function deepRows(){
     if(!avail(d.n,d.t).show)return;
     var nx=nextOpp(nt(d.t));if(!nx||!TS[nx.opp])return;
     if(S.dgm!=='All'&&nx.key!==S.dgm)return;
-    var dm=d.kind==='rush'?'drush':'dpass',f=mv(nx.opp,dm)/lavg[dm],pct=Math.max(-12,Math.min(12,(f-1)*50));
+    var dm=d.kind==='rush'?'drush':'dpass',f=mv(nx.opp,dm)/lavg[dm],pct=Math.max(-12,Math.min(12,(f-1)*50));pct=Math.max(-15,Math.min(15,pct+defLearn('nfl',d.kind,nx.opp)));
     var p={avg:d.avgS,kind:d.kind,g:d.g},mid=roundHalf(d.avgS),lo=roundHalf(d.avgS*.75),hi=roundHalf(d.avgS*1.25);
     var P=function(l){return calc(p,l,-110,-110,pct).po};
     out.push({d:d,nx:nx,pct:pct,proj:d.avgS*(1+pct/100),rk:mrank(nx.opp,dm),allow:mv(nx.opp,dm),marks:[[lo,P(lo)],[mid,P(mid)],[hi,P(hi)]]});
@@ -3644,7 +3644,7 @@ function pxRefresh(lg){
   });
 }
 function nbaT(abbr,name){return NBAT[tabb(abbr)]||NBAT[teamAbbr('nba',name||'')||'']||null}
-function pxAdj(p){
+function pxAdj0(p){
   var cl=function(v,m){return Math.max(-m,Math.min(m,v))};
   if(p.lg==='nba'){
     var T=nbaT(p.opp,p.oppName);if(!T)return 0;
@@ -4482,6 +4482,7 @@ document.addEventListener('click',function(e){
   else if(act==='hblog'){hbLog(el.dataset.gid,el.dataset.t)}
   else if(act==='hbcopy'){hbCopy(el.dataset.lg,el.dataset.t)}
   else if(act==='hbprop'){hbProp(el.dataset.i)}
+  else if(act==='dldeep'){dlogSync(true);render()}
   else if(act==='team'){S.sheet={type:'team',lg:el.dataset.lg,n:el.dataset.n};renderSheet()}
   else if(act==='gf'){S.gf=el.dataset.v;render()}
   else if(act==='dk'){S.dk=el.dataset.v;S.dmore=false;render()}
@@ -5827,7 +5828,7 @@ function learnHtml(lg){
    '<li><b>Team by team:</b> '+(ks.length?ks.map(function(k){var o=T[k];return esc(k)+' '+(o.am>=0?'+':'')+o.am.toFixed(1)+' ('+o.n+' g)'}).join(', ')+'. A plus means the team has beaten the model’s margin; the shift is shrunk hard until there are many games.':'no team has two graded games yet, so no team adjustment is applied.')+'</li>'+
    ['ml','sp','tot'].map(function(t){return '<li><b>'+HB_T[t]+' chances:</b> '+(L.cnt[t]>=20?'shifted '+(L.dp[t]>=0?'+':'')+(L.dp[t]*100).toFixed(1)+' points from '+L.cnt[t]+' graded picks.':'no shift until 20 graded picks ('+(L.cnt[t]||0)+' so far).')+'</li>'}).join('')+'</ul>'+
    '<p class="src">It learns from graded games on this device: league and team margin and total bias, and how often its stated chances actually hit. It does not learn player behavior, and it is not a trained model. The DraftKings line is still weighted about 70-90% in every number it shows.</p>';
-  return h;
+  return h+dlHtml(lg);
 }
 function amBe(o){return o<0?-o/(-o+100):100/(o+100)}
 function amProfit(o){return o>0?o/100:100/-o}
@@ -5969,6 +5970,126 @@ function vHb(){
   h+=learnHtml(lg);
   return h+'<p class="src" style="margin-top:12px">Live status updates every 30 seconds while the app is open. Picks the app saved before a game started are graded on the final score; a spread or total needs 52.4% to break even at -110.</p>'+foot();
 }
+
+
+/* ---------- block57: learn how each defense treats each stat from finished games (box scores), backfill from earlier games ---------- */
+var DL_LG={nfl:{ix:{pass:0,rush:1,rec:2},names:['Passing yards','Rushing yards','Receiving yards'],min:[100,20,20],K:70,cap:12,start:'20260901'},
+           nba:{ix:{npts:0,nreb:1,nast:2,ntpm:3},names:['Points','Rebounds','Assists','Threes'],min:[8,3,2,.8],K:70,cap:10,start:'20261020'},
+           ncaafb:{ix:{cpass:0,crush:1,crec:2},names:['Passing yards','Rushing yards','Receiving yards'],min:[100,20,20],K:70,cap:12,start:'20260829'},
+           ncaamb:{ix:{npts:0,nreb:1,nast:2,ntpm:3},names:['Points','Rebounds','Assists','Threes'],min:[8,3,2,.8],K:70,cap:10,start:'20261101'}};
+S.dlog={};S.dlV=0;S.dlBusy=false;S.dlMsg='';
+try{var rdl=JSON.parse(localStorage.getItem('hitboard.dlog.v1')||'null');if(rdl&&typeof rdl==='object')S.dlog=rdl}catch(e){}
+function dlSave(){
+  var ks=Object.keys(S.dlog);
+  if(ks.length>700){ks.sort(function(a,b){return S.dlog[a].at-S.dlog[b].at}).slice(0,ks.length-700).forEach(function(k){delete S.dlog[k]})}
+  try{localStorage.setItem('hitboard.dlog.v1',JSON.stringify(S.dlog))}catch(e){try{var k2=Object.keys(S.dlog).sort(function(a,b){return S.dlog[a].at-S.dlog[b].at});k2.slice(0,Math.floor(k2.length/3)).forEach(function(k){delete S.dlog[k]});localStorage.setItem('hitboard.dlog.v1',JSON.stringify(S.dlog))}catch(e2){}}
+}
+function dlAb(lg,a){a=String(a||'').toUpperCase();return lg==='nfl'?nt(a):tabb(a)}
+function dlExtract(lg,j){
+  var teams=[],byAb={};
+  ((j.boxscore&&j.boxscore.players)||[]).forEach(function(tm){
+    var ab=dlAb(lg,tm.team&&tm.team.abbreviation);if(!ab)return;
+    var P={},bb=lg==='nba'||lg==='ncaamb';
+    (tm.statistics||[]).forEach(function(cat){
+      var L=cat.labels||[],ix=function(l){return L.indexOf(l)};
+      (cat.athletes||[]).forEach(function(a){
+        if(!a.athlete)return;var nm=normName(a.athlete.displayName),st=a.stats||[];if(!nm||!st.length)return;
+        var r=P[nm]=P[nm]||(bb?[null,null,null,null]:[null,null,null]),num=function(i){var v=parseFloat(st[i]);return isNaN(v)?null:v};
+        if(bb){
+          if(ix('PTS')>=0)r[0]=num(ix('PTS'));if(ix('REB')>=0)r[1]=num(ix('REB'));if(ix('AST')>=0)r[2]=num(ix('AST'));
+          if(ix('3PT')>=0){var t=parseInt(String(st[ix('3PT')]).split('-')[0],10);r[3]=isNaN(t)?null:t}
+        }else{
+          var yi=ix('YDS');if(yi<0)return;var v=num(yi);if(v==null)return;
+          if(cat.name==='passing')r[0]=v;else if(cat.name==='rushing')r[1]=v;else if(cat.name==='receiving')r[2]=v;
+        }
+      });
+    });
+    if(Object.keys(P).length){teams.push({t:ab,p:P});byAb[ab]=1}
+  });
+  if(teams.length!==2)return null;
+  teams[0].o=teams[1].t;teams[1].o=teams[0].t;return teams;
+}
+var _dlE=null,_dlK='';
+function dlCompute(){
+  var key=S.dlV+'|'+PROPS.length+'|'+(S.glV||0);if(_dlE&&_dlK===key)return _dlE;
+  var E={n:{},tot:{},lgm:{}};
+  Object.keys(DL_LG).forEach(function(lg){
+    var C=DL_LG[lg],base={};
+    if(lg==='nfl'){DEEP.forEach(function(d){base['nfl|'+d.kind+'|'+normName(d.n)]=d.avgS})}
+    else PROPS.forEach(function(p){if(p.lg===lg&&C.ix[p.kind]!=null)base[lg+'|'+p.kind+'|'+normName(p.name)]=p.avg});
+    var kinds=Object.keys(C.ix);
+    var games=Object.keys(S.dlog).map(function(k){return S.dlog[k]}).filter(function(g){return g.lg===lg});
+    // per player history for leave-one-out means
+    var hist={};
+    games.forEach(function(g){g.s.forEach(function(sd){Object.keys(sd.p).forEach(function(nm){sd.p[nm].forEach(function(v,i){if(v==null)return;var k=i+'|'+nm,h=hist[k]=hist[k]||{s:0,n:0};h.s+=v;h.n++})})})});
+    var agg={};
+    games.forEach(function(g){g.s.forEach(function(sd){Object.keys(sd.p).forEach(function(nm){sd.p[nm].forEach(function(v,i){
+      if(v==null)return;var h=hist[i+'|'+nm],kd=kinds.filter(function(k){return C.ix[k]===i})[0],bp=base[lg+'|'+kd+'|'+nm],loo=h.n>1?(h.s-v)/(h.n-1):null,b;
+      if(loo!=null&&bp!=null){var w=Math.min(1,(h.n-1)/8);b=w*loo+(1-w)*bp}else if(loo!=null&&h.n>=4)b=loo;else if(bp!=null)b=bp;else return;
+      if(!(b>=C.min[i]))return;
+      var r=Math.max(0,Math.min(3,v/b)),k=lg+'|'+i+'|'+sd.o,a=agg[k]=agg[k]||{s:0,n:0},l=agg[lg+'|'+i]=agg[lg+'|'+i]||{s:0,n:0};
+      a.s+=r;a.n++;l.s+=r;l.n++;
+    })})})});
+    Object.keys(agg).forEach(function(k){
+      var p=k.split('|');if(p.length<3)return;
+      var l=agg[p[0]+'|'+p[1]],lm=l.s/l.n,a=agg[k],w=a.n/(a.n+C.K);
+      E.n[k]=a.n;E[k]=Math.max(-C.cap,Math.min(C.cap,w*(a.s/a.n-lm)*100));
+    });
+    E.tot[lg]=games.length;
+  });
+  _dlE=E;_dlK=key;return E;
+}
+function defLearn(lg,kind0,opp){
+  var C=DL_LG[lg];if(!C||C.ix[kind0]==null)return 0;
+  try{var E=dlCompute(),v=E[lg+'|'+C.ix[kind0]+'|'+dlAb(lg,opp)];return v==null?0:v}catch(e){return 0}
+}
+function pxAdj(p){
+  var b=pxAdj0(p),l=p.opp?defLearn(p.lg,p.kind,p.opp):0;
+  return Math.max(-15,Math.min(15,b+l));
+}
+/* sync finished games into the log; deep=true goes back to the season start */
+function dlogSync(deep){
+  if(window.claude||typeof fetch!=='function'||S.dlBusy)return Promise.resolve();
+  S.dlBusy=true;S.dlMsg=deep?'Reading earlier games…':'';
+  var now=new Date(),fd=function(d){return d.getFullYear()+('0'+(d.getMonth()+1)).slice(-2)+('0'+d.getDate()).slice(-2)};
+  var span=deep?null:10;
+  var jobs=Object.keys(DL_LG).map(function(lg){
+    var C=DL_LG[lg],from=span?fd(new Date(now.getTime()-span*864e5)):C.start;if(from<C.start)from=C.start;
+    if(from>fd(now))return Promise.resolve([]);
+    // ESPN scoreboards answer date ranges; split long ranges into 14-day windows
+    var wins=[],a=new Date(from.slice(0,4),+from.slice(4,6)-1,+from.slice(6,8));
+    while(a<=now&&wins.length<14){var b=new Date(Math.min(a.getTime()+13*864e5,now.getTime()));wins.push(fd(a)+'-'+fd(b));a=new Date(b.getTime()+864e5)}
+    return Promise.all(wins.map(function(w){return fetch('https://site.api.espn.com/apis/site/v2/sports/'+ESPN[lg]+'/scoreboard?dates='+w+'&limit=300'+(lg==='ncaafb'?'&groups=80':lg==='ncaamb'?'&groups=50':'')).then(function(r){return r.ok?r.json():null}).catch(function(){return null})})).then(function(js){
+      var out=[];js.forEach(function(j){((j&&j.events)||[]).forEach(function(e){var c=(e.competitions||[])[0]||{},done=c.status&&c.status.type&&c.status.type.completed;if(done&&e.id&&!S.dlog[lg+'|'+e.id])out.push({lg:lg,id:e.id,at:Date.parse(e.date)||0})})});
+      return out;
+    });
+  });
+  return Promise.all(jobs).then(function(L){
+    var todo=[].concat.apply([],L).sort(function(a,b){return b.at-a.at}).slice(0,deep?160:30),i=0,got=0;
+    if(!todo.length)return;
+    var next=function(){
+      var part=todo.slice(i,i+6);i+=6;if(!part.length)return Promise.resolve();
+      return Promise.all(part.map(function(g){return fetch('https://site.api.espn.com/apis/site/v2/sports/'+ESPN[g.lg]+'/summary?event='+encodeURIComponent(g.id)).then(function(r){return r.ok?r.json():null}).then(function(j){
+        if(!j)return;var s=dlExtract(g.lg,j);if(s){S.dlog[g.lg+'|'+g.id]={lg:g.lg,at:g.at,s:s};got++}
+      }).catch(function(){})})).then(function(){S.dlMsg='Read '+Math.min(i,todo.length)+' of '+todo.length+' earlier games…';return next()});
+    };
+    return next().then(function(){if(got){dlSave();S.dlV++;_dlE=null;try{_pxAt={}}catch(e){}}S.dlMsg='';});
+  }).catch(function(){S.dlMsg=''}).then(function(){S.dlBusy=false;var ae=document.activeElement;if(!(ae&&ae.tagName==='INPUT')&&!S.sheet)render()});
+}
+function dlHtml(lg){
+  var C=DL_LG[lg];
+  if(!C)return '<h3>Defense effects</h3><p class="note" style="margin-top:0">The app does not learn defense effects for '+esc(lgName(lg))+' yet. It covers football and basketball.</p>';
+  var E=dlCompute(),n=E.tot[lg]||0,rows=[];
+  C.names.forEach(function(nm,i){Object.keys(E).forEach(function(k){var p=k.split('|');if(p[0]!==lg||p.length!==3||+p[1]!==i)return;if((E.n[k]||0)>=12)rows.push({nm:nm,opp:p[2],v:E[k],n:E.n[k]})})});
+  rows.sort(function(a,b){return Math.abs(b.v)-Math.abs(a.v)});
+  var h='<h3>Defense effects learned from box scores</h3><p class="src" style="margin-top:0">'+(n?'Learned from '+n+' finished '+esc(lgName(lg))+' game'+(n>1?'s':'')+' so far.':'No finished games read yet.')+' For every player in every game, it compares what he did with his usual number and credits the difference to the defense he faced. It shrinks hard toward zero until a defense has many player-games, and the match-up adjustment on props adds it to the usual formula.</p>';
+  if(rows.length)h+='<div class="tblwrap"><table><thead><tr><th>Defense</th><th>Stat</th><th>Effect</th><th>Player-games</th></tr></thead><tbody>'+rows.slice(0,8).map(function(r){return '<tr><td>'+esc(r.opp)+'</td><td>'+esc(r.nm)+'</td><td>'+(r.v>=0?'+':'')+r.v.toFixed(1)+'% '+(r.v>=0?'<span class="src">gives up more</span>':'<span class="src">holds down</span>')+'</td><td>'+r.n+'</td></tr>'}).join('')+'</tbody></table></div>';
+  else h+='<p class="note">No defense has 12 player-games yet, so nothing is adjusted.</p>';
+  h+='<div class="actions"><button class="btn" data-act="dldeep"'+(S.dlBusy?' disabled':'')+'>'+(S.dlBusy?esc(S.dlMsg||'Reading…'):'Learn from earlier games')+'</button></div><p class="src">This reads the box scores of games already played this season (up to 160 at a time) and adds them to what the app knows. Tap it again to go further back.</p>';
+  return h;
+}
+setTimeout(function(){try{dlogSync(false)}catch(e){}},6000);
+setInterval(function(){try{if(!document.hidden)dlogSync(false)}catch(e){}},5*60000);
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
