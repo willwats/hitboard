@@ -1935,7 +1935,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v87, Oct 24';
+var BUILD='v88, Oct 24';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -5278,7 +5278,7 @@ function parseGameLegsA(raw){
 
 
 /* ---------- block45: header-driven team legs ("Wyoming +6, MIA Heat +1.5, ..." line is read most cleanly) ---------- */
-function parseGameLegs(raw){
+function parseGameLegs0(raw){
   var lines=String(raw||'').replace(/[−–—]/g,'-').split(/\n+/).map(function(x){return x.trim()}).filter(Boolean),now=Date.now();
   var hdr=null;
   lines.forEach(function(ln){
@@ -6090,6 +6090,29 @@ function dlHtml(lg){
 }
 setTimeout(function(){try{dlogSync(false)}catch(e){}},6000);
 setInterval(function(){try{if(!document.hidden)dlogSync(false)}catch(e){}},5*60000);
+
+
+/* ---------- block58: slip header list that wraps onto a second line ("... Ole Miss" / "+3") ---------- */
+function parseGameLegs(raw){
+  var L=String(raw||'').replace(/[−–—]/g,'-').split(/\n/),out=[],i=0;
+  var listy=function(s){return s.indexOf(',')>=0&&/[A-Za-z]{2}[A-Za-z .']*\s*[+-]\d/.test(s)};
+  while(i<L.length){
+    var cur=L[i].trim();i++;
+    if(listy(cur)){
+      var guard=0;
+      while(i<L.length&&guard++<3){
+        var nx=L[i].trim();if(!nx){i++;continue}
+        var lastPart=cur.split(/\s*,\s*/).pop(),noNum=!/[+-]\d{1,2}(?:\.\d)?\s*$/.test(lastPart);
+        if(/,\s*$/.test(cur)||(noNum&&/^[+-]?\d{1,2}(?:\.\d)?\b/.test(nx))||(/^[+-]\d{1,2}(?:\.\d)?$/.test(nx)&&noNum)){
+          if(noNum&&/^\d/.test(nx))nx='+'+nx;
+          cur=cur+(/,\s*$/.test(cur)?' ':' ')+nx;i++;
+        }else break;
+      }
+    }
+    out.push(cur);
+  }
+  return parseGameLegs0(out.join('\n'));
+}
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
