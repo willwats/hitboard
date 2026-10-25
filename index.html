@@ -588,7 +588,7 @@ function normFeed(lg,games){
 }
 
 /* ---------- state ---------- */
-var S={cat:null,tab:'games',sport:'nfl',gf:'All',sheet:null,picks:[],stake:10,feed:SNAP.feed,feedAt:SNAP.at,live:false,src:'the data feed',busy:false,msg:'',msgKind:'',stats:{}};
+var S={cat:null,tab:'today',sport:'nfl',gf:'All',sheet:null,picks:[],stake:10,feed:SNAP.feed,feedAt:SNAP.at,live:false,src:'the data feed',busy:false,msg:'',msgKind:'',stats:{}};
 try{var raw=localStorage.getItem('hitboard.picks.v2');if(raw){var a=JSON.parse(raw);if(Array.isArray(a))S.picks=a.filter(function(x){return propById(x.pid)&&(x.side==='over'||x.side==='under')})}}catch(e){}
 function save(){try{localStorage.setItem('hitboard.picks.v2',JSON.stringify(S.picks))}catch(e){}}
 var $=function(s){return document.querySelector(s)};
@@ -1935,7 +1935,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v90, Oct 24';
+var BUILD='v91, Oct 24';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -1944,7 +1944,7 @@ function dispInfo(){
     document.body.removeChild(d);return r;
   }catch(e){return ''}
 }
-function foot(){return '<p class="foot"><button class="linkbtn" data-act="tab" data-t="about">How the model works</button> · <span class="src">Build '+BUILD+'</span><br><span class="src">'+dispInfo()+'</span><br><span class="src">'+(S.rosN?'Rosters: ESPN, '+S.rosN+' teams, updated '+esc(fmtClock(S.rosLAt))+(S.rosErr?' ('+S.rosErr+' team'+(S.rosErr>1?'s':'')+' failed)':''):'Rosters: not loaded yet, tap Refresh')+'</span></p><p class="foot">For entertainment and research only, not betting advice. Probabilities are estimates and can be wrong. If gambling is a problem for you or someone you know, call 1-800-GAMBLER.</p>'}
+function foot(){return '<p class="foot"><button class="linkbtn" data-act="tour">Take the tour</button> · <button class="linkbtn" data-act="tab" data-t="about">How the model works</button> · <span class="src">Build '+BUILD+'</span><br><span class="src">'+dispInfo()+'</span><br><span class="src">'+(S.rosN?'Rosters: ESPN, '+S.rosN+' teams, updated '+esc(fmtClock(S.rosLAt))+(S.rosErr?' ('+S.rosErr+' team'+(S.rosErr>1?'s':'')+' failed)':''):'Rosters: not loaded yet, tap Refresh')+'</span></p><p class="foot">For entertainment and research only, not betting advice. Probabilities are estimates and can be wrong. If gambling is a problem for you or someone you know, call 1-800-GAMBLER.</p>'}
 
 /* ---------- sheets ---------- */
 /* ---------- team model, analyst sections, parlays ---------- */
@@ -4284,7 +4284,7 @@ function scY(){return window.pageYOffset||0}
 function scSet(y){window.scrollTo(0,y)}
 function scTop(){scSet(0)}
 function render(){
-  var _y=scY(),_h={home:vHome,games:vGames,scores:vScores,div:vDiv,record:vRecord,props:vProps,parlay:vParlay,picks:vPicks,about:vAbout,more:vMore,builder:vBuilder,hb:vHb}[S.tab](),_v=$('#view');
+  var _y=scY(),_h={home:vHome,games:vGames,scores:vScores,div:vDiv,record:vRecord,props:vProps,parlay:vParlay,picks:vPicks,about:vAbout,more:vMore,builder:vBuilder,hb:vHb,today:vToday}[S.tab](),_v=$('#view');
   if(_v.__h!==_h){_v.innerHTML=_h;_v.__h=_h}
   $('#stamp').innerHTML='Feed '+esc(fmtClock(S.feedAt))+'<br>'+(S.live?'live':'snapshot');
   renderNav();updateSlipBar();
@@ -4482,6 +4482,7 @@ document.addEventListener('click',function(e){
   else if(act==='hblog'){hbLog(el.dataset.gid,el.dataset.t)}
   else if(act==='hbcopy'){hbCopy(el.dataset.lg,el.dataset.t)}
   else if(act==='hbprop'){hbProp(el.dataset.i)}
+  else if(act==='tour'){tourStart()}
   else if(act==='dldeep'){dlogSync(true);render()}
   else if(act==='team'){S.sheet={type:'team',lg:el.dataset.lg,n:el.dataset.n};renderSheet()}
   else if(act==='gf'){S.gf=el.dataset.v;render()}
@@ -5853,13 +5854,13 @@ function sheetHtml(lg,t){
   if(lg==='ncaamb'||lg==='mlb')return '';
   var it=sheetItems(lg,t);
   var h='<h3>Bet sheet, next 36 hours</h3>';
-  if(!it.length)return h+'<p class="note" style="margin-top:0">No '+esc(lgName(lg))+' pick clears break-even at DraftKings’ price right now. Skipping is a valid play. The sheet refreshes with each line update.</p>';
+  if(!it.length)return h+'<p class="note" style="margin-top:0">No bet: nothing in '+esc(lgName(lg))+' beats DraftKings’ price by 2% or more right now. Skipping is a valid play. The sheet refreshes with each line update.</p>';
   var done=function(i){return S.mine.some(function(m){return m.gid===i.g.id&&m.type===i.x.t&&(m.side||'')===(i.x.t==='tot'?(i.x.over?'over':'under'):(i.x.side||''))})};
   h+='<p class="src" style="margin-top:0">Picks where the model’s chance beats what the DraftKings price needs. Enter them in the DraftKings app yourself, then tap <b>Log as placed</b> so the app tracks the result.</p>';
   h+=it.map(function(i,ix){var x=i.x,lg2=i.g.lg;
     return '<div class="card" style="margin-bottom:8px"><div class="r" style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><div><b>'+esc(x.pick)+'</b> <span class="src">'+esc(HB_T[x.t])+' · '+fmtAm(i.pr)+(i.assumed?' (price not read, -110 assumed)':'')+'</span></div>'+hbPill('Edge +'+(i.edge*100).toFixed(1)+'%','hi')+'</div>'+
-      '<div class="src">'+esc(i.g.a+' @ '+i.g.h)+' · '+esc(gTime(i.g))+'</div><div class="src">Model '+Math.round(x.p*100)+'% vs '+Math.round(amBe(i.pr)*100)+'% the price needs · about '+(i.ev>=0?'+':'')+'$'+i.ev.toFixed(2)+' per $10 if the model is right</div>'+
-      '<div class="actions" style="margin-top:6px">'+(done(i)?'<span class="src"><b>Logged</b></span>':'<button class="btn" data-act="hblog" data-gid="'+esc(i.g.id)+'" data-t="'+x.t+'">Log as placed ($10)</button>')+'</div></div>';
+      '<div class="src">'+esc(i.g.a+' @ '+i.g.h)+' · '+esc(gTime(i.g))+'</div><div class="src">Model '+Math.round(x.p*100)+'% vs '+Math.round(amBe(i.pr)*100)+'% the price needs · about '+(i.ev>=0?'+':'')+'$'+i.ev.toFixed(2)+' per $10 if the model is right</div><div class="src">'+stakeNote(i)+'</div>'+
+      '<div class="actions" style="margin-top:6px">'+(done(i)?'<span class="src"><b>Logged</b></span>':'<button class="btn" data-act="hblog" data-gid="'+esc(i.g.id)+'" data-t="'+x.t+'">Log as placed ($'+stakeFor(x.p,i.pr)+')</button>')+'</div></div>';
   }).join('');
   h+='<div class="actions"><button class="btn" data-act="hbcopy" data-lg="'+lg+'" data-t="'+(t||'')+'">'+(S.hbCopied===lg?'Copied':'Copy the sheet')+'</button><a class="btn" href="https://sportsbook.draftkings.com/" target="_blank" rel="noopener">Open DraftKings</a></div>';
   return h+'<p class="src">The model leans on the DraftKings line for most of every number, so edges are small and the record is short. No bet is guaranteed to profit. Bet only what you can afford to lose.</p>';
@@ -6181,6 +6182,170 @@ trendEnsure=function(g){
     }).catch(function(){});
   });
 };
+
+
+/* ---------- block60: Today tab, edge bar, stake sizing, bankroll, closing line value, scorecard, injury heads-up, first-open tour ---------- */
+var EDGE_MIN=.02,TD_LG=['nfl','nba','ncaafb','nhl'];
+S.bank={amt:0,unit:10};S.close={};
+try{var bk=JSON.parse(localStorage.getItem('hitboard.bank.v1')||'null');if(bk)S.bank={amt:+bk.amt||0,unit:+bk.unit||10}}catch(e){}
+try{var cl=JSON.parse(localStorage.getItem('hitboard.close.v1')||'null');if(cl&&typeof cl==='object')S.close=cl}catch(e){}
+function bankSave(){try{localStorage.setItem('hitboard.bank.v1',JSON.stringify(S.bank))}catch(e){}}
+function clSave(){
+  var ks=Object.keys(S.close);if(ks.length>400){ks.sort(function(a,b){return S.close[a].t-S.close[b].t}).slice(0,ks.length-400).forEach(function(k){delete S.close[k]})}
+  try{localStorage.setItem('hitboard.close.v1',JSON.stringify(S.close))}catch(e){}
+}
+/* save DraftKings' last line for every game that has not started; it freezes at kickoff and becomes the closing line */
+function clCapture(){
+  var now=Date.now(),ch=false;
+  LG.forEach(function(l){(S.feed[l[0]]||[]).forEach(function(g){
+    if(!g.dk||kind(g)!=='up'||!(g.start>now)||g.start-now>36*36e5)return;
+    var o=S.close[g.id],n={t:now,lg:g.lg,sp:g.dk.sp||null,tt:g.dk.tt!=null?g.dk.tt:null,ml:g.dk.ml||null};
+    if(!o||JSON.stringify([o.sp,o.tt,o.ml])!==JSON.stringify([n.sp,n.tt,n.ml])){S.close[g.id]=n;ch=true}
+  })});
+  if(ch)clSave();
+}
+function clvOf(t,side,line,odds,over,gid){
+  var c=S.close[gid];if(!c)return null;
+  if(t==='sp'){var sp=c.sp;if(!sp||sp.pts==null||line==null||isNaN(line))return null;var hs=sp.fav==='h'?-sp.pts:sp.pts,cs=side==='h'?hs:-hs;return {k:'pts',v:line-cs}}
+  if(t==='tot'){if(c.tt==null||line==null||isNaN(line))return null;var o=side==='over'||over===true;return {k:'pts',v:o?c.tt-line:line-c.tt}}
+  if(t==='ml'){var cp=c.ml&&(side==='h'?c.ml.h:c.ml.a);if(cp==null||odds==null||!isFinite(odds))return null;return {k:'pct',v:(amBe(cp)-amBe(odds))*100}}
+  return null;
+}
+function clvTxt(c){return c?(c.v>=0?'+':'')+c.v.toFixed(1)+(c.k==='pts'?' pts':'%'):'—'}
+function clvAll(){
+  var out=[];
+  S.log.forEach(function(x){if(x.t!=='sp'&&x.t!=='tot')return;var c=clvOf(x.t,x.side,x.num,null,x.over,x.gid);if(c)out.push({c:c,w:'app'})});
+  S.mine.forEach(function(x){if(x.type!=='sp'&&x.type!=='tot'&&x.type!=='ml')return;if(!x.gid)return;var c=clvOf(x.type,x.side,x.line!=null?parseFloat(x.line):null,x.oddsGiven===false?null:parseFloat(x.odds),x.side==='over',x.gid);if(c)out.push({c:c,w:'you'})});
+  return out;
+}
+/* stake sizing: quarter Kelly, capped at 2% of the bankroll */
+function bankAmt(){return S.bank.amt>0?S.bank.amt:1000}
+function stakeFor(p,pr){var b=amProfit(pr),k=(p*b-(1-p))/b;if(!(k>0))return 0;return Math.max(1,Math.round(bankAmt()*Math.min(.02,k*.25)))}
+function stakeNote(i){
+  var s=stakeFor(i.x.p,i.pr);
+  return 'Suggested stake $'+s+' ('+(100*s/bankAmt()).toFixed(1)+'% of '+(S.bank.amt>0?'your':'an assumed')+' $'+Math.round(bankAmt())+' bankroll, quarter-Kelly, never above 2%)'+(i.edge>.12?'. <b>Big gap from the market.</b> Check for a stale line or late news before betting.':'');
+}
+function betPL(x){
+  if(!x.res||x.res==='P')return 0;var st=Number(x.stake)||0,od=(x.odds!=null&&x.oddsGiven!==false&&isFinite(parseFloat(x.odds)))?parseFloat(x.odds):-110;
+  return x.res==='W'?st*amProfit(od):-st;
+}
+/* the edge bar: nothing under 2% is suggested */
+var sheetItems0=sheetItems;
+sheetItems=function(lg,t){return sheetItems0(lg,t).filter(function(i){return i.edge>=EDGE_MIN})};
+/* props: skip players with fewer than 5 games of history */
+propItems=function(lg){
+  var now=Date.now(),td=[];
+  try{straightList(lg).filter(function(b){return b.label!=='Game bet'&&b.rec&&b.rec.t==='rprop'}).forEach(function(b){
+    var g=find(b.rec.gid);if(!g||kind(g)!=='up'||!(g.start>now)||g.start>now+36*36e5)return;
+    var n=null;try{n=bSample(b)}catch(e){}if(n!=null&&n<5)return;
+    td.push({b:b,g:g,sc:bScore(b)})})}catch(e){}
+  return td.sort(function(a,b){return b.sc-a.sc}).slice(0,8);
+};
+hbLog=function(gid,t){
+  var g=find(gid);if(!g)return;var it=sheetItems(g.lg,t).filter(function(i){return i.g.id===gid})[0];if(!it)return;
+  var x=it.x,P={type:t,gid:gid,side:t==='tot'?(x.over?'over':'under'):(x.side||'h'),line:t==='ml'?null:x.num,odds:it.assumed?'':it.pr,stake:stakeFor(x.p,it.pr)||S.bank.unit};
+  var ok=saveParsed(P,'');if(ok){saveMine();try{trackBets()}catch(e){}}
+  render();
+};
+/* injury heads-up on open bets */
+function outStatus(lg,name){
+  try{var n=normName(name),p=null;PROPS.forEach(function(q){if(!p&&q.lg===lg&&normName(q.name)===n)p=q});if(!p)return null;var it=pxStat(p);return it&&OUT_RE.test(it.st)?it.st:null}catch(e){return null}
+}
+function headsUp(){
+  var out=[],now=Date.now();
+  S.mine.forEach(function(x){
+    if(x.res)return;
+    var g=x.gid?find(x.gid):null;
+    if((x.type==='rprop'||x.type==='prop')&&x.player){var s=outStatus(x.lg,x.player);if(s)out.push({k:'inj|'+x.id+'|'+x.player,t:x.player+' is listed '+s.toLowerCase()+'. Your bet: '+(x.pick||'')})}
+    (x.legD||[]).forEach(function(l){var s=outStatus(x.lg||(g&&g.lg),l.n);if(s)out.push({k:'inj|'+x.id+'|'+l.n,t:l.n+' is listed '+s.toLowerCase()+'. It is a leg in your '+(x.legD.length+((x.glegs||[]).length))+'-leg parlay.'})});
+    if(g&&kind(g)==='up'&&g.start>now&&g.start-now<=2*36e5)out.push({k:'soon|'+x.id,t:'Starts '+gTime(g)+': '+(x.pick||g.a+' @ '+g.h)});
+  });
+  return out;
+}
+function pushHeadsUp(){try{headsUp().forEach(function(a){if(a.k.indexOf('inj|')===0)pushAlert(a.t,a.k)})}catch(e){}}
+function vToday(){
+  var all=[];TD_LG.forEach(function(lg){try{sheetItems(lg).forEach(function(i){all.push(i)})}catch(e){}});
+  all.sort(function(a,b){return b.edge-a.edge});all=all.slice(0,5);
+  var h='<h2>Today</h2><p class="lede">What is worth a look, what you have riding, and how the picks have really done. Skipping a day is a fine play.</p>';
+  var hu=headsUp();
+  if(hu.length)h+='<h3>Heads up</h3><div class="card"><ul class="pts" style="margin:0">'+hu.slice(0,6).map(function(a){return '<li>'+esc(a.t)+'</li>'}).join('')+'</ul></div>';
+  h+='<h3>Best bets right now</h3>';
+  if(!all.length)h+='<div class="card empty"><b>No bet right now.</b> Nothing in the next 36 hours beats DraftKings’ price by 2% or more. The list fills in as lines load and games get closer. Check Props and Hitboard for player and sport-by-sport views.</div>';
+  else{
+    var done=function(i){return S.mine.some(function(m){return m.gid===i.g.id&&m.type===i.x.t&&(m.side||'')===(i.x.t==='tot'?(i.x.over?'over':'under'):(i.x.side||''))})};
+    h+='<p class="src" style="margin-top:0">Only picks where the model beats the price by 2% or more. Place them yourself at DraftKings, then tap Log so the app tracks them.</p>'+all.map(function(i){var x=i.x;
+      return '<div class="card" style="margin-bottom:8px"><div class="r" style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><div><b>'+esc(x.pick)+'</b> <span class="src">'+esc(lgName(i.g.lg))+' · '+esc(HB_T[x.t])+' · '+fmtAm(i.pr)+(i.assumed?' (assumed)':'')+'</span></div>'+hbPill('Edge +'+(i.edge*100).toFixed(1)+'%','hi')+'</div>'+
+        '<div class="src">'+esc(i.g.a+' @ '+i.g.h)+' · '+esc(gTime(i.g))+'</div><div class="src">Model '+Math.round(x.p*100)+'% vs '+Math.round(amBe(i.pr)*100)+'% needed</div><div class="src">'+stakeNote(i)+'</div>'+
+        '<div class="actions" style="margin-top:6px">'+(done(i)?'<span class="src"><b>Logged</b></span>':'<button class="btn" data-act="hblog" data-gid="'+esc(i.g.id)+'" data-t="'+x.t+'">Log as placed ($'+stakeFor(x.p,i.pr)+')</button>')+'</div></div>'}).join('');
+  }
+  /* bankroll */
+  var settled=S.mine.filter(function(x){return x.res}),pl=0;settled.forEach(function(x){pl+=betPL(x)});
+  var openR=0,openN=0;S.mine.forEach(function(x){if(!x.res){openR+=Number(x.stake)||0;openN++}});
+  var staked=0;settled.forEach(function(x){staked+=Number(x.stake)||0});
+  var par=S.mine.filter(function(x){return x.type==='parlay'}),parSt=0,allSt=0;S.mine.forEach(function(x){var s=Number(x.stake)||0;allSt+=s;if(x.type==='parlay')parSt+=s});
+  h+='<h3>Bankroll</h3><div class="card"><div class="r" style="display:flex;gap:10px;flex-wrap:wrap"><label class="src" style="flex:1;min-width:120px">Starting bankroll ($)<br><input type="number" inputmode="decimal" id="bk_amt" min="0" step="10" value="'+(S.bank.amt||'')+'" placeholder="e.g. 500" style="width:100%"></label><label class="src" style="flex:1;min-width:120px">One unit ($)<br><input type="number" inputmode="decimal" id="bk_unit" min="1" step="1" value="'+S.bank.unit+'" style="width:100%"></label></div>'+
+    '<div class="facts" style="margin-top:8px"><span>Profit <b>'+(pl>=0?'+':'-')+'$'+Math.abs(pl).toFixed(2)+'</b></span><span>Bankroll <b>'+(S.bank.amt>0?'$'+(S.bank.amt+pl).toFixed(2):'—')+'</b></span><span>ROI <b>'+(staked?(100*pl/staked).toFixed(1)+'%':'—')+'</b></span><span>Open <b>'+openN+'</b> <span class="src">$'+openR.toFixed(0)+' at risk</span></span></div>'+
+    '<p class="src" style="margin:8px 0 0">Profit counts settled bets you logged or scanned, at the odds you entered (-110 where none was read).'+(par.length&&allSt?' Parlays are '+Math.round(100*parSt/allSt)+'% of what you have staked. A parlay multiplies the book’s built-in margin, so expect them to lose more over time than single bets.':'')+'</p></div>';
+  /* scorecard */
+  var rows=[];
+  LG.forEach(function(l){['ml','sp','tot'].forEach(function(t){
+    var D=S.log.filter(function(x){return x.lg===l[0]&&x.t===t&&(x.res==='W'||x.res==='L')});if(!D.length)return;
+    var w=D.filter(function(x){return x.res==='W'}).length,u=0;D.forEach(function(x){u+=x.res==='W'?100/110:-1});
+    rows.push('<tr><td>'+esc(l[1])+'</td><td>'+esc(HB_T[t])+'</td><td>'+w+'-'+(D.length-w)+'</td><td>'+pct1(w/D.length)+'</td><td>'+(t==='ml'?'—':(u>=0?'+':'')+u.toFixed(1)+'u')+'</td></tr>')});
+    var A=S.auto.filter(function(x){return x.lg===l[0]&&(x.res==='W'||x.res==='L')});
+    if(A.length){var aw=A.filter(function(x){return x.res==='W'}).length;rows.push('<tr><td>'+esc(l[1])+'</td><td>Props</td><td>'+aw+'-'+(A.length-aw)+'</td><td>'+pct1(aw/A.length)+'</td><td>—</td></tr>')}
+  });
+  h+='<h3>Scorecard</h3><div class="card">'+(rows.length?'<div class="tblwrap"><table><thead><tr><th>Sport</th><th>Bet</th><th>Record</th><th>Hit</th><th>Flat 1u</th></tr></thead><tbody>'+rows.join('')+'</tbody></table></div>':'<p class="src" style="margin:0">No graded picks yet. The app saves its picks before games start and grades them on the final score.</p>')+
+    '<p class="src" style="margin:8px 0 0">This is the app’s own record since it started tracking, graded at -110. It is not a backtest on old games: past DraftKings lines are not available, so a true backtest cannot be done here. A spread or total needs 52.4% to break even.</p></div>';
+  /* closing line value */
+  var cv=clvAll(),pts=cv.filter(function(v){return v.c.k==='pts'}),beat=cv.filter(function(v){return v.c.v>0}).length,avg=pts.length?pts.reduce(function(a,v){return a+v.c.v},0)/pts.length:null;
+  h+='<h3>Closing line check</h3><div class="card"><div class="facts"><span>Measured <b>'+cv.length+'</b></span><span>Beat the close <b>'+(cv.length?Math.round(100*beat/cv.length)+'%':'—')+'</b></span><span>Avg spread/total <b>'+(avg==null?'—':(avg>=0?'+':'')+avg.toFixed(2)+' pts')+'</b></span></div>'+
+    '<p class="src" style="margin:8px 0 0">Closing line value compares the number you got with DraftKings’ last number before kickoff. Beating it over many bets (30 or more) is the best sign of a real edge; a few wins or losses prove nothing. The app saves DraftKings’ line while it is open, so open it within a few hours of games to capture closes.</p></div>';
+  /* should I have bet it */
+  var last=S.log.filter(function(x){return x.res==='W'||x.res==='L'}).sort(function(a,b){return (b.st||0)-(a.st||0)}).slice(0,8);
+  h+='<h3>Should I have bet it?</h3>';
+  if(!last.length)h+='<div class="card empty">Finished picks show up here with the result, the line you would have had and the closing line.</div>';
+  else h+='<div class="card"><div class="tblwrap"><table><thead><tr><th>Pick</th><th>Result</th><th>Model</th><th>Vs close</th></tr></thead><tbody>'+last.map(function(x){var c=(x.t==='sp'||x.t==='tot')?clvOf(x.t,x.side,x.num,null,x.over,x.gid):null;return '<tr><td>'+esc(x.pick)+'<br><span class="src">'+esc(x.game||'')+'</span></td><td><b>'+(x.res==='W'?'Hit':'Missed')+'</b></td><td>'+Math.round(x.p*100)+'%</td><td>'+clvTxt(c)+'</td></tr>'}).join('')+'</tbody></table></div><p class="src" style="margin:8px 0 0">“Vs close” is how much better (+) or worse (-) the pick’s number was than the closing line.</p></div>';
+  /* line check */
+  h+='<h3>Shop the number</h3><div class="card"><p class="src" style="margin:0">The app only reads DraftKings’ lines, so it cannot compare books for you. Half a point matters on spreads and totals: before you bet, check the same line at another book you use.</p><div class="actions" style="margin-top:8px"><a class="btn" href="https://sportsbook.fanduel.com/" target="_blank" rel="noopener">FanDuel</a><a class="btn" href="https://sports.betmgm.com/" target="_blank" rel="noopener">BetMGM</a><a class="btn" href="https://sportsbook.caesars.com/" target="_blank" rel="noopener">Caesars</a></div></div>';
+  h+='<div class="actions" style="margin-top:12px"><button class="btn" data-act="tab" data-t="parlay">Parlay builder</button><button class="btn" data-act="tour">Take the tour</button></div>';
+  return h+foot();
+}
+/* ---- first-open tour ---- */
+var TOUR=[
+ {tab:'today',hl:'today',t:'Today',x:'Start here. Best bets across every sport, your bankroll, and how the picks have really done. If nothing clears the edge bar, it says no bet.'},
+ {tab:'games',hl:'games',t:'Games',x:'Every game with live scores, lines and the model’s read. Tap a game for the breakdown, each team’s last five games and player props.'},
+ {tab:'props',hl:'props',t:'Props',x:'Player props by type, then by game. Tap a player for season stats and game-by-game results.'},
+ {tab:'picks',hl:'picks',t:'My bets',x:'Upload a DraftKings screenshot or log a bet. The app reads each leg, then tracks scores and player stats live and shows whether you are covering.'},
+ {tab:'hb',hl:'hb',t:'Hitboard',x:'The app’s own picks, one sport at a time, split into moneyline, spread, over/under and props. Place a bet at DraftKings, then tap Log so it is tracked. The bottom of each sport shows what the app has learned.'},
+ {tab:'today',hl:null,t:'How to read it',x:'Edge is the model’s chance minus what the price needs. Under 2% is skipped. Stakes are a small slice of your bankroll. The closing line check is the honest test: beating the close over 30 or more bets is a good sign, a few wins prove nothing. No bet is guaranteed to win.'}
+];
+var _tourI=0;
+(function(){var st=document.createElement('style');st.textContent='.tourhl{outline:3px solid #3ddc84!important;outline-offset:-3px;border-radius:12px}#tour{position:fixed;left:12px;right:12px;bottom:84px;z-index:9999;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:14px;padding:14px;box-shadow:0 8px 28px rgba(0,0,0,.45);max-width:560px;margin:0 auto}#tour h4{margin:0 0 4px;font-size:18px}#tour p{margin:0 0 10px;font-size:15px;line-height:1.4}#tour .tb{display:flex;gap:8px;align-items:center}#tour .dots{flex:1;color:var(--muted);font-size:13px}';document.head.appendChild(st)})();
+function tourHl(k){document.querySelectorAll('#nav button').forEach(function(b){b.classList.toggle('tourhl',!!k&&b.getAttribute('data-t')===k)})}
+function tourShow(i){
+  _tourI=i;var s=TOUR[i],el=document.getElementById('tour');
+  if(!el){el=document.createElement('div');el.id='tour';el.setAttribute('role','dialog');el.setAttribute('aria-label','App tour');document.body.appendChild(el)}
+  S.tab=s.tab;S.sheet=null;try{render()}catch(e){}
+  tourHl(s.hl);
+  el.innerHTML='<h4>'+esc(s.t)+'</h4><p>'+esc(s.x)+'</p><div class="tb"><span class="dots">'+(i+1)+' of '+TOUR.length+'</span>'+(i>0?'<button class="btn" id="tourB">Back</button>':'')+'<button class="btn" id="tourS">'+(i<TOUR.length-1?'Skip':'Close')+'</button>'+(i<TOUR.length-1?'<button class="btn" id="tourN" style="background:var(--accent,#3ddc84);color:#04140c">Next</button>':'')+'</div>';
+  var nx=document.getElementById('tourN'),bk2=document.getElementById('tourB');
+  if(nx)nx.onclick=function(){tourShow(i+1)};if(bk2)bk2.onclick=function(){tourShow(i-1)};
+  document.getElementById('tourS').onclick=tourEnd;
+}
+function tourEnd(){var el=document.getElementById('tour');if(el)el.remove();tourHl(null);try{localStorage.setItem('hitboard.tour.v1','1')}catch(e){}S.tab='today';try{render()}catch(e){}}
+function tourStart(){tourShow(0)}
+document.addEventListener('change',function(e){
+  var t=e.target;if(!t||!t.id)return;
+  if(t.id==='bk_amt'){S.bank.amt=Math.max(0,parseFloat(t.value)||0);bankSave();render()}
+  else if(t.id==='bk_unit'){S.bank.unit=Math.max(1,parseFloat(t.value)||10);bankSave();render()}
+});
+TABS=TABS.filter(function(t){return t[0]!=='parlay'});
+TABS.unshift(['today','Today','<path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>']);
+NAVG.today=['today','parlay','builder'];
+setTimeout(function(){try{clCapture();pushHeadsUp()}catch(e){}},4000);
+setInterval(function(){try{clCapture();pushHeadsUp()}catch(e){}},60000);
+setTimeout(function(){var seen=false;try{seen=localStorage.getItem('hitboard.tour.v1')==='1'}catch(e){}if(!seen)tourStart()},1500);
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
