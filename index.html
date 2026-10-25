@@ -1935,7 +1935,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v88, Oct 24';
+var BUILD='v89, Oct 24';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -5228,7 +5228,7 @@ function parseGameLegsA(raw){
   var sideOf=function(g,team){
     var t=normName(team),tn=nick(team),ta=tabb(team.replace(/[^A-Za-z]/g,''));
     var sc=function(full,ab){var f=normName(full),b=f.split(' ');
-      if(f===t)return 3;if(t&&(f.indexOf(t+' ')===0||t.indexOf(f+' ')===0))return 3;
+      if(f===t)return 3;if(t&&((f.indexOf(t+' ')===0&&!/^(state|st|tech|a m|am|polytechnic)\b/.test(f.slice(t.length+1)))||t.indexOf(f+' ')===0))return 3;
       if(tn&&b[b.length-1]===tn)return 2;
       var first=t.split(' ')[0];if(first&&first.length>2&&b[0]===first)return 2;
       if(ab&&tabb(ab)===ta&&ta.length>=2)return 2;
@@ -5300,13 +5300,13 @@ function parseGameLegs0(raw){
   var sideOf=function(g,team){
     var t=normName(team),tn=nick(team),ta=tabb(team.replace(/[^A-Za-z]/g,''));
     var sc=function(full,ab){var f=normName(full),b=f.split(' ');
-      if(f===t||(t&&(f.indexOf(t+' ')===0||t.indexOf(f+' ')===0)))return 3;
+      if(f===t||(t&&((f.indexOf(t+' ')===0&&!/^(state|st|tech|a m|am|polytechnic)\b/.test(f.slice(t.length+1)))||t.indexOf(f+' ')===0)))return 3;
       if(tn&&b[b.length-1]===tn)return 2;
       var first=t.split(' ')[0];if(first&&first.length>2&&b[0]===first)return 2;
       if(ab&&tabb(ab)===tabb(first.toUpperCase()))return 2;
       if(ab&&ta.length>=2&&tabb(ab)===ta)return 2;
       return 0};
-    var a=sc(g.an,g.a),h=sc(g.hn,g.h);return a>h?'a':h>a?'h':null;
+    var a=sc(g.an,g.a),h=sc(g.hn,g.h);sideOf.last=Math.max(a,h);return a>h?'a':h>a?'h':null;
   };
   var useRows=rows.length===hdr.length;
   return hdr.map(function(h,j){
@@ -5316,8 +5316,8 @@ function parseGameLegs0(raw){
     if(r&&r.ab)g=pool.filter(function(q){return tabb(q.a)===tabb(r.ab[0])&&tabb(q.h)===tabb(r.ab[1])})[0];
     if(r&&r.nm&&!g){var an=nick(r.nm[0]),hn=nick(r.nm[1]);g=pool.filter(function(q){return nick(q.an)===an&&nick(q.hn)===hn})[0]}
     if(!g&&!tot){
-      var c=pool.filter(function(q){return sideOf(q,h.team)}).sort(function(a,b){return Math.abs(a.start-now)-Math.abs(b.start-now)});
-      if(c.length&&(c.length===1||Math.abs(c[0].start-now)<Math.abs(c[1].start-now)))g=c[0];
+      var c=pool.filter(function(q){var v=sideOf(q,h.team);q._sc=sideOf.last;return v}).sort(function(a,b){return (b._sc-a._sc)||(Math.abs(a.start-now)-Math.abs(b.start-now))});
+      if(c.length&&(c.length===1||c[0]._sc>c[1]._sc||Math.abs(c[0].start-now)<Math.abs(c[1].start-now)))g=c[0];
     }
     if(g){leg.gid=g.id;leg.lg=g.lg;if(!tot){leg.side=sideOf(g,h.team);if(!leg.side)leg.gid=null}}
     return leg;
