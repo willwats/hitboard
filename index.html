@@ -1935,7 +1935,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v93, Oct 25';
+var BUILD='v94, Oct 25';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -3245,7 +3245,7 @@ function feedSheetK0(g){
     else h+='<p class="note" style="margin-top:14px">The feed has no win probability for this game yet, so the prediction below uses team stats only.</p>';
   }
   if(k!=='up')h+='<h2 style="margin-top:22px">'+(k==='final'?'Pre-game breakdown':'Full breakdown')+'</h2><p class="src">Built from season stats before this game, so you can see how the matchup looked going in.</p>';
-  h+=g.lg==='ncaamb'?'<p class="note" style="margin-top:14px">No team ratings for college basketball yet.</p>':(k==='up'?'<details class="more"><summary>More: ratings, injuries, projections</summary>'+feedAnalyst(g)+'</details>':feedAnalyst(g));
+  h+=g.lg==='ncaamb'?'<p class="note" style="margin-top:14px">No team ratings for college basketball yet.</p>':(k==='up'?'<details class="more"'+(g.lg==='nfl'?' open':'')+'><summary>More: ratings, injuries, projections</summary>'+feedAnalyst(g)+'</details>':feedAnalyst(g));
   if(k==='up')h+=consHtml(g);
   return h;
 }
@@ -6467,6 +6467,32 @@ function tfRun(){
 try{tfApply()}catch(e){}
 setTimeout(tfRun,7000);
 setInterval(function(){try{if(!document.hidden)tfRun()}catch(e){}},3*60000);
+
+
+/* ---------- block63: NFL game sheets get a player props section (and the matchup opens by default) ---------- */
+function nflGameProps(g){
+  var h='<h3>Player props for this game</h3>';
+  if(kind(g)!=='up')return h+'<p class="note" style="margin-top:0">This game has started, so its props are closed here. Check Props for the next slate.</p>';
+  var KS=[['rec','Receiving'],['rush','Rushing'],['pass','Passing']],kd=KS.some(function(k){return k[0]===S.gpk})?S.gpk:'rec',A=nt(g.a),H=nt(g.h);
+  h+='<div class="chips" role="group" aria-label="Prop stat">'+KS.map(function(k){return '<button class="chip" data-act="gpk" data-v="'+k[0]+'" aria-pressed="'+(kd===k[0])+'">'+k[1]+'</button>'}).join('')+'</div>';
+  var lav={dpass:leagueAvg('dpass'),drush:leagueAvg('drush')},dm=kd==='rush'?'drush':'dpass',rows=[];
+  DEEP.forEach(function(d){
+    if(d.kind!==kd)return;var t=nt(d.t);if(t!==A&&t!==H)return;
+    try{if(!avail(d.n,d.t).show)return}catch(e){}
+    var opp=t===A?H:A;if(!TS[opp])return;
+    var f=mv(opp,dm)/lav[dm],pct=Math.max(-12,Math.min(12,(f-1)*50));pct=Math.max(-15,Math.min(15,pct+defLearn('nfl',d.kind,opp)));
+    var p={avg:d.avgS,kind:d.kind,g:d.g},mid=roundHalf(d.avgS),lo=roundHalf(d.avgS*.75),hi=roundHalf(d.avgS*1.25),P=function(l){return calc(p,l,-110,-110,pct).po};
+    rows.push({d:d,opp:opp,pct:pct,proj:d.avgS*(1+pct/100),rk:mrank(opp,dm),allow:mv(opp,dm),marks:[[lo,P(lo)],[mid,P(mid)],[hi,P(hi)]]});
+  });
+  rows.sort(function(a,b){return b.proj-a.proj});
+  if(!rows.length)return h+'<p class="note" style="margin-top:0">No players with '+esc(KS.filter(function(k){return k[0]===kd})[0][1].toLowerCase())+' data are listed for this game.</p>';
+  h+='<p class="src" style="margin-top:0">Tap a player for his season and game log. “Chance to clear” uses his 2026 average, shifted by how the opponent’s '+(kd==='rush'?'run':'pass')+' defense ranks'+(rows.length>12?'. Top 12 of '+rows.length+' shown; see Props for the rest':'')+'.</p>';
+  h+='<div class="tblwrap"><table><thead><tr><th>Player and matchup</th><th>Proj.</th><th>Chance to clear</th></tr></thead><tbody>'+rows.slice(0,12).map(function(r){var d=r.d;
+    return '<tr><td><button class="pxname" data-act="prof" data-n="'+esc(d.n)+'" data-lg="nfl" data-team="'+esc(d.t)+'"><b>'+esc(d.n)+'</b></button> <span class="src">'+esc(d.t)+' '+esc(d.pos)+'</span><br><span class="src">vs '+esc(r.opp)+' · '+ordn(r.rk)+' '+(kd==='rush'?'vs the run':'vs the pass')+', allows '+r.allow.toFixed(0)+' yds/g</span></td><td>'+r.proj.toFixed(1)+'<br><span class="src">avg '+d.avg.toFixed(1)+'</span></td><td>'+r.marks.map(function(m){return '<span class="hrpill '+(m[1]>=.7?'hi':m[1]<.4?'lo':'mid')+'" style="display:inline-block;margin:0 0 3px 0">'+m[0].toFixed(1)+'+ · '+Math.round(m[1]*100)+'%</span>'}).join('<br>')+'</td></tr>'}).join('')+'</tbody></table></div>';
+  return h;
+}
+var gamePropsHtml0=gamePropsHtml;
+gamePropsHtml=function(g){return g.lg==='nfl'?(kind(g)==='final'?'':nflGameProps(g)):gamePropsHtml0(g)};
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
