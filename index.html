@@ -1935,7 +1935,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v92, Oct 25';
+var BUILD='v93, Oct 25';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -6389,6 +6389,84 @@ vGames=function(){
   var panel='';try{panel=gamesBest(S.gs||'all')}catch(e){}
   return h.slice(0,j)+panel+h.slice(j);
 };
+
+
+/* ---------- block62: give every team on the slate props, built from its own recent box scores when the league tables skip it ---------- */
+var TF={ncaafb:{kinds:[['cpass','Pass Yds','pass',100],['crush','Rush Yds','rush',20],['crec','Rec Yds','rec',20]],max:8},
+        nba:{kinds:[['npts','Points','pts',6],['nreb','Rebounds','reb',3],['nast','Assists','ast',2],['ntpm','Threes','tpm',.8]],max:8}};
+S.tfill={};S.tfBusy=false;S.tfN=0;
+try{var tfc=JSON.parse(localStorage.getItem('hitboard.tf.v1')||'null');if(tfc&&typeof tfc==='object')S.tfill=tfc}catch(e){}
+function tfSave(){
+  var ks=Object.keys(S.tfill);if(ks.length>260){ks.sort(function(a,b){return S.tfill[a].at-S.tfill[b].at}).slice(0,ks.length-260).forEach(function(k){delete S.tfill[k]})}
+  try{localStorage.setItem('hitboard.tf.v1',JSON.stringify(S.tfill))}catch(e){try{S.tfill={};}catch(e2){}}
+}
+function tfApply(){
+  for(var i=PROPS.length-1;i>=0;i--)if(PROPS[i].tf)PROPS.splice(i,1);
+  var have={};PROPS.forEach(function(p){have[p.lg+'|'+p.kind+'|'+normName(p.name)]=1});
+  var n=0;
+  Object.keys(S.tfill).forEach(function(k){
+    var e=S.tfill[k],C=TF[e.lg];if(!C)return;n++;
+    e.pl.forEach(function(r){
+      C.kinds.forEach(function(kd,ix){
+        var v=r.a[ix];if(!(v>=kd[3])||have[e.lg+'|'+kd[0]+'|'+normName(r.n)])return;
+        have[e.lg+'|'+kd[0]+'|'+normName(r.n)]=1;
+        pxAdd({lg:e.lg,kind:kd[0],name:r.n,team:e.team,stat:kd[1],g:r.g,avg:v,total:Math.round(v*r.g),tf:1,
+          note:v.toFixed(1)+' '+(e.lg==='nba'?kd[1].toLowerCase()+' a game':'yards a game')+' over '+r.g+' of '+e.n+' recent '+esc(e.team)+' games this season, from ESPN box scores. Replace the line with the one at your book.'});
+      });
+    });
+  });
+  S.tfN=n;
+  try{if(typeof _pxAt==='object'&&_pxAt){delete _pxAt.nba;delete _pxAt.ncaafb}}catch(e){}
+}
+var rsApply0=rsApply;
+rsApply=function(D){rsApply0(D);try{tfApply()}catch(e){}};
+function tfTeamCount(lg,ab){var c=0;PROPS.forEach(function(p){if(p.lg===lg&&!p.tf&&tabb(p.team)===tabb(ab))c++});return c}
+function tfNeed(){
+  var now=Date.now(),need=[],seen={};
+  Object.keys(TF).forEach(function(lg){(S.feed[lg]||[]).forEach(function(g){
+    if(kind(g)!=='up'||g.start>now+5*864e5)return;
+    [[g.a,g.an],[g.h,g.hn]].forEach(function(w){
+      var k=lg+'|'+tabb(w[0]);if(seen[k])return;seen[k]=1;
+      var e=S.tfill[k];if(e&&now-e.at<10*36e5)return;
+      if(!e&&tfTeamCount(lg,w[0])>=3)return;
+      need.push({lg:lg,ab:w[0],nm:w[1],k:k,s:g.start});
+    });
+  })});
+  return need.sort(function(a,b){return a.s-b.s});
+}
+function tfRun(){
+  if(window.claude||typeof fetch!=='function'||S.tfBusy)return;
+  var need=tfNeed().slice(0,6);if(!need.length)return;
+  S.tfBusy=true;var added=0;
+  var one=function(t){
+    var C=TF[t.lg];
+    return tmIdFor(t.lg,t.ab,t.nm).then(function(id){return tmSched(t.lg,id).then(function(v){
+      var evs=v.slice(-C.max);if(!evs.length)throw 0;
+      var base='https://site.api.espn.com/apis/site/v2/sports/'+ESPN[t.lg]+'/summary?event=',acc={};
+      return Promise.all(evs.map(function(e){
+        return (S.tbox[e.id]?Promise.resolve(S.tbox[e.id]):fetch(base+encodeURIComponent(e.id)).then(function(r){return r.ok?r.json():null}).catch(function(){return null})).then(function(j){
+          if(!j)return;S.tbox[e.id]=j;var ex=trExtract(t.lg,j,id,tabb(t.ab));
+          Object.keys(ex).forEach(function(nm){var o=acc[nm]=acc[nm]||{g:0,s:C.kinds.map(function(){return 0}),c:C.kinds.map(function(){return 0})};
+            o.g++;C.kinds.forEach(function(kd,ix){var x=ex[nm][kd[2]];if(x!=null){o.s[ix]+=x;o.c[ix]++}})});
+        });
+      })).then(function(){
+        var pl=[];Object.keys(acc).forEach(function(nm){var o=acc[nm];if(o.g<2&&t.lg==='ncaafb')return;
+          var a=C.kinds.map(function(kd,ix){return o.c[ix]>=2?o.s[ix]/o.c[ix]:null});
+          if(a.some(function(x,ix){return x!=null&&x>=C.kinds[ix][3]}))pl.push({n:nm,g:o.g,a:a.map(function(x){return x==null?null:Math.round(x*10)/10})})});
+        S.tfill[t.k]={at:Date.now(),lg:t.lg,team:t.ab,n:evs.length,pl:pl};added+=pl.length;
+      });
+    })}).catch(function(){S.tfill[t.k]={at:Date.now()-9*36e5,lg:t.lg,team:t.ab,n:0,pl:[]}});
+  };
+  var i=0,next=function(){if(i>=need.length)return Promise.resolve();return one(need[i++]).then(next)};
+  next().then(function(){
+    tfSave();tfApply();S.tfBusy=false;
+    var ae=document.activeElement;if(!(ae&&ae.tagName==='INPUT')&&!S.sheet)render();
+    if(tfNeed().length)setTimeout(tfRun,3000);
+  }).catch(function(){S.tfBusy=false});
+}
+try{tfApply()}catch(e){}
+setTimeout(tfRun,7000);
+setInterval(function(){try{if(!document.hidden)tfRun()}catch(e){}},3*60000);
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
