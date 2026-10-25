@@ -1935,7 +1935,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v89, Oct 24';
+var BUILD='v90, Oct 24';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -6113,6 +6113,74 @@ function parseGameLegs(raw){
   }
   return parseGameLegs0(out.join('\n'));
 }
+
+
+/* ---------- block59: games with no stats (college teams missing from the tables, no "last five" from ESPN): build both from each team's own ESPN schedule ---------- */
+S.tmL={};S.tmS={};S.tfb={};S.cfbTry={};
+function tmList(lg){
+  if(S.tmL[lg]&&S.tmL[lg].length>0)return Promise.resolve(S.tmL[lg]);
+  var u='https://site.api.espn.com/apis/site/v2/sports/'+ESPN[lg]+'/teams?limit=500'+(lg==='ncaafb'?'&groups=80':lg==='ncaamb'?'&groups=50':'');
+  return fetch(u).then(function(r){if(!r.ok)throw 0;return r.json()}).then(function(j){
+    var m=[];(((j.sports||[{}])[0].leagues||[{}])[0].teams||[]).forEach(function(t){t=t.team||t;m.push({id:t.id,ab:t.abbreviation,nm:t.displayName,loc:t.location})});
+    if(!m.length)throw 0;S.tmL[lg]=m;return m});
+}
+function tmIdFor(lg,ab,name){
+  return tmList(lg).then(function(m){
+    var h=null,n=normName(name||'');
+    m.forEach(function(x){if(!h&&n&&normName(x.nm)===n)h=x});
+    m.forEach(function(x){if(!h&&sameTm(x.ab,ab))h=x});
+    if(!h)throw 0;return h.id});
+}
+function tmSched(lg,id){
+  var k=lg+'|'+id,c=S.tmS[k];if(c&&Date.now()-c.t<20*60000)return Promise.resolve(c.v);
+  var base='https://site.api.espn.com/apis/site/v2/sports/'+ESPN[lg]+'/teams/'+id+'/schedule';
+  var gj=function(u){return fetch(u).then(function(r){return r.ok?r.json():null}).catch(function(){return null})};
+  return Promise.all([gj(base),gj(base+'?seasontype=2')]).then(function(js){
+    var ev={},sc=function(c){var s=c&&c.score;return s==null?null:parseFloat(typeof s==='object'?(s.value!=null?s.value:s.displayValue):s)};
+    js.filter(Boolean).forEach(function(j){(j.events||[]).forEach(function(e){
+      var c=(e.competitions||[])[0]||{},done=c.status&&c.status.type&&c.status.type.completed;if(!done||!e.id||ev[e.id])return;
+      var me=null,op=null;(c.competitors||[]).forEach(function(x){if(String(x.team&&x.team.id)===String(id))me=x;else op=x});
+      if(!me||!op)return;var pf=sc(me),pa=sc(op);if(pf==null||pa==null||isNaN(pf)||isNaN(pa))return;
+      ev[e.id]={id:e.id,date:e.date,home:me.homeAway==='home',pf:pf,pa:pa,opp:op.team||{}};
+    })});
+    var v=Object.keys(ev).map(function(k){return ev[k]}).sort(function(a,b){return Date.parse(a.date)-Date.parse(b.date)});
+    S.tmS[k]={t:Date.now(),v:v};return v;
+  });
+}
+/* 1) points scored and allowed for college football teams the stat tables skip */
+function cfbFill(g){
+  if(g.lg!=='ncaafb'||window.claude||typeof fetch!=='function')return;
+  [[g.a,g.an],[g.h,g.hn]].forEach(function(w){
+    var c=cfbFind(w[1]);if(c&&c.def!=null)return;
+    var k=normName(w[1]);if(S.cfbTry[k]&&Date.now()-S.cfbTry[k]<5*60000)return;S.cfbTry[k]=Date.now();
+    tmIdFor('ncaafb',w[0],w[1]).then(function(id){return tmSched('ncaafb',id)}).then(function(v){
+      if(v.length<3)return;var pf=0,pa=0;v.forEach(function(e){pf+=e.pf;pa+=e.pa});
+      CFB[k]={name:w[1],G:v.length,off:pf/v.length,def:pa/v.length,sched:1};
+      if(S.sheet)renderSheet();render();
+    }).catch(function(){});
+  });
+}
+var feedTeams0=feedTeams;
+feedTeams=function(g){var r=feedTeams0(g);if(r&&r.missing&&g.lg==='ncaafb'){try{cfbFill(g)}catch(e){}}return r};
+/* 2) last five games from each team's schedule when ESPN's game summary has none */
+var trendEnsure0=trendEnsure;
+trendEnsure=function(g){
+  var p=trendEnsure0(g);
+  return Promise.resolve(p).then(function(){
+    var c=S.trend[g.id];if(!c||c.st!=='err'||window.claude||g.lg==='ncaamb'||g.lg==='mlb')return;
+    if(S.tfb[g.id]&&Date.now()-S.tfb[g.id]<2*60000)return;S.tfb[g.id]=Date.now();
+    var base='https://site.api.espn.com/apis/site/v2/sports/'+ESPN[g.lg]+'/summary?event=';
+    return Promise.all([[g.a,g.an],[g.h,g.hn]].map(function(w){
+      return tmIdFor(g.lg,w[0],w[1]).then(function(id){return tmSched(g.lg,id).then(function(v){
+        var evs=v.slice(-5).map(function(e){return {id:e.id,gameDate:e.date,atVs:e.home?'vs':'@',gameResult:e.pf>e.pa?'W':e.pf<e.pa?'L':'T',score:Math.max(e.pf,e.pa)+'-'+Math.min(e.pf,e.pa),opponent:{abbreviation:e.opp.abbreviation,displayName:e.opp.displayName}}});
+        if(!evs.length)throw 0;return {ab:w[0],name:w[1],id:id,evs:evs};
+      })});
+    })).then(function(teams){
+      var jobs=[];teams.forEach(function(t){t.evs.forEach(function(e){if(S.tbox[e.id])return;jobs.push(fetch(base+encodeURIComponent(e.id)).then(function(r){return r.ok?r.json():null}).then(function(j){S.tbox[e.id]=j}).catch(function(){S.tbox[e.id]=null}))})});
+      return Promise.all(jobs).then(function(){S.trend[g.id]={st:'ok',t:Date.now(),teams:teams};if(S.sheet&&S.sheet.type==='fgame'&&S.sheet.id===g.id)renderSheet()});
+    }).catch(function(){});
+  });
+};
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
