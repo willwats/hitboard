@@ -1935,7 +1935,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v98, Oct 27';
+var BUILD='v99, Oct 27';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -4487,6 +4487,7 @@ document.addEventListener('click',function(e){
   else if(act==='hbcopy'){hbCopy(el.dataset.lg,el.dataset.t)}
   else if(act==='hbprop'){hbProp(el.dataset.i)}
   else if(act==='tour'){tourStart()}
+  else if(act==='bbgame'){S.sheet={type:'fgame',id:el.dataset.id,why:{t:el.dataset.t}};var bg0=find(el.dataset.id);if(bg0){try{loadStats(bg0)}catch(e3){}if(kind(bg0)!=='final')trendEnsure(bg0);try{if(wxLeagueOn(bg0.lg))wxEnsure(bg0).then(function(){if(S.sheet&&S.sheet.id===bg0.id)renderSheet()})}catch(e4){}}renderSheet()}
   else if(act==='phk'){S.phk[el.dataset.key]=el.dataset.v;renderSheet()}
   else if(act==='thin'){S.thin=el.dataset.v==='true';render()}
   else if(act==='phcopy'){var tx=phCard();try{navigator.clipboard.writeText(tx).then(function(){el.textContent='Copied'},function(){hbCopyOld(tx);el.textContent='Copied'})}catch(e2){hbCopyOld(tx);el.textContent='Copied'}}
@@ -5866,8 +5867,8 @@ function sheetHtml(lg,t){
   var done=function(i){return S.mine.some(function(m){return m.gid===i.g.id&&m.type===i.x.t&&(m.side||'')===(i.x.t==='tot'?(i.x.over?'over':'under'):(i.x.side||''))})};
   h+='<p class="src" style="margin-top:0">Picks where the model’s chance beats what the DraftKings price needs. Place them yourself in the DraftKings app, then scan your slip in My bets so the app tracks the result.</p>';
   h+=it.map(function(i,ix){var x=i.x,lg2=i.g.lg;
-    return '<div class="card" style="margin-bottom:8px"><div class="r" style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><div><b>'+esc(x.pick)+'</b> <span class="src">'+esc(HB_T[x.t])+' · '+fmtAm(i.pr)+(i.assumed?' (price not read, -110 assumed)':'')+'</span></div>'+hbPill('Edge +'+(i.edge*100).toFixed(1)+'%','hi')+'</div>'+
-      '<div class="src">'+esc(i.g.a+' @ '+i.g.h)+' · '+esc(gTime(i.g))+'</div><div class="src">Model '+Math.round(x.p*100)+'% vs '+Math.round(amBe(i.pr)*100)+'% the price needs · about '+(i.ev>=0?'+':'')+'$'+i.ev.toFixed(2)+' per $10 if the model is right</div><div class="src">'+stakeNote(i)+'</div>'+
+    return '<div class="card" data-act="bbgame" data-id="'+esc(i.g.id)+'" data-t="'+x.t+'" style="margin-bottom:8px;cursor:pointer"><div class="r" style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><div><b>'+esc(x.pick)+'</b> <span class="src">'+esc(HB_T[x.t])+' · '+fmtAm(i.pr)+(i.assumed?' (price not read, -110 assumed)':'')+'</span></div>'+hbPill('Edge +'+(i.edge*100).toFixed(1)+'%','hi')+'</div>'+
+      '<div class="src">'+esc(i.g.a+' @ '+i.g.h)+' · '+esc(gTime(i.g))+'</div><div class="src">Tap for the reason and matchup</div><div class="src">Model '+Math.round(x.p*100)+'% vs '+Math.round(amBe(i.pr)*100)+'% the price needs · about '+(i.ev>=0?'+':'')+'$'+i.ev.toFixed(2)+' per $10 if the model is right</div>'+
       '</div>';
   }).join('');
   h+='<div class="actions"><button class="btn" data-act="hbcopy" data-lg="'+lg+'" data-t="'+(t||'')+'">'+(S.hbCopied===lg?'Copied':'Copy the sheet')+'</button><a class="btn" href="https://sportsbook.draftkings.com/" target="_blank" rel="noopener">Open DraftKings</a></div>';
@@ -5924,7 +5925,7 @@ function propSheetHtml(lg){
   if(!it.length)return h+'<p class="note" style="margin-top:0">No '+esc(lgName(lg))+' props to suggest right now. They appear once the day’s games and player data are loaded.</p>';
   h+='<p class="src" style="margin-top:0">The app’s highest-chance props, ranked after weighting for sample size. The app does not see prop prices, so compare each with your DraftKings price: the fair price is shown. Bet it only if DraftKings pays at least that.</p>';
   h+=it.map(function(o,i){var b=o.b,r=b.rec,done=S.mine.some(function(m){return m.type==='rprop'&&m.gid===r.gid&&normName(m.player)===normName(r.name)&&m.k===r.k&&m.thr===r.thr});
-    return '<div class="card" style="margin-bottom:8px"><div class="r" style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><div><b>'+esc(b.title)+'</b></div>'+hbPill(Math.round(b.p*100)+'%','hi')+'</div>'+
+    return '<div class="card" data-act="prof" data-n="'+esc(r.name)+'" data-lg="'+esc(r.lg||o.g.lg)+'" data-team="'+esc(teamOfName(r.lg||o.g.lg,r.name))+'" style="margin-bottom:8px;cursor:pointer"><div class="r" style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><div><b>'+esc(b.title)+'</b></div>'+hbPill(Math.round(b.p*100)+'%','hi')+'</div>'+
       '<div class="src">'+esc(b.sub)+' · '+esc(gTime(o.g))+'</div><div class="src">Fair price '+fmtAm(fairAm(b.p))+' · bet it if DraftKings pays '+fmtAm(fairAm(b.p))+' or better</div>'+
       '</div>';
   }).join('');
@@ -6300,7 +6301,7 @@ function resultsHtml(){
 function vToday(){
   var all=[];TD_LG.forEach(function(lg){try{sheetItems(lg).forEach(function(i){all.push(i)})}catch(e){}});
   all.sort(function(a,b){return b.edge-a.edge});all=all.slice(0,3);
-  var h='<h2>Today</h2><p class="lede">What is worth a look, what you have riding, and how the picks have really done. Skipping a day is a fine play.</p>';
+  var h='<h2>Today</h2><p class="lede">What is worth a look right now and what you have riding. Skipping a day is a fine play.</p>';
   var hu=headsUp();
   if(hu.length)h+='<h3>Heads up</h3><div class="card"><ul class="pts" style="margin:0">'+hu.slice(0,6).map(function(a){return '<li>'+esc(a.t)+'</li>'}).join('')+'</ul></div>';
   h+='<h3>Best bets right now</h3>';
@@ -6309,31 +6310,21 @@ function vToday(){
   else{
     var done=function(i){return S.mine.some(function(m){return m.gid===i.g.id&&m.type===i.x.t&&(m.side||'')===(i.x.t==='tot'?(i.x.over?'over':'under'):(i.x.side||''))})};
     h+='<p class="src" style="margin-top:0">Only picks where the model beats the price by 2% or more. Place them yourself at DraftKings, then scan your slip in My bets to track them.</p>'+all.map(function(i){var x=i.x;
-      return '<div class="card" style="margin-bottom:8px"><div class="r" style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><div><b>'+esc(x.pick)+'</b> <span class="src">'+esc(lgName(i.g.lg))+' · '+esc(HB_T[x.t])+' · '+fmtAm(i.pr)+(i.assumed?' (assumed)':'')+'</span></div>'+hbPill('Edge +'+(i.edge*100).toFixed(1)+'%','hi')+'</div>'+
-        '<div class="src">'+esc(i.g.a+' @ '+i.g.h)+' · '+esc(gTime(i.g))+'</div><div class="src">Model '+Math.round(x.p*100)+'% vs '+Math.round(amBe(i.pr)*100)+'% needed</div><div class="src">'+stakeNote(i)+'</div>'+
+      return '<div class="card" data-act="bbgame" data-id="'+esc(i.g.id)+'" data-t="'+x.t+'" style="margin-bottom:8px;cursor:pointer"><div class="r" style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><div><b>'+esc(x.pick)+'</b> <span class="src">'+esc(lgName(i.g.lg))+' · '+esc(HB_T[x.t])+' · '+fmtAm(i.pr)+(i.assumed?' (assumed)':'')+'</span></div>'+hbPill('Edge +'+(i.edge*100).toFixed(1)+'%','hi')+'</div>'+
+        '<div class="src">'+esc(i.g.a+' @ '+i.g.h)+' · '+esc(gTime(i.g))+'</div><div class="src">Tap for the reason and matchup</div><div class="src">Model '+Math.round(x.p*100)+'% vs '+Math.round(amBe(i.pr)*100)+'% needed</div>'+
         '</div>'}).join('');
   }
-  /* bankroll */
-  var settled=S.mine.filter(function(x){return x.res}),pl=0;settled.forEach(function(x){pl+=betPL(x)});
-  var openR=0,openN=0;S.mine.forEach(function(x){if(!x.res){openR+=Number(x.stake)||0;openN++}});
-  var staked=0;settled.forEach(function(x){staked+=Number(x.stake)||0});
-  var par=S.mine.filter(function(x){return x.type==='parlay'}),parSt=0,allSt=0;S.mine.forEach(function(x){var s=Number(x.stake)||0;allSt+=s;if(x.type==='parlay')parSt+=s});
-  h+='<h3>Bankroll</h3><div class="card"><div class="r" style="display:flex;gap:10px;flex-wrap:wrap"><label class="src" style="flex:1;min-width:120px">Starting bankroll ($)<br><input type="number" inputmode="decimal" id="bk_amt" min="0" step="10" value="'+(S.bank.amt||'')+'" placeholder="e.g. 500" style="width:100%"></label><label class="src" style="flex:1;min-width:120px">One unit ($)<br><input type="number" inputmode="decimal" id="bk_unit" min="1" step="1" value="'+S.bank.unit+'" style="width:100%"></label></div>'+
-    '<div class="facts" style="margin-top:8px"><span>Profit <b>'+(pl>=0?'+':'-')+'$'+Math.abs(pl).toFixed(2)+'</b></span><span>Bankroll <b>'+(S.bank.amt>0?'$'+(S.bank.amt+pl).toFixed(2):'—')+'</b></span><span>ROI <b>'+(staked?(100*pl/staked).toFixed(1)+'%':'—')+'</b></span><span>Open <b>'+openN+'</b> <span class="src">$'+openR.toFixed(0)+' at risk</span></span></div>'+
-    '<p class="src" style="margin:8px 0 0">Stakes are quarter Kelly, never above 2% of the bankroll. Profit counts settled bets you scanned or entered, at the odds you entered (-110 where none was read).'+(par.length&&allSt?' Parlays are '+Math.round(100*parSt/allSt)+'% of what you have staked. A parlay multiplies the book’s built-in margin, so expect them to lose more over time than single bets.':'')+'</p></div>';
-  /* line check */
-  h+='<h3>Shop the number</h3><div class="card"><p class="src" style="margin:0">The app only reads DraftKings’ lines, so it cannot compare books for you. Half a point matters on spreads and totals: before you bet, check the same line at another book you use.</p><div class="actions" style="margin-top:8px"><a class="btn" href="https://sportsbook.fanduel.com/" target="_blank" rel="noopener">FanDuel</a><a class="btn" href="https://sports.betmgm.com/" target="_blank" rel="noopener">BetMGM</a><a class="btn" href="https://sportsbook.caesars.com/" target="_blank" rel="noopener">Caesars</a></div></div>';
   h+='<div class="actions" style="margin-top:12px"><button class="btn" data-act="tab" data-t="record">Results</button><button class="btn" data-act="tab" data-t="parlay">Parlay builder</button><button class="btn" data-act="tour">Take the tour</button></div>';
   return h+foot();
 }
 /* ---- first-open tour ---- */
 var TOUR=[
- {tab:'today',hl:'today',t:'Today',x:'Start here. Best bets across every sport, your bankroll, and how the picks have really done. If nothing clears the edge bar, it says no bet.'},
+ {tab:'today',hl:'today',t:'Today',x:'Start here. The best bets across every sport, plus anything worth double-checking on your open bets. Tap a bet to see the reason and the matchup behind it. If nothing clears the edge bar, it says no bet.'},
  {tab:'games',hl:'games',t:'Games',x:'Every game with live scores, lines and the model’s read. Tap a game for the breakdown, each team’s last five games and player props.'},
  {tab:'props',hl:'props',t:'Props',x:'Player props by type, then by game. Tap a player for season stats and game-by-game results.'},
  {tab:'picks',hl:'picks',t:'My bets',x:'Upload a DraftKings screenshot or log a bet. The app reads each leg, then tracks scores and player stats live and shows whether you are covering.'},
  {tab:'hb',hl:'hb',t:'Hitboard',x:'The app’s own picks, one sport at a time, split into moneyline, spread, over/under and props. Place a bet at DraftKings, then scan your slip in My bets so it is tracked. The bottom of each sport shows what the app has learned.'},
- {tab:'today',hl:null,t:'How to read it',x:'Edge is the model’s chance minus what the price needs. Under 2% is skipped. Stakes are a small slice of your bankroll. The closing line check is the honest test: beating the close over 30 or more bets is a good sign, a few wins prove nothing. No bet is guaranteed to win.'}
+ {tab:'today',hl:null,t:'How to read it',x:'Edge is the model’s chance minus what the price needs. Under 2% is skipped.  The closing line check is the honest test: beating the close over 30 or more bets is a good sign, a few wins prove nothing. No bet is guaranteed to win.'}
 ];
 var _tourI=0;
 (function(){var st=document.createElement('style');st.textContent='.tourhl{outline:3px solid #3ddc84!important;outline-offset:-3px;border-radius:12px}#tour{position:fixed;left:12px;right:12px;bottom:84px;z-index:9999;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:14px;padding:14px;box-shadow:0 8px 28px rgba(0,0,0,.45);max-width:560px;margin:0 auto}#tour h4{margin:0 0 4px;font-size:18px}#tour p{margin:0 0 10px;font-size:15px;line-height:1.4}#tour .tb{display:flex;gap:8px;align-items:center}#tour .dots{flex:1;color:var(--muted);font-size:13px}';document.head.appendChild(st)})();
@@ -6388,16 +6379,16 @@ function gamesBest(lg){
   var T=gdTest(),when={today:'today',tomorrow:'tomorrow',week:'this week'}[T.sel]||'',name=lg==='all'?'all sports':lgName(lg),h='<h3>Best bets: '+esc(name)+' · '+when+'</h3>';
   if(lg==='all'||(lg!=='ncaamb'&&lg!=='mlb')){
     var cv=coverList(lg,T);
-    h+='<div class="card"><div class="src" style="margin:0 0 6px"><b>Who covers the spread</b>, most likely first</div>';
+    h+='<div class="card"><div class="src" style="margin:0 0 6px"><b>Who covers the spread</b>, most likely first. Tap a pick for the reason and matchup.</div>';
     if(!cv.length)h+='<p class="src" style="margin:0">No spread picks for '+when+' yet. They appear once lines load for those games.</p>';
     else h+=cv.map(function(i){var x=i.x,g=i.g,mrg=x.rm!=null?' · model margin '+(x.rm>=0?'+':'')+Number(x.rm).toFixed(1):'';
-      return '<div style="padding:8px 0;border-top:1px solid var(--line)"><div class="r" style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><div><b>'+esc(x.pick)+'</b> <span class="src">'+fmtAm(i.pr)+(i.assumed?' assumed':'')+'</span></div>'+hbPill(Math.round(x.p*100)+'% to cover',i.edge>=EDGE_MIN?'hi':'mid')+'</div><div class="src">'+esc(g.a+' @ '+g.h)+' · '+esc(gTime(g))+mrg+'</div><div class="src">'+(i.edge>EDGE_MAX?'<b>Check the line.</b> A gap this big (+'+(i.edge*100).toFixed(0)+'%) is almost always a stale line or bad data, not a real edge':i.edge>=EDGE_MIN?'<b>Clears the 2% edge bar</b> at this price ('+(i.edge>=0?'+':'')+(i.edge*100).toFixed(1)+'%)':'A lean, not a bet: edge '+(i.edge>=0?'+':'')+(i.edge*100).toFixed(1)+'% at this price')+'</div></div>'}).join('');
+      return '<div data-act="bbgame" data-id="'+esc(g.id)+'" data-t="sp" style="padding:8px 0;border-top:1px solid var(--line);cursor:pointer"><div class="r" style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><div><b>'+esc(x.pick)+'</b> <span class="src">'+fmtAm(i.pr)+(i.assumed?' assumed':'')+'</span></div>'+hbPill(Math.round(x.p*100)+'% to cover',i.edge>=EDGE_MIN?'hi':'mid')+'</div><div class="src">'+esc(g.a+' @ '+g.h)+' · '+esc(gTime(g))+mrg+'</div><div class="src">'+(i.edge>EDGE_MAX?'<b>Check the line.</b> A gap this big (+'+(i.edge*100).toFixed(0)+'%) is almost always a stale line or bad data, not a real edge':i.edge>=EDGE_MIN?'<b>Clears the 2% edge bar</b> at this price ('+(i.edge>=0?'+':'')+(i.edge*100).toFixed(1)+'%)':'A lean, not a bet: edge '+(i.edge>=0?'+':'')+(i.edge*100).toFixed(1)+'% at this price')+'</div></div>'}).join('');
     h+='</div>';
   }
   var pr=[];try{if(lg==='all'){TD_LG.forEach(function(L){pr=pr.concat(propItems(L))});pr.sort(function(a,b){return b.sc-a.sc});pr=pr.slice(0,5)}else pr=propItems(lg).slice(0,5);pr=pr.filter(function(o){return T.ok(o.g)})}catch(e){}
-  h+='<div class="card" style="margin-top:8px"><div class="src" style="margin:0 0 6px"><b>Best player props</b>, after weighting for sample size</div>';
+  h+='<div class="card" style="margin-top:8px"><div class="src" style="margin:0 0 6px"><b>Best player props</b>, after weighting for sample size. Tap a player for stats and splits.</div>';
   if(!pr.length)h+='<p class="src" style="margin:0">No props to suggest for '+when+' yet. They appear once those games and player data load.</p>';
-  else h+=pr.map(function(o){var b=o.b;return '<div style="padding:8px 0;border-top:1px solid var(--line)"><div class="r" style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><div><b>'+esc(b.title)+'</b></div>'+hbPill(Math.round(b.p*100)+'%','hi')+'</div><div class="src">'+esc(b.sub)+' · '+esc(gTime(o.g))+'</div><div class="src">Fair price '+fmtAm(fairAm(b.p))+'. Bet it only if DraftKings pays that or better.</div></div>'}).join('');
+  else h+=pr.map(function(o){var b=o.b;var rr=b.rec||{};return '<div data-act="prof" data-n="'+esc(rr.name||'')+'" data-lg="'+esc(rr.lg||o.g.lg)+'" data-team="'+esc(teamOfName(rr.lg||o.g.lg,rr.name||''))+'" style="padding:8px 0;border-top:1px solid var(--line);cursor:pointer"><div class="r" style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><div><b>'+esc(b.title)+'</b></div>'+hbPill(Math.round(b.p*100)+'%','hi')+'</div><div class="src">'+esc(b.sub)+' · '+esc(gTime(o.g))+'</div><div class="src">Fair price '+fmtAm(fairAm(b.p))+'. Bet it only if DraftKings pays that or better.</div></div>'}).join('');
   h+='</div><div class="actions" style="margin-top:8px"><button class="btn" data-act="hbgo" data-lg="'+lg+'" data-m="sp">All '+esc(name)+' picks</button><button class="btn" data-act="hbgo" data-lg="'+lg+'" data-m="props">Prop sheet</button></div>';
   return h;
 }
@@ -6602,9 +6593,46 @@ vToday=function(){
     '<li><b>Hit rate:</b> how often a player cleared a line in recent games. Over 5 games it is noisy, so it is marked thin.</li>'+
     '<li><b>Splits:</b> the same stat for home or away, rested or back-to-back, and against this opponent.</li>'+
     '<li><b>Defense effect:</b> how much more or less a defense gives up than average for a stat, learned from finished games and shrunk toward zero until there is plenty of data.</li>'+
-    '<li><b>Quarter Kelly:</b> a stake sizing rule that bets a quarter of what the Kelly formula suggests, capped at 2% of your bankroll.</li></ul></details></div>';
+    '</ul></details></div>';
   var j=h.lastIndexOf('<p class="foot">');j=h.lastIndexOf('<div class="actions"',j);
   return j>0?h.slice(0,j)+g+h.slice(j):h+g;
+};
+
+
+/* ---------- block65: tap a best bet to see why and the matchup behind it ---------- */
+function teamOfName(lg,name){
+  var n=normName(name),t='';
+  PROPS.forEach(function(p){if(!t&&p.lg===lg&&normName(p.name)===n)t=p.team});
+  if(!t)DEEP.forEach(function(d){if(!t&&lg==='nfl'&&normName(d.n)===n)t=d.t});
+  return t;
+}
+function whyBlock(g,why){
+  var bs=null;try{bs=picksFor(g)}catch(e){}
+  var b=bs&&bs.filter(function(x){return x.t===why.t})[0];if(!b)return '';
+  var C=null;try{C=feedCalc(g)}catch(e){}
+  var px=(g.dk&&g.dk.px)||{},ml=(g.dk&&g.dk.ml)||{},assumed=false;
+  var pr=b.t==='sp'?(b.side==='h'?px.sh:px.sa):b.t==='tot'?(b.over?px.to:px.tu):(b.side==='h'?ml.h:ml.a);
+  if(pr==null||!isFinite(pr)){pr=-110;assumed=true}
+  var ed=b.p-amBe(pr);
+  var h='<div class="card" style="margin:10px 0"><div class="src"><b>Why this pick</b></div><div style="margin:4px 0"><b>'+esc(b.pick)+'</b> <span class="src">'+esc(b.mk||'')+' · '+fmtAm(pr)+(assumed?' (assumed)':'')+'</span></div>'+
+    '<div class="src">Model '+Math.round(b.p*100)+'% vs '+Math.round(amBe(pr)*100)+'% the price needs, an edge of '+(ed>=0?'+':'')+(ed*100).toFixed(1)+'%</div>'+
+    '<p style="margin:8px 0 4px">'+esc(b.why||'')+'</p>';
+  if(C&&C.T&&C.T.A&&C.T.H){
+    var A=C.T.A,H=C.T.H,u=g.lg==='nhl'?'goals':'points';
+    h+='<div class="tblwrap"><table><thead><tr><th>Team</th><th>Scores a game</th><th>Allows a game</th></tr></thead><tbody><tr><td>'+esc(g.a)+'</td><td>'+Number(A.pf).toFixed(1)+'</td><td>'+Number(A.pa).toFixed(1)+'</td></tr><tr><td>'+esc(g.h)+' (home)</td><td>'+Number(H.pf).toFixed(1)+'</td><td>'+Number(H.pa).toFixed(1)+'</td></tr></tbody></table></div>'+
+      '<p class="src" style="margin:4px 0">Season '+u+' for and against. The model sets each side’s scoring against the other’s defense, adds a home edge, then blends with the market.</p>';
+  }
+  if(C&&C.ln){var bits=[];if(C.ln.sp&&C.ln.sp!=='n/a')bits.push('spread '+C.ln.sp);if(C.ln.tot&&C.ln.tot!=='n/a')bits.push('total '+C.ln.tot);if(C.ln.ml&&C.ln.ml!=='n/a')bits.push('moneyline '+C.ln.ml);if(bits.length)h+='<p class="src" style="margin:4px 0">Market: '+esc(bits.join(' · '))+(C.ln.srcs&&C.ln.srcs.length?' ('+esc(C.ln.srcs.join(', '))+')':'')+'.</p>'}
+  if(C&&C.LN&&C.LN.n&&(Math.abs(C.LN.dm)>=.05||Math.abs(C.LN.dt)>=.05))h+='<p class="src" style="margin:4px 0">Learned from these teams’ past results: margin '+(C.LN.dm>=0?'+':'')+C.LN.dm.toFixed(1)+', total '+(C.LN.dt>=0?'+':'')+C.LN.dt.toFixed(1)+'.</p>';
+  return h+'<p class="src" style="margin:4px 0 0">The full matchup, injuries and last five games are below.</p></div>';
+}
+var feedSheet1=feedSheet;
+feedSheet=function(g){
+  var h=feedSheet1(g),w=S.sheet&&S.sheet.id===g.id?S.sheet.why:null;
+  if(!w)return h;
+  var blk='';try{blk=whyBlock(g,w)}catch(e){}
+  var i=h.indexOf('</div></div>');if(i>=0&&blk)h=h.slice(0,i+12)+blk+h.slice(i+12);
+  return h.replace('<details class="more">','<details class="more" open>');
 };
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
