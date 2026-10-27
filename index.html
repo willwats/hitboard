@@ -1935,7 +1935,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v97, Oct 27';
+var BUILD='v98, Oct 27';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -6364,10 +6364,17 @@ setTimeout(function(){var seen=false;try{seen=localStorage.getItem('hitboard.tou
 
 
 /* ---------- block61: best bets for the chosen sport at the top of Games: who covers, and the best props ---------- */
-function coverList(lg){
-  var now=Date.now(),out=[];
+function gdTest(){
+  var now=Date.now(),k0=dayKey(now),k1=dayKey(now+864e5),all=[];
+  LG.forEach(function(l){if(S.gs==='all'||S.gs===l[0])(S.feed[l[0]]||[]).forEach(function(g){all.push(g)})});
+  var up=all.filter(function(g){return kind(g)==='up'}),nt0=up.filter(function(g){return dayKey(g.start)===k0}).length,nt1=up.filter(function(g){return dayKey(g.start)===k1}).length;
+  var sel=S.gd||(nt0?'today':nt1?'tomorrow':'week');
+  return {sel:sel,ok:function(g){return sel==='today'?dayKey(g.start)===k0:sel==='tomorrow'?dayKey(g.start)===k1:true}};
+}
+function coverList(lg,T){
+  var now=Date.now(),out=[];T=T||gdTest();
   (lg==='all'?TD_LG:[lg]).forEach(function(L){(S.feed[L]||[]).forEach(function(g){
-    if(kind(g)!=='up'||!(g.start>now)||g.start>now+5*864e5)return;
+    if(kind(g)!=='up'||!(g.start>now)||g.start>now+7*864e5||!T.ok(g))return;
     var b=picksFor(g);if(!b)return;var px=(g.dk&&g.dk.px)||{};
     b.forEach(function(x){
       if(x.t!=='sp'||x.p==null)return;
@@ -6378,18 +6385,18 @@ function coverList(lg){
   return out.sort(function(a,b){return b.x.p-a.x.p}).slice(0,6);
 }
 function gamesBest(lg){
-  var name=lg==='all'?'all sports':lgName(lg),h='<h3>Best bets: '+esc(name)+'</h3>';
+  var T=gdTest(),when={today:'today',tomorrow:'tomorrow',week:'this week'}[T.sel]||'',name=lg==='all'?'all sports':lgName(lg),h='<h3>Best bets: '+esc(name)+' · '+when+'</h3>';
   if(lg==='all'||(lg!=='ncaamb'&&lg!=='mlb')){
-    var cv=coverList(lg);
+    var cv=coverList(lg,T);
     h+='<div class="card"><div class="src" style="margin:0 0 6px"><b>Who covers the spread</b>, most likely first</div>';
-    if(!cv.length)h+='<p class="src" style="margin:0">No spread picks yet. They appear once lines load for the next games.</p>';
+    if(!cv.length)h+='<p class="src" style="margin:0">No spread picks for '+when+' yet. They appear once lines load for those games.</p>';
     else h+=cv.map(function(i){var x=i.x,g=i.g,mrg=x.rm!=null?' · model margin '+(x.rm>=0?'+':'')+Number(x.rm).toFixed(1):'';
       return '<div style="padding:8px 0;border-top:1px solid var(--line)"><div class="r" style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><div><b>'+esc(x.pick)+'</b> <span class="src">'+fmtAm(i.pr)+(i.assumed?' assumed':'')+'</span></div>'+hbPill(Math.round(x.p*100)+'% to cover',i.edge>=EDGE_MIN?'hi':'mid')+'</div><div class="src">'+esc(g.a+' @ '+g.h)+' · '+esc(gTime(g))+mrg+'</div><div class="src">'+(i.edge>EDGE_MAX?'<b>Check the line.</b> A gap this big (+'+(i.edge*100).toFixed(0)+'%) is almost always a stale line or bad data, not a real edge':i.edge>=EDGE_MIN?'<b>Clears the 2% edge bar</b> at this price ('+(i.edge>=0?'+':'')+(i.edge*100).toFixed(1)+'%)':'A lean, not a bet: edge '+(i.edge>=0?'+':'')+(i.edge*100).toFixed(1)+'% at this price')+'</div></div>'}).join('');
     h+='</div>';
   }
-  var pr=[];try{if(lg==='all'){TD_LG.forEach(function(L){pr=pr.concat(propItems(L))});pr.sort(function(a,b){return b.sc-a.sc});pr=pr.slice(0,5)}else pr=propItems(lg).slice(0,5)}catch(e){}
+  var pr=[];try{if(lg==='all'){TD_LG.forEach(function(L){pr=pr.concat(propItems(L))});pr.sort(function(a,b){return b.sc-a.sc});pr=pr.slice(0,5)}else pr=propItems(lg).slice(0,5);pr=pr.filter(function(o){return T.ok(o.g)})}catch(e){}
   h+='<div class="card" style="margin-top:8px"><div class="src" style="margin:0 0 6px"><b>Best player props</b>, after weighting for sample size</div>';
-  if(!pr.length)h+='<p class="src" style="margin:0">No props to suggest yet. They appear once the day’s games and player data load.</p>';
+  if(!pr.length)h+='<p class="src" style="margin:0">No props to suggest for '+when+' yet. They appear once those games and player data load.</p>';
   else h+=pr.map(function(o){var b=o.b;return '<div style="padding:8px 0;border-top:1px solid var(--line)"><div class="r" style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><div><b>'+esc(b.title)+'</b></div>'+hbPill(Math.round(b.p*100)+'%','hi')+'</div><div class="src">'+esc(b.sub)+' · '+esc(gTime(o.g))+'</div><div class="src">Fair price '+fmtAm(fairAm(b.p))+'. Bet it only if DraftKings pays that or better.</div></div>'}).join('');
   h+='</div><div class="actions" style="margin-top:8px"><button class="btn" data-act="hbgo" data-lg="'+lg+'" data-m="sp">All '+esc(name)+' picks</button><button class="btn" data-act="hbgo" data-lg="'+lg+'" data-m="props">Prop sheet</button></div>';
   return h;
