@@ -1935,7 +1935,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v94, Oct 25';
+var BUILD='v95, Oct 27';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -2641,6 +2641,7 @@ function deepRows(){
   var out=[];
   DEEP.forEach(function(d){
     if(d.kind!==S.dk)return;
+    if(S.thin&&d.g<5)return;
     if(!avail(d.n,d.t).show)return;
     var nx=nextOpp(nt(d.t));if(!nx||!TS[nx.opp])return;
     if(S.dgm!=='All'&&nx.key!==S.dgm)return;
@@ -4483,6 +4484,9 @@ document.addEventListener('click',function(e){
   else if(act==='hbcopy'){hbCopy(el.dataset.lg,el.dataset.t)}
   else if(act==='hbprop'){hbProp(el.dataset.i)}
   else if(act==='tour'){tourStart()}
+  else if(act==='phk'){S.phk[el.dataset.key]=el.dataset.v;renderSheet()}
+  else if(act==='thin'){S.thin=el.dataset.v==='true';render()}
+  else if(act==='phcopy'){var tx=phCard();try{navigator.clipboard.writeText(tx).then(function(){el.textContent='Copied'},function(){hbCopyOld(tx);el.textContent='Copied'})}catch(e2){hbCopyOld(tx);el.textContent='Copied'}}
   else if(act==='hbgo'){S.hbs=el.dataset.lg;S.hbm=el.dataset.m;S.tab='hb';render();scTop()}
   else if(act==='dldeep'){dlogSync(true);render()}
   else if(act==='team'){S.sheet={type:'team',lg:el.dataset.lg,n:el.dataset.n};renderSheet()}
@@ -6493,6 +6497,96 @@ function nflGameProps(g){
 }
 var gamePropsHtml0=gamePropsHtml;
 gamePropsHtml=function(g){return g.lg==='nfl'?(kind(g)==='final'?'':nflGameProps(g)):gamePropsHtml0(g)};
+
+
+/* ---------- block64: ideas borrowed from prop-research apps: hit rate against a line, splits (home/away, rested/back-to-back, vs this opponent), matchup context, research card, small-sample filter, glossary ---------- */
+S.phk={};S.phLine={};S.thin=false;
+var PH_L=['PTS','REB','AST','3PT','YDS','REC','TD','SOG','G','A'];
+function phSel(sh){
+  var key=sh.lg+'|'+normName(sh.name),c=S.profD[key];if(!c||c.st!=='ok')return null;
+  var si=Math.min(sh.si||0,c.seasons.length-1),S1=c.seasons[si],ti=Math.min(sh.ti||0,S1.tabsL.length-1),T=S1.tabsL[ti];
+  var labs=PH_L.filter(function(l){return T.labels.indexOf(l)>=0});if(!labs.length)return null;
+  var lab=labs.indexOf(S.phk[key])>=0?S.phk[key]:labs[0];
+  return {key:key,T:T,rows:T.rows,labs:labs,lab:lab,idx:T.labels.indexOf(lab)};
+}
+function phKind(sh,T,lab){
+  if(sh.lg==='nba')return {PTS:'npts',REB:'nreb',AST:'nast','3PT':'ntpm'}[lab]||null;
+  if(lab!=='YDS')return null;var n=String(T.name).toLowerCase(),p=sh.lg==='ncaafb'?'c':'';
+  return /pass/.test(n)?p+'pass':/rush/.test(n)?p+'rush':/rec/.test(n)?p+'rec':null;
+}
+function phOpp(sh){
+  var now=Date.now(),best=null;
+  (S.feed[sh.lg]||[]).forEach(function(g){if(kind(g)!=='up'||!(g.start>now))return;var a=sameTm(g.a,sh.team),h=sameTm(g.h,sh.team);if(!a&&!h)return;if(!best||g.start<best.g.start)best={g:g,opp:a?g.h:g.a,oppName:a?g.hn:g.an}});
+  return best;
+}
+function phStats(sh){
+  var s=phSel(sh);if(!s)return null;
+  var vals=s.rows.map(function(r,i){var v=pNum(r.stats[s.idx]);var nx=s.rows[i+1],gap=nx&&r.date&&nx.date?(Date.parse(r.date)-Date.parse(nx.date))/864e5:null;return {v:v,r:r,gap:gap}}).filter(function(x){return x.v!=null});
+  if(!vals.length)return null;
+  var avg=vals.reduce(function(a,x){return a+x.v},0)/vals.length,lk=s.key+'|'+s.lab,line=S.phLine[lk]!=null?S.phLine[lk]:roundHalf(avg),op=phOpp(sh);
+  var win=function(n,f){var a=vals.filter(f||function(){return true});if(n)a=a.slice(0,n);var o=a.filter(function(x){return x.v>line}).length,u=a.filter(function(x){return x.v<line}).length;return {n:a.length,o:o,u:u}};
+  var W=[['Last 5',win(5)],['Last 10',win(10)],['Season',win(0)],['Home',win(0,function(x){return x.r.home===true})],['Away',win(0,function(x){return x.r.home===false})]];
+  if(sh.lg==='nba'||sh.lg==='ncaamb'||sh.lg==='nhl'){W.push(['Rested (2+ days)',win(0,function(x){return x.gap!=null&&x.gap>=1.7})]);W.push(['Back-to-back',win(0,function(x){return x.gap!=null&&x.gap<1.7})])}
+  if(op)W.push(['vs '+op.opp,win(0,function(x){return sameTm(x.r.opp,op.opp)})]);
+  var streak=0;for(var i=0;i<vals.length;i++){if(vals[i].v>line)streak++;else break}
+  return {s:s,line:line,avg:avg,W:W,op:op,streak:streak,n:vals.length,lk:lk};
+}
+function phPanel(sh){
+  var d=phStats(sh);if(!d)return '';
+  var k=phKind(sh,d.s.T,d.s.lab),h='<h3>Hit rate against a line</h3><div class="card">';
+  if(d.s.labs.length>1)h+='<div class="chips" role="group" aria-label="Stat">'+d.s.labs.map(function(l){return '<button class="chip" data-act="phk" data-key="'+esc(d.s.key)+'" data-v="'+esc(l)+'" aria-pressed="'+(l===d.s.lab)+'">'+esc(l)+'</button>'}).join('')+'</div>';
+  h+='<div style="display:flex;gap:8px;align-items:center;margin:6px 0"><label class="src" for="ph_line">Line at your book</label><input id="ph_line" type="number" step="0.5" value="'+d.line+'" data-lk="'+esc(d.lk)+'" style="width:90px"><span class="src">'+esc(d.s.lab)+' · season avg '+d.avg.toFixed(1)+' over '+d.n+' games</span></div>';
+  h+='<div class="tblwrap"><table><thead><tr><th>Split</th><th class="lc">Over</th><th class="lc">Under</th><th class="lc">Over %</th></tr></thead><tbody>'+d.W.map(function(w){var x=w[1],p=x.n?x.o/x.n:null;
+    return '<tr><td>'+esc(w[0])+(x.n&&x.n<5?' <span class="src">thin</span>':'')+'</td><td class="lc">'+x.o+'</td><td class="lc">'+x.u+'</td><td class="lc">'+(p==null?'—':'<span class="hrpill '+(p>=.7?'hi':p<.4?'lo':'mid')+'" style="display:inline-block">'+Math.round(p*100)+'% <span class="src">of '+x.n+'</span></span>')+'</td></tr>'}).join('')+'</tbody></table></div>';
+  if(d.streak>=3)h+='<p class="src" style="margin:6px 0 0">Cleared '+d.line+' in his last '+d.streak+' games in a row.</p>';
+  if(d.op){
+    var dr=null;try{dr=trDefRank(sh.lg,d.op.opp,d.op.oppName)}catch(e){}
+    var lv=k?defLearn(sh.lg,k,d.op.opp):0;
+    h+='<p class="src" style="margin:6px 0 0"><b>Next: '+(sameTm(d.op.g.a,sh.team)?'at':'vs')+' '+esc(d.op.opp)+'</b>, '+esc(gTime(d.op.g))+(dr?'. '+esc(dr.txt):'')+(lv?'. From box scores the app has read, '+esc(d.op.opp)+' has run '+Math.abs(lv).toFixed(1)+'% '+(lv>0?'softer':'tougher')+' than average against this stat':'')+'.</p>';
+  }
+  h+='<div class="actions" style="margin-top:6px"><button class="btn" data-act="phcopy">Copy research card</button></div>';
+  return h+'<p class="src">Hit rate counts games where he went over or under the line (a tie counts as neither). Under 5 games is marked thin. A past hit rate does not make a future hit.</p></div>';
+}
+var profBody1=profBody;
+profBody=function(sh){
+  var h=profBody1(sh),p='';
+  try{p=phPanel(sh)}catch(e){}
+  var i=h.indexOf('<h3>Averages and trend</h3>');
+  return i>=0&&p?h.slice(0,i)+p+h.slice(i):h;
+};
+function phCard(){
+  var sh=S.sheet;if(!sh||sh.type!=='prof')return '';var d=phStats(sh);if(!d)return '';
+  var L=[sh.name+' ('+sh.team+')',d.s.lab+' line '+d.line+' · season avg '+d.avg.toFixed(1)+' over '+d.n+' games'];
+  d.W.forEach(function(w){var x=w[1];if(x.n)L.push(w[0]+': over '+x.o+', under '+x.u+' of '+x.n+' ('+Math.round(100*x.o/x.n)+'% over)'+(x.n<5?' thin':''))});
+  if(d.op)L.push('Next: '+(sameTm(d.op.g.a,sh.team)?'at ':'vs ')+d.op.opp+', '+gTime(d.op.g));
+  L.push('Hitboard research card. Estimates, not advice.');return L.join('\n');
+}
+document.addEventListener('change',function(e){
+  var t=e.target;if(!t||t.id!=='ph_line')return;var v=parseFloat(t.value);if(isNaN(v))return;S.phLine[t.getAttribute('data-lk')]=v;renderSheet();
+});
+/* small-sample filter on prop lists */
+var pxList0=pxList;
+pxList=function(lg,kd){var r=pxList0(lg,kd);return S.thin?r.filter(function(p){return p.g==null||p.g>=5}):r};
+function thinChips(){return '<div class="chips" role="group" aria-label="Sample size"><span class="src" style="align-self:center">Sample:</span>'+[[false,'All players'],[true,'5+ games only']].map(function(c){return '<button class="chip" data-act="thin" data-v="'+c[0]+'" aria-pressed="'+(S.thin===c[0])+'">'+c[1]+'</button>'}).join('')+'</div>'}
+var vProps0=vProps;
+vProps=function(){
+  var h=vProps0();if(S.ptop)return h;
+  var i=h.indexOf('</h2>');return i<0?h:h.slice(0,i+5)+thinChips()+h.slice(i+5);
+};
+/* glossary on Today */
+var vToday0=vToday;
+vToday=function(){
+  var h=vToday0(),g='<h3>What the words mean</h3><div class="card"><details><summary>Open the glossary</summary><ul class="pts" style="margin-top:8px">'+
+    '<li><b>Edge:</b> the model’s chance minus the chance the price needs. +3% means the model thinks the bet wins 3 points more often than the price requires.</li>'+
+    '<li><b>Fair price:</b> the odds that match the model’s chance. If your book pays better, the prop has an edge on the model’s numbers.</li>'+
+    '<li><b>Closing line:</b> the last number before kickoff. Beating it is the best sign of a real edge.</li>'+
+    '<li><b>Hit rate:</b> how often a player cleared a line in recent games. Over 5 games it is noisy, so it is marked thin.</li>'+
+    '<li><b>Splits:</b> the same stat for home or away, rested or back-to-back, and against this opponent.</li>'+
+    '<li><b>Defense effect:</b> how much more or less a defense gives up than average for a stat, learned from finished games and shrunk toward zero until there is plenty of data.</li>'+
+    '<li><b>Quarter Kelly:</b> a stake sizing rule that bets a quarter of what the Kelly formula suggests, capped at 2% of your bankroll.</li></ul></details></div>';
+  var j=h.lastIndexOf('<p class="foot">');j=h.lastIndexOf('<div class="actions"',j);
+  return j>0?h.slice(0,j)+g+h.slice(j):h+g;
+};
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
