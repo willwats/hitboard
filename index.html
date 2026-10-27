@@ -1935,7 +1935,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v96, Oct 27';
+var BUILD='v97, Oct 27';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -2764,6 +2764,8 @@ function learnP(L,t,p){if(!L||!L.dp)return p;var q=p+(L.dp[t]||0);return t==='ml
 S.log=[];
 try{var rl=localStorage.getItem('hitboard.log.v1');if(rl){var al=JSON.parse(rl);if(Array.isArray(al))S.log=al}}catch(e){}
 function saveLog(){try{localStorage.setItem('hitboard.log.v1',JSON.stringify(S.log.slice(-1500)))}catch(e){}}
+/* picks saved while NHL/MLB moneylines were misread as a 100+ point spread (95% picks) are dropped */
+(function(){var n0=S.log.length;S.log=S.log.filter(function(x){return !((x.t==='sp'&&Math.abs(x.num)>=100)||(x.p>=.945&&(x.lg==='nhl'||x.lg==='mlb')))});if(S.log.length!==n0)saveLog()})();
 function picksFor(g){
   try{
     if(g.lg==='nfl'&&!lineFor(g)){var r=research(g);if(r){var m=model(r);return m?straightBets(r,m):null}}
@@ -4320,11 +4322,11 @@ function parseDK(odds,rawA,rawH){
   var tt=num(o.overUnder);if(tt==null&&o.total&&o.total.over)tt=num((o.total.over.close||o.total.over.open||{}).line);
   if(tt!=null)out.tt=tt;
   var fav=null,pts=null,d=String(o.details||'').trim(),m=d.match(/^([A-Za-z.]+)\s*([+-]?\d+(?:\.\d+)?)$/);
-  if(m){fav=eq(m[1],rawH)?'h':eq(m[1],rawA)?'a':null;pts=Math.abs(parseFloat(m[2]))}
+  if(m){fav=eq(m[1],rawH)?'h':eq(m[1],rawA)?'a':null;pts=Math.abs(parseFloat(m[2]));if(pts>=100){fav=null;pts=null}}
   else if(/^(even|pk|pick)/i.test(d)){fav='h';pts=0}
   if((fav==null||pts==null)&&o.pointSpread&&o.pointSpread.home){var hl=num((o.pointSpread.home.close||o.pointSpread.home.open||{}).line);if(hl!=null){fav=hl<=0?'h':'a';pts=Math.abs(hl)}}
   if((fav==null||pts==null)&&o.spread!=null){var sp=num(o.spread);if(sp!=null&&o.homeTeamOdds&&o.homeTeamOdds.favorite!=null){fav=o.homeTeamOdds.favorite?'h':'a';pts=Math.abs(sp)}}
-  if(fav&&pts!=null)out.sp={fav:fav,pts:pts};
+  if(fav&&pts!=null&&pts<100)out.sp={fav:fav,pts:pts};
   var mh=num(o.homeTeamOdds&&o.homeTeamOdds.moneyLine),ma=num(o.awayTeamOdds&&o.awayTeamOdds.moneyLine);
   if((mh==null||ma==null)&&o.moneyline){mh=num(((o.moneyline.home||{}).close||(o.moneyline.home||{}).open||{}).odds);ma=num(((o.moneyline.away||{}).close||(o.moneyline.away||{}).open||{}).odds)}
   if(mh!=null&&ma!=null)out.ml={a:ma,h:mh};
@@ -4346,6 +4348,7 @@ function lineFor(g){
   else if(k&&k.tt){L.tt=k.tt;L.srcs.push('total Kalshi')}
   if(d.ml){L.mlP=1-nov(d.ml.a,d.ml.h);L.srcs.push('moneyline '+(d.src||'DraftKings'))}
   else if(k&&k.ml){L.mlP=k.ml.h;L.srcs.push('moneyline Kalshi')}
+  if(L.pts!=null&&L.pts>=100){L.pts=null;L.fav=null}
   if(L.pts==null&&L.tt==null&&L.mlP==null)return null;
   L.a=g.a;L.h=g.h;
   L.sp=L.pts==null?'n/a':(L.pts===0?'pick’em':(L.fav==='h'?g.h:g.a)+' -'+L.pts);L.tot=L.tt==null?'n/a':L.tt;L.ml=L.mlP==null?'n/a':g.h+' '+Math.round(L.mlP*100)+'% / '+g.a+' '+Math.round((1-L.mlP)*100)+'%';L.srcTxt='Sources: '+L.srcs.join(', ')+'.';
