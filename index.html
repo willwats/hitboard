@@ -643,7 +643,7 @@ function feedCardK0(g){
   return h+'</div></article>';
 }
 function modeSwitch(cur){
-  return '<div class="chips" role="group" aria-label="Section">'+[['games','Games'],['scores','Scores'],['div','Divisions'],['props','Props'],['parlay','Bets'],['record','Record']].map(function(m){return '<button class="chip" data-act="tab" data-t="'+m[0]+'" aria-pressed="'+(cur===m[0])+'">'+m[1]+'</button>'}).join('')+'</div>';
+  return '<div class="chips" role="group" aria-label="Section">'+[['games','Games'],['scores','Scores'],['div','Divisions'],['parlay','Parlay builder'],['record','Results']].map(function(m){return '<button class="chip" data-act="tab" data-t="'+m[0]+'" aria-pressed="'+(cur===m[0])+'">'+m[1]+'</button>'}).join('')+'</div>';
 }
 function sportChips(){
   return '<div class="chips" role="group" aria-label="Sport">'+LG.map(function(l){return '<button class="chip" data-act="sport" data-v="'+l[0]+'" aria-pressed="'+(S.sport===l[0])+'">'+l[1]+'</button>'}).join('')+'</div>';
@@ -1935,7 +1935,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v95, Oct 27';
+var BUILD='v96, Oct 27';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -5861,14 +5861,14 @@ function sheetHtml(lg,t){
   var h='<h3>Bet sheet, next 36 hours</h3>';
   if(!it.length)return h+'<p class="note" style="margin-top:0">No bet: nothing in '+esc(lgName(lg))+' beats DraftKings’ price by 2% or more right now. Skipping is a valid play. The sheet refreshes with each line update.</p>';
   var done=function(i){return S.mine.some(function(m){return m.gid===i.g.id&&m.type===i.x.t&&(m.side||'')===(i.x.t==='tot'?(i.x.over?'over':'under'):(i.x.side||''))})};
-  h+='<p class="src" style="margin-top:0">Picks where the model’s chance beats what the DraftKings price needs. Enter them in the DraftKings app yourself, then tap <b>Log as placed</b> so the app tracks the result.</p>';
+  h+='<p class="src" style="margin-top:0">Picks where the model’s chance beats what the DraftKings price needs. Place them yourself in the DraftKings app, then scan your slip in My bets so the app tracks the result.</p>';
   h+=it.map(function(i,ix){var x=i.x,lg2=i.g.lg;
     return '<div class="card" style="margin-bottom:8px"><div class="r" style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><div><b>'+esc(x.pick)+'</b> <span class="src">'+esc(HB_T[x.t])+' · '+fmtAm(i.pr)+(i.assumed?' (price not read, -110 assumed)':'')+'</span></div>'+hbPill('Edge +'+(i.edge*100).toFixed(1)+'%','hi')+'</div>'+
       '<div class="src">'+esc(i.g.a+' @ '+i.g.h)+' · '+esc(gTime(i.g))+'</div><div class="src">Model '+Math.round(x.p*100)+'% vs '+Math.round(amBe(i.pr)*100)+'% the price needs · about '+(i.ev>=0?'+':'')+'$'+i.ev.toFixed(2)+' per $10 if the model is right</div><div class="src">'+stakeNote(i)+'</div>'+
-      '<div class="actions" style="margin-top:6px">'+(done(i)?'<span class="src"><b>Logged</b></span>':'<button class="btn" data-act="hblog" data-gid="'+esc(i.g.id)+'" data-t="'+x.t+'">Log as placed ($'+stakeFor(x.p,i.pr)+')</button>')+'</div></div>';
+      '</div>';
   }).join('');
   h+='<div class="actions"><button class="btn" data-act="hbcopy" data-lg="'+lg+'" data-t="'+(t||'')+'">'+(S.hbCopied===lg?'Copied':'Copy the sheet')+'</button><a class="btn" href="https://sportsbook.draftkings.com/" target="_blank" rel="noopener">Open DraftKings</a></div>';
-  return h+'<p class="src">The model leans on the DraftKings line for most of every number, so edges are small and the record is short. No bet is guaranteed to profit. Bet only what you can afford to lose.</p>';
+  return h+'<p class="src">The model leans on the DraftKings line for most of every number, so edges are small and the record is short.</p>';
 }
 function hbLog(gid,t){
   var g=find(gid);if(!g)return;var it=sheetItems(g.lg).filter(function(i){return i.g.id===gid&&i.x.t===t})[0];if(!it)return;
@@ -5923,9 +5923,9 @@ function propSheetHtml(lg){
   h+=it.map(function(o,i){var b=o.b,r=b.rec,done=S.mine.some(function(m){return m.type==='rprop'&&m.gid===r.gid&&normName(m.player)===normName(r.name)&&m.k===r.k&&m.thr===r.thr});
     return '<div class="card" style="margin-bottom:8px"><div class="r" style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><div><b>'+esc(b.title)+'</b></div>'+hbPill(Math.round(b.p*100)+'%','hi')+'</div>'+
       '<div class="src">'+esc(b.sub)+' · '+esc(gTime(o.g))+'</div><div class="src">Fair price '+fmtAm(fairAm(b.p))+' · bet it if DraftKings pays '+fmtAm(fairAm(b.p))+' or better</div>'+
-      '<div style="display:flex;gap:8px;align-items:center;margin-top:6px">'+(done?'<span class="src"><b>Logged</b></span>':'<input type="text" inputmode="numeric" id="hbo_'+i+'" placeholder="Your odds (optional)" style="flex:1;min-width:0"><button class="btn" data-act="hbprop" data-i="'+i+'">Log as placed ($10)</button>')+'</div></div>';
+      '</div>';
   }).join('');
-  return h+'<p class="src">No bet is guaranteed to profit. Bet only what you can afford to lose.</p>';
+  return h;
 }
 function hbProp(i){
   var o=S.hbProps[+i];if(!o)return;var r=o.b.rec,inp=document.getElementById('hbo_'+i),od=inp?parseFloat(String(inp.value).replace(/[−–]/g,'-')):NaN,given=isFinite(od)&&Math.abs(od)>=100;
@@ -6228,7 +6228,7 @@ function bankAmt(){return S.bank.amt>0?S.bank.amt:1000}
 function stakeFor(p,pr){var b=amProfit(pr),k=(p*b-(1-p))/b;if(!(k>0))return 0;return Math.max(1,Math.round(bankAmt()*Math.min(.02,k*.25)))}
 function stakeNote(i){
   var s=stakeFor(i.x.p,i.pr);
-  return 'Suggested stake $'+s+' ('+(100*s/bankAmt()).toFixed(1)+'% of '+(S.bank.amt>0?'your':'an assumed')+' $'+Math.round(bankAmt())+' bankroll, quarter-Kelly, never above 2%)'+(i.edge>.12?'. <b>Big gap from the market.</b> Check for a stale line or late news before betting.':'');
+  return 'Suggested stake $'+s+' ('+(100*s/bankAmt()).toFixed(1)+'% of '+(S.bank.amt>0?'your':'an assumed')+' $'+Math.round(bankAmt())+' bankroll)';
 }
 function betPL(x){
   if(!x.res||x.res==='P')return 0;var st=Number(x.stake)||0,od=(x.odds!=null&&x.oddsGiven!==false&&isFinite(parseFloat(x.odds)))?parseFloat(x.odds):-110;
@@ -6236,7 +6236,9 @@ function betPL(x){
 }
 /* the edge bar: nothing under 2% is suggested */
 var sheetItems0=sheetItems;
-sheetItems=function(lg,t){return sheetItems0(lg,t).filter(function(i){return i.edge>=EDGE_MIN})};
+var EDGE_MAX=.15;
+sheetItems=function(lg,t){return sheetItems0(lg,t).filter(function(i){return i.edge>=EDGE_MIN&&i.edge<=EDGE_MAX})};
+function bigGapCount(){var n=0;TD_LG.forEach(function(lg){try{sheetItems0(lg).forEach(function(i){if(i.edge>EDGE_MAX)n++})}catch(e){}});return n}
 /* props: skip players with fewer than 5 games of history */
 propItems=function(lg){
   var now=Date.now(),td=[];
@@ -6268,29 +6270,8 @@ function headsUp(){
   return out;
 }
 function pushHeadsUp(){try{headsUp().forEach(function(a){if(a.k.indexOf('inj|')===0)pushAlert(a.t,a.k)})}catch(e){}}
-function vToday(){
-  var all=[];TD_LG.forEach(function(lg){try{sheetItems(lg).forEach(function(i){all.push(i)})}catch(e){}});
-  all.sort(function(a,b){return b.edge-a.edge});all=all.slice(0,5);
-  var h='<h2>Today</h2><p class="lede">What is worth a look, what you have riding, and how the picks have really done. Skipping a day is a fine play.</p>';
-  var hu=headsUp();
-  if(hu.length)h+='<h3>Heads up</h3><div class="card"><ul class="pts" style="margin:0">'+hu.slice(0,6).map(function(a){return '<li>'+esc(a.t)+'</li>'}).join('')+'</ul></div>';
-  h+='<h3>Best bets right now</h3>';
-  if(!all.length)h+='<div class="card empty"><b>No bet right now.</b> Nothing in the next 36 hours beats DraftKings’ price by 2% or more. The list fills in as lines load and games get closer. Check Props and Hitboard for player and sport-by-sport views.</div>';
-  else{
-    var done=function(i){return S.mine.some(function(m){return m.gid===i.g.id&&m.type===i.x.t&&(m.side||'')===(i.x.t==='tot'?(i.x.over?'over':'under'):(i.x.side||''))})};
-    h+='<p class="src" style="margin-top:0">Only picks where the model beats the price by 2% or more. Place them yourself at DraftKings, then tap Log so the app tracks them.</p>'+all.map(function(i){var x=i.x;
-      return '<div class="card" style="margin-bottom:8px"><div class="r" style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><div><b>'+esc(x.pick)+'</b> <span class="src">'+esc(lgName(i.g.lg))+' · '+esc(HB_T[x.t])+' · '+fmtAm(i.pr)+(i.assumed?' (assumed)':'')+'</span></div>'+hbPill('Edge +'+(i.edge*100).toFixed(1)+'%','hi')+'</div>'+
-        '<div class="src">'+esc(i.g.a+' @ '+i.g.h)+' · '+esc(gTime(i.g))+'</div><div class="src">Model '+Math.round(x.p*100)+'% vs '+Math.round(amBe(i.pr)*100)+'% needed</div><div class="src">'+stakeNote(i)+'</div>'+
-        '<div class="actions" style="margin-top:6px">'+(done(i)?'<span class="src"><b>Logged</b></span>':'<button class="btn" data-act="hblog" data-gid="'+esc(i.g.id)+'" data-t="'+x.t+'">Log as placed ($'+stakeFor(x.p,i.pr)+')</button>')+'</div></div>'}).join('');
-  }
-  /* bankroll */
-  var settled=S.mine.filter(function(x){return x.res}),pl=0;settled.forEach(function(x){pl+=betPL(x)});
-  var openR=0,openN=0;S.mine.forEach(function(x){if(!x.res){openR+=Number(x.stake)||0;openN++}});
-  var staked=0;settled.forEach(function(x){staked+=Number(x.stake)||0});
-  var par=S.mine.filter(function(x){return x.type==='parlay'}),parSt=0,allSt=0;S.mine.forEach(function(x){var s=Number(x.stake)||0;allSt+=s;if(x.type==='parlay')parSt+=s});
-  h+='<h3>Bankroll</h3><div class="card"><div class="r" style="display:flex;gap:10px;flex-wrap:wrap"><label class="src" style="flex:1;min-width:120px">Starting bankroll ($)<br><input type="number" inputmode="decimal" id="bk_amt" min="0" step="10" value="'+(S.bank.amt||'')+'" placeholder="e.g. 500" style="width:100%"></label><label class="src" style="flex:1;min-width:120px">One unit ($)<br><input type="number" inputmode="decimal" id="bk_unit" min="1" step="1" value="'+S.bank.unit+'" style="width:100%"></label></div>'+
-    '<div class="facts" style="margin-top:8px"><span>Profit <b>'+(pl>=0?'+':'-')+'$'+Math.abs(pl).toFixed(2)+'</b></span><span>Bankroll <b>'+(S.bank.amt>0?'$'+(S.bank.amt+pl).toFixed(2):'—')+'</b></span><span>ROI <b>'+(staked?(100*pl/staked).toFixed(1)+'%':'—')+'</b></span><span>Open <b>'+openN+'</b> <span class="src">$'+openR.toFixed(0)+' at risk</span></span></div>'+
-    '<p class="src" style="margin:8px 0 0">Profit counts settled bets you logged or scanned, at the odds you entered (-110 where none was read).'+(par.length&&allSt?' Parlays are '+Math.round(100*parSt/allSt)+'% of what you have staked. A parlay multiplies the book’s built-in margin, so expect them to lose more over time than single bets.':'')+'</p></div>';
+function resultsHtml(){
+  var h='';
   /* scorecard */
   var rows=[];
   LG.forEach(function(l){['ml','sp','tot'].forEach(function(t){
@@ -6311,9 +6292,35 @@ function vToday(){
   h+='<h3>Should I have bet it?</h3>';
   if(!last.length)h+='<div class="card empty">Finished picks show up here with the result, the line you would have had and the closing line.</div>';
   else h+='<div class="card"><div class="tblwrap"><table><thead><tr><th>Pick</th><th>Result</th><th>Model</th><th>Vs close</th></tr></thead><tbody>'+last.map(function(x){var c=(x.t==='sp'||x.t==='tot')?clvOf(x.t,x.side,x.num,null,x.over,x.gid):null;return '<tr><td>'+esc(x.pick)+'<br><span class="src">'+esc(x.game||'')+'</span></td><td><b>'+(x.res==='W'?'Hit':'Missed')+'</b></td><td>'+Math.round(x.p*100)+'%</td><td>'+clvTxt(c)+'</td></tr>'}).join('')+'</tbody></table></div><p class="src" style="margin:8px 0 0">“Vs close” is how much better (+) or worse (-) the pick’s number was than the closing line.</p></div>';
+  return h;
+}
+function vToday(){
+  var all=[];TD_LG.forEach(function(lg){try{sheetItems(lg).forEach(function(i){all.push(i)})}catch(e){}});
+  all.sort(function(a,b){return b.edge-a.edge});all=all.slice(0,3);
+  var h='<h2>Today</h2><p class="lede">What is worth a look, what you have riding, and how the picks have really done. Skipping a day is a fine play.</p>';
+  var hu=headsUp();
+  if(hu.length)h+='<h3>Heads up</h3><div class="card"><ul class="pts" style="margin:0">'+hu.slice(0,6).map(function(a){return '<li>'+esc(a.t)+'</li>'}).join('')+'</ul></div>';
+  h+='<h3>Best bets right now</h3>';
+  var bg=bigGapCount();if(bg)h+='<p class="src" style="margin-top:0">'+bg+' pick'+(bg>1?'s were':' was')+' left out because the model sat more than 15 points away from the price. That is almost always a stale line or bad data, not a real edge.</p>';
+  if(!all.length)h+='<div class="card empty"><b>No bet right now.</b> Nothing in the next 36 hours beats DraftKings’ price by 2% or more. The list fills in as lines load and games get closer. Check Props and Hitboard for player and sport-by-sport views.</div>';
+  else{
+    var done=function(i){return S.mine.some(function(m){return m.gid===i.g.id&&m.type===i.x.t&&(m.side||'')===(i.x.t==='tot'?(i.x.over?'over':'under'):(i.x.side||''))})};
+    h+='<p class="src" style="margin-top:0">Only picks where the model beats the price by 2% or more. Place them yourself at DraftKings, then scan your slip in My bets to track them.</p>'+all.map(function(i){var x=i.x;
+      return '<div class="card" style="margin-bottom:8px"><div class="r" style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><div><b>'+esc(x.pick)+'</b> <span class="src">'+esc(lgName(i.g.lg))+' · '+esc(HB_T[x.t])+' · '+fmtAm(i.pr)+(i.assumed?' (assumed)':'')+'</span></div>'+hbPill('Edge +'+(i.edge*100).toFixed(1)+'%','hi')+'</div>'+
+        '<div class="src">'+esc(i.g.a+' @ '+i.g.h)+' · '+esc(gTime(i.g))+'</div><div class="src">Model '+Math.round(x.p*100)+'% vs '+Math.round(amBe(i.pr)*100)+'% needed</div><div class="src">'+stakeNote(i)+'</div>'+
+        '</div>'}).join('');
+  }
+  /* bankroll */
+  var settled=S.mine.filter(function(x){return x.res}),pl=0;settled.forEach(function(x){pl+=betPL(x)});
+  var openR=0,openN=0;S.mine.forEach(function(x){if(!x.res){openR+=Number(x.stake)||0;openN++}});
+  var staked=0;settled.forEach(function(x){staked+=Number(x.stake)||0});
+  var par=S.mine.filter(function(x){return x.type==='parlay'}),parSt=0,allSt=0;S.mine.forEach(function(x){var s=Number(x.stake)||0;allSt+=s;if(x.type==='parlay')parSt+=s});
+  h+='<h3>Bankroll</h3><div class="card"><div class="r" style="display:flex;gap:10px;flex-wrap:wrap"><label class="src" style="flex:1;min-width:120px">Starting bankroll ($)<br><input type="number" inputmode="decimal" id="bk_amt" min="0" step="10" value="'+(S.bank.amt||'')+'" placeholder="e.g. 500" style="width:100%"></label><label class="src" style="flex:1;min-width:120px">One unit ($)<br><input type="number" inputmode="decimal" id="bk_unit" min="1" step="1" value="'+S.bank.unit+'" style="width:100%"></label></div>'+
+    '<div class="facts" style="margin-top:8px"><span>Profit <b>'+(pl>=0?'+':'-')+'$'+Math.abs(pl).toFixed(2)+'</b></span><span>Bankroll <b>'+(S.bank.amt>0?'$'+(S.bank.amt+pl).toFixed(2):'—')+'</b></span><span>ROI <b>'+(staked?(100*pl/staked).toFixed(1)+'%':'—')+'</b></span><span>Open <b>'+openN+'</b> <span class="src">$'+openR.toFixed(0)+' at risk</span></span></div>'+
+    '<p class="src" style="margin:8px 0 0">Stakes are quarter Kelly, never above 2% of the bankroll. Profit counts settled bets you scanned or entered, at the odds you entered (-110 where none was read).'+(par.length&&allSt?' Parlays are '+Math.round(100*parSt/allSt)+'% of what you have staked. A parlay multiplies the book’s built-in margin, so expect them to lose more over time than single bets.':'')+'</p></div>';
   /* line check */
   h+='<h3>Shop the number</h3><div class="card"><p class="src" style="margin:0">The app only reads DraftKings’ lines, so it cannot compare books for you. Half a point matters on spreads and totals: before you bet, check the same line at another book you use.</p><div class="actions" style="margin-top:8px"><a class="btn" href="https://sportsbook.fanduel.com/" target="_blank" rel="noopener">FanDuel</a><a class="btn" href="https://sports.betmgm.com/" target="_blank" rel="noopener">BetMGM</a><a class="btn" href="https://sportsbook.caesars.com/" target="_blank" rel="noopener">Caesars</a></div></div>';
-  h+='<div class="actions" style="margin-top:12px"><button class="btn" data-act="tab" data-t="parlay">Parlay builder</button><button class="btn" data-act="tour">Take the tour</button></div>';
+  h+='<div class="actions" style="margin-top:12px"><button class="btn" data-act="tab" data-t="record">Results</button><button class="btn" data-act="tab" data-t="parlay">Parlay builder</button><button class="btn" data-act="tour">Take the tour</button></div>';
   return h+foot();
 }
 /* ---- first-open tour ---- */
@@ -6322,7 +6329,7 @@ var TOUR=[
  {tab:'games',hl:'games',t:'Games',x:'Every game with live scores, lines and the model’s read. Tap a game for the breakdown, each team’s last five games and player props.'},
  {tab:'props',hl:'props',t:'Props',x:'Player props by type, then by game. Tap a player for season stats and game-by-game results.'},
  {tab:'picks',hl:'picks',t:'My bets',x:'Upload a DraftKings screenshot or log a bet. The app reads each leg, then tracks scores and player stats live and shows whether you are covering.'},
- {tab:'hb',hl:'hb',t:'Hitboard',x:'The app’s own picks, one sport at a time, split into moneyline, spread, over/under and props. Place a bet at DraftKings, then tap Log so it is tracked. The bottom of each sport shows what the app has learned.'},
+ {tab:'hb',hl:'hb',t:'Hitboard',x:'The app’s own picks, one sport at a time, split into moneyline, spread, over/under and props. Place a bet at DraftKings, then scan your slip in My bets so it is tracked. The bottom of each sport shows what the app has learned.'},
  {tab:'today',hl:null,t:'How to read it',x:'Edge is the model’s chance minus what the price needs. Under 2% is skipped. Stakes are a small slice of your bankroll. The closing line check is the honest test: beating the close over 30 or more bets is a good sign, a few wins prove nothing. No bet is guaranteed to win.'}
 ];
 var _tourI=0;
@@ -6374,14 +6381,14 @@ function gamesBest(lg){
     h+='<div class="card"><div class="src" style="margin:0 0 6px"><b>Who covers the spread</b>, most likely first</div>';
     if(!cv.length)h+='<p class="src" style="margin:0">No spread picks yet. They appear once lines load for the next games.</p>';
     else h+=cv.map(function(i){var x=i.x,g=i.g,mrg=x.rm!=null?' · model margin '+(x.rm>=0?'+':'')+Number(x.rm).toFixed(1):'';
-      return '<div style="padding:8px 0;border-top:1px solid var(--line)"><div class="r" style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><div><b>'+esc(x.pick)+'</b> <span class="src">'+fmtAm(i.pr)+(i.assumed?' assumed':'')+'</span></div>'+hbPill(Math.round(x.p*100)+'% to cover',i.edge>=EDGE_MIN?'hi':'mid')+'</div><div class="src">'+esc(g.a+' @ '+g.h)+' · '+esc(gTime(g))+mrg+'</div><div class="src">'+(i.edge>=EDGE_MIN?'<b>Clears the 2% edge bar</b> at this price ('+(i.edge>=0?'+':'')+(i.edge*100).toFixed(1)+'%)':'A lean, not a bet: edge '+(i.edge>=0?'+':'')+(i.edge*100).toFixed(1)+'% at this price')+'</div></div>'}).join('');
+      return '<div style="padding:8px 0;border-top:1px solid var(--line)"><div class="r" style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><div><b>'+esc(x.pick)+'</b> <span class="src">'+fmtAm(i.pr)+(i.assumed?' assumed':'')+'</span></div>'+hbPill(Math.round(x.p*100)+'% to cover',i.edge>=EDGE_MIN?'hi':'mid')+'</div><div class="src">'+esc(g.a+' @ '+g.h)+' · '+esc(gTime(g))+mrg+'</div><div class="src">'+(i.edge>EDGE_MAX?'<b>Check the line.</b> A gap this big (+'+(i.edge*100).toFixed(0)+'%) is almost always a stale line or bad data, not a real edge':i.edge>=EDGE_MIN?'<b>Clears the 2% edge bar</b> at this price ('+(i.edge>=0?'+':'')+(i.edge*100).toFixed(1)+'%)':'A lean, not a bet: edge '+(i.edge>=0?'+':'')+(i.edge*100).toFixed(1)+'% at this price')+'</div></div>'}).join('');
     h+='</div>';
   }
   var pr=[];try{if(lg==='all'){TD_LG.forEach(function(L){pr=pr.concat(propItems(L))});pr.sort(function(a,b){return b.sc-a.sc});pr=pr.slice(0,5)}else pr=propItems(lg).slice(0,5)}catch(e){}
   h+='<div class="card" style="margin-top:8px"><div class="src" style="margin:0 0 6px"><b>Best player props</b>, after weighting for sample size</div>';
   if(!pr.length)h+='<p class="src" style="margin:0">No props to suggest yet. They appear once the day’s games and player data load.</p>';
   else h+=pr.map(function(o){var b=o.b;return '<div style="padding:8px 0;border-top:1px solid var(--line)"><div class="r" style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><div><b>'+esc(b.title)+'</b></div>'+hbPill(Math.round(b.p*100)+'%','hi')+'</div><div class="src">'+esc(b.sub)+' · '+esc(gTime(o.g))+'</div><div class="src">Fair price '+fmtAm(fairAm(b.p))+'. Bet it only if DraftKings pays that or better.</div></div>'}).join('');
-  h+='</div><div class="actions" style="margin-top:8px"><button class="btn" data-act="hbgo" data-lg="'+lg+'" data-m="sp">All '+esc(name)+' picks and logging</button><button class="btn" data-act="hbgo" data-lg="'+lg+'" data-m="props">Prop sheet</button></div><p class="src">Estimates, not promises. No bet is guaranteed to win.</p>';
+  h+='</div><div class="actions" style="margin-top:8px"><button class="btn" data-act="hbgo" data-lg="'+lg+'" data-m="sp">All '+esc(name)+' picks</button><button class="btn" data-act="hbgo" data-lg="'+lg+'" data-m="props">Prop sheet</button></div>';
   return h;
 }
 var vGames1=vGames;
@@ -6574,6 +6581,8 @@ vProps=function(){
   var i=h.indexOf('</h2>');return i<0?h:h.slice(0,i+5)+thinChips()+h.slice(i+5);
 };
 /* glossary on Today */
+var vRecord0=vRecord;
+vRecord=function(){var h=vRecord0(),j=h.lastIndexOf('<p class="foot">');var r='';try{r=resultsHtml()}catch(e){}return j>0?h.slice(0,j)+r+h.slice(j):h+r};
 var vToday0=vToday;
 vToday=function(){
   var h=vToday0(),g='<h3>What the words mean</h3><div class="card"><details><summary>Open the glossary</summary><ul class="pts" style="margin-top:8px">'+
