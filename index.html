@@ -1935,7 +1935,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v100, Oct 27';
+var BUILD='v101, Oct 27';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -6883,6 +6883,143 @@ whyBlock=function(g,why){
   // drop the old "full matchup is below" line, put the narrative before the closing tag
   h=h.replace(/<p class="src" style="margin:4px 0 0">The full matchup[^<]*<\/p><\/div>$/,'</div>');
   return h+d;
+};
+
+/* ---------- block67: outside reporting (NFL Week 8, read Oct 27 2026) in Game Preview and Why this pick ---------- */
+var OUTSRC={
+ cv:{n:'Covers',u:'https://www.covers.com/nfl/picks-against-the-spread-week-8-2026'},
+ sbd:{n:'Sports Betting Dime (model)',u:'https://www.sportsbettingdime.com/news/nfl/picks-against-the-spread-week-8-2026/'},
+ gh:{n:'The Game Haus',u:'https://thegamehaus.com/nfl/nfl-week-8-picks-against-the-spread/2026/10/27/'},
+ cbs:{n:'CBS Sports (simulations)',u:'https://www.cbssports.com/betting/news/week-8-2026-nfl-odds-picks-predictions/'},
+ siGB:{n:'SI Betting',u:'https://www.si.com/betting/panthers-vs-packers-prediction-odds-spread-injuries-trends-for-nfl-week-8-2026'},
+ siDET:{n:'SI Betting',u:'https://www.si.com/betting/vikings-vs-lions-prediction-odds-spread-injuries-trends-for-nfl-week-8-2026'},
+ siTB:{n:'SI Betting',u:'https://www.si.com/betting/falcons-vs-buccaneers-prediction-odds-spread-injuries-trends-for-nfl-week-8-2026'}
+};
+/* a = away, h = home; picks: [source, side (a, h, o, u), reason] */
+var OUTNOTES=[
+ {a:'CAR',h:'GB',ln:'Packers by 3.5 to 4, total 47.5',inj:'Panthers: Taylor Moton out, Jaelan Phillips questionable. Packers: Sean Rhyan and Jacob Monk questionable.',p:[
+  ['cv','a','Carolina’s blowout loss to Tampa Bay is a worry, but Green Bay managed only 17 points against Detroit and both teams are on a short week, so the Panthers can keep it close.'],
+  ['sbd','a','Carolina’s offense under Bryce Young scores 26.5 a game and converts 43.1% of third downs, against Green Bay’s 20.6 points a game. Green Bay is on short rest after a division game. The model still gives the Packers 65.5% to win.'],
+  ['gh','h','Young struggled against Tampa Bay and has to bounce back against a Packers defense that is improving. Jordan Love should help Green Bay win and cover at home.'],
+  ['siGB','h','Carolina allows the most yards per carry in the league and ranks 20th in EPA per play on defense. Green Bay’s defense ranks 5th and held Detroit to 20. Carolina is banged up and on a short week. Counterpoint: Green Bay has the league’s worst running game and Josh Jacobs had 36 yards on 11 carries last week.']]},
+ {a:'BAL',h:'BUF',ln:'Bills by 3.5, total 53.5',inj:'Lamar Jackson’s ankle limited his practice time; most writers expect him back.',p:[
+  ['cv','a','Buffalo is off a bye but its defense has been inconsistent. Baltimore has moved the ball even without Jackson, and his expected return raises its ceiling.'],
+  ['sbd','h','Buffalo is 5-1, averaging 32.8 points with a +6 turnover differential. Jackson’s ankle adds uncertainty for Baltimore, which averages 24.1.'],
+  ['gh','h','Jackson is expected back, but Buffalo is coming off a bye. Its defense may allow points, but the offense should outscore Baltimore at home.']]},
+ {a:'TEN',h:'CIN',ln:'Bengals by 9.5 to 10.5, total 47',inj:'',p:[
+  ['cv','h','Cincinnati has the edge on both sides and just scored 35 against Baltimore. Tennessee has struggled to move the ball. The risk is a backdoor cover.'],
+  ['sbd','h','Cincinnati averages 27.2 points and converts half its third downs. Tennessee has the league’s worst scoring offense at 15.4 points and 248.6 yards a game.'],
+  ['gh','h','Cincinnati recovered from a poor first half against Baltimore and should score often and force turnovers.']]},
+ {a:'ARI',h:'DAL',ln:'Cowboys by 6 to 6.5, total 54',inj:'',p:[
+  ['cv','a','Dallas’s defense has been easy to move the ball against and the Cowboys are on a short week after a division game. Arizona needs to finish drives and avoid turnovers.'],
+  ['sbd','h','Dallas scores touchdowns on 77.3% of red-zone trips against Arizona’s 46.2%. The model gives Dallas 71.3% and expects a win by at least a touchdown.'],
+  ['gh','h','Dallas still has defensive problems but found its offense against Philadelphia and can win by a touchdown if that keeps up.']]},
+ {a:'MIN',h:'DET',ln:'Lions by 3 to 3.5, total 46 to 46.5',inj:'Vikings: Aaron Jones questionable. Lions: Ennis Rakestraw Jr. questionable; Kerby Joseph on PUP.',p:[
+  ['cv','a','Minnesota’s unbeaten record rests on a top defense, which is a problem for Detroit, whose defense has been vulnerable. Expect a one-possession game.'],
+  ['sbd','a','Minnesota is 6-0, 4-2 against the spread and allows 12.3 points. Detroit scores 30.7 but is 1-3-1 ATS and 1-5 straight up against top-10 pass defenses in its last six.'],
+  ['gh','a','Detroit’s offense is excellent but its defense has struggled. Minnesota’s defense has been elite, so the writer expects it to stay within a field goal.'],
+  ['siDET','u','No strong side lean. The Vikings have not played a game with more than 39 combined points and the Under has hit five straight. Detroit scored only 20 against Green Bay.']]},
+ {a:'IND',h:'JAX',ln:'Jaguars by 7.5, total 46.5',inj:'',p:[
+  ['cv','h','Jacksonville is off a bye with a clear efficiency edge. Indianapolis has lost three straight and scored 10 against Minnesota. Laying more than a touchdown carries risk.'],
+  ['sbd','h','Jacksonville averages 25.7 and allows 17.3, with a top-five red-zone rate. Indianapolis is -3 in road turnover margin. The model gives Jacksonville 77%.'],
+  ['gh','h','Indianapolis is struggling and trade rumors are growing. Jacksonville is off a bye and has played well most of the season.']]},
+ {a:'LV',h:'NYJ',ln:'Listed anywhere from Jets -1.5 to Raiders -1.5 depending on the source',inj:'',p:[
+  ['cv','h','The writer doubts Las Vegas deserves road favoritism. The Jets have been more efficient over the full season and the Raiders struggle to run the ball.'],
+  ['sbd','a','The model has the Jets at 50.6%, but Las Vegas is 5-1 against the spread and its passing attack (26.1 points, 263.7 yards a game) outpaces New York’s 19.6-point offense.'],
+  ['gh','h','Las Vegas has lost recently, its defense is struggling and it travels cross-country. The Jets want to bounce back from their loss to Miami.']]},
+ {a:'CLE',h:'PIT',ln:'Steelers by 3.5, total 38.5',inj:'',p:[
+  ['cv','a','Pittsburgh is coming off an international trip. Neither offense is consistent and Cleveland’s defense should keep it competitive.'],
+  ['sbd','h','Pittsburgh is +4 in turnover differential and Cleveland is -5, with pressure allowed on over 34% of dropbacks. The model gives Pittsburgh 64.5%.'],
+  ['cbs','h','Pittsburgh has won 22 straight home games against Cleveland and is 3-0 ATS at home this year. Cleveland ranks 28th in scoring.'],
+  ['gh','h','Pittsburgh is on a roll and its defense is stepping up. Cleveland has had trouble winning in Pittsburgh.']]},
+ {a:'ATL',h:'TB',ln:'Buccaneers by 1.5 to 2.5, total 45.5 to 46.5',inj:'Questionable: Falcons Zaccheaus, Deablo, Robinson, Terrell, Bowman; Buccaneers Egbuka, Winfield Jr., Goedeke. Baker Mayfield is playing through a thumb injury.',p:[
+  ['cv','a','Tampa Bay’s 43-point game against Carolina is one outlier. Atlanta’s 29-20 win over San Francisco was stronger than it looks.'],
+  ['sbd','a','Atlanta averages more yards per play (5.8 to 5.2) and more points (24.4 to 23.1). Tampa Bay has front-seven depth injuries and is 1-2 ATS in recent division games. The model still has Tampa Bay at 53.9% to win.'],
+  ['gh','a','Tampa Bay needed little offense against Carolina and may have to work harder, which could strain Mayfield’s thumb. Atlanta has averaged 31 points since Michael Penix Jr. returned.'],
+  ['siTB','a','Tampa Bay is 0-4 ATS at home and 2-5 overall, possibly overvalued after the Carolina blowout. Atlanta ranks 4th in EPA per rush defense, which blunts the run-heavy scripts Tampa Bay’s wins came in.']]},
+ {a:'LAC',h:'LA',ln:'Rams by 6.5 to 7, total 43.5',inj:'',p:[
+  ['cv','h','The Chargers are winless with one of the league’s least efficient offenses and the Rams are coming off 35 points. The one caution is the Chargers’ bye week.'],
+  ['sbd','h','The Chargers are 0-6 and 0-5 ATS, scoring 15 a game with a 29.4% third-down rate and allowing 26.8. Matthew Stafford averages 299 passing yards. The model gives the Rams 75.6%.'],
+  ['cbs','h','Justin Herbert has 12 turnovers against 6 touchdowns over the Chargers’ losing run. The Rams are 6-2 ATS in non-conference games since 2025. The simulations also lean Over.'],
+  ['gh','h','The Chargers are coming off a bye but have looked poor. The writer expects the Rams to win by at least seven.']]},
+ {a:'KC',h:'DEN',ln:'Chiefs by 1.5, total 41.5',inj:'',p:[
+  ['cv','a','Kansas City’s 20-3 loss in Seattle was poor, but its underlying offense and defense rate above Denver’s. Expect a response and a win by at least a field goal.'],
+  ['sbd','a','Kansas City converts 41.7% of third downs to Denver’s 35.8%, and Denver’s 20.6-point offense faces a defense allowing 20.1.'],
+  ['gh','a','Denver has won mostly on defense and Bo Nix’s inconsistency may catch up. Patrick Mahomes should produce enough to stay ahead.']]},
+ {a:'NE',h:'MIA',ln:'Patriots by 7.5, total 44.5',inj:'',p:[
+  ['cv','h','New England is the better team and has extra rest, but asking it to cover more than a touchdown on the road is a lot. Miami beat the Jets and can score.'],
+  ['sbd','a','The model gives New England 76.8%. Miami averages 16.3 points and has allowed the highest pressure rate in the AFC.'],
+  ['gh','a','Miami got its first win last week, but New England had extra preparation time and Drake Maye has played well. Miami may hang for a half before New England pulls away.']]},
+ {a:'PHI',h:'WAS',ln:'Commanders by 3.5 to 4, total 40.5',inj:'Eagles are without DeVonta Smith and Dontayvion Wicks, and the quarterback situation is unsettled (Tanner McKee has been the starter).',p:[
+  ['cv','h','Washington is off a bye while Philadelphia is on a short week and facing distractions.'],
+  ['sbd','h','Philadelphia is 1-5 ATS and scores 17.7 a game. Washington has a +6 turnover differential. The model gives Washington 63.9%.'],
+  ['gh','h','Philadelphia is showing some life with McKee at quarterback, but Washington is off a bye and can prepare for a backup.']]},
+ {a:'CHI',h:'SEA',ln:'Seahawks by 3 to 3.5, total 46.5 (Monday)',inj:'Seattle’s Zach Charbonnet has a knee injury.',p:[
+  ['cv','a','Chicago had a long break after its Thursday win and Seattle has a short turnaround. The Bears have moved the ball more efficiently.'],
+  ['sbd','a','Chicago is 5-2 straight up and against the spread, averaging 25.7 points and 390.7 yards. Seattle is 2-3-2 ATS. The model still gives Seattle 59%.'],
+  ['gh','a','Seattle beat Kansas City and has a strong defense, but Chicago can score and should keep the game close.']]}
+];
+var OUT_ASOF='Oct 27, 2026';
+function outFor(g){
+  if(!g||g.lg!=='nfl')return null;
+  if(g.start<Date.parse('2026-10-28T00:00:00Z')||g.start>Date.parse('2026-11-04T12:00:00Z'))return null;
+  var r=null;OUTNOTES.forEach(function(x){if(!r&&nt(g.a)===nt(x.a)&&nt(g.h)===nt(x.h))r=x});return r;
+}
+function outLink(k){var s=OUTSRC[k];return s?'<a href="'+esc(s.u)+'" target="_blank" rel="noopener">'+esc(s.n)+'</a>':''}
+function outCount(o){
+  var c={a:0,h:0,o:0,u:0};o.p.forEach(function(x){c[x[1]]++});return c;
+}
+function outHtml(g){
+  var o=outFor(g);if(!o)return '';
+  var c=outCount(o),side=c.a+c.h,bits=[];
+  if(side)bits.push(c.h+' of '+side+' side with '+esc(g.hn)+', '+c.a+' with '+esc(g.an));
+  if(c.o)bits.push(c.o+' lean Over');if(c.u)bits.push(c.u+' lean Under');
+  var h='<div class="card" style="margin:6px 0 10px;line-height:1.5"><div class="src"><b>Outside reporting</b> · read '+OUT_ASOF+'</div>'+
+    '<p style="margin:6px 0">'+esc(o.ln?'Lines the sources listed: '+o.ln+'. ':'')+(bits.length?'Their picks: '+bits.join('; ')+'.':'')+'</p><ul class="pts">'+
+    o.p.map(function(x){var w=x[1]==='a'?g.an:x[1]==='h'?g.hn:x[1]==='o'?'the Over':'the Under';return '<li>'+outLink(x[0])+' picks <b>'+esc(w)+'</b>. '+esc(x[2])+'</li>'}).join('')+'</ul>'+
+    (o.inj?'<p style="margin:6px 0"><b>Injury notes from these sources.</b> '+esc(o.inj)+'</p>':'')+
+    '<p class="src" style="margin-bottom:0">These are other writers’ opinions and models, summarized here. They mostly use the same public lines and trends, so agreement among them is not proof of an edge, and injury news can change by kickoff.</p></div>';
+  return h;
+}
+/* put outside reporting right after the app’s write-up */
+var pvHtml2=pvHtml;
+pvHtml=function(g){
+  var h=pvHtml2(g),o='';
+  try{o=outHtml(g)}catch(e){o=''}
+  if(!o)return h;
+  var i=h.indexOf('<div class="src" style="margin:8px 0 2px"><b>ESPN game data</b></div>');
+  if(i<0){var j=h.indexOf('</h3>');if(j<0)return h;
+    // find end of the write-up card: it is the first card after the heading
+    var k=h.indexOf('</div>',h.indexOf('Written by the app',j));
+    return k>=0?h.slice(0,k+6)+o+h.slice(k+6):h+o}
+  return h.slice(0,i)+o+h.slice(i);
+};
+/* Why this pick: what the outside sources say about this side */
+function outWhy(g,b){
+  var o=outFor(g);if(!o)return '';
+  var c=outCount(o);
+  if(b.t==='tot'){
+    var want=b.over?'o':'u',tot=o.p.filter(function(x){return x[1]==='o'||x[1]==='u'});
+    if(!tot.length)return '<p><b>Outside sources.</b> None of the sources I read gave a total pick for this game, so the over/under rests on the model alone.</p>';
+    return '<p><b>Outside sources.</b> '+tot.map(function(x){return outLink(x[0])+' leans '+(x[1]==='o'?'Over':'Under')+': '+esc(x[2])}).join(' ')+(tot.some(function(x){return x[1]!==want})?' That is the opposite of this pick, so treat the total with extra caution.':' That agrees with this pick.')+'</p>';
+  }
+  var pick=b.side==='h'?'h':'a',mine=o.p.filter(function(x){return x[1]===pick}),against=o.p.filter(function(x){return x[1]===(pick==='h'?'a':'h')});
+  var nm=pick==='h'?g.hn:g.an,on=pick==='h'?g.an:g.hn,side=c.a+c.h;
+  var s='<p><b>Outside sources.</b> '+mine.length+' of '+side+' outside picks back '+esc(nm)+(b.t==='sp'?' against the spread':'')+'.';
+  if(mine.length&&b.t==='sp')s+=' Note their lines differ slightly: '+esc(o.ln)+'.';
+  s+='</p>';
+  if(mine.length)s+='<ul class="pts">'+mine.slice(0,3).map(function(x){return '<li>'+outLink(x[0])+': '+esc(x[2])+'</li>'}).join('')+'</ul>';
+  if(against.length)s+='<p><b>The case against.</b> '+against.slice(0,2).map(function(x){return outLink(x[0])+' goes the other way ('+esc(on)+'): '+esc(x[2])}).join(' ')+'</p>';
+  if(!mine.length)s+='<p>No outside source I read backs this side, so the pick is the model alone. That is a reason for extra caution.</p>';
+  return s;
+}
+var gwWhy1=gwWhy;
+gwWhy=function(g,b){
+  var h=gwWhy1(g,b),w='';
+  try{w=outWhy(g,b)}catch(e){w=''}
+  if(!w||!h)return h;
+  var k=h.indexOf('<p><b>What could go wrong.</b>');
+  return k>=0?h.slice(0,k)+w+h.slice(k):h.replace(/<\/div>$/,w+'</div>');
 };
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
