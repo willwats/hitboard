@@ -1935,7 +1935,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v105, Oct 28';
+var BUILD='v106, Oct 28';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -7168,6 +7168,93 @@ resultsHtml=function(){
    '<tr><td>Writers agreement weight (NFL)</td><td>'+th[4].toFixed(2)+'</td></tr>'+
    '<tr><td>Bias: moneyline / spread / total</td><td>'+th[0].toFixed(2)+' / '+th[1].toFixed(2)+' / '+th[2].toFixed(2)+'</td></tr>'+
    '<tr><td>Error before / after (Brier, lower is better)</td><td>'+M.b0.toFixed(3)+' / '+M.b1.toFixed(3)+'</td></tr></tbody></table></div>';
+};
+
+/* ---------- block71: Games tab schedule with each game’s lines; tap a game for moneyline, spread and total detail ---------- */
+function schLine(g){
+  var d=g.dk,bits=[];
+  if(d&&d.sp&&d.sp.pts!=null){bits.push('<b>Spread</b> '+(d.sp.pts===0?'PK':esc(d.sp.fav==='h'?g.h:g.a)+' -'+d.sp.pts))}
+  if(d&&d.ml)bits.push('<b>ML</b> '+esc(g.a)+' '+prc(d.ml.a)+' / '+esc(g.h)+' '+prc(d.ml.h));
+  if(d&&d.tt!=null)bits.push('<b>O/U</b> '+d.tt);
+  return bits.length?bits.join(' · '):'Lines not posted yet';
+}
+function schRow(g){
+  var k=kind(g),t=new Date(g.start).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}),st;
+  if(k==='live')st='<span class="hrpill lo" style="display:inline-block">LIVE</span> '+(g.sa!=null?esc(g.a)+' '+g.sa+', '+esc(g.h)+' '+g.sh:'');
+  else if(k==='final')st='Final · '+(g.sa!=null?esc(g.a)+' '+g.sa+', '+esc(g.h)+' '+g.sh:'');
+  else st=esc(t);
+  return '<div data-act="fgame" data-id="'+esc(g.id)+'" style="padding:10px 0;border-top:1px solid var(--line);cursor:pointer"><div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><div><b>'+esc(g.an||g.a)+' @ '+esc(g.hn||g.h)+'</b></div><div class="src">'+st+'</div></div><div class="src" style="margin-top:2px">'+schLine(g)+'</div></div>';
+}
+function schHtml(){
+  var all=[];LG.forEach(function(l){if(S.gs==='all'||S.gs===l[0])(S.feed[l[0]]||[]).forEach(function(g){all.push(g)})});
+  var now=Date.now(),k0=dayKey(now),k1=dayKey(now+864e5);
+  var up=all.filter(function(g){return kind(g)==='up'});
+  var cntT=all.filter(function(g){return dayKey(g.start)===k0}).length,sel=S.gd||(cntT?'today':up.some(function(g){return dayKey(g.start)===k1})?'tomorrow':'week');
+  var list=sel==='today'?all.filter(function(g){return dayKey(g.start)===k0}):sel==='tomorrow'?up.filter(function(g){return dayKey(g.start)===k1}):up;
+  list.sort(function(a,b){return a.start-b.start});
+  if(!list.length)return '';
+  var title=sel==='today'?'Today’s schedule':sel==='tomorrow'?'Tomorrow’s schedule':'Schedule this week';
+  var h='<h3>'+title+'</h3><p class="src" style="margin-top:0">Tap a game for the moneyline, spread and over/under in detail, with the model’s view. Lines are DraftKings via ESPN.</p>';
+  var groups=[];
+  if(S.gs==='all'||!S.gs){LG.forEach(function(l){var f=list.filter(function(g){return g.lg===l[0]});if(f.length)groups.push([l[1],f])})}
+  else groups.push([null,list]);
+  groups.forEach(function(gr){
+    var byDay=sel==='week'?{}:null;
+    if(gr[0])h+='<div class="src" style="margin-top:10px"><b>'+esc(gr[0])+'</b> · '+gr[1].length+' game'+(gr[1].length>1?'s':'')+'</div>';
+    if(sel==='week'){var last='';gr[1].forEach(function(g){var dk=new Date(g.start).toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});if(dk!==last){h+='<div class="src" style="margin-top:8px"><b>'+esc(dk)+'</b></div>';last=dk}h+=schRow(g)})}
+    else h+=gr[1].map(schRow).join('');
+  });
+  return h;
+}
+var vGames3=vGames;
+vGames=function(){
+  var h=vGames3();
+  if(S.gd==='prev')return h;
+  var i=h.indexOf('<p class="lede" style="margin-top:12px">'),j=h.lastIndexOf('<p class="foot">');
+  if(i<0||j<i)return h;
+  var s='';try{s=schHtml()}catch(e){s=''}
+  return s?h.slice(0,i)+s+h.slice(j):h;
+};
+/* odds detail at the top of a game’s sheet */
+function oddsDetail(g){
+  var d=g.dk;if(!d||kind(g)==='final')return '';
+  var bs=null;try{bs=picksFor(g)}catch(e){}
+  var B=function(t){return bs&&bs.filter(function(x){return x.t===t})[0]},p=d.px||{},o=d.open||{};
+  var h='<div class="card" style="margin:10px 0;line-height:1.5"><div class="src"><b>Odds detail</b> · '+esc(d.src||'DraftKings')+' via ESPN</div>';
+  /* moneyline */
+  if(d.ml){
+    var ml=B('ml'),pH=ml?(ml.side==='h'?ml.p:1-ml.p):null,nvH=nov(d.ml.a,d.ml.h);
+    h+='<p style="margin:8px 0 2px"><b>Moneyline</b></p><div class="tblwrap"><table><thead><tr><th>Team</th><th>Price</th><th>Price implies</th>'+(pH!=null?'<th>Model</th>':'')+'</tr></thead><tbody>'+
+     '<tr><td>'+esc(g.a)+'</td><td>'+prc(d.ml.a)+'</td><td>'+Math.round((1-nvH)*100)+'%</td>'+(pH!=null?'<td>'+Math.round((1-pH)*100)+'%</td>':'')+'</tr>'+
+     '<tr><td>'+esc(g.h)+'</td><td>'+prc(d.ml.h)+'</td><td>'+Math.round(nvH*100)+'%</td>'+(pH!=null?'<td>'+Math.round(pH*100)+'%</td>':'')+'</tr></tbody></table></div>'+
+     '<p class="src" style="margin:2px 0">“Price implies” removes the book’s margin. '+(o.mlA!=null&&o.mlH!=null?'Opened at '+esc(g.a)+' '+prc(o.mlA)+' / '+esc(g.h)+' '+prc(o.mlH)+'.':'')+'</p>';
+  }
+  /* spread */
+  if(d.sp&&d.sp.pts!=null){
+    var sp=B('sp'),fa=d.sp.fav==='a',pt=d.sp.pts,la=pt===0?0:(fa?-pt:pt),lh=pt===0?0:(fa?pt:-pt);
+    var cA=sp?(sp.side==='a'?sp.p:1-sp.p):null,cH=sp?(sp.side==='h'?sp.p:1-sp.p):null;
+    h+='<p style="margin:10px 0 2px"><b>Spread</b></p><div class="tblwrap"><table><thead><tr><th>Team</th><th>Line</th><th>Price</th><th>Needs</th>'+(sp?'<th>Model covers</th>':'')+'</tr></thead><tbody>'+
+     '<tr><td>'+esc(g.a)+'</td><td>'+sgn(la)+'</td><td>'+(p.sa!=null?prc(p.sa):'—')+'</td><td>'+(p.sa!=null?Math.round(amBe(p.sa)*100)+'%':'—')+'</td>'+(sp?'<td>'+Math.round(cA*100)+'%</td>':'')+'</tr>'+
+     '<tr><td>'+esc(g.h)+'</td><td>'+sgn(lh)+'</td><td>'+(p.sh!=null?prc(p.sh):'—')+'</td><td>'+(p.sh!=null?Math.round(amBe(p.sh)*100)+'%':'—')+'</td>'+(sp?'<td>'+Math.round(cH*100)+'%</td>':'')+'</tr></tbody></table></div>'+
+     '<p class="src" style="margin:2px 0">“Needs” is the win rate that breaks even at that price. '+(o.spH!=null?'Opened at '+esc(g.h)+' '+sgn(o.spH)+'.':'')+'</p>';
+  }
+  /* total */
+  if(d.tt!=null){
+    var tot=B('tot'),proj=null;try{proj=feedCalc(g).total}catch(e){}
+    h+='<p style="margin:10px 0 2px"><b>Over/under '+d.tt+'</b></p><div class="tblwrap"><table><thead><tr><th>Side</th><th>Price</th><th>Needs</th>'+(tot?'<th>Model</th>':'')+'</tr></thead><tbody>'+
+     '<tr><td>Over '+d.tt+'</td><td>'+(p.to!=null?prc(p.to):'—')+'</td><td>'+(p.to!=null?Math.round(amBe(p.to)*100)+'%':'—')+'</td>'+(tot?'<td>'+Math.round((tot.over?tot.p:1-tot.p)*100)+'%</td>':'')+'</tr>'+
+     '<tr><td>Under '+d.tt+'</td><td>'+(p.tu!=null?prc(p.tu):'—')+'</td><td>'+(p.tu!=null?Math.round(amBe(p.tu)*100)+'%':'—')+'</td>'+(tot?'<td>'+Math.round((tot.over?1-tot.p:tot.p)*100)+'%</td>':'')+'</tr></tbody></table></div>'+
+     '<p class="src" style="margin:2px 0">'+(proj!=null?'The model projects about '+proj.toFixed(1)+' combined '+(g.lg==='nhl'?'goals':'points')+'. ':'')+(o.tt!=null?'Opened at '+o.tt+'.':'')+'</p>';
+  }
+  return h+'<p class="src" style="margin-bottom:0">Compare these prices with your own book before betting. A model edge is an estimate, not a guarantee.</p></div>';
+}
+var feedSheet5=feedSheet;
+feedSheet=function(g){
+  var h=feedSheet5(g),o='';
+  try{o=oddsDetail(g)}catch(e){o=''}
+  if(!o)return h;
+  var mk='aria-label="Close">×</button></div>',i=h.indexOf(mk);
+  return i<0?h:h.slice(0,i+mk.length)+o+h.slice(i+mk.length);
 };
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
