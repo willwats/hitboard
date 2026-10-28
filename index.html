@@ -1935,7 +1935,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v103, Oct 27';
+var BUILD='v104, Oct 27';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -2958,7 +2958,7 @@ function feedAnalyst(g){
   var ba=(total-margin)/2,bh=(total+margin)/2;
   var win=margin>=0?g.hn:g.an;
   h+='<h3>Prediction</h3><div class="card bcard"><div class="teams">'+esc(win)+' by '+Math.abs(margin).toFixed(1)+'</div><div class="facts"><span>'+esc(g.a)+' <b>'+ba.toFixed(1)+'</b></span><span>'+esc(g.h)+' <b>'+bh.toFixed(1)+'</b></span><span>Total <b>'+total.toFixed(1)+'</b></span></div>'+
-   '<p class="src" style="margin-top:8px">Stats-only model: '+esc(g.a)+' '+sa.toFixed(1)+', '+esc(g.h)+' '+sh.toFixed(1)+' ('+(g.lg==='nba'?'last season’s':'this season’s')+' scoring blended with the opponent’s '+(g.lg==='nhl'?'goals':'points')+' allowed, home edge '+T.he+'). '+(fp!=null?'The data feed gives '+esc(g.h)+' a '+pc(fp)+'% win chance. ':'The feed has no win probability for this game. ')+(ln?'The listed line is '+esc(ln.sp)+'. ':'')+'The margin weights the stats model 30% and the market or feed 70%. The total uses the market line at 90% when one exists.</p></div>';
+   '<p class="src" style="margin-top:8px">Stats-only model: '+esc(g.a)+' '+sa.toFixed(1)+', '+esc(g.h)+' '+sh.toFixed(1)+' ('+(g.lg==='nba'&&!NBA_THIS?'last season’s':'this season’s')+' scoring blended with the opponent’s '+(g.lg==='nhl'?'goals':'points')+' allowed, home edge '+T.he+'). '+(fp!=null?'The data feed gives '+esc(g.h)+' a '+pc(fp)+'% win chance. ':'The feed has no win probability for this game. ')+(ln?'The listed line is '+esc(ln.sp)+'. ':'')+'The margin weights the stats model 30% and the market or feed 70%. The total uses the market line at 90% when one exists.</p></div>';
   function rowsFor(t,isNba){
     var R=[];
     if(isNba){var s=NBAT[t.k];R=[{n:'Scoring offense',r:nbaRank('PF',s.PF),v:s.PF.toFixed(1)+' pts/g'},{n:'Scoring defense',r:nbaRank('PA',s.PA),v:s.PA.toFixed(1)+' pts/g allowed'},{n:'Scoring margin',r:nbaRank('NET',s.PF-s.PA),v:((s.PF-s.PA)>=0?'+':'')+(s.PF-s.PA).toFixed(1)}]}
@@ -2971,7 +2971,7 @@ function feedAnalyst(g){
   function sw(R){var s=R.slice().sort(function(a,b){return a.r-b.r});return {s:s[0],w:s[s.length-1]}}
   var swA=sw(Ra),swH=sw(Rh),f=function(x){return x.n+' '+ordn(x.r)+' ('+x.v+')'};
   h+='<h3>Strengths and weaknesses</h3><div class="tblwrap"><table><thead><tr><th></th><th>'+esc(g.a)+'</th><th>'+esc(g.h)+'</th></tr></thead><tbody>'+
-   (A.rec?'<tr><td>'+(g.lg==='nba'?'2025-26 record':g.lg==='nfl'?'Record before the week':'Record')+'</td><td>'+A.rec+'</td><td>'+H.rec+'</td></tr>':'')+
+   (A.rec?'<tr><td>'+(g.lg==='nba'?(NBA_THIS?'2026-27 record':'2025-26 record'):g.lg==='nfl'?'Record before the week':'Record')+'</td><td>'+A.rec+'</td><td>'+H.rec+'</td></tr>':'')+
    Ra.map(function(x,i){return '<tr><td>'+x.n+'</td><td>'+ordn(x.r)+' · '+x.v+'</td><td>'+ordn(Rh[i].r)+' · '+Rh[i].v+'</td></tr>'}).join('')+
    '<tr><td>Best / worst</td><td>'+f(swA.s)+'<br>'+f(swA.w)+'</td><td>'+f(swH.s)+'<br>'+f(swH.w)+'</td></tr></tbody></table></div><p class="src">Ranks are out of '+tot+' teams, 1st is best. '+(g.lg==='nfl'?'Source: Pro Football Reference team stats through five or six games.':g.lg==='nhl'?'Source: '+NHL_SRC+' Shot and goal rates are blended with a league average because the samples are small.':g.lg==='nba'?'Source: Basketball-Reference, 2025-26 season. New rosters and the 2026-27 season are not reflected.':'Source: NCAA.com FBS team stats. Opponent quality is not adjusted, and the FBS table covers Division I FBS teams only.')+'</p>';
   var mu=matchupText(g,Ra,Rh);
@@ -2995,7 +2995,7 @@ function feedAnalyst(g){
   }else h+='<h3>Projection table</h3><p class="note" style="margin-top:0">No player hit-rate data for these teams in the sources.</p>';
   var bets=feedCalc(g).bets;
   h+='<h3>Best straight bets</h3><div class="list">'+bets.map(function(b){return '<div class="card bcard"><div class="label">'+b.mk+(b.conf!=='n/a'?' · confidence '+b.conf:'')+'</div><div class="teams">'+esc(b.pick)+'</div>'+(b.p!=null?'<div class="facts"><span>Est. chance <b>'+pc(b.p)+'%</b></span><span>Fair odds <b>'+fairOdds(b.p)+'</b></span><span>Break-even at -110 <b>52.4%</b></span>'+(b.mk!=='Moneyline'?'<span>Stake at -110 <b>'+kelly(b.p)+'</b></span>':'')+'</div>':'')+'<p class="src" style="margin-top:6px">'+esc(b.why)+'</p></div>'}).join('')+'</div>';
-  h+='<h3>Uncertainty</h3><ul class="pts"><li><b>Solid:</b> '+(g.lg==='nhl'?'goal and shot rates over the first 8 to 11 games, blended with the league average, and the feed’s win probability.':g.lg==='nfl'?'team stats through five or six games and the feed’s win probability.':g.lg==='nba'?'last season’s scoring numbers and the feed’s win probability.':'this season’s scoring numbers through about six or seven games.')+'</li><li><b>Volatile:</b> '+(g.lg==='nhl'?'the starting goalie (not confirmed here), line changes, injuries and a sample of only 8 to 11 games per team. Hockey is low scoring, so one bounce decides many games.':g.lg==='nfl'?'injuries (no verified list for this game), weather and a small sample. No sportsbook line was read for this game, so the fair spread and total above are numbers to compare with your book.':g.lg==='nba'?'rosters, trades, minutes and injuries for the new season. Last season’s teams are only a rough guide.':'schedule strength is not adjusted, injuries and weather are unknown, and one blowout moves a six-game average a lot.')+'</li><li><b>Props:</b> '+(g.lg==='nfl'?'season averages swing a lot game to game, so use them as context.':g.lg==='nhl'?'player rates are season averages from 8 to 11 games, steadied toward typical rates, so treat them as context rather than a forecast.':'hit rates here come from short samples ('+(g.lg==='nba'?'10':'5')+' games), so treat them as context rather than a forecast.')+'</li></ul>';
+  h+='<h3>Uncertainty</h3><ul class="pts"><li><b>Solid:</b> '+(g.lg==='nhl'?'goal and shot rates over the first 8 to 11 games, blended with the league average, and the feed’s win probability.':g.lg==='nfl'?'team stats through five or six games and the feed’s win probability.':g.lg==='nba'?(NBA_THIS?'this season’s scoring so far (few games, heavily steadied toward the league average) and the feed’s win probability.':'last season’s scoring numbers and the feed’s win probability.'):'this season’s scoring numbers through about six or seven games.')+'</li><li><b>Volatile:</b> '+(g.lg==='nhl'?'the starting goalie (not confirmed here), line changes, injuries and a sample of only 8 to 11 games per team. Hockey is low scoring, so one bounce decides many games.':g.lg==='nfl'?'injuries (no verified list for this game), weather and a small sample. No sportsbook line was read for this game, so the fair spread and total above are numbers to compare with your book.':g.lg==='nba'?'rosters, trades, minutes and injuries for the new season. Last season’s teams are only a rough guide.':'schedule strength is not adjusted, injuries and weather are unknown, and one blowout moves a six-game average a lot.')+'</li><li><b>Props:</b> '+(g.lg==='nfl'?'season averages swing a lot game to game, so use them as context.':g.lg==='nhl'?'player rates are season averages from 8 to 11 games, steadied toward typical rates, so treat them as context rather than a forecast.':'hit rates here come from short samples ('+(g.lg==='nba'?'10':'5')+' games), so treat them as context rather than a forecast.')+'</li></ul>';
   return h;
 }
 
@@ -5868,7 +5868,7 @@ function sheetHtml(lg,t){
   h+='<p class="src" style="margin-top:0">Picks where the model’s chance beats what the DraftKings price needs. Place them yourself in the DraftKings app, then scan your slip in My bets so the app tracks the result.</p>';
   h+=it.map(function(i,ix){var x=i.x,lg2=i.g.lg;
     return '<div class="card" data-act="bbgame" data-id="'+esc(i.g.id)+'" data-t="'+x.t+'" style="margin-bottom:8px;cursor:pointer"><div class="r" style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><div><b>'+esc(x.pick)+'</b> <span class="src">'+esc(HB_T[x.t])+' · '+fmtAm(i.pr)+(i.assumed?' (price not read, -110 assumed)':'')+'</span></div>'+hbPill('Edge +'+(i.edge*100).toFixed(1)+'%','hi')+'</div>'+
-      '<div class="src">'+esc(i.g.a+' @ '+i.g.h)+' · '+esc(gTime(i.g))+'</div><div class="src">Tap for the reason and matchup</div><div class="src">Model '+Math.round(x.p*100)+'% vs '+Math.round(amBe(i.pr)*100)+'% the price needs · about '+(i.ev>=0?'+':'')+'$'+i.ev.toFixed(2)+' per $10 if the model is right</div>'+
+      '<div class="src">'+esc(i.g.a+' @ '+i.g.h)+' · '+esc(gTime(i.g))+'</div><div class="src">Tap for the reason and matchup</div>'+consBadge(i.g,i.x)+'<div class="src">Model '+Math.round(x.p*100)+'% vs '+Math.round(amBe(i.pr)*100)+'% the price needs · about '+(i.ev>=0?'+':'')+'$'+i.ev.toFixed(2)+' per $10 if the model is right</div>'+
       '</div>';
   }).join('');
   h+='<div class="actions"><button class="btn" data-act="hbcopy" data-lg="'+lg+'" data-t="'+(t||'')+'">'+(S.hbCopied===lg?'Copied':'Copy the sheet')+'</button><a class="btn" href="https://sportsbook.draftkings.com/" target="_blank" rel="noopener">Open DraftKings</a></div>';
@@ -6311,7 +6311,7 @@ function vToday(){
     var done=function(i){return S.mine.some(function(m){return m.gid===i.g.id&&m.type===i.x.t&&(m.side||'')===(i.x.t==='tot'?(i.x.over?'over':'under'):(i.x.side||''))})};
     h+='<p class="src" style="margin-top:0">Only picks where the model beats the price by 2% or more. Place them yourself at DraftKings, then scan your slip in My bets to track them.</p>'+all.map(function(i){var x=i.x;
       return '<div class="card" data-act="bbgame" data-id="'+esc(i.g.id)+'" data-t="'+x.t+'" style="margin-bottom:8px;cursor:pointer"><div class="r" style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><div><b>'+esc(x.pick)+'</b> <span class="src">'+esc(lgName(i.g.lg))+' · '+esc(HB_T[x.t])+' · '+fmtAm(i.pr)+(i.assumed?' (assumed)':'')+'</span></div>'+hbPill('Edge +'+(i.edge*100).toFixed(1)+'%','hi')+'</div>'+
-        '<div class="src">'+esc(i.g.a+' @ '+i.g.h)+' · '+esc(gTime(i.g))+'</div><div class="src">Tap for the reason and matchup</div><div class="src">Model '+Math.round(x.p*100)+'% vs '+Math.round(amBe(i.pr)*100)+'% needed</div>'+
+        '<div class="src">'+esc(i.g.a+' @ '+i.g.h)+' · '+esc(gTime(i.g))+'</div><div class="src">Tap for the reason and matchup</div>'+consBadge(i.g,i.x)+'<div class="src">Model '+Math.round(x.p*100)+'% vs '+Math.round(amBe(i.pr)*100)+'% needed</div>'+
         '</div>'}).join('');
   }
   h+='<div class="actions" style="margin-top:12px"><button class="btn" data-act="tab" data-t="record">Results</button><button class="btn" data-act="tab" data-t="parlay">Parlay builder</button><button class="btn" data-act="tour">Take the tour</button></div>';
@@ -6382,7 +6382,7 @@ function gamesBest(lg){
     h+='<div class="card"><div class="src" style="margin:0 0 6px"><b>Who covers the spread</b>, most likely first. Tap a pick for the reason and matchup.</div>';
     if(!cv.length)h+='<p class="src" style="margin:0">No spread picks for '+when+' yet. They appear once lines load for those games.</p>';
     else h+=cv.map(function(i){var x=i.x,g=i.g,mrg=x.rm!=null?' · model margin '+(x.rm>=0?'+':'')+Number(x.rm).toFixed(1):'';
-      return '<div data-act="bbgame" data-id="'+esc(g.id)+'" data-t="sp" style="padding:8px 0;border-top:1px solid var(--line);cursor:pointer"><div class="r" style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><div><b>'+esc(x.pick)+'</b> <span class="src">'+fmtAm(i.pr)+(i.assumed?' assumed':'')+'</span></div>'+hbPill(Math.round(x.p*100)+'% to cover',i.edge>=EDGE_MIN?'hi':'mid')+'</div><div class="src">'+esc(g.a+' @ '+g.h)+' · '+esc(gTime(g))+mrg+'</div><div class="src">'+(i.edge>EDGE_MAX?'<b>Check the line.</b> A gap this big (+'+(i.edge*100).toFixed(0)+'%) is almost always a stale line or bad data, not a real edge':i.edge>=EDGE_MIN?'<b>Clears the 2% edge bar</b> at this price ('+(i.edge>=0?'+':'')+(i.edge*100).toFixed(1)+'%)':'A lean, not a bet: edge '+(i.edge>=0?'+':'')+(i.edge*100).toFixed(1)+'% at this price')+'</div></div>'}).join('');
+      return '<div data-act="bbgame" data-id="'+esc(g.id)+'" data-t="sp" style="padding:8px 0;border-top:1px solid var(--line);cursor:pointer"><div class="r" style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><div><b>'+esc(x.pick)+'</b> <span class="src">'+fmtAm(i.pr)+(i.assumed?' assumed':'')+'</span></div>'+hbPill(Math.round(x.p*100)+'% to cover',i.edge>=EDGE_MIN?'hi':'mid')+'</div><div class="src">'+esc(g.a+' @ '+g.h)+' · '+esc(gTime(g))+mrg+'</div><div class="src">'+(i.edge>EDGE_MAX?'<b>Check the line.</b> A gap this big (+'+(i.edge*100).toFixed(0)+'%) is almost always a stale line or bad data, not a real edge':i.edge>=EDGE_MIN?'<b>Clears the 2% edge bar</b> at this price ('+(i.edge>=0?'+':'')+(i.edge*100).toFixed(1)+'%)':'A lean, not a bet: edge '+(i.edge>=0?'+':'')+(i.edge*100).toFixed(1)+'% at this price')+'</div>'+consBadge(g,x)+'</div>'}).join('');
     h+='</div>';
   }
   var pr=[];try{if(lg==='all'){TD_LG.forEach(function(L){pr=pr.concat(propItems(L))});pr.sort(function(a,b){return b.sc-a.sc});pr=pr.slice(0,5)}else pr=propItems(lg).slice(0,5);pr=pr.filter(function(o){return T.ok(o.g)})}catch(e){}
@@ -6684,7 +6684,7 @@ function gwTotN(g){return g.lg==='nba'?30:(g.lg==='nfl'||g.lg==='nhl')?32:Object
 function gwProfile(g,T,side,name){
   var R=gwUnits(g,T,side);if(!R.length)return '';
   var N=gwTotN(g),s=R.slice().sort(function(a,b){return a.r-b.r}),best=s[0],worst=s[s.length-1],t=side==='a'?T.A:T.H;
-  var o=(t.rec?esc(t.rec)+(g.lg==='nba'?' last season. ':' so far. '):'')+'They score '+Number(t.pf).toFixed(1)+' and allow '+Number(t.pa).toFixed(1)+' a game. Their strongest unit is '+best.n+', '+ordn(best.r)+' of '+N+' ('+best.v+')'+(worst.r>N/2?', and the soft spot is '+worst.n+', '+ordn(worst.r)+' ('+worst.v+').':', with no unit ranked in the bottom half.');
+  var o=(t.rec?esc(t.rec)+(g.lg==='nba'&&!NBA_THIS?' last season. ':' so far. '):'')+'They score '+Number(t.pf).toFixed(1)+' and allow '+Number(t.pa).toFixed(1)+' a game. Their strongest unit is '+best.n+', '+ordn(best.r)+' of '+N+' ('+best.v+')'+(worst.r>N/2?', and the soft spot is '+worst.n+', '+ordn(worst.r)+' ('+worst.v+').':', with no unit ranked in the bottom half.');
   return o;
 }
 /* the mismatches that decide the game, stated in words */
@@ -6849,7 +6849,7 @@ function gwWhy(g,b){
   var margin=C.margin,total=C.total;
   if(pick){
     var mine=pside==='h'?margin:-margin;
-    P.push('<p><b>The case for '+esc(b.pick)+'.</b> The stats-and-market model has '+esc(pickN)+' '+(mine>=0?'winning by '+mine.toFixed(1):'losing by '+Math.abs(mine).toFixed(1))+' and gives them a '+Math.round(b.p*100)+'% chance '+(b.t==='sp'?'to cover '+esc(b.pick):'to win')+'. '+gwEdgeNote(g,b,mine,pside)+(g.lg==='nba'?' (NBA team numbers are from last season.)':'')+'</p>');
+    P.push('<p><b>The case for '+esc(b.pick)+'.</b> The stats-and-market model has '+esc(pickN)+' '+(mine>=0?'winning by '+mine.toFixed(1):'losing by '+Math.abs(mine).toFixed(1))+' and gives them a '+Math.round(b.p*100)+'% chance '+(b.t==='sp'?'to cover '+esc(b.pick):'to win')+'. '+gwEdgeNote(g,b,mine,pside)+(g.lg==='nba'&&!NBA_THIS?' (NBA team numbers are from last season.)':'')+'</p>');
     var mm=gwMismatch(g,T);if(mm)P.push('<p><b>Team matchup.</b> '+mm+'</p>');
     var f1=gwForm(g,pick),f2=gwForm(g,oth);
     if(f1||f2)P.push('<p><b>Recent form.</b> '+esc(gwFormText(g,pickN,f1))+' '+esc(gwFormText(g,othN,f2))+(f1&&f2&&f1.pf!=null&&f2.pa!=null?' Putting '+esc(poss(pickN))+' recent scoring ('+f1.pf.toFixed(1)+') next to what '+esc(othN)+' have allowed lately ('+f2.pa.toFixed(1)+') '+(f1.pf>f2.pa+3?'favors the pick.':f1.pf<f2.pa-3?'is a caution flag.':'is roughly even.'):'')+'</p>');
@@ -7043,6 +7043,80 @@ feedSheet=function(g){
   i+=mk.length;
   return h.slice(0,i)+pred+blk+h.slice(i);
 };
+
+/* ---------- block69: writers-agree badge (logged and tested in Results); NBA team ratings from this season only ---------- */
+var NBA_THIS=false,NBAT_LAST=null;
+function nbaSeasonSync(){
+  if(window.claude||typeof fetch!=='function')return Promise.resolve();
+  var now=new Date(),fd=function(d){return d.getFullYear()+('0'+(d.getMonth()+1)).slice(-2)+('0'+d.getDate()).slice(-2)};
+  return fetch('https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=20261020-'+fd(now)+'&limit=400').then(function(r){return r.ok?r.json():null}).then(function(j){
+    if(!j||!j.events)return;
+    var T={},tot=0,n=0;
+    j.events.forEach(function(e){
+      var c=(e.competitions||[])[0];if(!c||!(c.status&&c.status.type&&c.status.type.completed))return;
+      var cs=c.competitors||[];if(cs.length!==2)return;
+      var s=cs.map(function(x){return {ab:tabb(x.team&&x.team.abbreviation),pts:parseFloat(x.score)}});
+      if(!isFinite(s[0].pts)||!isFinite(s[1].pts)||(!s[0].pts&&!s[1].pts))return;
+      [[0,1],[1,0]].forEach(function(p){var a=s[p[0]],b=s[p[1]],t=T[a.ab]=T[a.ab]||{g:0,w:0,l:0,pf:0,pa:0};t.g++;t.pf+=a.pts;t.pa+=b.pts;if(a.pts>b.pts)t.w++;else t.l++;tot+=a.pts;n++});
+    });
+    if(!n)return;
+    var lgAvg=tot/n,k=12;
+    if(!NBAT_LAST){NBAT_LAST={};Object.keys(NBAT).forEach(function(x){NBAT_LAST[x]=NBAT[x]})}
+    Object.keys(NBAT).forEach(function(ab){
+      var t=T[ab]||{g:0,w:0,l:0,pf:0,pa:0};
+      NBAT[ab]={W:t.w,L:t.l,G:t.g,PF:(t.pf+lgAvg*k)/(t.g+k),PA:(t.pa+lgAvg*k)/(t.g+k)};
+    });
+    NBA_THIS=true;S.nbaSeason={at:Date.now(),games:n/2,lg:lgAvg};
+    var ae=document.activeElement;if(!(ae&&ae.tagName==='INPUT')){try{if(S.sheet)renderSheet();else render()}catch(e){}}
+  }).catch(function(){});
+}
+/* writers consensus helpers */
+function consAgree(g,x){
+  var o=null;try{o=outFor(g)}catch(e){}if(!o)return null;
+  var a=0,n=0;
+  if(x.t==='tot'){o.p.forEach(function(q){if(q[1]==='o'||q[1]==='u'){n++;if((q[1]==='o')===!!x.over)a++}})}
+  else{o.p.forEach(function(q){if(q[1]==='a'||q[1]==='h'){n++;if(q[1]===x.side)a++}})}
+  return n?[a,n]:null;
+}
+function consBadge(g,x){
+  var c=null;try{c=consAgree(g,x)}catch(e){}if(!c)return '';
+  var a=c[0],n=c[1],cls=a===n?'hi':a===0?'lo':'mid',txt=a===n?'all '+n+' outside writers agree':a===0?'0 of '+n+' outside writers agree':a+' of '+n+' outside writers agree';
+  return '<div class="src" style="margin-top:2px"><span class="hrpill '+cls+'" style="display:inline-block">Writers: '+txt+'</span></div>';
+}
+/* log the writers’ agreement with each pick so Results can test whether it helps */
+var trackPicks0=trackPicks;
+trackPicks=function(){
+  trackPicks0();
+  try{
+    var ch=false;
+    S.log.forEach(function(x){
+      if(x.oc!==undefined||x.res)return;
+      var g=find(x.gid);if(!g||g.lg!=='nfl'||kind(g)!=='up')return;
+      var c=consAgree(g,x);if(c){x.oc=c;ch=true}
+    });
+    if(ch)saveLog();
+  }catch(e){}
+};
+/* Results: does outside agreement predict winners? */
+var resultsHtml0=resultsHtml;
+resultsHtml=function(){
+  var h=resultsHtml0(),D=S.log.filter(function(x){return x.oc&&(x.res==='W'||x.res==='L')});
+  var all=S.log.filter(function(x){return x.oc}).length;
+  var g=[['Writers all agree',function(c){return c[0]===c[1]}],['Writers split',function(c){return c[0]>0&&c[0]<c[1]}],['No writer agrees',function(c){return c[0]===0}]];
+  var rows=g.map(function(q){var E=D.filter(function(x){return q[1](x.oc)}),w=E.filter(function(x){return x.res==='W'}).length;return '<tr><td>'+q[0]+'</td><td>'+(E.length?w+'-'+(E.length-w):'—')+'</td><td>'+(E.length?pct1(w/E.length):'—')+'</td></tr>'});
+  return h+'<h3>Do outside writers help? (NFL)</h3><p class="src" style="margin-top:0">Each NFL pick is saved with how many outside writers agreed before kickoff. As games finish, this shows whether picks the writers back win more than picks they oppose. '+all+' picks saved, '+D.length+' graded. Fewer than about 100 graded picks proves nothing, so treat early numbers as noise.</p><div class="tblwrap"><table><thead><tr><th>Group</th><th>Record</th><th>Win %</th></tr></thead><tbody>'+rows.join('')+'</tbody></table></div>';
+};
+setTimeout(nbaSeasonSync,900);
+var whyBlock3=whyBlock;
+whyBlock=function(g,why){
+  var h=whyBlock3(g,why);if(!h)return h;
+  var bs=null;try{bs=picksFor(g)}catch(e){}
+  var b=bs&&bs.filter(function(x){return x.t===why.t})[0];if(!b)return h;
+  var bd='';try{bd=consBadge(g,b)}catch(e){}
+  if(!bd)return h;
+  var i=h.indexOf('</span></div>');return i<0?h:h.slice(0,i+13)+bd+h.slice(i+13);
+};
+
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
