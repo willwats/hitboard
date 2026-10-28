@@ -1935,7 +1935,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v106, Oct 28';
+var BUILD='v107, Oct 28';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -7256,6 +7256,52 @@ feedSheet=function(g){
   var mk='aria-label="Close">×</button></div>',i=h.indexOf(mk);
   return i<0?h:h.slice(0,i+mk.length)+o+h.slice(i+mk.length);
 };
+
+/* ---------- block72: search for a team and its upcoming matchups ---------- */
+S.gq='';
+function gqResults(){
+  var q=String(S.gq||'').toLowerCase().trim();
+  if(!q)return '';
+  var words=q.split(/\s+/).filter(Boolean),found=[];
+  LG.forEach(function(l){(S.feed[l[0]]||[]).forEach(function(g){
+    if(kind(g)==='final')return;
+    var hay=[g.a,g.an,g.h,g.hn,lgName(g.lg)].join(' ').toLowerCase();
+    if(words.every(function(w){return hay.indexOf(w)>=0}))found.push(g);
+  })});
+  found.sort(function(a,b){return a.start-b.start});
+  if(!found.length)return '<div class="card empty">No upcoming games found for “'+esc(S.gq)+'”. Try a city or nickname, like “Celtics” or “Boston”. Only games the app has loaded are searched, which is the next several days.</div>';
+  var h='<p class="src" style="margin:8px 0 0">'+found.length+' upcoming game'+(found.length>1?'s':'')+' for “'+esc(S.gq)+'”. Tap one for the lines and the model’s view.</p>',last='';
+  found.slice(0,40).forEach(function(g){
+    var dk=new Date(g.start).toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'})+' · '+lgName(g.lg);
+    if(dk!==last){h+='<div class="src" style="margin-top:10px"><b>'+esc(dk)+'</b></div>';last=dk}
+    h+=schRow(g);
+  });
+  return h;
+}
+var vGames4=vGames;
+vGames=function(){
+  var h=vGames4();
+  if(S.gd==='prev')return h;
+  var key='aria-label="Day">',i=h.indexOf(key);if(i<0)return h;
+  var j=h.indexOf('</div>',i);if(j<0)return h;j+=6;
+  var box='<div style="margin:10px 0 4px"><input type="search" id="gsq" placeholder="Search a team or city" value="'+esc(S.gq||'')+'" autocomplete="off" autocapitalize="none" aria-label="Search teams" style="width:100%"></div><div id="gsr">'+(S.gq?gqResults():'')+'</div>';
+  if(String(S.gq||'').trim()){
+    var f=h.lastIndexOf('<p class="foot">');
+    return h.slice(0,j)+box+(f>=j?h.slice(f):'');
+  }
+  return h.slice(0,j)+box+h.slice(j);
+};
+document.addEventListener('input',function(e){
+  var t=e.target;if(!t||t.id!=='gsq')return;
+  S.gq=t.value;
+  if(!S.gq.trim()){var ae=document.activeElement;S.gqRender=1;render();var n=document.getElementById('gsq');if(n){n.focus();try{n.setSelectionRange(n.value.length,n.value.length)}catch(x){}}return}
+  var box=document.getElementById('gsr');
+  if(!box||S.gqPrev===false){render();var n2=document.getElementById('gsq');if(n2){n2.focus();try{n2.setSelectionRange(n2.value.length,n2.value.length)}catch(x){}}return}
+  /* first keystroke swaps the rest of the page for results */
+  if(!S.gqOn){S.gqOn=1;render();var n3=document.getElementById('gsq');if(n3){n3.focus();try{n3.setSelectionRange(n3.value.length,n3.value.length)}catch(x){}}return}
+  box.innerHTML=gqResults();
+});
+document.addEventListener('input',function(e){var t=e.target;if(t&&t.id==='gsq'&&!String(t.value).trim())S.gqOn=0});
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
