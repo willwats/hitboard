@@ -1935,7 +1935,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v104, Oct 27';
+var BUILD='v105, Oct 28';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -3361,7 +3361,7 @@ function rsApply(D){
     [['npts','Points',r.pts,6,1],['nreb','Rebounds',r.reb,3,1],['nast','Assists',r.ast,2,1],['ntpm','Threes',r.tpm,.8,2]].forEach(function(m){
       if(!(m[2]>=m[3])||have['nba|'+m[0]+'|'+normName(r.n)])return;
       pxAdd({lg:'nba',kind:m[0],name:r.n,team:r.t,stat:m[1],g:r.g,avg:m[2],total:Math.round(m[2]*r.g),rs:1,
-        note:m[2].toFixed(m[4])+' '+m[1].toLowerCase()+' a game over '+r.g+' games in '+lab+' (ESPN), about '+Math.round(r.mpg)+' minutes. This is last season’s full-year average, so check this season’s role and minutes. Replace the line with the one at your book.'});
+        note:m[2].toFixed(m[4])+' '+m[1].toLowerCase()+' a game over '+r.g+' games in '+lab+' (ESPN), about '+Math.round(r.mpg)+' minutes. '+(D.sy>=rsSeasonN()?'This is the 2026-27 average so far, a small sample that will move.':'This is last season’s full-year average, so check this season’s role and minutes.')+' Replace the line with the one at your book.'});
     });
   });
   (D.cfb||[]).forEach(function(r){
@@ -3395,13 +3395,13 @@ function rsTeam(a,lg){
 function loadStatAvgs(){
   if(window.claude||typeof fetch!=='function'||S.rsBusy)return;
   var now=Date.now();if(now-S.rsAt<6*3600e3)return;
-  S.rsBusy=true;var sy=rsSeason(),out={sy:sy,nba:[],cfb:[]};
+  S.rsBusy=true;var sy=rsSeasonN(),out={sy:sy,nba:[],cfb:[]};
   var nba=[1,2,3].reduce(function(pr,pg){return pr.then(function(){
     if(pg>1&&out._stop)return;
     return rsFetchJson('https://site.web.api.espn.com/apis/common/v3/sports/basketball/nba/statistics/byathlete?region=us&lang=en&contentorigin=espn&isqualified=false&page='+pg+'&limit=100&sort=general.avgMinutes%3Adesc&season='+sy+'&seasontype=2').then(function(j){
       (j.athletes||[]).forEach(function(a){
         var g=rsVal(a,j,'general','gamesPlayed'),mp=rsVal(a,j,'general','avgMinutes');
-        if(!(g>=15)||!(mp>=14)){if(mp!=null&&mp<14)out._stop=1;return}
+        if(!(g>=2)||!(mp>=12)){if(mp!=null&&mp<12)out._stop=1;return}
         out.nba.push({n:a.athlete.displayName,t:rsTeam(a,'nba'),g:g,mpg:mp,pts:rsVal(a,j,'offensive','avgPoints'),reb:rsVal(a,j,'general','avgRebounds'),ast:rsVal(a,j,'offensive','avgAssists'),tpm:rsVal(a,j,'offensive','avgThreePointFieldGoalsMade')});
       });
     }).catch(function(){out._stop=1});
@@ -7117,6 +7117,58 @@ whyBlock=function(g,why){
   var i=h.indexOf('</span></div>');return i<0?h:h.slice(0,i+13)+bd+h.slice(i+13);
 };
 
+
+/* ---------- block70: NBA player numbers from this season only; learned calibration model ---------- */
+function rsSeasonN(){var d=new Date(),m=d.getMonth()+1,y=d.getFullYear(),day=d.getDate();return (m>=11||(m===10&&day>=20))?y+1:(m>=7?y:y)}
+/* drop last season’s static NBA player rows and hit-rate tables */
+(function(){
+  for(var i=PROPS.length-1;i>=0;i--)if(PROPS[i].lg==='nba'&&!PROPS[i].rs)PROPS.splice(i,1);
+  try{DATA.hit.nba.tables.forEach(function(t){t._r0=[];t.rows=[]})}catch(e){}
+})();
+/* learned calibration: ridge logistic regression on the app’s own graded picks */
+function lmSig(x){return 1/(1+Math.exp(-x))}
+function lmLogit(p){p=Math.max(.05,Math.min(.95,p));return Math.log(p/(1-p))}
+var _lmK='',_lmV=null,LM_MIN=40,TI={ml:0,sp:1,tot:2};
+function lmFeat(x){var z2=0;if(x.oc&&x.oc[1])z2=(x.oc[0]/x.oc[1]-.5)*2;return [lmLogit(x.p0),z2]}
+function lmModel(){
+  var D=S.log.filter(function(x){return x.p0!=null&&(x.res==='W'||x.res==='L')&&TI[x.t]!=null});
+  var key=D.length+'|'+S.log.length;if(_lmK===key&&_lmV)return _lmV;
+  var M={n:D.length,on:false,th:[0,0,0,1,0]};
+  if(D.length>=LM_MIN){
+    var mu=[0,0,0,1,0],lam=[25,25,25,25,25],th=mu.slice(),lr=.15;
+    for(var it=0;it<400;it++){
+      var gr=[0,0,0,0,0];
+      D.forEach(function(x){var f=lmFeat(x),t=TI[x.t],z=th[t]+th[3]*f[0]+th[4]*f[1],e=lmSig(z)-(x.res==='W'?1:0);gr[t]+=e;gr[3]+=e*f[0];gr[4]+=e*f[1]});
+      for(var j=0;j<5;j++)th[j]-=lr*(gr[j]+lam[j]*(th[j]-mu[j]))/(D.length+lam[j]);
+    }
+    M.th=th;M.on=true;
+    var b0=0,b1=0;
+    D.forEach(function(x){var y=x.res==='W'?1:0,p0=Math.max(.01,Math.min(.99,x.p0)),f=lmFeat(x),p1=lmSig(th[TI[x.t]]+th[3]*f[0]+th[4]*f[1]);b0+=(p0-y)*(p0-y);b1+=(p1-y)*(p1-y)});
+    M.b0=b0/D.length;M.b1=b1/D.length;
+  }
+  _lmK=key;_lmV=M;return M;
+}
+function lmAdj(g,b){
+  var M=lmModel();if(!M.on||b.p0==null||TI[b.t]==null)return b;
+  var oc=null;try{oc=consAgree(g,b)}catch(e){}
+  var f=lmFeat({p0:b.p0,oc:oc}),p=lmSig(M.th[TI[b.t]]+M.th[3]*f[0]+M.th[4]*f[1]);
+  p=Math.max(b.p0-.08,Math.min(b.p0+.08,p));
+  p=b.t==='ml'?Math.max(.05,Math.min(.95,p)):Math.max(.4,Math.min(.6,p));
+  var c={};Object.keys(b).forEach(function(k){c[k]=b[k]});c.p=p;c.lm=true;return c;
+}
+var picksFor0=picksFor;
+picksFor=function(g){var b=picksFor0(g);if(!b)return b;try{if(!lmModel().on)return b;return b.map(function(x){return lmAdj(g,x)})}catch(e){return b}};
+var resultsHtml2=resultsHtml;
+resultsHtml=function(){
+  var h=resultsHtml2(),M=lmModel(),s='<h3>Learning model</h3>';
+  if(!M.on)return h+s+'<p class="src" style="margin-top:0">The app tunes its win chances from its own graded picks. It switches on after '+LM_MIN+' graded picks ('+M.n+' so far). Until then picks use the stats-and-market blend, with the small team-level adjustments the app already learns.</p>';
+  var th=M.th;
+  return h+s+'<p class="src" style="margin-top:0">Fitted on '+M.n+' graded picks with a strong pull toward “no change”, so it moves slowly. Each chance is shifted by at most 8 points. The numbers below are measured on the same picks it learned from, so they flatter it; the real test is the next graded picks.</p><div class="tblwrap"><table><tbody>'+
+   '<tr><td>Trust in the model’s chance</td><td>'+th[3].toFixed(2)+' (1.00 means no change)</td></tr>'+
+   '<tr><td>Writers agreement weight (NFL)</td><td>'+th[4].toFixed(2)+'</td></tr>'+
+   '<tr><td>Bias: moneyline / spread / total</td><td>'+th[0].toFixed(2)+' / '+th[1].toFixed(2)+' / '+th[2].toFixed(2)+'</td></tr>'+
+   '<tr><td>Error before / after (Brier, lower is better)</td><td>'+M.b0.toFixed(3)+' / '+M.b1.toFixed(3)+'</td></tr></tbody></table></div>';
+};
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
