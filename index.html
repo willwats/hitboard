@@ -1665,7 +1665,7 @@ function scanRes(){
   if(a.p==null)return h+'<p class="note">'+esc(a.note||'')+'</p>';
   var be=1/dec(od||-110),ev=100*(a.p*dec(od||-110)-1),edge=a.p-be;
   return h+'<div class="big">'+(a.p*100).toFixed(1)+'%</div><div class="src">model chance this bet wins</div>'+
-    (isFinite(od)&&Math.abs(od)>=100?'<div class="facts"><span>Break-even <b>'+(be*100).toFixed(1)+'%</b></span><span>Edge <b>'+(edge>=0?'+':'')+(edge*100).toFixed(1)+' pts</b></span><span>Per $100 <b>'+(ev>=0?'+':'')+'$'+ev.toFixed(0)+'</b></span></div>':'')+
+    (isFinite(od)&&Math.abs(od)>=100?'<div class="facts"><span>Break-even <b>'+(be*100).toFixed(1)+'%</b></span><span>Edge <b>'+(edge>=0?'+':'')+(edge*100).toFixed(1)+' pts</b></span></div>':'')+
     '<p class="note">'+esc(a.note)+' Break-even includes the sportsbook’s cut. An edge under a few points is within the model’s error.</p>';
 }
 function scanHtml(){
@@ -1935,7 +1935,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v108, Oct 28';
+var BUILD='v109, Oct 28';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -5868,7 +5868,7 @@ function sheetHtml(lg,t){
   h+='<p class="src" style="margin-top:0">Picks where the model’s chance beats what the DraftKings price needs. Place them yourself in the DraftKings app, then scan your slip in My bets so the app tracks the result.</p>';
   h+=it.map(function(i,ix){var x=i.x,lg2=i.g.lg;
     return '<div class="card" data-act="bbgame" data-id="'+esc(i.g.id)+'" data-t="'+x.t+'" style="margin-bottom:8px;cursor:pointer"><div class="r" style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><div><b>'+esc(x.pick)+'</b> <span class="src">'+esc(HB_T[x.t])+' · '+fmtAm(i.pr)+(i.assumed?' (price not read, -110 assumed)':'')+'</span></div>'+hbPill('Edge +'+(i.edge*100).toFixed(1)+'%','hi')+'</div>'+
-      '<div class="src">'+esc(i.g.a+' @ '+i.g.h)+' · '+esc(gTime(i.g))+'</div><div class="src">Tap for the reason and matchup</div>'+consBadge(i.g,i.x)+'<div class="src">Model '+Math.round(x.p*100)+'% vs '+Math.round(amBe(i.pr)*100)+'% the price needs · about '+(i.ev>=0?'+':'')+'$'+i.ev.toFixed(2)+' per $10 if the model is right</div>'+
+      '<div class="src">'+esc(i.g.a+' @ '+i.g.h)+' · '+esc(gTime(i.g))+'</div><div class="src">Tap for the reason and matchup</div>'+consBadge(i.g,i.x)+'<div class="src">Model '+Math.round(x.p*100)+'% vs '+Math.round(amBe(i.pr)*100)+'% the price needs</div>'+
       '</div>';
   }).join('');
   h+='<div class="actions"><button class="btn" data-act="hbcopy" data-lg="'+lg+'" data-t="'+(t||'')+'">'+(S.hbCopied===lg?'Copied':'Copy the sheet')+'</button><a class="btn" href="https://sportsbook.draftkings.com/" target="_blank" rel="noopener">Open DraftKings</a></div>';
@@ -7223,7 +7223,7 @@ function oddsDetail(g){
   var h='<div class="card" style="margin:10px 0;line-height:1.5"><div class="src"><b>Odds detail</b> · '+esc(d.src||'DraftKings')+' via ESPN</div>';
   /* moneyline */
   if(d.ml){
-    var ml=B('ml'),pH=ml?(ml.side==='h'?ml.p:1-ml.p):null,nvH=nov(d.ml.a,d.ml.h);
+    var ml=B('ml'),pH=ml?(ml.side==='h'?ml.p:1-ml.p):null,nvH=1-nov(d.ml.a,d.ml.h);
     h+='<p style="margin:8px 0 2px"><b>Moneyline</b></p><div class="tblwrap"><table><thead><tr><th>Team</th><th>Price</th><th>Price implies</th>'+(pH!=null?'<th>Model</th>':'')+'</tr></thead><tbody>'+
      '<tr><td>'+esc(g.a)+'</td><td>'+prc(d.ml.a)+'</td><td>'+Math.round((1-nvH)*100)+'%</td>'+(pH!=null?'<td>'+Math.round((1-pH)*100)+'%</td>':'')+'</tr>'+
      '<tr><td>'+esc(g.h)+'</td><td>'+prc(d.ml.h)+'</td><td>'+Math.round(nvH*100)+'%</td>'+(pH!=null?'<td>'+Math.round(pH*100)+'%</td>':'')+'</tr></tbody></table></div>'+
@@ -7308,8 +7308,8 @@ var WY_NAME={ml:'Moneyline',sp:'Spread',tot:'Over/under'};
 function gwMlExtra(g,b,C,T){
   var P=[],d=g.dk||{},ml=d.ml,side=b.side,nm=side==='h'?g.hn:g.an,on=side==='h'?g.an:g.hn,pr=ml?(side==='h'?ml.h:ml.a):null;
   if(pr!=null){
-    var imp=amBe(pr),nv=side==='h'?nov(ml.a,ml.h):1-nov(ml.a,ml.h),win=pr>0?10*pr/100:10*100/(-pr),ev=b.p*win-(1-b.p)*10;
-    P.push('<p><b>The price.</b> At '+fmtAm(pr)+', a $10 bet on '+esc(nm)+' wins $'+win.toFixed(2)+'. The price implies '+Math.round(imp*100)+'% ('+Math.round(nv*100)+'% once the book’s margin is removed); the model says '+Math.round(b.p*100)+'%. If the model were exactly right, that is worth about '+(ev>=0?'+':'−')+'$'+Math.abs(ev).toFixed(2)+' per $10 over many bets, but any single bet loses '+Math.round((1-b.p)*100)+' times in 100. '+(pr>0?'Backing the underdog needs only '+Math.round(imp*100)+'% to break even, but it will lose more often than it wins. ':'Laying a favorite price means you risk more than you win, so a few upsets cost more than they seem. ')+'</p>');
+    var imp=amBe(pr),nv=side==='h'?1-nov(ml.a,ml.h):nov(ml.a,ml.h);
+    P.push('<p><b>The price.</b> At '+fmtAm(pr)+', the price implies '+esc(nm)+' wins '+Math.round(imp*100)+'% of the time ('+Math.round(nv*100)+'% once the book’s margin is removed). The model says '+Math.round(b.p*100)+'%. '+(b.p-imp>=.02?'That is about '+((b.p-imp)*100).toFixed(1)+' points above the price.':b.p-imp<=-.02?'That is about '+((imp-b.p)*100).toFixed(1)+' points below the price, so the market likes this side more than the model does.':'That is in line with the price.')+' '+(pr>0?'As the underdog, '+esc(nm)+' is expected to lose more often than it wins.':'As the favorite, '+esc(nm)+' is expected to win most of the time, but upsets still happen about '+Math.round((1-b.p)*100)+' times in 100.')+'</p>');
   }
   var Ra=gwUnits(g,T,side==='h'?'h':'a'),Ro=gwUnits(g,T,side==='h'?'a':'h');
   if(Ra.length&&Ro.length){
