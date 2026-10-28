@@ -1935,7 +1935,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v107, Oct 28';
+var BUILD='v108, Oct 28';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -6746,7 +6746,7 @@ function gwPlayers(g,T,side){
   });
 }
 function gwEdgeNote(g,b,mine,pside){
-  if(b.t!=='sp'){return 'The pick comes from the gap between that chance and the price on offer.'}
+  if(b.t!=='sp'){var ml=g.dk&&g.dk.ml,pr=ml?(b.side==='h'?ml.h:ml.a):null;if(pr==null)return 'No price is posted, so this is only the likeliest winner.';var ed=b.p-amBe(pr);return ed>=.02?'The price needs '+Math.round(amBe(pr)*100)+'%, so the model sees about '+(ed*100).toFixed(1)+' points of edge.':'The price needs '+Math.round(amBe(pr)*100)+'%, so at '+fmtAm(pr)+' there is no edge. This is the model’s likeliest winner, not a value bet.'}
   var sp=g.dk&&g.dk.sp;if(!sp||sp.pts==null)return '';
   var need=sp.fav===pside?sp.pts:-sp.pts,d=mine-need;
   if(Math.abs(d)<1)return 'The model’s margin and the line agree within a point, so on these numbers it is close to a coin flip with little real edge.';
@@ -7302,6 +7302,64 @@ document.addEventListener('input',function(e){
   box.innerHTML=gqResults();
 });
 document.addEventListener('input',function(e){var t=e.target;if(t&&t.id==='gsq'&&!String(t.value).trim())S.gqOn=0});
+
+/* ---------- block73: market tabs (moneyline, spread, over/under) with a full case for each ---------- */
+var WY_NAME={ml:'Moneyline',sp:'Spread',tot:'Over/under'};
+function gwMlExtra(g,b,C,T){
+  var P=[],d=g.dk||{},ml=d.ml,side=b.side,nm=side==='h'?g.hn:g.an,on=side==='h'?g.an:g.hn,pr=ml?(side==='h'?ml.h:ml.a):null;
+  if(pr!=null){
+    var imp=amBe(pr),nv=side==='h'?nov(ml.a,ml.h):1-nov(ml.a,ml.h),win=pr>0?10*pr/100:10*100/(-pr),ev=b.p*win-(1-b.p)*10;
+    P.push('<p><b>The price.</b> At '+fmtAm(pr)+', a $10 bet on '+esc(nm)+' wins $'+win.toFixed(2)+'. The price implies '+Math.round(imp*100)+'% ('+Math.round(nv*100)+'% once the book’s margin is removed); the model says '+Math.round(b.p*100)+'%. If the model were exactly right, that is worth about '+(ev>=0?'+':'−')+'$'+Math.abs(ev).toFixed(2)+' per $10 over many bets, but any single bet loses '+Math.round((1-b.p)*100)+' times in 100. '+(pr>0?'Backing the underdog needs only '+Math.round(imp*100)+'% to break even, but it will lose more often than it wins. ':'Laying a favorite price means you risk more than you win, so a few upsets cost more than they seem. ')+'</p>');
+  }
+  var Ra=gwUnits(g,T,side==='h'?'h':'a'),Ro=gwUnits(g,T,side==='h'?'a':'h');
+  if(Ra.length&&Ro.length){
+    var N=gwTotN(g),bestO=Ro.slice().sort(function(x,y){return x.r-y.r})[0],worstP=Ra.slice().sort(function(x,y){return y.r-x.r})[0];
+    P.push('<p><b>How the upset happens.</b> '+esc(on)+'’s best unit is '+bestO.n+' ('+ordn(bestO.r)+' of '+N+', '+bestO.v+') and '+esc(nm)+'’s softest is '+worstP.n+' ('+ordn(worstP.r)+', '+worstP.v+'). A bad turnover night, a key injury or a hot opposing player is how a moneyline pick loses, and the model cannot see those in advance.</p>');
+  }
+  var home=side==='h';
+  P.push('<p><b>Home edge.</b> '+esc(home?nm:on)+' are at home, which the model values at about '+(T&&T.he!=null?T.he+' '+(g.lg==='nhl'?'goal':'points'):'a small edge')+'. '+(home?'That helps this pick.':'That works against this pick, so the road team needs to be clearly better to be the model’s choice.')+'</p>');
+  return P.join('');
+}
+function gwTotExtra(g,b,C,T){
+  var P=[],u=g.lg==='nhl'?'goals':'points',ba=(C.total-C.margin)/2,bh=(C.total+C.margin)/2,line=b.num;
+  P.push('<p><b>The projection.</b> The model has '+esc(g.an)+' at '+ba.toFixed(1)+' and '+esc(g.hn)+' at '+bh.toFixed(1)+' for '+C.total.toFixed(1)+' combined'+(line!=null?', '+(C.total>=line?'above':'below')+' the posted '+line+' by '+Math.abs(C.total-line).toFixed(1):'')+'. '+(Math.abs(C.total-(line==null?C.total:line))<1.5?'A gap this small is well inside normal game-to-game swing, so this is a lean, not a strong read.':'')+'</p>');
+  var lt=null;try{lt=leagueTotal(g.lg)}catch(e){}
+  if(lt&&T){var sum=T.A.pf+T.H.pf;P.push('<p><b>Scoring pace.</b> The two teams score '+T.A.pf.toFixed(1)+' and '+T.H.pf.toFixed(1)+' a game and allow '+T.A.pa.toFixed(1)+' and '+T.H.pa.toFixed(1)+'. Their scoring added up is '+(sum>lt?'above':'below')+' the typical combined '+lt.toFixed(1)+' for '+lgName(g.lg)+'.'+(g.lg==='nfl'?' Defenses face '+mv(T.A.k,'pace').toFixed(0)+' plays a game for '+esc(g.a)+' and '+mv(T.H.k,'pace').toFixed(0)+' for '+esc(g.h)+'; more plays favors the over.':'')+'</p>');}
+  var over=!!b.over;
+  var ov=[],un=[];
+  if(T&&lt){(T.A.pf+T.H.pf>lt?ov:un).push('both offenses score at a combined rate '+(T.A.pf+T.H.pf>lt?'above':'below')+' the league’s');(T.A.pa+T.H.pa>lt?ov:un).push('the defenses allow a combined '+(T.A.pa+T.H.pa).toFixed(1)+', '+(T.A.pa+T.H.pa>lt?'more':'less')+' than typical')}
+  var fa=gwForm(g,g.a),fh=gwForm(g,g.h);
+  if(fa&&fh&&fa.tot!=null&&fh.tot!=null){var rt=(fa.tot+fh.tot)/2;(line!=null&&rt>line?ov:un).push('their last-five games averaged '+rt.toFixed(1)+' combined '+u+' against a line of '+line)}
+  if(g.lg==='nhl')un.push('a hot or cold starting goalie decides hockey totals, so check who is confirmed');
+  if(g.lg==='nfl'||g.lg==='ncaafb'){try{un.push('weather and wind can cap scoring: '+String(wxLong(g)).replace(/<[^>]+>/g,''))}catch(e){}}
+  P.push('<p><b>Path to the over.</b> '+(ov.length?ov.join('; ')+'.':'Nothing in the data points clearly up.')+'</p><p><b>Path to the under.</b> '+(un.length?un.join('; ')+'.':'Nothing in the data points clearly down.')+'</p>');
+  P.push('<p class="src" style="margin:4px 0">The pick leans '+(over?'over':'under')+'. Totals are the noisiest of the three markets: one hot shooting night or a garbage-time run decides them.</p>');
+  return P.join('');
+}
+var gwWhy2=gwWhy;
+gwWhy=function(g,b){
+  var h=gwWhy2(g,b);if(!h)return h;
+  var C=null,T=null;try{C=feedCalc(g);T=gwSide(g).T}catch(e){}
+  if(!C)return h;
+  var ex='';
+  try{if(b.t==='ml')ex=gwMlExtra(g,b,C,T);else if(b.t==='tot')ex=gwTotExtra(g,b,C,T)}catch(e){ex=''}
+  if(!ex)return h;
+  var k=h.indexOf('<p><b>Team matchup.</b>');
+  return k>=0?h.slice(0,k)+ex+h.slice(k):h.replace(/<\/div>$/,ex+'</div>');
+};
+var whyBlock4=whyBlock;
+whyBlock=function(g,why){
+  var h=whyBlock4(g,why);if(!h)return h;
+  var bs=null;try{bs=picksFor(g)}catch(e){}
+  if(!bs||bs.length<2)return h;
+  var chips='<div class="chips" role="group" aria-label="Market" style="margin-top:10px">'+['ml','sp','tot'].filter(function(t){return bs.some(function(x){return x.t===t})}).map(function(t){
+    var nm=t==='sp'&&g.lg==='nhl'?'Puck line':WY_NAME[t];return '<button class="chip" data-wy="'+t+'" aria-pressed="'+(why.t===t)+'">'+nm+'</button>'}).join('')+'</div>';
+  return chips+h;
+};
+document.addEventListener('click',function(e){
+  var el=e.target&&e.target.closest?e.target.closest('[data-wy]'):null;if(!el||!S.sheet||S.sheet.type!=='fgame')return;
+  S.sheet.why={t:el.getAttribute('data-wy')};renderSheet();
+});
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
