@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v112, Oct 28';
+var BUILD='v113, Oct 30';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -3407,25 +3407,33 @@ function loadStatAvgs(){
       });
     }).catch(function(){out._stop=1});
   })},Promise.resolve());
-  var cfb=[1,2].reduce(function(pr,pg){return pr.then(function(){
-    return rsFetchJson('https://site.web.api.espn.com/apis/common/v3/sports/football/college-football/statistics/byathlete?region=us&lang=en&contentorigin=espn&page='+pg+'&limit=100').then(function(j){
-      (j.athletes||[]).forEach(function(a){
+  var cfbSeen={},cfbJobs=[];
+  ['passing.passingYardsPerGame','rushing.rushingYardsPerGame','receiving.receivingYardsPerGame'].forEach(function(so){[1,2,3,4,5].forEach(function(pg){cfbJobs.push([so,pg])})});
+  var cfbDone={};
+  var cfb=cfbJobs.reduce(function(pr,jb){return pr.then(function(){
+    if(cfbDone[jb[0]])return;
+    return rsFetchJson('https://site.web.api.espn.com/apis/common/v3/sports/football/college-football/statistics/byathlete?region=us&lang=en&contentorigin=espn&isqualified=false&page='+jb[1]+'&limit=100&sort='+encodeURIComponent(jb[0]+':desc')).then(function(j){
+      var L=j.athletes||[];if(L.length<100)cfbDone[jb[0]]=1;
+      L.forEach(function(a){
         var g=rsVal(a,j,'general','gamesPlayed');if(!(g>=3))return;
         var o={n:a.athlete.displayName,t:rsTeam(a,'ncaafb'),g:g,pass:rsVal(a,j,'passing','passingYardsPerGame'),rush:rsVal(a,j,'rushing','rushingYardsPerGame'),rec:rsVal(a,j,'receiving','receivingYardsPerGame')};
-        if(o.pass>0||o.rush>0||o.rec>0)out.cfb.push(o);
+        if(!(o.pass>0||o.rush>0||o.rec>0))return;
+        var k=o.n+'|'+o.t,p=cfbSeen[k];
+        if(p){['pass','rush','rec'].forEach(function(f){if((o[f]||0)>(p[f]||0))p[f]=o[f]})}
+        else{cfbSeen[k]=o;out.cfb.push(o)}
       });
-    }).catch(function(){});
+    }).catch(function(){cfbDone[jb[0]]=1});
   })},Promise.resolve());
   Promise.all([nba,cfb]).then(function(){
     S.rsBusy=false;delete out._stop;
     if(!out.nba.length&&!out.cfb.length)return;
     S.rsAt=Date.now();
-    try{localStorage.setItem('hitboard.rs.v1',JSON.stringify({at:S.rsAt,d:out}))}catch(e){}
+    try{localStorage.setItem('hitboard.rs.v2',JSON.stringify({at:S.rsAt,d:out}))}catch(e){}
     rsApply(out);
     var ae=document.activeElement;if(!(ae&&ae.tagName==='INPUT')){render();if(S.sheet&&S.sheet.type==='fgame')renderSheet()}
   }).catch(function(){S.rsBusy=false});
 }
-try{var rsC=JSON.parse(localStorage.getItem('hitboard.rs.v1')||'null');if(rsC&&rsC.d){S.rsAt=rsC.at||0;rsApply(rsC.d)}}catch(e){}
+try{var rsC=JSON.parse(localStorage.getItem('hitboard.rs.v2')||'null');if(rsC&&rsC.d){S.rsAt=rsC.at||0;rsApply(rsC.d)}}catch(e){}
 
 /* ---------- game log: fold newly finished games into the hit-rate tables ---------- */
 var GL_CUT={nfl:Date.UTC(2026,9,14,12),ncaafb:Date.UTC(2026,9,18,19),nba:Date.UTC(2026,9,20,12)};
@@ -7396,6 +7404,60 @@ vGames=vGames4;
   document.addEventListener('keydown',function(e){if(e.key==='Escape'&&root.classList.contains('on'))close()});
   if(window.refreshStamp)try{window.refreshStamp()}catch(x){}
 })();
+
+/* ---------- block75: full college-football team table built live from this season's ESPN results ---------- */
+S.cfbLiveAt=0;
+function cfbKey(loc){var s=String(loc||'').normalize('NFD').replace(/[̀-ͯ]/g,'');var k=nn(s);k=CFB_ALIAS[k]||k;if(k==='miami'&&CFB['miami (fl)'])k='miami (fl)';return k}
+function cfbApplyRows(rows){
+  rows.forEach(function(r){
+    var k=cfbKey(r[1]);if(!k)return;
+    var o=CFB[k];
+    if(o&&!o.live&&o.G>r[2]&&!o.sched)return;
+    CFB[k]={name:r[1],G:r[2],off:r[3],def:r[4],live:1};
+  });
+}
+function cfbLive(){
+  if(window.claude||typeof fetch!=='function'||S.cfbBusy||Date.now()-S.cfbLiveAt<3*3600e3)return;
+  S.cfbBusy=true;
+  var now=new Date(),y=now.getFullYear(),st=Date.UTC(y,7,22),en=Date.now();
+  var pad=function(n){return n<10?'0'+n:''+n},fd=function(t){var d=new Date(t);return d.getUTCFullYear()+pad(d.getUTCMonth()+1)+pad(d.getUTCDate())};
+  var ranges=[];for(var t=st;t<=en;t+=7*864e5)ranges.push(fd(t)+'-'+fd(Math.min(t+6*864e5,en+864e5)));
+  tmList('ncaafb').then(function(list){
+    var fbs={};list.forEach(function(x){fbs[String(x.id)]=1});
+    var base='https://site.api.espn.com/apis/site/v2/sports/'+ESPN.ncaafb+'/scoreboard?groups=80&limit=400&dates=';
+    return Promise.all(ranges.map(function(r){return fetch(base+r,{cache:'no-store'}).then(function(x){return x.ok?x.json():null}).catch(function(){return null})})).then(function(js){
+      var seen={},T={};
+      js.filter(Boolean).forEach(function(j){(j.events||[]).forEach(function(e){
+        if(!e.id||seen[e.id])return;var c=(e.competitions||[])[0]||{},d=c.status&&c.status.type&&c.status.type.completed;if(!d)return;
+        var cs=c.competitors||[];if(cs.length!==2)return;
+        var sc=cs.map(function(x){return parseFloat(x.score&&typeof x.score==='object'?(x.score.value!=null?x.score.value:x.score.displayValue):x.score)});
+        if(isNaN(sc[0])||isNaN(sc[1]))return;seen[e.id]=1;
+        cs.forEach(function(x,i){var tm=x.team||{},id=String(tm.id);if(!fbs[id])return;
+          var o=T[id]||(T[id]={n:tm.location||tm.displayName||'',G:0,pf:0,pa:0});o.G++;o.pf+=sc[i];o.pa+=sc[1-i]})
+      })});
+      var rows=[];Object.keys(T).forEach(function(id){var o=T[id];if(o.G>=1&&o.n)rows.push([id,o.n,o.G,o.pf/o.G,o.pa/o.G])});
+      if(rows.length<40)throw 0;
+      cfbApplyRows(rows);S.cfbLiveAt=Date.now();
+      try{localStorage.setItem('hitboard.cfbt.v1',JSON.stringify({at:S.cfbLiveAt,rows:rows}))}catch(e){}
+      S.cfbBusy=false;try{render();if(S.sheet)renderSheet()}catch(e){}
+    });
+  }).catch(function(){S.cfbBusy=false});
+}
+try{var cfc=JSON.parse(localStorage.getItem('hitboard.cfbt.v1')||'null');if(cfc&&cfc.rows&&Date.now()-cfc.at<48*3600e3){cfbApplyRows(cfc.rows);S.cfbLiveAt=cfc.at}}catch(e){}
+var loadStatAvgs0=loadStatAvgs;
+loadStatAvgs=function(){try{cfbLive()}catch(e){}return loadStatAvgs0()};
+/* spread section: say what is actually missing */
+var coverBreakdown0=coverBreakdown;
+coverBreakdown=function(g){
+  var h=coverBreakdown0(g);
+  try{
+    if(h.indexOf('is posted for this game yet')>=0){
+      var T=feedTeams(g);
+      if(T&&T.missing)h=h.replace(/<p class="note"[^>]*>.*?<\/p>/,'<p class="note" style="margin-top:0">The cover chance needs scoring numbers for '+esc(T.missing.join(' and '))+', and they are still loading from ESPN. The app is pulling this season’s games for the team now, so reopen this game in a moment.</p>');
+    }
+  }catch(e){}
+  return h;
+};
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
