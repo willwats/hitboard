@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v114, Oct 30';
+var BUILD='v115, Oct 30';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -7602,6 +7602,363 @@ feedAnalyst=function(g){
   return feedAnalyst1(g);
 };
 if(S.cfbBusy==null)S.cfbBusy=false;
+
+var CFB_NOTES=[
+ {a:'Michigan Wolverines',h:'Rutgers Scarlet Knights',n:[
+  'Michigan has lost three of its last four, including a 13-6 overtime loss to Indiana, and its weakest area is the run game (104th nationally in EPA per rush).',
+  'Michigan starts true freshman Tommy Carr for the second straight week. He went 20 of 32 for 167 yards, no touchdowns and an interception last week.',
+  'Michigan has beaten only one team by more than 16 this year (52-17 over UTEP) and none by more than ten otherwise. UMass beat Rutgers by 16.',
+  'Rutgers’ offense rates 53rd in adjusted EPA per play and 56th in success rate. Its only Big Ten win is over Maryland.',
+  'The Under is 8-2 in the last ten meetings and 6-1 in Michigan’s games this year. Rutgers is 3-1 against the spread in the last four meetings.']},
+ {a:'Arizona Wildcats',h:'Texas Tech Red Raiders',n:[
+  'Arizona beat Cincinnati, which beat Texas Tech last week. Arizona’s 11-point loss at BYU is the better road comparison.',
+  'Texas Tech had 13 penalties and lost the turnover battle against Cincinnati, which exposed holes in its defense. This game is at home.',
+  'Arizona quarterback Noah Fifita is playing the best football of his career.']},
+ {a:'Florida Gators',h:'Georgia Bulldogs',n:[
+  'Georgia lost at home to Auburn in a turnover-heavy game. Florida won at Texas last time out.',
+  'Florida’s scoring defense ranks 110th. Georgia ranks fifth in scoring and fifth in yards per play.',
+  'Florida offensive coordinator Buster Faulkner used to coach at Georgia. His Georgia Tech offenses covered all three meetings with Georgia and gained 563 yards in 2024.',
+  'Both Florida quarterbacks are listed as questionable but are expected to play. Georgia’s Gunner Stockton is also expected to play.']},
+ {a:'Northwestern Wildcats',h:'Oregon Ducks',n:[
+  'Northwestern gave up 244 rushing yards last week, and its FBS wins came against teams with a combined 12-25 record.',
+  'Northwestern has lost by double digits in each of its last three trips to the West Coast.',
+  'Oregon’s defense ranks in the top ten nationally in interceptions.',
+  'Northwestern ranks in the top 20 in scoring and yards per play and in the top 15 in scoring defense, so it is not a pushover.']},
+ {a:'Utah Utes',h:'Cincinnati Bearcats',n:[
+  'Utah is 7-0 but needed to beat Colorado 27-24 and hold off Houston. It is 6-1 against the spread.',
+  'Cincinnati beat Texas Tech last week and plays much better defense at home than on the road.']},
+ {a:'Clemson Tigers',h:'Florida State Seminoles',n:[
+  'Clemson’s offense is the worst among Power Four teams in EPA per play and success rate: 21.4 points (111th), 333 yards (115th) and only two passing touchdowns.',
+  'Clemson’s starting quarterback struggled and was hurt. Tait Reynolds starts. Clemson has held five of seven opponents to 20 or fewer.',
+  'Florida State averages 30.6 points, but Ashton Daniels has eight interceptions and running back Ousmane Kromah is out for the season.',
+  'Florida State is 1-3 against the spread at home and 0-2 as a favorite.']},
+ {a:'Miami Hurricanes',h:'North Carolina Tar Heels',n:[
+  'Miami’s offense leads the country in yards per play and points, and its games have gone over the total six times in seven.',
+  'Miami’s run defense is among the best in the country, but it has allowed 300-plus passing yards to Wake Forest, Florida State and Pitt.',
+  'North Carolina is weak running the ball (105th in yards per carry) and 114th in total offense, but its receivers Jordan Shipp and Jelani Thurman make big plays.',
+  'Miami plays Notre Dame next week, which is a look-ahead risk for a big favorite.']},
+ {a:'Ohio State Buckeyes',h:'USC Trojans',n:[
+  'Ohio State’s starting quarterback Julian Sayin is out. True freshman Luke Fahey or Tavien St. Clair makes his first start, with Jeremiah Smith as the top target.',
+  'USC’s defense ranks around 106th in yards allowed per pass attempt and 107th in EPA, but USC’s pass offense is top ten (303.5 yards a game).',
+  'USC is 2-6 against the spread and is 86th in yards per carry. Ohio State allows 13.4 points a game and has averaged only about 25 on the road over two seasons.',
+  'The spread has moved off the key number of 7 to 6.5.']},
+ {a:'Mississippi State Bulldogs',h:'Texas Longhorns',n:[
+  'Arch Manning has nine turnovers this season, tied for second most nationally, and had three in his last game.',
+  'Texas has covered once in its last six games and is 3-9-1 against the spread after a win since Manning became the starter.',
+  'Mississippi State is 9-4 against the spread in its last 13 road games and took Texas to overtime last year.']},
+ {a:'Notre Dame Fighting Irish',h:'Navy Midshipmen',n:[
+  'Notre Dame lost to BYU last time out and has had two weeks to reset. Navy has not played a Power Four team this season.',
+  'Recent Notre Dame wins in this series: 49-10, 41-14, 42-3, then 35-32 in 2022 after leading 35-13 at halftime. Navy’s offense can shorten a game by running the ball.']},
+ {a:'Minnesota Golden Gophers',h:'Indiana Hoosiers',n:[
+  'Indiana has an elite defense and a sputtering offense, and has not scored 21 points in three straight games. That points to a low-scoring game where a 20-point spread is hard to cover.']},
+ {a:'Missouri Tigers',h:'Arkansas Razorbacks',n:[
+  'Arkansas had two weeks off, held up against Tennessee and won by ten at Vanderbilt. Missouri has lost recent games to Mississippi State and Ole Miss.']},
+ {a:'SMU Mustangs',h:'Syracuse Orange',n:[
+  'Syracuse has played through quarterback injuries and its only double-digit loss was 27-13 at Pitt. SMU is on its third road game this year.']},
+ {a:'Stanford Cardinal',h:'Louisville Cardinals',n:[
+  'Louisville scores 38.7 points a game (11th) and rushes for 215 yards a game (15th). Stanford’s run defense allows 187.6 yards a game (119th).',
+  'Stanford has lost road games 35-7, 57-3 and 58-7, and has lost by 23 or more in eight of its last nine on the road. Louisville has had two weeks off.']},
+ {a:'Washington Huskies',h:'Nebraska Cornhuskers',n:[
+  'Nebraska ranks fourth in defensive EPA per play and has not allowed more than 23 points all year. It is 6-1 against the spread.',
+  'Washington’s quarterback missed time with a rib injury and the Huskies committed five turnovers last week.']},
+ {a:'Wisconsin Badgers',h:'Iowa Hawkeyes',n:[
+  'Wisconsin’s defense has allowed ten or fewer points four times, including a 17-7 loss to UCLA, and the last two meetings were 42-10 and 37-0.']},
+ {a:'New Mexico Lobos',h:'San Jose State Spartans',n:[
+  'New Mexico wins by control in low-scoring games. San Jose State lacks offensive punch, lost 26-10 at home to Fresno State, and is not bad against the run.']},
+ {a:'Tulane Green Wave',h:'Charlotte 49ers',n:[
+  'Charlotte ranks last in FBS in third and fourth down success (29.5%) and 135th in defensive success rate. Tulane has several quality running backs and a big-play receiver in Destyn Hill.']},
+ {a:'Baylor Bears',h:'UCF Knights',n:[
+  'Baylor’s defense is opportunistic (8-plus interceptions, 27 sacks). UCF is playing a backup quarterback who has been turnover-prone, in a letdown spot after its upset of BYU.']},
+ {a:'Kent State Golden Flashes',h:'Sacramento State Hornets',n:[
+  'Kent State is 0-4 against the spread on the road and has been outscored 183-12 in those games, with a 2,300-mile trip. Sacramento State has lost badly to better teams but is rated about the same as Kent State.']}
+];
+
+/* ---------- block77: the pick section. Matchup first: what each team does well and badly, run and pass, and why the pick covers ---------- */
+function cnFor(g){
+  try{
+    if(g.lg==='ncaafb'){var r=null;CFB_NOTES.forEach(function(x){if(!r&&normName(g.an)===normName(x.a)&&normName(g.hn)===normName(x.h))r=x});return r?{n:r.n,inj:''}:null}
+    if(g.lg==='nfl'){var o=outFor(g);return o?{n:o.p.map(function(x){return x[2]}),inj:o.inj||''}:null}
+  }catch(e){}
+  return null;
+}
+var TWO_W=['red wings','blue jackets','maple leafs','golden knights','trail blazers','white sox','red sox','blue jays'];
+function shortNm(g,side){
+  var full=side==='a'?g.an:g.hn,ab=side==='a'?g.a:g.h;
+  try{if(g.lg==='ncaafb'){
+    var tl=S.tmL.ncaafb||[],nf=normName(full),hit=null;tl.forEach(function(x){if(!hit&&normName(x.nm)===nf&&x.loc)hit=x.loc});
+    if(hit)return hit;
+    var c=cfbFind(full);if(c&&c.name&&normName(c.name)!==nf&&nf.indexOf(normName(c.name))===0)return c.name.replace(/\bSt\.?$/,'State')}}catch(e){}
+  var w=String(full||ab).split(' ');if(w.length<2)return full||ab;
+  var two=w.slice(-2).join(' ').toLowerCase();
+  if(g.lg==='ncaafb'){return w.slice(0,Math.max(1,w.length-1)).join(' ')}
+  return TWO_W.indexOf(two)>=0?w.slice(-2).join(' '):w[w.length-1];
+}
+var US_BM={ncaafb:{rush:165,ypc:4.5,pass:225,ypa:6.5,t3:.40,to:1.3,sk:2.2,pts:29},nfl:{rush:115,ypc:4.4,pass:215,ypa:6.0,t3:.40,to:1.2,sk:2.4,pts:22}};
+S.us=S.us||{};
+function usNum(v){var m=String(v==null?'':v).match(/-?\d+(\.\d+)?/);return m?parseFloat(m[0]):null}
+function pairOf(v){var m=String(v||'').match(/(\d+)\s*[-\/]\s*(\d+)/);return m?[+m[1],+m[2]]:null}
+function usSide(m){var ca=pairOf(m.completionAttempts),sk=pairOf(m.sacksYardsLost),td=pairOf(m.thirdDownEff);
+  return {rush:usNum(m.rushingYards),ra:usNum(m.rushingAttempts),pass:usNum(m.netPassingYards),pa:ca?ca[1]:null,sk:sk?sk[0]:0,t3m:td?td[0]:null,t3a:td?td[1]:null,to:usNum(m.turnovers)}}
+function usGame(j,id){
+  var bt=j&&j.boxscore&&j.boxscore.teams;if(!bt||bt.length!==2)return null;
+  var me=null,op=null;bt.forEach(function(x){if(String(x.team&&x.team.id)===String(id))me=x;else op=x});
+  if(!me||!op)return null;
+  var mp=function(t){var m={};(t.statistics||[]).forEach(function(s){m[s.name]=s.displayValue});return m};
+  var o=usSide(mp(me)),d=usSide(mp(op));
+  if(o.rush==null||o.pass==null||d.rush==null||d.pass==null)return null;
+  return {o:o,d:d};
+}
+function usTeam(lg,ab,name){
+  return tmIdFor(lg,ab,name).then(function(id){return tmSched(lg,id).then(function(v){
+    var last=v.slice(-8),base='https://site.api.espn.com/apis/site/v2/sports/'+ESPN[lg]+'/summary?event=';
+    return Promise.all(last.map(function(e){
+      if(S.tbox[e.id]!==undefined)return Promise.resolve();
+      return fetch(base+encodeURIComponent(e.id)).then(function(r){return r.ok?r.json():null}).then(function(j){S.tbox[e.id]=j}).catch(function(){S.tbox[e.id]=null});
+    })).then(function(){
+      var P={id:id,G:v.length,n:0,pf:0,pa:0,s:{},res:[]},A=P.s;
+      ['oR','oRA','oP','oPA','oSk','o3m','o3a','oTO','dR','dRA','dP','dPA','dSk','d3m','d3a','dTO'].forEach(function(k){A[k]=0});
+      v.forEach(function(e){P.pf+=e.pf;P.pa+=e.pa});
+      last.forEach(function(e){
+        P.res.push({opp:(e.opp&&(e.opp.shortDisplayName||e.opp.displayName||e.opp.abbreviation))||'',home:e.home,pf:e.pf,pa:e.pa});
+        var u=usGame(S.tbox[e.id],id);if(!u)return;P.n++;
+        A.oR+=u.o.rush;A.oRA+=u.o.ra||0;A.oP+=u.o.pass;A.oPA+=u.o.pa||0;A.oSk+=u.o.sk;A.o3m+=u.o.t3m||0;A.o3a+=u.o.t3a||0;A.oTO+=u.o.to||0;
+        A.dR+=u.d.rush;A.dRA+=u.d.ra||0;A.dP+=u.d.pass;A.dPA+=u.d.pa||0;A.dSk+=u.o.sk?0:0;A.dSk+=u.d.sk;A.d3m+=u.d.t3m||0;A.d3a+=u.d.t3a||0;A.dTO+=u.d.to||0;
+      });
+      if(!P.G)throw 0;
+      return P;
+    });
+  })});
+}
+function usEnsure(g){
+  if(window.claude||typeof fetch!=='function'||(g.lg!=='ncaafb'&&g.lg!=='nfl'))return;
+  var c=S.us[g.id];
+  if(c&&(c.st==='load'||(c.st==='ok'&&Date.now()-c.t<30*60000)||(c.st==='err'&&Date.now()-c.t<2*60000)))return;
+  S.us[g.id]={st:'load',t:Date.now(),d:c&&c.d};
+  Promise.all([usTeam(g.lg,g.a,g.an),usTeam(g.lg,g.h,g.hn)]).then(function(r){
+    S.us[g.id]={st:'ok',t:Date.now(),d:{a:r[0],h:r[1]}};
+  }).catch(function(){S.us[g.id]={st:'err',t:Date.now(),d:c&&c.d}}).then(function(){
+    try{if(S.sheet&&S.sheet.type==='fgame'&&S.sheet.id===g.id)renderSheet()}catch(e){}
+  });
+}
+/* per-game rates from a team profile */
+function usRates(P){
+  if(!P||!P.n)return null;var A=P.s,n=P.n,G=P.res.length||n;
+  return {n:n,pf:P.pf/P.G,pa:P.pa/P.G,
+    oR:A.oR/n,oYpc:A.oRA?A.oR/A.oRA:null,oP:A.oP/n,oYpa:A.oPA?A.oP/A.oPA:null,oSk:A.oSk/n,o3:A.o3a?A.o3m/A.o3a:null,oTO:A.oTO/n,
+    dR:A.dR/n,dYpc:A.dRA?A.dR/A.dRA:null,dP:A.dP/n,dYpa:A.dPA?A.dP/A.dPA:null,dSk:A.dSk/n,d3:A.d3a?A.d3m/A.d3a:null,dTO:A.dTO/n};
+}
+function usLvOff(v,b){var r=v/b;return r>=1.12?'strong':r<=.88?'weak':'ok'}
+function usLvDef(v,b){var r=v/b;return r<=.88?'strong':r>=1.12?'weak':'ok'}
+function hbF0(x){return Math.round(x)}
+function hbF1(x){return x.toFixed(1)}
+/* works / struggles for one team (football) */
+function teamWS(nm,R,bm){
+  var W=[],B=[];
+  var add=function(l,good,t){(good?W:B).push(t)};
+  var ro=usLvOff(R.oR,bm.rush),po=usLvOff(R.oP,bm.pass),rd=usLvDef(R.dR,bm.rush),pd=usLvDef(R.dP,bm.pass);
+  if(ro==='strong')W.push('Runs the ball well: '+hbF0(R.oR)+' yards a game'+(R.oYpc?' at '+hbF1(R.oYpc)+' a carry':'')+'.');
+  if(ro==='weak')B.push('Struggles to run the ball: only '+hbF0(R.oR)+' yards a game'+(R.oYpc?' at '+hbF1(R.oYpc)+' a carry':'')+'. A typical team gets about '+bm.rush+'.');
+  if(po==='strong')W.push('Throws it well: '+hbF0(R.oP)+' net passing yards a game'+(R.oYpa?', '+hbF1(R.oYpa)+' per attempt':'')+'.');
+  if(po==='weak')B.push('Struggles to pass: only '+hbF0(R.oP)+' net passing yards a game'+(R.oYpa?', '+hbF1(R.oYpa)+' per attempt':'')+'. A typical team gets about '+bm.pass+'.');
+  if(rd==='strong')W.push('Stops the run: allows '+hbF0(R.dR)+' rushing yards a game'+(R.dYpc?' ('+hbF1(R.dYpc)+' a carry)':'')+'.');
+  if(rd==='weak')B.push('Gets run on: allows '+hbF0(R.dR)+' rushing yards a game'+(R.dYpc?' ('+hbF1(R.dYpc)+' a carry)':'')+'.');
+  if(pd==='strong')W.push('Covers well against the pass: allows just '+hbF0(R.dP)+' passing yards a game'+(R.dYpa?', '+hbF1(R.dYpa)+' per attempt':'')+'.');
+  if(pd==='weak')B.push('Leaks against the pass: allows '+hbF0(R.dP)+' passing yards a game'+(R.dYpa?', '+hbF1(R.dYpa)+' per attempt':'')+'.');
+  if(R.oTO>=bm.to*1.3)B.push('Careless with the ball: '+hbF1(R.oTO)+' turnovers a game.');
+  else if(R.oTO<=bm.to*.7)W.push('Protects the ball: just '+hbF1(R.oTO)+' turnovers a game.');
+  if(R.dTO>=bm.to*1.3)W.push('Takes the ball away: '+hbF1(R.dTO)+' takeaways a game.');
+  else if(R.dTO<=bm.to*.6)B.push('Rarely forces turnovers: '+hbF1(R.dTO)+' a game.');
+  if(R.o3!=null){if(R.o3>=.46)W.push('Keeps drives alive on third down ('+hbF0(R.o3*100)+'%).');else if(R.o3<=.34)B.push('Stalls on third down, converting only '+hbF0(R.o3*100)+'%.')}
+  if(R.d3!=null){if(R.d3<=.33)W.push('Gets off the field on third down, holding opponents to '+hbF0(R.d3*100)+'%.');else if(R.d3>=.48)B.push('Cannot get off the field on third down: opponents convert '+hbF0(R.d3*100)+'%.')}
+  if(R.oSk>=bm.sk*1.4)B.push('Gives up sacks: '+hbF1(R.oSk)+' a game.');
+  if(R.dSk>=bm.sk*1.4)W.push('Gets to the quarterback: '+hbF1(R.dSk)+' sacks a game.');
+  var so=R.pf/bm.pts;
+  if(so>=1.15)W.push('Scores '+hbF1(R.pf)+' a game.');else if(so<=.85)B.push('Scores just '+hbF1(R.pf)+' a game.');
+  var sd=R.pa/bm.pts;
+  if(sd<=.85)W.push('Allows only '+hbF1(R.pa)+' points a game.');else if(sd>=1.15)B.push('Allows '+hbF1(R.pa)+' points a game.');
+  return {W:W,B:B};
+}
+function hbList(a,empty){return a.length?'<ul class="pts" style="margin-top:2px">'+a.map(function(x){return '<li>'+esc(x)+'</li>'}).join('')+'</ul>':'<p class="src" style="margin-top:2px">'+esc(empty)+'</p>'}
+/* the matchup: each phase of the game */
+function usPhases(g,ra,rh,bm,na,nh){
+  var P=[];
+  var ph=function(off,R1,R2,k1,k2,bmv,what,verbO,verbD){
+    var exp=(R1[k1]+R2[k2])/2,lv=exp>=bmv*1.1?'good':exp<=bmv*.9?'bad':'mid';
+    return {off:off,exp:exp,lv:lv,R1:R1,R2:R2,what:what};
+  };
+  P.push({t:'run',team:'a',nm:na,opp:nh,exp:(ra.oR+rh.dR)/2,o:ra.oR,d:rh.dR,bm:bm.rush});
+  P.push({t:'pass',team:'a',nm:na,opp:nh,exp:(ra.oP+rh.dP)/2,o:ra.oP,d:rh.dP,bm:bm.pass});
+  P.push({t:'run',team:'h',nm:nh,opp:na,exp:(rh.oR+ra.dR)/2,o:rh.oR,d:ra.dR,bm:bm.rush});
+  P.push({t:'pass',team:'h',nm:nh,opp:na,exp:(rh.oP+ra.dP)/2,o:rh.oP,d:ra.dP,bm:bm.pass});
+  P.forEach(function(p){p.r=p.exp/p.bm;p.lv=p.r>=1.1?'good':p.r<=.9?'bad':'mid'});
+  return P;
+}
+function phTxt(p){
+  var w=p.t==='run'?'run game':'passing game',u=p.t==='run'?'rushing':'passing',dn=p.t==='run'?'run defense':'pass defense';
+  var s=p.nm+' '+w+' meets '+p.opp+' '+dn+': '+p.nm+' gets '+hbF0(p.o)+' '+u+' yards a game and '+p.opp+' allows '+hbF0(p.d)+'. ';
+  s+=p.lv==='good'?'Expect '+p.nm+' to move the ball this way (about '+hbF0(p.exp)+').':p.lv==='bad'?'Expect '+p.nm+' to be shut down here (about '+hbF0(p.exp)+').':'No clear edge, about '+hbF0(p.exp)+' expected.';
+  return s;
+}
+/* pick for a football or generic game */
+function pickModel(g){
+  var ln=null;try{ln=lineFor(g)}catch(e){}
+  var us=S.us[g.id],D=us&&us.d,Ra=D?usRates(D.a):null,Rh=D?usRates(D.h):null,bm=US_BM[g.lg];
+  var he=g.lg==='nfl'?2.5:g.lg==='ncaafb'?3:g.lg==='nhl'?.25:2.5;
+  var sa=null,sh=null,src='';
+  var T=null;try{T=feedTeams(g)}catch(e){}
+  if(T&&!T.missing){sa=(T.A.pf+T.H.pa)/2-T.he/2;sh=(T.H.pf+T.A.pa)/2+T.he/2;he=T.he}
+  else if(Ra&&Rh){sa=(Ra.pf+Rh.pa)/2-he/2;sh=(Rh.pf+Ra.pa)/2+he/2}
+  var M0=sa!=null?sh-sa:null,My=null,ph=null;
+  if(Ra&&Rh&&bm){
+    var ya=((Ra.oR+Rh.dR)/2+(Ra.oP+Rh.dP)/2),yh=((Rh.oR+Ra.dR)/2+(Rh.oP+Ra.dP)/2);
+    My=(yh-ya)/14+he;ph=usPhases(g,Ra,Rh,bm,shortNm(g,'a'),shortNm(g,'h'));
+  }
+  var M=M0!=null&&My!=null?0.65*M0+0.35*My:(M0!=null?M0:null);
+  var mk=(ln&&ln.pts!=null)?(ln.fav==='h'?ln.pts:-ln.pts):null;
+  return {ln:ln,Ra:Ra,Rh:Rh,bm:bm,sa:sa,sh:sh,M0:M0,My:My,M:M,mk:mk,ph:ph,he:he,T:T,tot:(sa!=null?sa+sh:null)};
+}
+function sgnPts(x){return (x>0?'+':x<0?'-':'')+Math.abs(x)}
+function pickBlock(g){
+  var up=false;try{up=kind(g)==='up'}catch(e){}
+  if(!up||(g.lg!=='ncaafb'&&g.lg!=='nfl'&&g.lg!=='nba'&&g.lg!=='nhl'))return '';
+  try{usEnsure(g)}catch(e){}
+  var m=pickModel(g),na=shortNm(g,'a'),nh=shortNm(g,'h'),us=S.us[g.id],loading=!!(us&&us.st==='load'),h='';
+  var fb=(g.lg==='ncaafb'||g.lg==='nfl');
+  if(m.M==null||!m.ln||m.ln.pts==null){
+    h='<h3>The pick</h3>';
+    if(m.M==null)return h+'<div class="card bcard"><div class="label">Spread pick</div><div class="teams">Working on it</div><p class="src" style="margin-top:6px">'+(loading?'Pulling each team’s recent games now. This fills in on its own.':'The team numbers for this game have not loaded yet. This fills in on its own.')+'</p></div>'+(function(){try{return marketRead(g)}catch(e){return ''}})();
+    return h+'<div class="card bcard"><div class="label">Spread pick</div><div class="teams">No spread posted yet</div><p class="src" style="margin-top:6px">I have '+esc(m.M>=0?nh:na)+' winning by about '+hbF1(Math.abs(m.M))+'. Once a line is posted I will say which side covers.</p></div>';
+  }
+  var L=m.mk,edge=m.M-L,homeCov=edge>=0,pickSide=homeCov?'h':'a',pk=homeCov?nh:na,ok=homeCov?na:nh;
+  var lineForPick=homeCov?-L:L;   /* the pick team's spread number */
+  var fav=L>=0?'h':'a',favN=fav==='h'?nh:na,dogN=fav==='h'?na:nh;
+  var sc=g.lg==='nhl'?0.2:1,shr=0.5*Math.abs(edge)/sc,conf=shr>=4?'Strong lean':shr>=2?'Lean':'Slight lean, thin edge';
+  var mine=0.5*m.M+0.5*L;
+  var big=Math.abs(L);
+  var head=pk+' '+sgnPts(lineForPick)+' covers';
+  var Mf=fav==='h'?m.M:-m.M,sub;
+  if(pickSide===fav)sub='I have '+esc(pk)+' winning by about '+hbF0(Math.abs(Mf))+', more than the '+big+' it needs. ';
+  else if(Mf>0)sub='I have '+esc(favN)+' winning by about '+hbF0(Mf)+', which is inside the '+big+' it has to win by. ';
+  else sub='I have '+esc(pk)+' winning the game outright. ';
+  h+='<h3>The pick</h3><div class="card bcard"><div class="label">Spread pick · '+esc(conf)+'</div><div class="teams" style="font-size:22px">'+esc(head)+'</div><p style="margin:8px 0 0;line-height:1.5">'+sub+(m.ln.tt!=null?'The line expects about '+hbF0((m.ln.tt+big)/2)+' to '+hbF0((m.ln.tt-big)/2)+' (total '+m.ln.tt+').':'')+'</p></div>';
+  /* WHY */
+  var why=[],against=[];
+  var favImp=m.ln.tt!=null?(m.ln.tt+big)/2:null,dogImp=m.ln.tt!=null?(m.ln.tt-big)/2:null;
+  var Rf=m.Ra&&m.Rh?(fav==='h'?m.Rh:m.Ra):null,Rd=m.Ra&&m.Rh?(fav==='h'?m.Ra:m.Rh):null;
+  if(m.ph&&Rf&&Rd){
+    var ofPick=m.ph.filter(function(p){return p.team===pickSide}),ofOpp=m.ph.filter(function(p){return p.team!==pickSide});
+    var good=ofPick.slice().sort(function(a,b){return b.r-a.r}),badOpp=ofOpp.slice().sort(function(a,b){return a.r-b.r});
+    if(good[0].lv==='good')why.push(esc(phTxt(good[0])));
+    if(badOpp[0].lv==='bad')why.push(esc(phTxt(badOpp[0])));
+    if(good[1]&&good[1].lv==='good'&&why.length<3)why.push(esc(phTxt(good[1])));
+    if(badOpp[1]&&badOpp[1].lv==='bad'&&why.length<3)why.push(esc(phTxt(badOpp[1])));
+  }
+  if(favImp!=null&&Rf&&Rd){
+    var expF=(Rf.pf+Rd.pa)/2,expD=(Rd.pf+Rf.pa)/2;
+    if(pickSide!==fav)why.push(esc(favN)+' is priced to score about '+hbF0(favImp)+' and hold '+esc(dogN)+' to about '+hbF0(dogImp)+'. It averages '+hbF1(Rf.pf)+' and '+esc(dogN)+' allows '+hbF1(Rd.pa)+' (about '+hbF0(expF)+' expected), while '+esc(dogN)+' scores '+hbF1(Rd.pf)+' and '+esc(favN)+' allows '+hbF1(Rf.pa)+' (about '+hbF0(expD)+' expected). '+(expF-expD<big?'That is a smaller gap than '+big+'.':'The gap is there, but it needs everything to go right for '+esc(favN)+'.'));
+    else why.push(esc(favN)+' is priced to score about '+hbF0(favImp)+' and hold '+esc(dogN)+' to about '+hbF0(dogImp)+'. It averages '+hbF1(Rf.pf)+' and '+esc(dogN)+' allows '+hbF1(Rd.pa)+' (about '+hbF0(expF)+' expected), while '+esc(dogN)+' scores '+hbF1(Rd.pf)+' and '+esc(favN)+' allows '+hbF1(Rf.pa)+' (about '+hbF0(expD)+' expected). '+(expF-expD>=big?'That clears the number.':'That is close to the number, and the rest of the matchup pushes it over.'));
+  }else if(m.T&&!m.T.missing&&favImp!=null){
+    var Af=fav==='h'?m.T.H:m.T.A,Ad=fav==='h'?m.T.A:m.T.H;
+    why.push(esc(favN)+' is priced to score about '+hbF0(favImp)+' and win by '+big+'. It averages '+hbF1(Af.pf)+' and '+esc(dogN)+' allows '+hbF1(Ad.pa)+'.');
+  }
+  if(Rf&&Rd&&m.ln.tt!=null){
+    var lt=US_BM[g.lg]?US_BM[g.lg].pts*2:null;
+    if(lt&&m.ln.tt<=lt-8&&pickSide!==fav)why.push('The total of '+m.ln.tt+' is low for football, which means fewer possessions and fewer points for the favorite to win by '+big+'. That helps the underdog.');
+    if(lt&&m.ln.tt>=lt+8&&pickSide===fav)why.push('The total of '+m.ln.tt+' is high, which means plenty of possessions and room for the favorite to pull away.');
+  }
+  if(Rf&&Rd){
+    var tf=(pickSide===fav?Rf:Rd),to=(pickSide===fav?Rd:Rf);
+    if(tf.oTO<=to.oTO-.4&&tf.dTO>=to.dTO)why.push(esc(pk)+' protects the ball better ('+hbF1(tf.oTO)+' turnovers a game to '+hbF1(to.oTO)+'), which matters in a game that is close.');
+    var last3=function(P){return P.res.slice(-3).map(function(r){return (r.pf>r.pa?'W':'L')+' '+r.pf+'-'+r.pa}).join(', ')};
+    var Pp=pickSide==='h'?m.Rh&&S.us[g.id].d.h:m.Ra&&S.us[g.id].d.a;
+    if(Pp&&Pp.res.length>=3)why.push(esc(pk)+' last three: '+last3(Pp)+'.');
+  }
+  if(!m.ph&&m.T&&!m.T.missing&&!why.length){
+    var pool=poolFor(g.lg),n=pool.length,PT=pickSide==='h'?m.T.H:m.T.A,OT=pickSide==='h'?m.T.A:m.T.H,d=g.lg==='nhl'?2:1,u=g.lg==='nhl'?'goals':'points';
+    if(n>=10){why.push(esc(pk)+' scores '+PT.pf.toFixed(d)+' '+u+' a game ('+ordn(rkOf(pool,'pf',PT.pf,1))+' of '+n+') against an '+esc(ok)+' defense that allows '+OT.pa.toFixed(d)+' ('+ordn(rkOf(pool,'pa',OT.pa,0))+').');
+      why.push(esc(ok)+' scores '+OT.pf.toFixed(d)+' ('+ordn(rkOf(pool,'pf',OT.pf,1))+') against a '+esc(pk)+' defense that allows '+PT.pa.toFixed(d)+' ('+ordn(rkOf(pool,'pa',PT.pa,0))+').')}
+  }
+  if(!why.length)why.push('The numbers I can read put '+esc(pk)+' on the right side of the line. '+(fb?'The run and pass numbers for this game have not loaded, so this rests on scoring.':'This rests on scoring numbers.'));
+  h+='<h3>Why '+esc(pk)+' covers</h3><ul class="pts" style="margin-top:2px">'+why.map(function(x){return '<li>'+x+'</li>'}).join('')+'</ul>';
+  /* teams */
+  if(m.Ra&&m.Rh&&m.bm){
+    var wa=teamWS(na,m.Ra,m.bm),wh=teamWS(nh,m.Rh,m.bm);
+    [[na,wa,'a'],[nh,wh,'h']].forEach(function(t){
+      h+='<h3>'+esc(t[0])+': what works and what does not</h3><div class="src"><b>Works</b></div>'+hbList(t[1].W,'Nothing here stands out as a strength.')+'<div class="src" style="margin-top:6px"><b>Struggles</b></div>'+hbList(t[1].B,'Nothing here stands out as a real weakness.');
+    });
+    /* matchup phases */
+    h+='<h3>How the game plays out</h3><ul class="pts" style="margin-top:2px">'+m.ph.map(function(p){return '<li>'+esc(phTxt(p))+'</li>'}).join('')+'</ul>';
+    var script=[];
+    var favRun=m.ph.filter(function(p){return p.team===fav&&p.t==='run'})[0],dogRun=m.ph.filter(function(p){return p.team!==fav&&p.t==='run'})[0];
+    if(favRun&&dogRun){
+      if(favRun.lv==='bad')script.push(favN+' will have trouble running the clock if it gets a lead, because its ground game is shut down against this defense. That keeps the game close for longer.');
+      if(favRun.lv==='good'&&dogRun.lv!=='good')script.push(favN+' can lean on the run once ahead, shorten the game and bleed clock, which is how a favorite puts a game away.');
+      if(dogRun.lv==='good')script.push(dogN+' can run the ball against this defense, which keeps the ball away from '+favN+' and keeps the margin down.');
+    }
+    if(script.length)h+='<p style="margin:8px 0;line-height:1.5">'+script.map(esc).join(' ')+'</p>';
+  }else{
+    h+=genericRead(g,m,na,nh);
+  }
+  /* wrong */
+  var wr=[];
+  if(m.ph){
+    var theirs=m.ph.filter(function(p){return p.team!==pickSide&&p.lv==='good'}).sort(function(a,b){return b.r-a.r})[0];
+    if(theirs)wr.push(phTxt(theirs)+' If that goes big, '+esc(ok)+' can beat this pick.');
+    var mine2=m.ph.filter(function(p){return p.team===pickSide&&p.lv==='bad'}).sort(function(a,b){return a.r-b.r})[0];
+    if(mine2)wr.push(phTxt(mine2)+' That is the soft spot in this pick.');
+  }
+  try{var ia=injOut(g,'a'),ih=injOut(g,'h');
+    if(ia&&ia.length)wr.push(na+' has '+ia.slice(0,5).join(', ')+' Out or Doubtful.');
+    if(ih&&ih.length)wr.push(nh+' has '+ih.slice(0,5).join(', ')+' Out or Doubtful.');}catch(e){}
+  wr.push('Opponent strength is not adjusted in the numbers, and one turnover or a long play can swing a game. Check the injury news again near kickoff.');
+  h+='<h3>What could make this wrong</h3><ul class="pts" style="margin-top:2px">'+wr.map(function(x){return '<li>'+esc(x)+'</li>'}).join('')+'</ul>';
+  /* around the game */
+  var cn=cnFor(g);
+  if(cn&&cn.n&&cn.n.length)h+='<h3>Around the game</h3><ul class="pts" style="margin-top:2px">'+cn.n.map(function(x){return '<li>'+esc(x)+'</li>'}).join('')+'</ul>'+(cn.inj?'<p class="note" style="margin-top:6px">'+esc(cn.inj)+'</p>':'');
+  /* total and moneyline */
+  var tl=[];
+  if(m.ln.tt!=null&&m.tot!=null){var d=m.tot-m.ln.tt;tl.push('<li><b>Total '+m.ln.tt+':</b> '+(d>=3?'I lean Over. My numbers have about '+hbF0(m.tot)+'.':d<=-3?'I lean Under. My numbers have about '+hbF0(m.tot)+'.':'No real lean. My numbers have about '+hbF0(m.tot)+', close to the line.')+'</li>')}
+  var wn=m.M>=0?nh:na;
+  tl.push('<li><b>Winner:</b> I have '+esc(wn)+' winning'+(Math.abs(m.M)<3?', but it is close to a coin flip.':'.')+'</li>');
+  h+='<h3>Total and winner</h3><ul class="pts" style="margin-top:2px">'+tl.join('')+'</ul>';
+  if(loading&&!m.ph)h+='<p class="src">Pulling each team’s recent games for the run and pass breakdown. This fills in on its own.</p>';
+  return h;
+}
+/* basketball / hockey: the same layout from team numbers */
+function genericRead(g,m,na,nh){
+  var pool=poolFor(g.lg),T=m.T,h='';
+  if(!T||T.missing||pool.length<10)return '';
+  var A=T.A,H=T.H,n=pool.length;
+  var row=function(nm,X){
+    var ro=rkOf(pool,'pf',X.pf,1),rd=rkOf(pool,'pa',X.pa,0),W=[],B=[],u=g.lg==='nhl'?'goals':'points';
+    var d=g.lg==='nhl'?2:1;
+    (ro<=n*.3?W:ro>=n*.7?B:[]).push((ro<=n*.3?'Scores well':'Struggles to score')+': '+X.pf.toFixed(d)+' '+u+' a game ('+ordn(ro)+' of '+n+').');
+    (rd<=n*.3?W:rd>=n*.7?B:[]).push((rd<=n*.3?'Defends well':'Defense leaks')+': allows '+X.pa.toFixed(d)+' ('+ordn(rd)+' of '+n+').');
+    if(g.lg==='nhl'){var NT=NHLT[X.k];if(NT){var rs=nhlRank('sf',NT.sf,1),rsa=nhlRank('sa',NT.sa,0),rp=nhlRank('pp',NT.pp,1),rk=nhlRank('pk',NT.pk,1);
+      (rs<=10?W:rs>=23?B:[]).push((rs<=10?'Drives shot volume':'Gets few shots')+': '+NT.sf.toFixed(1)+' a game ('+ordn(rs)+').');
+      (rsa<=10?W:rsa>=23?B:[]).push((rsa<=10?'Limits shots against':'Gives up a lot of shots')+': '+NT.sa.toFixed(1)+' a game ('+ordn(rsa)+').');
+      (rp<=8?W:rp>=25?B:[]).push((rp<=8?'Dangerous power play':'Weak power play')+': '+(NT.pp*100).toFixed(1)+'% ('+ordn(rp)+').')}}
+    return '<h3>'+esc(nm)+': what works and what does not</h3><div class="src"><b>Works</b></div>'+hbList(W,'Nothing stands out as a strength.')+'<div class="src" style="margin-top:6px"><b>Struggles</b></div>'+hbList(B,'Nothing stands out as a real weakness.');
+  };
+  h+=row(na,A)+row(nh,H);
+  var sa=(A.pf+H.pa)/2,sh=(H.pf+A.pa)/2;
+  h+='<h3>How the game plays out</h3><ul class="pts" style="margin-top:2px"><li>'+esc(na)+' scoring against '+esc(nh)+' defense: expect about '+sa.toFixed(g.lg==='nhl'?1:0)+'. '+esc(nh)+' scoring against '+esc(na)+' defense: expect about '+sh.toFixed(g.lg==='nhl'?1:0)+'.</li></ul>';
+  return h;
+}
+/* wire it in: new section on top, the old prediction/why tabs and the duplicate spread section are replaced for games not started */
+var whyBlock3=whyBlock;
+whyBlock=function(g,why){var up=false;try{up=kind(g)==='up'}catch(e){}if(up&&(g.lg==='ncaafb'||g.lg==='nfl'||g.lg==='nba'||g.lg==='nhl'))return '';return whyBlock3(g,why)};
+var coverBreakdown3=coverBreakdown;
+coverBreakdown=function(g){var up=false;try{up=kind(g)==='up'}catch(e){}if(up&&(g.lg==='ncaafb'||g.lg==='nfl'||g.lg==='nba'||g.lg==='nhl'))return '';return coverBreakdown3(g)};
+var feedSheet3=feedSheet;
+feedSheet=function(g){
+  var h=feedSheet3(g),blk='';
+  try{blk=pickBlock(g)}catch(e){blk=''}
+  if(!blk)return h;
+  var mk='aria-label="Close">×</button></div>',i=h.indexOf(mk);
+  if(i<0)return h;i+=mk.length;
+  return h.slice(0,i)+blk+h.slice(i);
+};
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
