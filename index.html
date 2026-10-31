@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v116, Oct 31';
+var BUILD='v117, Oct 31';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -7839,7 +7839,6 @@ function sgnPts(x){return (x>0?'+':x<0?'-':'')+Math.abs(x)}
 function predScore(g,m,L,na,nh){
   var tot=m.tot,mine=m.M;
   if(tot==null)return null;
-  if(m.ln&&m.ln.tt!=null)tot=0.5*tot+0.5*m.ln.tt;
   var h=(tot+mine)/2,a=(tot-mine)/2;
   return {a:a,h:h,mine:mine};
 }
@@ -7902,11 +7901,13 @@ function pickBlock(g){
   var mine=0.5*m.M+0.5*L;
   var big=Math.abs(L);
   var head=pk+' '+sgnPts(lineForPick)+' covers';
-  var Mf=fav==='h'?m.M:-m.M,sub;
-  if(pickSide===fav)sub='I have '+esc(pk)+' winning by about '+hbF0(Math.abs(Mf))+', more than the '+big+' it needs. ';
-  else if(Mf>0)sub='I have '+esc(favN)+' winning by about '+hbF0(Mf)+', which is inside the '+big+' it has to win by. ';
-  else sub='I have '+esc(pk)+' winning the game outright. ';
-  h+='<h3>The pick</h3><div class="card bcard"><div class="label">Spread pick · '+esc(conf)+'</div><div class="teams" style="font-size:22px">'+esc(head)+'</div><p style="margin:8px 0 0;line-height:1.5">'+sub+(m.ln.tt!=null?'The line expects about '+hbF0((m.ln.tt+big)/2)+' to '+hbF0((m.ln.tt-big)/2)+' (total '+m.ln.tt+').':'')+'</p></div>';
+  var Mf=fav==='h'?m.M:-m.M,sub,ps0=predScore(g,m,L,na,nh);
+  var scTxt=ps0?(ps0.h>=ps0.a?esc(nh)+' '+hbF0(ps0.h)+', '+esc(na)+' '+hbF0(ps0.a):esc(na)+' '+hbF0(ps0.a)+', '+esc(nh)+' '+hbF0(ps0.h)):'';
+  sub='<b>My predicted score, from the two teams alone: '+scTxt+'.</b> ';
+  if(pickSide===fav)sub+=esc(pk)+' wins by about '+hbF0(Math.abs(Mf))+', more than the '+big+' it needs, so it covers.';
+  else if(Mf>0)sub+=esc(favN)+' wins by about '+hbF0(Mf)+', which is less than the '+big+' it has to win by, so '+esc(pk)+' covers.';
+  else sub+=esc(pk)+' wins the game outright, so it covers.';
+  h+='<h3>The pick</h3><div class="card bcard"><div class="label">Spread pick · '+esc(conf)+'</div><div class="teams" style="font-size:22px">'+esc(head)+'</div><p style="margin:8px 0 0;line-height:1.5">'+sub+(m.ln.tt!=null?' For comparison, the betting line implies about '+hbF0((m.ln.tt+big)/2)+' to '+hbF0((m.ln.tt-big)/2)+'. I did not use it to build my score.':'')+'</p></div>';
   /* WHY */
   var why=[],against=[];
   why.push('My number is '+esc(favN)+' '+((fav==='h'?m.M:-m.M)>=0?'by about '+hbF0(Math.abs(m.M)):'losing by about '+hbF0(Math.abs(m.M)))+' against a line of '+big+', which puts '+esc(pk)+' '+(pickSide===fav?'about '+hbF0(Math.abs(edge))+' points clear of it.':'about '+hbF0(Math.abs(edge))+' points of cushion.'));
