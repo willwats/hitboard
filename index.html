@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v119, Oct 31';
+var BUILD='v120, Oct 31';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -7930,9 +7930,8 @@ function pickBlock(g){
   var sc=g.lg==='nhl'?0.2:1,shr=0.5*Math.abs(edge)/sc,conf=shr>=4?'Strong lean':shr>=2?'Lean':'Slight lean, thin edge';
   var mine=0.5*m.M+0.5*L;
   var big=Math.abs(L);
-  var ex=null;try{ex=expSig(g,pickSide)}catch(e){}
-  if(ex&&ex.rel==='agree')conf=conf==='Lean'?'Strong lean':conf==='Slight lean, thin edge'?'Lean':conf;
-  else if(ex&&ex.rel==='split')conf=conf==='Strong lean'?'Lean':'Split, thin edge';
+  var ex=null;try{ex=expSig(g,pickSide,m.M>=0?'h':'a')}catch(e){}
+  conf='Confidence '+hbGradeOf(shr,ex);
   var head=pk+' '+sgnPts(lineForPick)+' covers';
   var Mf=fav==='h'?m.M:-m.M,sub,ps0=predScore(g,m,L,na,nh);
   var scTxt=ps0?(ps0.h>=ps0.a?esc(nh)+' '+hbF0(ps0.h)+', '+esc(na)+' '+hbF0(ps0.a):esc(na)+' '+hbF0(ps0.a)+', '+esc(nh)+' '+hbF0(ps0.h)):'';
@@ -7940,7 +7939,7 @@ function pickBlock(g){
   if(pickSide===fav)sub+=esc(pk)+' wins by about '+hbF0(Math.abs(Mf))+', more than the '+big+' it needs, so it covers.';
   else if(Mf>0)sub+=esc(favN)+' wins by about '+hbF0(Mf)+', which is less than the '+big+' it has to win by, so '+esc(pk)+' covers.';
   else sub+=esc(pk)+' wins the game outright, so it covers.';
-  h+='<h3>The pick</h3><div class="card bcard"><div class="label">Spread pick · '+esc(conf)+'</div><div class="teams" style="font-size:22px">'+esc(head)+'</div><p style="margin:8px 0 0;line-height:1.5">'+sub+' The spread of '+big+' was not used to build this. I only compare my result to it at the end.'+(ex?(ex.rel==='agree'?' Outside analysts land on the same side, which adds some confidence.':' Outside analysts lean the other way (see the notes below), so treat this one as a lower-confidence call.'):'')+'</p></div>';
+  h+='<h3>The pick</h3><div class="card bcard"><div class="label">Spread pick · '+esc(conf)+'</div><div class="teams" style="font-size:22px">'+esc(head)+'</div><p style="margin:8px 0 0;line-height:1.5">'+sub+' The spread of '+big+' was not used to build this. I only compare my result to it at the end.'+(ex?(ex.rel==='agree'?' Outside analysts land on the same side, which raised the grade.':' Outside analysts lean the other way (see the notes below). I kept my pick because it comes from the teams alone, but I lowered the grade.'):'')+'</p></div>';
   /* WHY */
   var why=[],against=[];
   why.push('My number is '+esc(favN)+' '+((fav==='h'?m.M:-m.M)>=0?'by about '+hbF0(Math.abs(m.M)):'losing by about '+hbF0(Math.abs(m.M)))+' against a line of '+big+', which puts '+esc(pk)+' '+(pickSide===fav?'about '+hbF0(Math.abs(edge))+' points clear of it.':'about '+hbF0(Math.abs(edge))+' points of cushion.'));
@@ -8012,6 +8011,7 @@ function pickBlock(g){
   if(m.ln.tt!=null&&m.tot!=null){var d=m.tot-m.ln.tt;tl.push('<li><b>Total '+m.ln.tt+':</b> '+(d>=3?'I lean Over. My numbers have about '+hbF0(m.tot)+'.':d<=-3?'I lean Under. My numbers have about '+hbF0(m.tot)+'.':'No real lean. My numbers have about '+hbF0(m.tot)+', close to the line.')+'</li>')}
   var wn=m.M>=0?nh:na;
   tl.push('<li><b>Winner:</b> I have '+esc(wn)+' winning'+(Math.abs(m.M)<3?', but it is close to a coin flip.':'.')+'</li>');
+  try{var etl=expTotLine(g,m);if(etl)tl.push(etl)}catch(e){}
   h+='<h3>Total and winner</h3><ul class="pts" style="margin-top:2px">'+tl.join('')+'</ul>';
   if(loading&&!m.ph)h+='<p class="src">Pulling each team’s recent games for the run and pass breakdown. This fills in on its own.</p>';
   return h;
@@ -8102,12 +8102,13 @@ function expFor(g){
     if((expTm(g,'a',a)&&expTm(g,'h',b))||(expTm(g,'a',b)&&expTm(g,'h',a)))r=x});
   return r;
 }
-function expSig(g,pickSide){
+function expSig(g,pickSide,winSide){
   var e=expFor(g);if(!e||!e.p)return null;
   var p=e.p,side=null;
   if(p.tm){if(expTm(g,'a',p.tm))side='a';else if(expTm(g,'h',p.tm))side='h'}
   if(!side)return null;
-  if(p.k==='spread'||p.k==='ml')return {rel:side===pickSide?'agree':'split',side:side,k:p.k};
+  if(p.k==='spread')return {rel:side===pickSide?'agree':'split',side:side,k:p.k};
+  if(p.k==='ml')return {rel:side===(winSide||pickSide)?'agree':'split',side:side,k:p.k};
   return null;
 }
 var cnFor78=cnFor;
@@ -8118,6 +8119,75 @@ cnFor=function(g){
   var base=b&&b.n?b.n.slice():[];
   return {n:base.concat(e.n),inj:b&&b.inj?b.inj:''};
 };
+
+/* v119b: letter grades, one team-only pick everywhere, analyst agreement shown as a split when it differs */
+function hbGradeOf(shr,ex){
+  var s=shr+(ex?(ex.rel==='agree'?1.5:-2):0);
+  return s>=6?'A':s>=5?'A-':s>=4?'B+':s>=3?'B':s>=2?'B-':s>=1.5?'C+':s>=1?'C':s>=.5?'C-':'D';
+}
+function hbGradeNum(l){return {'A':9,'A-':8,'B+':7,'B':6,'B-':5,'C+':4,'C':3,'C-':2,'D':1}[l]||0}
+function hbEval(g){
+  if(!g||(g.lg!=='ncaafb'&&g.lg!=='nfl'&&g.lg!=='nba'&&g.lg!=='nhl'))return null;
+  var m=null;try{m=pickModel(g)}catch(e){return null}
+  if(!m||m.M==null||m.mk==null)return {g:g,pending:true};
+  var na=shortNm(g,'a'),nh=shortNm(g,'h'),L=m.mk,edge=m.M-L,pickSide=edge>=0?'h':'a',pk=pickSide==='h'?nh:na;
+  var sc=g.lg==='nhl'?0.2:1,shr=0.5*Math.abs(edge)/sc,winSide=m.M>=0?'h':'a';
+  var ex=null;try{ex=expSig(g,pickSide,winSide)}catch(e){}
+  var lineP=pickSide==='h'?-L:L,grade=hbGradeOf(shr,ex),q=null;
+  try{q=predScore(g,m,L,na,nh)}catch(e){}
+  return {g:g,m:m,pk:pk,pickSide:pickSide,line:lineP,shr:shr,ex:ex,grade:grade,gn:hbGradeNum(grade)+shr/100,q:q,na:na,nh:nh};
+}
+function hbCoverItems(lg,ok,lim){
+  var now=Date.now(),L=[],pend=0,n=0;
+  (lg==='all'?TD_LG:[lg]).forEach(function(l){(S.feed[l]||[]).forEach(function(g){
+    if(kind(g)!=='up'||!(g.start>now)||g.start>now+7*864e5||!ok(g))return;
+    if(g.lg!=='ncaafb'&&g.lg!=='nfl'&&g.lg!=='nba'&&g.lg!=='nhl')return;
+    if(n++<30){try{usEnsure(g)}catch(e){}}
+    var e=hbEval(g);if(!e)return;if(e.pending){pend++;return}L.push(e)});});
+  L.sort(function(a,b){return b.gn-a.gn});
+  return {items:L.slice(0,lim||8),pend:pend};
+}
+function hbGradePill(e){return hbPill('Grade '+e.grade,e.gn>=5?'hi':'mid')}
+function hbCoverHtml(r,when){
+  var h='<div class="card"><div class="src" style="margin:0 0 6px"><b>Who covers the spread</b>, best grade first. Built from the two teams only, then checked against what analysts are saying. Tap a pick for the reason and matchup.</div>';
+  if(!r.items.length)h+='<p class="src" style="margin:0">'+(r.pend?'Pulling team stats for '+r.pend+' game'+(r.pend>1?'s':'')+' for '+when+'. Grades fill in on their own.':'No spread picks for '+when+' yet. They appear once lines load for those games.')+'</p>';
+  else{
+    h+=r.items.map(function(e){var g=e.g,x=e.ex;
+      var sc=e.q?(e.q.h>=e.q.a?e.nh+' '+hbF0(e.q.h)+', '+e.na+' '+hbF0(e.q.a):e.na+' '+hbF0(e.q.a)+', '+e.nh+' '+hbF0(e.q.h)):'';
+      return '<div data-act="bbgame" data-id="'+esc(g.id)+'" data-t="sp" style="padding:8px 0;border-top:1px solid var(--line);cursor:pointer"><div class="r" style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><div><b>'+esc(e.pk)+' '+esc(sgnPts(e.line))+'</b></div>'+hbGradePill(e)+'</div><div class="src">'+esc(g.a+' @ '+g.h)+' · '+esc(gTime(g))+'</div>'+(sc?'<div class="src">My predicted score: '+esc(sc)+'</div>':'')+(x?'<div class="src">'+(x.rel==='agree'?'Analysts agree with this side.':'Analysts lean the other way, so the grade is lowered.')+'</div>':'')+'</div>'}).join('');
+    if(r.pend)h+='<p class="src" style="margin:8px 0 0">'+r.pend+' more game'+(r.pend>1?'s are':' is')+' still loading team stats.</p>';
+  }
+  return h+'</div>';
+}
+var gamesBest79=gamesBest;
+gamesBest=function(lg){
+  var h=gamesBest79(lg);
+  try{
+    var T=gdTest(),when={today:'today',tomorrow:'tomorrow',week:'this week'}[T.sel]||'';
+    var i=h.indexOf('<div class="card"><div class="src" style="margin:0 0 6px"><b>Who covers'),j=h.indexOf('<div class="card" style="margin-top:8px"><div class="src" style="margin:0 0 6px"><b>Best player props');
+    if(i>=0&&j>i)h=h.slice(0,i)+hbCoverHtml(hbCoverItems(lg,T.ok,8),when)+h.slice(j);
+  }catch(e){}
+  return h;
+};
+var vToday79=vToday;
+vToday=function(){
+  var h=vToday79();
+  try{
+    var i=h.indexOf('<h3>Best bets right now</h3>');if(i<0)return h;
+    var j=h.indexOf('<h3>',i+10);if(j<0)j=h.length;
+    var lim=Date.now()+36*36e5,r=hbCoverItems('all',function(g){return g.start<=lim},6);
+    h=h.slice(0,i)+'<h3>Best bets right now</h3>'+hbCoverHtml(r,'the next 36 hours')+h.slice(j);
+  }catch(e){}
+  return h;
+};
+/* analyst total lean next to mine */
+function expTotLine(g,m){
+  var e=expFor(g);if(!e||!e.p||e.p.k!=='total'||!m||m.tot==null||!m.ln||m.ln.tt==null)return '';
+  var d=m.tot-m.ln.tt,mine=d>=3?'over':d<=-3?'under':null,w=e.p.d;
+  if(mine===w)return '<li><b>Analysts:</b> they lean '+(w==='over'?'Over':'Under')+' too, so this is the same side as mine.</li>';
+  if(!mine)return '<li><b>Analysts:</b> they lean '+(w==='over'?'Over':'Under')+'. I have no real lean, so I would not play the total.</li>';
+  return '<li><b>Analysts:</b> they lean '+(w==='over'?'Over':'Under')+', the opposite of my numbers. That is a split, so treat the total as a pass.</li>';
+}
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
