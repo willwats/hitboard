@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v120, Oct 31';
+var BUILD='v121, Oct 31';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -7931,7 +7931,7 @@ function pickBlock(g){
   var mine=0.5*m.M+0.5*L;
   var big=Math.abs(L);
   var ex=null;try{ex=expSig(g,pickSide,m.M>=0?'h':'a')}catch(e){}
-  conf='Confidence '+hbGradeOf(shr,ex);
+  conf='Grade '+hbGradeOf(shr,ex);
   var head=pk+' '+sgnPts(lineForPick)+' covers';
   var Mf=fav==='h'?m.M:-m.M,sub,ps0=predScore(g,m,L,na,nh);
   var scTxt=ps0?(ps0.h>=ps0.a?esc(nh)+' '+hbF0(ps0.h)+', '+esc(na)+' '+hbF0(ps0.a):esc(na)+' '+hbF0(ps0.a)+', '+esc(nh)+' '+hbF0(ps0.h)):'';
@@ -7939,7 +7939,7 @@ function pickBlock(g){
   if(pickSide===fav)sub+=esc(pk)+' wins by about '+hbF0(Math.abs(Mf))+', more than the '+big+' it needs, so it covers.';
   else if(Mf>0)sub+=esc(favN)+' wins by about '+hbF0(Mf)+', which is less than the '+big+' it has to win by, so '+esc(pk)+' covers.';
   else sub+=esc(pk)+' wins the game outright, so it covers.';
-  h+='<h3>The pick</h3><div class="card bcard"><div class="label">Spread pick · '+esc(conf)+'</div><div class="teams" style="font-size:22px">'+esc(head)+'</div><p style="margin:8px 0 0;line-height:1.5">'+sub+' The spread of '+big+' was not used to build this. I only compare my result to it at the end.'+(ex?(ex.rel==='agree'?' Outside analysts land on the same side, which raised the grade.':' Outside analysts lean the other way (see the notes below). I kept my pick because it comes from the teams alone, but I lowered the grade.'):'')+'</p></div>';
+  h+='<h3>The pick</h3><div class="card bcard"><div class="label">Pick · '+esc(conf)+'</div><div class="teams" style="font-size:22px">'+esc(head)+'</div><p style="margin:8px 0 0;line-height:1.5">'+sub+''+(ex?(ex.rel==='agree'?' Outside analysts land on the same side, which raised the grade.':' Outside analysts lean the other way (see the notes below). I kept my pick because it comes from the teams alone, but I lowered the grade.'):'')+'</p></div>';
   /* WHY */
   var why=[],against=[];
   why.push('My number is '+esc(favN)+' '+((fav==='h'?m.M:-m.M)>=0?'by about '+hbF0(Math.abs(m.M)):'losing by about '+hbF0(Math.abs(m.M)))+' against a line of '+big+', which puts '+esc(pk)+' '+(pickSide===fav?'about '+hbF0(Math.abs(edge))+' points clear of it.':'about '+hbF0(Math.abs(edge))+' points of cushion.'));
@@ -7973,7 +7973,9 @@ function pickBlock(g){
       why.push(esc(ok)+' scores '+OT.pf.toFixed(d)+' ('+ordn(rkOf(pool,'pf',OT.pf,1))+') against a '+esc(pk)+' defense that allows '+PT.pa.toFixed(d)+' ('+ordn(rkOf(pool,'pa',PT.pa,0))+').')}
   }
   if(!why.length)why.push('The numbers I can read put '+esc(pk)+' on the right side of the line. '+(fb?'The run and pass numbers for this game have not loaded, so this rests on scoring.':'This rests on scoring numbers.'));
-  h+='<h3>Why '+esc(pk)+' covers</h3><ul class="pts" style="margin-top:2px">'+why.map(function(x){return '<li>'+x+'</li>'}).join('')+'</ul>';
+  h+='<h3>Why '+esc(pk)+' covers</h3><ul class="pts" style="margin-top:2px">'+why.slice(0,3).map(function(x){return '<li>'+x+'</li>'}).join('')+'</ul>';
+  var hTop0=h;h='';
+  var hTeams='';
   /* teams */
   if(m.Ra&&m.Rh&&m.bm){
     var Du=S.us[g.id]&&S.us[g.id].d,wa=teamWS(na,m.Ra,m.bm,Du&&Du.a.res),wh=teamWS(nh,m.Rh,m.bm,Du&&Du.h.res);
@@ -7983,13 +7985,16 @@ function pickBlock(g){
     /* matchup phases */
     try{h+=keyPlayers(g,m,na,nh)}catch(e){}
     h+='<h3>Run and pass matchups</h3><ul class="pts" style="margin-top:2px">'+m.ph.map(function(p){return '<li>'+esc(phTxt(p))+'</li>'}).join('')+'</ul>';
+    hTeams=h;h='';
     var fp=flowParas(g,m,na,nh,fav,favN,dogN,pickSide,pk,big);
     h+='<h3>How I expect it to play out</h3>'+fp.map(function(x){return '<p style="margin:8px 0;line-height:1.55"><b>'+esc(x[0])+'.</b> '+esc(x[1])+'</p>'}).join('');
   }else{
     h+=genericRead(g,m,na,nh);
+    hTeams=h;h='';
     try{var pool2=poolFor(g.lg);if(m.T&&!m.T.missing&&pool2.length>=10)h+='<h3>How I expect it to play out</h3>'+flowFallback(g,m,na,nh,fav,favN,dogN,pickSide,pk,big,pool2).map(function(x){return '<p style="margin:8px 0;line-height:1.55"><b>'+esc(x[0])+'.</b> '+esc(x[1])+'</p>'}).join('')}catch(e){}
     if(fb&&us&&us.st==='err')h+='<p class="src">Run and pass numbers did not load ('+esc(us.why||'no response')+'). They retry on their own.</p>';
   }
+  var hFlow=h;h='';
   /* wrong */
   var wr=[];
   if(m.ph){
@@ -8003,9 +8008,11 @@ function pickBlock(g){
     if(ih&&ih.length)wr.push(nh+' has '+ih.slice(0,5).join(', ')+' Out or Doubtful.');}catch(e){}
   wr.push('Opponent strength is not adjusted in the numbers, and one turnover or a long play can swing a game. Check the injury news again near kickoff.');
   h+='<h3>What could make this wrong</h3><ul class="pts" style="margin-top:2px">'+wr.map(function(x){return '<li>'+esc(x)+'</li>'}).join('')+'</ul>';
+  var hRisk=h;h='';
   /* around the game */
   var cn=cnFor(g);
   if(cn&&cn.n&&cn.n.length)h+='<h3>Around the game</h3><ul class="pts" style="margin-top:2px">'+cn.n.map(function(x){return '<li>'+esc(x)+'</li>'}).join('')+'</ul>'+(cn.inj?'<p class="note" style="margin-top:6px">'+esc(cn.inj)+'</p>':'');
+  var hAround=h;h='';
   /* total and moneyline */
   var tl=[];
   if(m.ln.tt!=null&&m.tot!=null){var d=m.tot-m.ln.tt;tl.push('<li><b>Total '+m.ln.tt+':</b> '+(d>=3?'I lean Over. My numbers have about '+hbF0(m.tot)+'.':d<=-3?'I lean Under. My numbers have about '+hbF0(m.tot)+'.':'No real lean. My numbers have about '+hbF0(m.tot)+', close to the line.')+'</li>')}
@@ -8013,6 +8020,9 @@ function pickBlock(g){
   tl.push('<li><b>Winner:</b> I have '+esc(wn)+' winning'+(Math.abs(m.M)<3?', but it is close to a coin flip.':'.')+'</li>');
   try{var etl=expTotLine(g,m);if(etl)tl.push(etl)}catch(e){}
   h+='<h3>Total and winner</h3><ul class="pts" style="margin-top:2px">'+tl.join('')+'</ul>';
+  var hTot=h;h='';
+  var hTopOnly=hTop0;
+  h=hTopOnly+hbFold('Team strengths and weaknesses',hTeams)+hbFold('How I expect it to play out',hFlow,false,true)+hbFold('What analysts are saying',hAround.replace(/^<h3>.*?<\/h3>/,''),ex&&ex.rel==='split')+hbFold('Total, winner and risks',hTot+hRisk);
   if(loading&&!m.ph)h+='<p class="src">Pulling each team’s recent games for the run and pass breakdown. This fills in on its own.</p>';
   return h;
 }
@@ -8148,13 +8158,16 @@ function hbCoverItems(lg,ok,lim){
   return {items:L.slice(0,lim||8),pend:pend};
 }
 function hbGradePill(e){return hbPill('Grade '+e.grade,e.gn>=5?'hi':'mid')}
+function hbCoverRow(e){var g=e.g,x=e.ex;
+  var sc=e.q?(e.q.h>=e.q.a?e.nh+' '+hbF0(e.q.h)+', '+e.na+' '+hbF0(e.q.a):e.na+' '+hbF0(e.q.a)+', '+e.nh+' '+hbF0(e.q.h)):'';
+  return '<div data-act="bbgame" data-id="'+esc(g.id)+'" data-t="sp" style="padding:8px 0;border-top:1px solid var(--line);cursor:pointer"><div class="r" style="display:flex;justify-content:space-between;gap:8px;align-items:center"><div><b>'+esc(e.pk)+' '+esc(sgnPts(e.line))+'</b><div class="src">'+esc(g.a+' @ '+g.h)+' · '+esc(gTime(g))+'</div></div><span style="font-size:26px;font-weight:700;line-height:1">'+esc(e.grade)+'</span></div>'+(sc?'<div class="src">Predicted: '+esc(sc)+(x?(x.rel==='agree'?' · analysts agree':' · analysts differ'):'')+'</div>':'')+'</div>'}
 function hbCoverHtml(r,when){
-  var h='<div class="card"><div class="src" style="margin:0 0 6px"><b>Who covers the spread</b>, best grade first. Built from the two teams only, then checked against what analysts are saying. Tap a pick for the reason and matchup.</div>';
+  var top=r.items.filter(function(e){return e.gn>=5}),rest=r.items.filter(function(e){return e.gn<5});
+  var h='<div class="card"><div class="src" style="margin:0 0 6px"><b>Who covers the spread</b>, best grade first. Tap a pick for the reason.</div>';
   if(!r.items.length)h+='<p class="src" style="margin:0">'+(r.pend?'Pulling team stats for '+r.pend+' game'+(r.pend>1?'s':'')+' for '+when+'. Grades fill in on their own.':'No spread picks for '+when+' yet. They appear once lines load for those games.')+'</p>';
   else{
-    h+=r.items.map(function(e){var g=e.g,x=e.ex;
-      var sc=e.q?(e.q.h>=e.q.a?e.nh+' '+hbF0(e.q.h)+', '+e.na+' '+hbF0(e.q.a):e.na+' '+hbF0(e.q.a)+', '+e.nh+' '+hbF0(e.q.h)):'';
-      return '<div data-act="bbgame" data-id="'+esc(g.id)+'" data-t="sp" style="padding:8px 0;border-top:1px solid var(--line);cursor:pointer"><div class="r" style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><div><b>'+esc(e.pk)+' '+esc(sgnPts(e.line))+'</b></div>'+hbGradePill(e)+'</div><div class="src">'+esc(g.a+' @ '+g.h)+' · '+esc(gTime(g))+'</div>'+(sc?'<div class="src">My predicted score: '+esc(sc)+'</div>':'')+(x?'<div class="src">'+(x.rel==='agree'?'Analysts agree with this side.':'Analysts lean the other way, so the grade is lowered.')+'</div>':'')+'</div>'}).join('');
+    h+=top.length?top.map(hbCoverRow).join(''):'<p style="margin:0"><b>No strong play for '+when+'.</b> Nothing grades B- or better. Skipping is a fine play.</p>';
+    if(rest.length)h+='<details style="margin-top:8px"><summary class="src" style="cursor:pointer">Weaker picks ('+rest.length+')</summary>'+rest.map(hbCoverRow).join('')+'</details>';
     if(r.pend)h+='<p class="src" style="margin:8px 0 0">'+r.pend+' more game'+(r.pend>1?'s are':' is')+' still loading team stats.</p>';
   }
   return h+'</div>';
@@ -8188,6 +8201,15 @@ function expTotLine(g,m){
   if(!mine)return '<li><b>Analysts:</b> they lean '+(w==='over'?'Over':'Under')+'. I have no real lean, so I would not play the total.</li>';
   return '<li><b>Analysts:</b> they lean '+(w==='over'?'Over':'Under')+', the opposite of my numbers. That is a split, so treat the total as a pass.</li>';
 }
+
+/* v121: simpler layout. Answer first, details folded. */
+function hbFold(title,html,open,strip){
+  if(!html)return '';
+  if(strip)html=html.replace(/^<h3>.*?<\/h3>/,'');
+  return '<details'+(open?' open':'')+' style="margin-top:10px;border-top:1px solid var(--line);padding-top:8px"><summary style="cursor:pointer;font-weight:600;padding:4px 0">'+esc(title)+'</summary><div style="margin-top:6px">'+html+'</div></details>';
+}
+var sheetHtml80=sheetHtml;
+sheetHtml=function(){return ''};
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
