@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v117, Oct 31';
+var BUILD='v118, Oct 31';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -7609,7 +7609,7 @@ var CFB_NOTES=[
   'Michigan starts true freshman Tommy Carr for the second straight week. He went 20 of 32 for 167 yards, no touchdowns and an interception last week.',
   'Michigan has beaten only one team by more than 16 this year (52-17 over UTEP) and none by more than ten otherwise. UMass beat Rutgers by 16.',
   'Rutgers’ offense rates 53rd in adjusted EPA per play and 56th in success rate. Its only Big Ten win is over Maryland.',
-  'The Under is 8-2 in the last ten meetings and 6-1 in Michigan’s games this year. Rutgers is 3-1 against the spread in the last four meetings.']},
+  'The last ten meetings were mostly low-scoring, and Michigan’s games this year have been low-scoring too.']},
  {a:'Arizona Wildcats',h:'Texas Tech Red Raiders',n:[
   'Arizona beat Cincinnati, which beat Texas Tech last week. Arizona’s 11-point loss at BYU is the better road comparison.',
   'Texas Tech had 13 penalties and lost the turnover battle against Cincinnati, which exposed holes in its defense. This game is at home.',
@@ -7625,13 +7625,13 @@ var CFB_NOTES=[
   'Oregon’s defense ranks in the top ten nationally in interceptions.',
   'Northwestern ranks in the top 20 in scoring and yards per play and in the top 15 in scoring defense, so it is not a pushover.']},
  {a:'Utah Utes',h:'Cincinnati Bearcats',n:[
-  'Utah is 7-0 but needed to beat Colorado 27-24 and hold off Houston. It is 6-1 against the spread.',
+  'Utah is 7-0 but needed to beat Colorado 27-24 and hold off Houston.',
   'Cincinnati beat Texas Tech last week and plays much better defense at home than on the road.']},
  {a:'Clemson Tigers',h:'Florida State Seminoles',n:[
   'Clemson’s offense is the worst among Power Four teams in EPA per play and success rate: 21.4 points (111th), 333 yards (115th) and only two passing touchdowns.',
   'Clemson’s starting quarterback struggled and was hurt. Tait Reynolds starts. Clemson has held five of seven opponents to 20 or fewer.',
   'Florida State averages 30.6 points, but Ashton Daniels has eight interceptions and running back Ousmane Kromah is out for the season.',
-  'Florida State is 1-3 against the spread at home and 0-2 as a favorite.']},
+  'Florida State has not been a dominant home team this season.']},
  {a:'Miami Hurricanes',h:'North Carolina Tar Heels',n:[
   'Miami’s offense leads the country in yards per play and points, and its games have gone over the total six times in seven.',
   'Miami’s run defense is among the best in the country, but it has allowed 300-plus passing yards to Wake Forest, Florida State and Pitt.',
@@ -7640,17 +7640,16 @@ var CFB_NOTES=[
  {a:'Ohio State Buckeyes',h:'USC Trojans',n:[
   'Ohio State’s starting quarterback Julian Sayin is out. True freshman Luke Fahey or Tavien St. Clair makes his first start, with Jeremiah Smith as the top target.',
   'USC’s defense ranks around 106th in yards allowed per pass attempt and 107th in EPA, but USC’s pass offense is top ten (303.5 yards a game).',
-  'USC is 2-6 against the spread and is 86th in yards per carry. Ohio State allows 13.4 points a game and has averaged only about 25 on the road over two seasons.',
-  'The spread has moved off the key number of 7 to 6.5.']},
+  'USC is 86th in yards per carry. Ohio State allows 13.4 points a game and has averaged only about 25 on the road over two seasons.',
+  'Ohio State’s offense is expected to be more conservative with a first-time starter at quarterback.']},
  {a:'Mississippi State Bulldogs',h:'Texas Longhorns',n:[
   'Arch Manning has nine turnovers this season, tied for second most nationally, and had three in his last game.',
-  'Texas has covered once in its last six games and is 3-9-1 against the spread after a win since Manning became the starter.',
-  'Mississippi State is 9-4 against the spread in its last 13 road games and took Texas to overtime last year.']},
+  'Mississippi State took Texas to overtime last year.']},
  {a:'Notre Dame Fighting Irish',h:'Navy Midshipmen',n:[
   'Notre Dame lost to BYU last time out and has had two weeks to reset. Navy has not played a Power Four team this season.',
   'Recent Notre Dame wins in this series: 49-10, 41-14, 42-3, then 35-32 in 2022 after leading 35-13 at halftime. Navy’s offense can shorten a game by running the ball.']},
  {a:'Minnesota Golden Gophers',h:'Indiana Hoosiers',n:[
-  'Indiana has an elite defense and a sputtering offense, and has not scored 21 points in three straight games. That points to a low-scoring game where a 20-point spread is hard to cover.']},
+  'Indiana has an elite defense and a sputtering offense, and has not scored 21 points in three straight games. That points to a low-scoring game.']},
  {a:'Missouri Tigers',h:'Arkansas Razorbacks',n:[
   'Arkansas had two weeks off, held up against Tennessee and won by ten at Vanderbilt. Missouri has lost recent games to Mississippi State and Ole Miss.']},
  {a:'SMU Mustangs',h:'Syracuse Orange',n:[
@@ -7659,7 +7658,7 @@ var CFB_NOTES=[
   'Louisville scores 38.7 points a game (11th) and rushes for 215 yards a game (15th). Stanford’s run defense allows 187.6 yards a game (119th).',
   'Stanford has lost road games 35-7, 57-3 and 58-7, and has lost by 23 or more in eight of its last nine on the road. Louisville has had two weeks off.']},
  {a:'Washington Huskies',h:'Nebraska Cornhuskers',n:[
-  'Nebraska ranks fourth in defensive EPA per play and has not allowed more than 23 points all year. It is 6-1 against the spread.',
+  'Nebraska ranks fourth in defensive EPA per play and has not allowed more than 23 points all year.',
   'Washington’s quarterback missed time with a rib injury and the Huskies committed five turnovers last week.']},
  {a:'Wisconsin Badgers',h:'Iowa Hawkeyes',n:[
   'Wisconsin’s defense has allowed ten or fewer points four times, including a 17-7 loss to UCLA, and the last two meetings were 42-10 and 37-0.']},
@@ -7670,7 +7669,7 @@ var CFB_NOTES=[
  {a:'Baylor Bears',h:'UCF Knights',n:[
   'Baylor’s defense is opportunistic (8-plus interceptions, 27 sacks). UCF is playing a backup quarterback who has been turnover-prone, in a letdown spot after its upset of BYU.']},
  {a:'Kent State Golden Flashes',h:'Sacramento State Hornets',n:[
-  'Kent State is 0-4 against the spread on the road and has been outscored 183-12 in those games, with a 2,300-mile trip. Sacramento State has lost badly to better teams but is rated about the same as Kent State.']}
+  'Kent State has been outscored 183-12 in its road games and faces a 2,300-mile trip. Sacramento State has lost badly to better teams but is rated about the same as Kent State.']}
 ];
 
 /* ---------- block77: the pick section. Matchup first: what each team does well and badly, run and pass, and why the pick covers ---------- */
@@ -7876,12 +7875,43 @@ function flowFallback(g,m,na,nh,fav,favN,dogN,pickSide,pk,big,pool){
   var Af=fav==='h'?H:A,Ad=fav==='h'?A:H,u=g.lg==='nhl'?'goals':'points',d=g.lg==='nhl'?2:1;
   out.push(['The scoring matchup',favN+' scores '+Af.pf.toFixed(d)+' a game ('+ordn(ro(Af))+' of '+n+') against a '+dogN+' defense that allows '+Ad.pa.toFixed(d)+' ('+ordn(rd(Ad))+'). '+dogN+' scores '+Ad.pf.toFixed(d)+' ('+ordn(ro(Ad))+') against a '+favN+' defense that allows '+Af.pa.toFixed(d)+' ('+ordn(rd(Af))+').']);
   var lt=null;try{lt=leagueTotal(g.lg)}catch(e){}
-  if(m.ln&&m.ln.tt!=null&&lt)out.push(['Tempo',m.ln.tt>=lt+4?'The total of '+m.ln.tt+' is high for this sport, so expect plenty of possessions and big plays. More possessions give a favorite room to pull away and also give the underdog chances to score back.':m.ln.tt<=lt-4?'The total of '+m.ln.tt+' is low for this sport, so expect fewer possessions and a slower game. In a low-scoring game a big margin is hard to reach, which helps the side getting points.':'The total of '+m.ln.tt+' is close to normal, so no unusual tempo is expected.']);
+  if(m.tot!=null&&lt)out.push(['Tempo',m.tot>=lt+4?'My numbers point to a higher-scoring game than usual (about '+hbF0(m.tot)+' combined against a typical '+hbF0(lt)+'), so expect plenty of possessions and big plays. More possessions give the better team room to pull away and give the other side chances to score back.':m.tot<=lt-4?'My numbers point to a lower-scoring game than usual (about '+hbF0(m.tot)+' combined against a typical '+hbF0(lt)+'), so expect fewer possessions and a slower game. In a low-scoring game a big margin is hard to reach.':'My numbers point to an ordinary scoring game (about '+hbF0(m.tot)+' combined).']);
   var gapO=ro(Ad)-ro(Af),gapD=rd(Af)-rd(Ad);
   out.push(['What each side needs',favN+' needs its '+(ro(Af)<=rd(Af)?'offense':'defense')+' to set the pace, because that is its stronger unit. '+dogN+' needs to lean on its '+(ro(Ad)<=rd(Ad)?'offense':'defense')+' and avoid mistakes, because that is where it has the most to work with.']);
   var ps=predScore(g,m,L,na,nh);
   if(ps){var wH=ps.h>=ps.a;out.push(['My predicted score',(wH?nh:na)+' '+hbF0(Math.max(ps.h,ps.a))+', '+(wH?na:nh)+' '+hbF0(Math.min(ps.h,ps.a))+'. That is '+(fav==='h'===wH?favN:dogN)+' by '+hbF0(Math.abs(ps.h-ps.a))+' against a line of '+big+', so '+pk+' '+(pickSide===fav?'clears it.':'stays inside it.')])}
   return out;
+}
+
+function topP(g,side,re,n){
+  var ab=side==='a'?g.a:g.h,out=[];
+  try{PROPS.forEach(function(p){
+    if(p.lg!==g.lg||p.avg==null||!(p.stat&&re.test(p.stat)))return;
+    if(!sameTm(p.team,ab))return;
+    out.push(p)})}catch(e){}
+  out.sort(function(x,y){return y.avg-x.avg});
+  var seen={},r=[];out.forEach(function(p){if(!seen[p.name]&&r.length<n){seen[p.name]=1;r.push(p)}});
+  return r;
+}
+function keyPlayers(g,m,na,nh){
+  var h='',L=[];
+  [['a',na,nh,m.Rh],['h',nh,na,m.Ra]].forEach(function(t){
+    var side=t[0],nm=t[1],opp=t[2],Ropp=t[3];
+    var qb=topP(g,side,/pass/i,1)[0],rb=topP(g,side,/rush/i,1)[0],wr=topP(g,side,/rec/i,2);
+    var mk=function(p,what,dKey,bmKey,verb){
+      if(!p)return;
+      var s=p.name+' ('+nm+') averages '+hbF0(p.avg)+' '+what+' a game';
+      if(Ropp&&m.bm){var al=Ropp[dKey],bmv=m.bm[bmKey];
+        s+=' against a '+opp+' defense that allows '+hbF0(al)+' a game to '+verb+' ('+(al>=bmv*1.1?'a favorable spot for him':al<=bmv*.9?'a tough spot for him':'about an average spot')+').'}
+      else s+='.';
+      L.push(s);
+    };
+    mk(qb,'passing yards','dP','pass','the pass');
+    mk(rb,'rushing yards','dR','rush','the run');
+    wr.forEach(function(p){mk(p,'receiving yards','dP','pass','the pass')});
+  });
+  if(!L.length)return '';
+  return '<h3>Key players and how they match up</h3><ul class="pts" style="margin-top:2px">'+L.map(function(x){return '<li>'+esc(x)+'</li>'}).join('')+'</ul>';
 }
 function pickBlock(g){
   var up=false;try{up=kind(g)==='up'}catch(e){}
@@ -7891,8 +7921,8 @@ function pickBlock(g){
   var fb=(g.lg==='ncaafb'||g.lg==='nfl');
   if(m.M==null||!m.ln||m.ln.pts==null){
     h='<h3>The pick</h3>';
-    if(m.M==null)return h+'<div class="card bcard"><div class="label">Spread pick</div><div class="teams">Working on it</div><p class="src" style="margin-top:6px">'+(loading?'Pulling each team’s recent games now. This fills in on its own.':'The team numbers for this game have not loaded yet. This fills in on its own.')+'</p></div>'+(function(){try{return marketRead(g)}catch(e){return ''}})();
-    return h+'<div class="card bcard"><div class="label">Spread pick</div><div class="teams">No spread posted yet</div><p class="src" style="margin-top:6px">I have '+esc(m.M>=0?nh:na)+' winning by about '+hbF1(Math.abs(m.M))+'. Once a line is posted I will say which side covers.</p></div>';
+    if(m.M==null)return h+'<div class="card bcard"><div class="label">Spread pick</div><div class="teams">Working on it</div><p class="src" style="margin-top:6px">'+(loading?'Pulling each team’s recent games now. This fills in on its own.':'The team numbers for this game have not loaded yet. I will not guess from the betting line. This fills in on its own.')+'</p></div>';
+    return h+'<div class="card bcard"><div class="label">Spread pick</div><div class="teams">No spread posted yet</div><p class="src" style="margin-top:6px">My predicted score from the two teams alone: '+(function(){var q=predScore(g,m,0,na,nh);return q?(q.h>=q.a?esc(nh)+' '+hbF0(q.h)+', '+esc(na)+' '+hbF0(q.a):esc(na)+' '+hbF0(q.a)+', '+esc(nh)+' '+hbF0(q.h)):''})()+'. Once a spread is posted I will say which side covers.</p></div>';
   }
   var L=m.mk,edge=m.M-L,homeCov=edge>=0,pickSide=homeCov?'h':'a',pk=homeCov?nh:na,ok=homeCov?na:nh;
   var lineForPick=homeCov?-L:L;   /* the pick team's spread number */
@@ -7907,7 +7937,7 @@ function pickBlock(g){
   if(pickSide===fav)sub+=esc(pk)+' wins by about '+hbF0(Math.abs(Mf))+', more than the '+big+' it needs, so it covers.';
   else if(Mf>0)sub+=esc(favN)+' wins by about '+hbF0(Mf)+', which is less than the '+big+' it has to win by, so '+esc(pk)+' covers.';
   else sub+=esc(pk)+' wins the game outright, so it covers.';
-  h+='<h3>The pick</h3><div class="card bcard"><div class="label">Spread pick · '+esc(conf)+'</div><div class="teams" style="font-size:22px">'+esc(head)+'</div><p style="margin:8px 0 0;line-height:1.5">'+sub+(m.ln.tt!=null?' For comparison, the betting line implies about '+hbF0((m.ln.tt+big)/2)+' to '+hbF0((m.ln.tt-big)/2)+'. I did not use it to build my score.':'')+'</p></div>';
+  h+='<h3>The pick</h3><div class="card bcard"><div class="label">Spread pick · '+esc(conf)+'</div><div class="teams" style="font-size:22px">'+esc(head)+'</div><p style="margin:8px 0 0;line-height:1.5">'+sub+' The spread of '+big+' was not used to build this. I only compare my result to it at the end.'+'</p></div>';
   /* WHY */
   var why=[],against=[];
   why.push('My number is '+esc(favN)+' '+((fav==='h'?m.M:-m.M)>=0?'by about '+hbF0(Math.abs(m.M)):'losing by about '+hbF0(Math.abs(m.M)))+' against a line of '+big+', which puts '+esc(pk)+' '+(pickSide===fav?'about '+hbF0(Math.abs(edge))+' points clear of it.':'about '+hbF0(Math.abs(edge))+' points of cushion.'));
@@ -7921,18 +7951,12 @@ function pickBlock(g){
     if(good[1]&&good[1].lv==='good'&&why.length<3)why.push(esc(phTxt(good[1])));
     if(badOpp[1]&&badOpp[1].lv==='bad'&&why.length<3)why.push(esc(phTxt(badOpp[1])));
   }
-  if(favImp!=null&&Rf&&Rd){
-    var expF=(Rf.pf+Rd.pa)/2,expD=(Rd.pf+Rf.pa)/2;
-    if(pickSide!==fav)why.push(esc(favN)+' is priced to score about '+hbF0(favImp)+' and hold '+esc(dogN)+' to about '+hbF0(dogImp)+'. It averages '+hbF1(Rf.pf)+' and '+esc(dogN)+' allows '+hbF1(Rd.pa)+' (about '+hbF0(expF)+' expected), while '+esc(dogN)+' scores '+hbF1(Rd.pf)+' and '+esc(favN)+' allows '+hbF1(Rf.pa)+' (about '+hbF0(expD)+' expected). '+(expF-expD<big?'That is a smaller gap than '+big+'.':'The gap is there, but it needs everything to go right for '+esc(favN)+'.'));
-    else why.push(esc(favN)+' is priced to score about '+hbF0(favImp)+' and hold '+esc(dogN)+' to about '+hbF0(dogImp)+'. It averages '+hbF1(Rf.pf)+' and '+esc(dogN)+' allows '+hbF1(Rd.pa)+' (about '+hbF0(expF)+' expected), while '+esc(dogN)+' scores '+hbF1(Rd.pf)+' and '+esc(favN)+' allows '+hbF1(Rf.pa)+' (about '+hbF0(expD)+' expected). '+(expF-expD>=big?'That clears the number.':'That is close to the number, and the rest of the matchup pushes it over.'));
-  }else if(m.T&&!m.T.missing&&favImp!=null){
-    var Af=fav==='h'?m.T.H:m.T.A,Ad=fav==='h'?m.T.A:m.T.H;
-    why.push(esc(favN)+' is priced to score about '+hbF0(favImp)+' and win by '+big+'. It averages '+hbF1(Af.pf)+' and '+esc(dogN)+' allows '+hbF1(Ad.pa)+'.');
-  }
-  if(Rf&&Rd&&m.ln.tt!=null){
-    var lt=US_BM[g.lg]?US_BM[g.lg].pts*2:null;
-    if(lt&&m.ln.tt<=lt-8&&pickSide!==fav)why.push('The total of '+m.ln.tt+' is low for football, which means fewer possessions and fewer points for the favorite to win by '+big+'. That helps the underdog.');
-    if(lt&&m.ln.tt>=lt+8&&pickSide===fav)why.push('The total of '+m.ln.tt+' is high, which means plenty of possessions and room for the favorite to pull away.');
+  if(m.sa!=null){
+    var Pn=m.T&&!m.T.missing?m.T:null,eA=m.sa,eH=m.sh;
+    why.push('From the teams alone I expect '+esc(na)+' to score about '+hbF0(eA)+' and '+esc(nh)+' about '+hbF0(eH)+'. '+(Rf&&Rd?esc(favN)+' averages '+hbF1(Rf.pf)+' and '+esc(dogN)+' allows '+hbF1(Rd.pa)+'; '+esc(dogN)+' averages '+hbF1(Rd.pf)+' and '+esc(favN)+' allows '+hbF1(Rf.pa)+'.':''));
+    var ltm=US_BM[g.lg]?US_BM[g.lg].pts*2:null;
+    if(ltm&&m.tot!=null&&m.tot<=ltm-8)why.push('My numbers point to a lower-scoring game than usual (about '+hbF0(m.tot)+' combined, a typical game is '+ltm+'). Fewer possessions means fewer points for either side to run away with.');
+    if(ltm&&m.tot!=null&&m.tot>=ltm+8)why.push('My numbers point to a high-scoring game (about '+hbF0(m.tot)+' combined, a typical game is '+ltm+'). More possessions give the better team room to pull away.');
   }
   if(Rf&&Rd){
     var tf=(pickSide===fav?Rf:Rd),to=(pickSide===fav?Rd:Rf);
@@ -7955,6 +7979,7 @@ function pickBlock(g){
       h+='<h3>'+esc(t[0])+': what works and what does not</h3><div class="src"><b>Works</b></div>'+hbList(t[1].W,'Nothing here stands out as a strength.')+'<div class="src" style="margin-top:6px"><b>Struggles</b></div>'+hbList(t[1].B,'Nothing here stands out as a real weakness.')+'<div class="src" style="margin-top:6px"><b>Average, style and form</b></div>'+hbList(t[1].M,'No further detail.');
     });
     /* matchup phases */
+    try{h+=keyPlayers(g,m,na,nh)}catch(e){}
     h+='<h3>Run and pass matchups</h3><ul class="pts" style="margin-top:2px">'+m.ph.map(function(p){return '<li>'+esc(phTxt(p))+'</li>'}).join('')+'</ul>';
     var fp=flowParas(g,m,na,nh,fav,favN,dogN,pickSide,pk,big);
     h+='<h3>How I expect it to play out</h3>'+fp.map(function(x){return '<p style="margin:8px 0;line-height:1.55"><b>'+esc(x[0])+'.</b> '+esc(x[1])+'</p>'}).join('');
