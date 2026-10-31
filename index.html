@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v113, Oct 30';
+var BUILD='v114, Oct 30';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -7458,6 +7458,150 @@ coverBreakdown=function(g){
   }catch(e){}
   return h;
 };
+
+/* ---------- block76: college table that always fills, and a matchup read in the spread section ---------- */
+S.cfbDiag={};S.cfbTryAt=0;
+function cfbApplyRows(rows){
+  rows.forEach(function(r){
+    var k=cfbKey(r[1]);if(!k||!(r[2]>=1))return;
+    var o=CFB[k];
+    if(o&&o.def!=null&&!o.live&&!o.sched&&o.G>r[2]&&r[2]<3)return;
+    CFB[k]={name:r[1],G:r[2],off:r[3],def:r[4],live:1};
+  });
+}
+function cfbRowsFromSchedules(list){
+  var rows=[],i=0,D=S.cfbDiag;D.mode='per-team schedules';
+  function step(){
+    var part=list.slice(i,i+8);i+=8;if(!part.length)return Promise.resolve();
+    return Promise.all(part.map(function(x){return tmSched('ncaafb',x.id).then(function(v){
+      if(v.length>=1){var pf=0,pa=0;v.forEach(function(e){pf+=e.pf;pa+=e.pa});rows.push([x.id,x.loc||x.nm,v.length,pf/v.length,pa/v.length])}
+    }).catch(function(){})})).then(step);
+  }
+  return step().then(function(){return rows});
+}
+function cfbLive(force){
+  if(window.claude||typeof fetch!=='function')return;
+  if(S.cfbBusy&&Date.now()-(S.cfbBusyAt||0)>45000)S.cfbBusy=false;
+  if(S.cfbBusy)return;
+  if(!force&&Date.now()-S.cfbLiveAt<3*3600e3)return;
+  S.cfbBusy=true;S.cfbBusyAt=Date.now();S.cfbTryAt=Date.now();
+  var D=S.cfbDiag={at:Date.now()};
+  var now=new Date(),y=now.getFullYear(),st=Date.UTC(y,7,22),en=Date.now();
+  var pad=function(n){return n<10?'0'+n:''+n},fd=function(t){var d=new Date(t);return d.getUTCFullYear()+pad(d.getUTCMonth()+1)+pad(d.getUTCDate())};
+  var ranges=[];for(var t=st;t<=en;t+=7*864e5)ranges.push(fd(t)+'-'+fd(Math.min(t+6*864e5,en+864e5)));
+  var fin=function(rows){
+    if(!rows||rows.length<40)throw 0;
+    cfbApplyRows(rows);S.cfbLiveAt=Date.now();D.rows=rows.length;
+    try{localStorage.setItem('hitboard.cfbt.v1',JSON.stringify({at:S.cfbLiveAt,rows:rows}))}catch(e){}
+    S.cfbBusy=false;try{render();if(S.sheet)renderSheet()}catch(e){}
+  };
+  tmList('ncaafb').then(function(list){
+    D.teams=list.length;
+    var fbs={};list.forEach(function(x){fbs[String(x.id)]=1});
+    var base='https://site.api.espn.com/apis/site/v2/sports/'+ESPN.ncaafb+'/scoreboard?groups=80&limit=400&dates=';
+    return Promise.all(ranges.map(function(r){return fetch(base+r,{cache:'no-store'}).then(function(x){return x.ok?x.json():null}).catch(function(){return null})})).then(function(js){
+      D.weeks=js.filter(Boolean).length+'/'+ranges.length;
+      var seen={},T={};
+      js.filter(Boolean).forEach(function(j){(j.events||[]).forEach(function(e){
+        if(!e.id||seen[e.id])return;var c=(e.competitions||[])[0]||{},d=c.status&&c.status.type&&c.status.type.completed;if(!d)return;
+        var cs=c.competitors||[];if(cs.length!==2)return;
+        var sc=cs.map(function(x){return parseFloat(x.score&&typeof x.score==='object'?(x.score.value!=null?x.score.value:x.score.displayValue):x.score)});
+        if(isNaN(sc[0])||isNaN(sc[1]))return;seen[e.id]=1;
+        cs.forEach(function(x,i){var tm=x.team||{},id=String(tm.id);if(!fbs[id])return;
+          var o=T[id]||(T[id]={n:tm.location||tm.displayName||'',G:0,pf:0,pa:0});o.G++;o.pf+=sc[i];o.pa+=sc[1-i]})
+      })});
+      D.games=Object.keys(seen).length;
+      var rows=[];Object.keys(T).forEach(function(id){var o=T[id];if(o.G>=1&&o.n)rows.push([id,o.n,o.G,o.pf/o.G,o.pa/o.G])});
+      if(rows.length>=100){D.mode='scoreboard';return fin(rows)}
+      return cfbRowsFromSchedules(list).then(fin);
+    });
+  }).catch(function(){S.cfbBusy=false;D.err=1});
+}
+/* when a game needs a missing team, retry the full pull (at most every 90 seconds) */
+var feedTeams1=feedTeams;
+feedTeams=function(g){var r=feedTeams1(g);if(r&&r.missing&&g.lg==='ncaafb'&&Date.now()-S.cfbTryAt>90000){try{cfbLive(true)}catch(e){}}return r};
+function cfbDiagTxt(){var D=S.cfbDiag||{};if(!D.at)return 'Data check: not started yet.';
+  return 'Data check: '+(D.err?'the ESPN pull failed. ':'')+(D.teams!=null?D.teams+' FBS teams listed. ':'')+(D.weeks?D.weeks+' weeks of scores read. ':'')+(D.games!=null?D.games+' finished games. ':'')+(D.rows!=null?D.rows+' teams rated ('+(D.mode||'')+'). ':'')+(S.cfbBusy?'Still working.':'')}
+/* ---- league pool and ranks ---- */
+function poolFor(lg){
+  var v=[];
+  try{
+    if(lg==='ncaafb')Object.keys(CFB).forEach(function(k){var c=CFB[k];if(c.off!=null&&c.def!=null)v.push({pf:c.off,pa:c.def})});
+    else if(lg==='nba')Object.keys(NBAT).forEach(function(k){v.push({pf:NBAT[k].PF,pa:NBAT[k].PA})});
+    else if(lg==='nfl')Object.keys(TS).forEach(function(k){v.push({pf:sv(k,'ppg'),pa:sv(k,'papg')})});
+    else if(lg==='nhl'){var L=nhlLg();Object.keys(NHLT).forEach(function(k){var t=NHLT[k];v.push({pf:nhlShr(t.gf,t.gp,L.gf),pa:nhlShr(t.ga,t.gp,L.ga)})})}
+  }catch(e){}
+  return v;
+}
+function rkOf(pool,key,val,high){var c=0;pool.forEach(function(x){if(high?x[key]>val:x[key]<val)c++});return c+1}
+function tierOf(r,n){var p=r/n;return p<=.15?'among the best':p<=.35?'good':p<=.65?'about average':p<=.85?'weak':'among the worst'}
+function unitOf(lg){return lg==='nhl'?'goals':'points'}
+function fmt1(x){return x.toFixed(lg0==='nhl'?2:1)}var lg0='';
+function teamLine(nm,X,pool,lg){
+  lg0=lg;var n=pool.length,ro=rkOf(pool,'pf',X.pf,1),rd=rkOf(pool,'pa',X.pa,0);
+  var bestO=ro<=rd,u=unitOf(lg);
+  return '<li><b>'+esc(nm)+'</b> scores '+fmt1(X.pf)+' a game ('+ordn(ro)+' of '+n+', '+tierOf(ro,n)+') and allows '+fmt1(X.pa)+' ('+ordn(rd)+' of '+n+', '+tierOf(rd,n)+'). Better at '+(bestO?'scoring':'stopping the other side')+', worse at '+(bestO?'stopping the other side':'scoring')+'.</li>';
+}
+function mkEdge(nmO,rO,nmD,rD,n){
+  var d=rD-rO,th=n*.15;
+  if(d>=th)return '<li><b>'+esc(nmO)+' offense against '+esc(nmD)+' defense:</b> '+ordn(rO)+' scoring offense meets '+ordn(rD)+' defense, so the offense has the edge.</li>';
+  if(d<=-th)return '<li><b>'+esc(nmO)+' offense against '+esc(nmD)+' defense:</b> '+ordn(rO)+' scoring offense meets '+ordn(rD)+' defense, the defense has the upper hand.</li>';
+  return '<li><b>'+esc(nmO)+' offense against '+esc(nmD)+' defense:</b> '+ordn(rO)+' meets '+ordn(rD)+', no clear edge.</li>';
+}
+function tmRead(g){
+  var T=feedTeams(g);if(!T||T.missing)return '';
+  var pool=poolFor(g.lg),n=pool.length;if(n<10)return '';
+  var A=T.A,H=T.H,u=unitOf(g.lg);lg0=g.lg;
+  var sa=(A.pf+H.pa)/2-T.he/2,sh=(H.pf+A.pa)/2+T.he/2;
+  var oa=rkOf(pool,'pf',A.pf,1),da=rkOf(pool,'pa',A.pa,0),oh=rkOf(pool,'pf',H.pf,1),dh=rkOf(pool,'pa',H.pa,0);
+  var C=null;try{C=feedCalc(g)}catch(e){}
+  var win=sh>=sa?g.hn:g.an,m=Math.abs(sh-sa);
+  var h='<h3>How the matchup plays out</h3><ul class="pts" style="margin-top:2px">'+teamLine(g.an,A,pool,g.lg)+teamLine(g.hn,H,pool,g.lg)+
+   mkEdge(g.an,oa,g.hn,dh,n)+mkEdge(g.hn,oh,g.an,da,n)+'</ul>';
+  h+='<div class="card bcard"><div class="label">My guess from the numbers</div><div class="teams">'+esc(win)+' by '+m.toFixed(1)+'</div><div class="facts"><span>'+esc(g.a)+' <b>'+sa.toFixed(1)+'</b></span><span>'+esc(g.h)+' <b>'+sh.toFixed(1)+'</b></span><span>Total <b>'+(sa+sh).toFixed(1)+'</b></span></div>'+
+   '<p class="src" style="margin-top:8px">Built from each side’s season scoring blended with what the other side allows (home edge '+T.he+'). '+(C&&C.ln&&C.ln.pts!=null?'The line is '+esc(C.ln.sp)+', so the numbers '+(Math.abs((sh-sa)-(C.ln.fav==='h'?C.ln.pts:-C.ln.pts))<1.5?'agree with the book and I see no real edge.':((sh-sa)-(C.ln.fav==='h'?C.ln.pts:-C.ln.pts)>0?'like '+esc(g.hn)+' more than the book does.':'like '+esc(g.an)+' more than the book does.')):'')+' The Prediction above also blends in the betting line. Opponent strength is not adjusted, so a team that padded numbers against weak opponents looks better than it is.</p></div>';
+  return h;
+}
+/* ---- no team numbers at all: say what the market says and what is missing ---- */
+function marketRead(g){
+  var ln=null;try{ln=lineFor(g)}catch(e){}
+  var h='<h3>How the matchup plays out</h3>';
+  var miss=[];try{var T0=feedTeams(g);if(T0&&T0.missing)miss=T0.missing}catch(e){}
+  if(!ln)return h+'<p class="note" style="margin-top:0">No line is posted yet and team scoring numbers for '+esc(miss.join(' and ')||'this game')+' are not loaded, so there is nothing to base a read on. '+esc(cfbDiagTxt())+'</p>';
+  var li=[];
+  var fav=ln.pts!=null?(ln.fav==='h'?g.hn:g.an):null,dog=ln.pts!=null?(ln.fav==='h'?g.an:g.hn):null;
+  if(ln.pts!=null&&ln.tt!=null){
+    var fs=(ln.tt+ln.pts)/2,ds=(ln.tt-ln.pts)/2;
+    li.push('<li><b>What the line implies:</b> '+esc(fav)+' by '+ln.pts+' with a total of '+ln.tt+' works out to about '+esc(fav)+' '+fs.toFixed(0)+', '+esc(dog)+' '+ds.toFixed(0)+'.</li>');
+    var lt=null;try{lt=leagueTotal(g.lg)}catch(e){}
+    if(lt)li.push('<li><b>Pace:</b> a typical game in this league totals about '+lt.toFixed(0)+', so '+ln.tt+' points to '+(ln.tt>=lt+4?'a higher-scoring game than usual.':ln.tt<=lt-4?'a lower-scoring game than usual.':'an ordinary scoring game.')+'</li>');
+    li.push('<li><b>Who is expected to do what:</b> '+(ln.pts>=14?esc(fav)+' is priced as a heavy favorite, so the book expects it to win the line of scrimmage and score at will, while '+esc(dog)+' is expected to struggle to keep up.':ln.pts>=7?esc(fav)+' is the clear favorite, and the book expects '+esc(dog)+' to hang around only if it can control the pace.':'The line is close, so the book sees these teams as near equals and the game turning on a few possessions.')+'</li>');
+  }
+  if(ln.mlP!=null)li.push('<li><b>Win chance from the moneyline:</b> '+esc(g.hn)+' '+Math.round(ln.mlP*100)+'%, '+esc(g.an)+' '+Math.round((1-ln.mlP)*100)+'% (a book’s own margin is removed).</li>');
+  [[g.an,g.a],[g.hn,g.h]].forEach(function(w){var c=null;try{c=cfbFind(w[0])}catch(e){}
+    if(c&&c.off!=null)li.push('<li><b>'+esc(w[0])+':</b> scores '+c.off.toFixed(1)+' a game'+(c.def!=null?' and allows '+c.def.toFixed(1):'')+' over '+c.G+' games'+(c.def==null?'; its defense number is still loading':'')+'.</li>')});
+  h+='<ul class="pts" style="margin-top:2px">'+li.join('')+'</ul>';
+  h+='<p class="note" style="margin-top:8px">This is the book’s read, not mine. '+esc(miss.join(' and '))+' has no scoring numbers loaded yet, so I cannot say which side does what well, and I am not guessing at a cover pick without them. '+esc(cfbDiagTxt())+' The page fills in on its own when the numbers land.</p>';
+  return h;
+}
+var coverBreakdown2=coverBreakdown;
+coverBreakdown=function(g){
+  var h=coverBreakdown2(g);
+  try{
+    var m=h.match(/<p class="note"[^>]*>The cover chance needs scoring numbers[\s\S]*?<\/p>/);
+    if(m){h=h.replace(m[0],'')+marketRead(g);return h}
+    if(h.indexOf('Best side of the spread')>=0)h+=tmRead(g);
+  }catch(e){}
+  return h;
+};
+/* the ratings section (inside More) no longer says the table stops at 100 */
+var feedAnalyst1=feedAnalyst;
+feedAnalyst=function(g){
+  var T=null;try{T=feedTeams(g)}catch(e){}
+  if(T&&T.missing&&g.lg==='ncaafb')return '<p class="note" style="margin-top:14px">Team scoring numbers for '+esc(T.missing.join(' and '))+' are still loading from ESPN. '+esc(cfbDiagTxt())+'</p>';
+  return feedAnalyst1(g);
+};
+if(S.cfbBusy==null)S.cfbBusy=false;
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
