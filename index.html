@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v122, Oct 31';
+var BUILD='v123, Oct 31';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -8210,6 +8210,99 @@ function hbFold(title,html,open,strip){
 }
 var sheetHtml80=sheetHtml;
 sheetHtml=function(){return ''};
+
+/* v123: college football anytime touchdown scorers, built from this season's touchdown counts */
+CATS.ncaafb.splice(1,0,['atd','Anytime TD']);
+S.atd={at:0,rows:[],st:'idle'};
+try{var atc=JSON.parse(localStorage.getItem('hitboard.atd.v1')||'null');if(atc&&atc.rows){S.atd.rows=atc.rows;S.atd.at=atc.at||0;S.atd.st='ok'}}catch(e){}
+function atdLoad(){
+  if(S.atd.st==='load'||typeof fetch!=='function')return;
+  if(S.atd.st==='ok'&&Date.now()-S.atd.at<6*36e5)return;
+  if(S.atd.st==='err'&&Date.now()-S.atd.at<3*60000)return;
+  S.atd.st='load';S.atd.at=S.atd.at||0;var seen={},rows=[],jobs=[];
+  ['rushing.rushingTouchdowns','receiving.receivingTouchdowns'].forEach(function(so){[1,2,3].forEach(function(pg){jobs.push([so,pg])})});
+  var done={},bad=0;
+  jobs.reduce(function(pr,jb){return pr.then(function(){
+    if(done[jb[0]])return;
+    return rsFetchJson('https://site.web.api.espn.com/apis/common/v3/sports/football/college-football/statistics/byathlete?region=us&lang=en&contentorigin=espn&isqualified=false&page='+jb[1]+'&limit=100&sort='+encodeURIComponent(jb[0]+':desc')).then(function(j){
+      var L=j.athletes||[];if(L.length<100)done[jb[0]]=1;
+      L.forEach(function(a){
+        var gp=rsVal(a,j,'general','gamesPlayed');if(!(gp>=2))return;
+        var r=rsVal(a,j,'rushing','rushingTouchdowns')||0,c=rsVal(a,j,'receiving','receivingTouchdowns')||0;
+        if(!(r+c>0))return;
+        var t=rsTeam(a,'ncaafb');if(!t)return;
+        var k=a.athlete.displayName+'|'+t,p=seen[k];
+        if(p){p.r=Math.max(p.r,r);p.c=Math.max(p.c,c)}
+        else{seen[k]={n:a.athlete.displayName,t:t,gp:gp,r:r,c:c};rows.push(seen[k])}
+      });
+    }).catch(function(){bad++;done[jb[0]]=1});
+  })},Promise.resolve()).then(function(){
+    if(rows.length){S.atd.rows=rows;S.atd.st='ok';S.atd.at=Date.now();try{localStorage.setItem('hitboard.atd.v1',JSON.stringify({at:S.atd.at,rows:rows}))}catch(e){}}
+    else{S.atd.st='err';S.atd.at=Date.now()}
+    var ae=document.activeElement;if(!(ae&&ae.tagName==='INPUT')){try{render();if(S.sheet&&S.sheet.type==='fgame')renderSheet()}catch(e){}}
+  }).catch(function(){S.atd.st='err';S.atd.at=Date.now()});
+}
+function atdGradeOf(p){return p>=.65?'A':p>=.55?'A-':p>=.48?'B+':p>=.42?'B':p>=.36?'B-':p>=.30?'C+':p>=.25?'C':p>=.2?'C-':'D'}
+function atdGame(g){
+  var out=[];if(g.lg!=='ncaafb')return out;
+  var m=null,T=null;try{m=pickModel(g);T=m&&m.T&&!m.T.missing?m.T:null}catch(e){}
+  [['a',g.a,'h'],['h',g.h,'a']].forEach(function(sd){
+    var side=sd[0],ab=sd[1],opp=sd[2],ex=[];
+    try{ex=(injOut(g,side)||[]).map(normName)}catch(e){}
+    var f=1;
+    if(T&&m.sa!=null){var X=side==='a'?T.A:T.H,exp=side==='a'?m.sa:m.sh;if(X&&X.pf>0)f=Math.max(.8,Math.min(1.25,exp/X.pf))}
+    S.atd.rows.forEach(function(r){
+      if(tabb(r.t)!==tabb(ab))return;
+      var nm=normName(r.n);if(ex.some(function(x){return x.indexOf(nm)>=0||nm.indexOf(x)>=0}))return;
+      var td=r.r+r.c,lam=(td+0.24)/(r.gp+2)*f,p=1-Math.exp(-lam);
+      out.push({n:r.n,t:ab,side:side,p:p,td:td,gp:r.gp,r:r.r,c:r.c,g:g,gr:atdGradeOf(p)});
+    });
+  });
+  return out.sort(function(a,b){return b.p-a.p});
+}
+function atdWhy(o){
+  var parts=[];if(o.r)parts.push(o.r+' rushing');if(o.c)parts.push(o.c+' receiving');
+  return parts.join(' and ')+' touchdown'+(o.td>1?'s':'')+' in '+o.gp+' games';
+}
+function atdRow(o,showGame){
+  var g=o.g;
+  return '<div data-act="prof" data-n="'+esc(o.n)+'" data-lg="ncaafb" data-team="'+esc(o.t)+'" style="padding:8px 0;border-top:1px solid var(--line);cursor:pointer"><div class="r" style="display:flex;justify-content:space-between;gap:8px;align-items:center"><div><b>'+esc(o.n)+'</b> <span class="src">'+esc(o.t)+'</span><div class="src">'+esc(atdWhy(o))+(showGame?' · '+esc(g.a+' @ '+g.h)+' · '+esc(gTime(g)):'')+'</div><div class="src">Fair price '+fmtAm(fairAm(o.p))+' · worth it if your book pays that or better</div></div><span style="font-size:26px;font-weight:700;line-height:1">'+esc(o.gr)+'</span></div></div>';
+}
+function atdHtml(g){
+  if(g.lg!=='ncaafb'||kind(g)!=='up')return '';
+  try{atdLoad()}catch(e){}
+  if(!S.atd.rows.length)return S.atd.st==='load'?'<p class="src">Loading this season’s touchdown counts. This fills in on its own.</p>':'';
+  var L=atdGame(g);if(!L.length)return '';
+  var top=L.slice(0,5);
+  return '<p class="src" style="margin-top:0">Best chances to score a touchdown at any point. Graded from each player’s touchdowns this season and how many points I expect this team to score. Prices are not read, so compare with your book.</p>'+top.map(function(o){return atdRow(o,false)}).join('');
+}
+var atdPick0=pickBlock;
+pickBlock=function(g){
+  var h=atdPick0(g);
+  try{
+    if(!h||g.lg!=='ncaafb')return h;
+    var f=hbFold('Anytime touchdown picks',atdHtml(g));if(!f)return h;
+    var i=h.lastIndexOf('<details');
+    /* put it before the last fold (risks) */
+    return i>=0?h.slice(0,i)+f+h.slice(i):h+f;
+  }catch(e){return h}
+};
+var vPropsLg81=vPropsLg;
+vPropsLg=function(){
+  if(S.sport!=='ncaafb'||curCat()!=='atd')return vPropsLg81();
+  try{atdLoad()}catch(e){}
+  var h='<h2>College football props</h2>'+propsChips()+modeSwitch('props');
+  h+='<div class="chips" role="group" aria-label="Prop type">'+CATS.ncaafb.map(function(c){return '<button class="chip" data-act="cat" data-v="'+c[0]+'" aria-pressed="'+(c[0]==='atd')+'">'+c[1]+'</button>'}).join('')+'</div>';
+  var now=Date.now(),all=[];
+  (S.feed.ncaafb||[]).forEach(function(g){if(kind(g)==='up'&&g.start>now&&g.start<now+36*36e5)atdGame(g).slice(0,3).forEach(function(o){all.push(o)})});
+  all.sort(function(a,b){return b.p-a.p});
+  h+='<h3>Anytime touchdown</h3>';
+  if(!S.atd.rows.length)h+='<div class="card empty">'+(S.atd.st==='err'?'The touchdown counts did not load. They retry on their own.':'Loading this season’s touchdown counts. This fills in on its own.')+'</div>';
+  else if(!all.length)h+='<div class="card empty">No college games in the next 36 hours with touchdown data yet.</div>';
+  else h+='<div class="card"><div class="src" style="margin:0 0 6px">Best chances to score at any point, best grade first. Built from this season’s touchdowns and my expected points for each team. Prices are not read, so compare each with your book’s price.</div>'+all.slice(0,25).map(function(o){return atdRow(o,true)}).join('')+'</div>';
+  return h+foot();
+};
+setTimeout(function(){try{atdLoad()}catch(e){}},4000);
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
