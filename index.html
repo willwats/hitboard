@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v121, Oct 31';
+var BUILD='v122, Oct 31';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -7793,7 +7793,7 @@ function teamWS(nm,R,bm,res){
   if(res&&res.length>=3){M.push('Last three: '+res.slice(-3).map(function(r){return (r.pf>r.pa?'W ':'L ')+r.pf+'-'+r.pa+(r.opp?' '+(r.home?'vs ':'at ')+r.opp:'')}).join(', ')+'.')}
   return {W:W,B:B,M:M};
 }
-function hbList(a,empty){return a.length?'<ul class="pts" style="margin-top:2px">'+a.map(function(x){return '<li>'+esc(x)+'</li>'}).join('')+'</ul>':'<p class="src" style="margin-top:2px">'+esc(empty)+'</p>'}
+function pbList(a,empty){return a.length?'<ul class="pts" style="margin-top:2px">'+a.map(function(x){return '<li>'+esc(x)+'</li>'}).join('')+'</ul>':'<p class="src" style="margin-top:2px">'+esc(empty)+'</p>'}
 /* the matchup: each phase of the game */
 function usPhases(g,ra,rh,bm,na,nh){
   var P=[];
@@ -7980,7 +7980,7 @@ function pickBlock(g){
   if(m.Ra&&m.Rh&&m.bm){
     var Du=S.us[g.id]&&S.us[g.id].d,wa=teamWS(na,m.Ra,m.bm,Du&&Du.a.res),wh=teamWS(nh,m.Rh,m.bm,Du&&Du.h.res);
     [[na,wa,'a'],[nh,wh,'h']].forEach(function(t){
-      h+='<h3>'+esc(t[0])+': what works and what does not</h3><div class="src"><b>Works</b></div>'+hbList(t[1].W,'Nothing here stands out as a strength.')+'<div class="src" style="margin-top:6px"><b>Struggles</b></div>'+hbList(t[1].B,'Nothing here stands out as a real weakness.')+'<div class="src" style="margin-top:6px"><b>Average, style and form</b></div>'+hbList(t[1].M,'No further detail.');
+      h+='<h3>'+esc(t[0])+': what works and what does not</h3><div class="src"><b>Works</b></div>'+pbList(t[1].W,'Nothing here stands out as a strength.')+'<div class="src" style="margin-top:6px"><b>Struggles</b></div>'+pbList(t[1].B,'Nothing here stands out as a real weakness.')+'<div class="src" style="margin-top:6px"><b>Average, style and form</b></div>'+pbList(t[1].M,'No further detail.');
     });
     /* matchup phases */
     try{h+=keyPlayers(g,m,na,nh)}catch(e){}
@@ -8044,7 +8044,7 @@ function genericRead(g,m,na,nh){
     if(ro>n*.3&&ro<n*.7)M.push('Scoring is about average: '+X.pf.toFixed(d)+' '+u+' a game ('+ordn(ro)+' of '+n+').');
     if(rd>n*.3&&rd<n*.7)M.push('Defense is about average: allows '+X.pa.toFixed(d)+' ('+ordn(rd)+' of '+n+').');
     var mg=X.pf-X.pa;M.push('Season scoring margin: '+(mg>=0?'+':'')+mg.toFixed(d)+' a game.');
-    return '<h3>'+esc(nm)+': what works and what does not</h3><div class="src"><b>Works</b></div>'+hbList(W,'Nothing stands out as a strength.')+'<div class="src" style="margin-top:6px"><b>Struggles</b></div>'+hbList(B,'Nothing stands out as a real weakness.')+'<div class="src" style="margin-top:6px"><b>Average and form</b></div>'+hbList(M,'No further detail.');
+    return '<h3>'+esc(nm)+': what works and what does not</h3><div class="src"><b>Works</b></div>'+pbList(W,'Nothing stands out as a strength.')+'<div class="src" style="margin-top:6px"><b>Struggles</b></div>'+pbList(B,'Nothing stands out as a real weakness.')+'<div class="src" style="margin-top:6px"><b>Average and form</b></div>'+pbList(M,'No further detail.');
   };
   h+=row(na,A)+row(nh,H);
   return h;
