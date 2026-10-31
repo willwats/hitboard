@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v125, Oct 31';
+var BUILD='v126, Oct 31';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -8654,6 +8654,176 @@ vHb=function(){
   var h=vHb83(),c='';try{c=cardHtml()}catch(e){}
   if(!c)return h;
   var i=h.indexOf('<h3>');return i>=0?h.slice(0,i)+c+h.slice(i):h+c;
+};
+
+/* v126: the same schedule-strength, post-game write-ups and carry-over for NBA and NHL */
+S.sosT={};
+function oppNet2(lg,ab){
+  try{
+    ab=String(ab||'').toUpperCase();
+    if(lg==='nba'){var t=NBAT[ab]||NBAT[tabb(ab)];if(t&&t.G)return t.PF-t.PA}
+    else if(lg==='nhl'){var h=NHLT[nhlK(ab)];if(h&&h.gp)return (h.gf-h.ga)/h.gp}
+  }catch(e){}
+  return null;
+}
+function sosEnsure2(g){
+  if((g.lg!=='nba'&&g.lg!=='nhl')||typeof fetch!=='function'||window.claude)return;
+  var c=S.sosT[g.id];if(c&&(c.st==='load'||(c.st==='ok'&&Date.now()-c.t<30*60000)||(c.st==='err'&&Date.now()-c.t<2*60000)))return;
+  S.sosT[g.id]={st:'load',t:Date.now()};
+  var one=function(ab,nm){return tmIdFor(g.lg,ab,nm).then(function(id){return tmSched(g.lg,id)}).then(function(v){
+    var vs=[];v.slice(-10).forEach(function(e){var n=oppNet2(g.lg,e.opp&&e.opp.abbreviation);if(n!=null&&isFinite(n))vs.push(n)});
+    return vs.length>=3?vs.reduce(function(a,b){return a+b},0)/vs.length:null})};
+  Promise.all([one(g.a,g.an),one(g.h,g.hn)]).then(function(r){S.sosT[g.id]={st:'ok',t:Date.now(),a:r[0],h:r[1]}}).catch(function(){S.sosT[g.id]={st:'err',t:Date.now()}}).then(function(){try{if(S.sheet&&S.sheet.type==='fgame'&&S.sheet.id===g.id)renderSheet()}catch(e){}});
+}
+var pickModel84=pickModel;
+pickModel=function(g){
+  var m=pickModel84(g);
+  try{
+    if(m&&m.M!=null&&(g.lg==='nba'||g.lg==='nhl')){
+      try{sosEnsure2(g)}catch(e){}
+      var c=S.sosT[g.id],cap=g.lg==='nhl'?.4:3,ccap=g.lg==='nhl'?.3:2,sosShift=0,carry=0;
+      if(c&&c.st==='ok'&&c.a!=null&&c.h!=null)sosShift=Math.max(-cap,Math.min(cap,0.5*(c.h-c.a)));
+      var la=lessAvg(g.lg,g.a),lh=lessAvg(g.lg,g.h);
+      if(la!=null||lh!=null)carry=Math.max(-ccap,Math.min(ccap,0.25*((lh||0)-(la||0))));
+      m.M=m.M+sosShift+carry;m.sos={a:c&&c.st==='ok'?c.a:null,h:c&&c.st==='ok'?c.h:null,shift:sosShift};m.carry={a:la,h:lh,shift:carry};
+    }
+  }catch(e){}
+  return m;
+};
+
+/* box scores for NBA and NHL */
+function bsNum(M,names){for(var i=0;i<names.length;i++){var v=M[names[i]];if(v!=null&&v!==''){var n=parseFloat(String(v).replace('%',''));if(!isNaN(n))return n}}return null}
+function revEnsure2(g){
+  if((g.lg!=='nba'&&g.lg!=='nhl')||!g.sid||typeof fetch!=='function'||window.claude)return;
+  var r=S.rev[g.id];if(r&&(r.st==='load'||r.st==='ok'||(r.st==='err'&&Date.now()-r.t<2*60000)))return;
+  S.rev[g.id]={st:'load',t:Date.now()};
+  fetch('https://site.api.espn.com/apis/site/v2/sports/'+ESPN[g.lg]+'/summary?event='+encodeURIComponent(g.sid)).then(function(r){return r.ok?r.json():null}).then(function(j){
+    var o=null;
+    if(j&&j.boxscore&&j.boxscore.teams&&j.boxscore.teams.length===2){
+      o={a:{M:{},top:null,gk:null},h:{M:{},top:null,gk:null}};
+      j.boxscore.teams.forEach(function(x){var sd=x.homeAway==='home'?'h':'a';(x.statistics||[]).forEach(function(s){o[sd].M[s.name]=s.displayValue})});
+      (j.boxscore.players||[]).forEach(function(tm){
+        var sd=null;j.boxscore.teams.forEach(function(x){if(String(x.team&&x.team.id)===String(tm.team&&tm.team.id))sd=x.homeAway==='home'?'h':'a'});
+        if(!sd)return;
+        (tm.statistics||[]).forEach(function(cat){
+          var L=cat.labels||[];
+          (cat.athletes||[]).forEach(function(a){
+            if(!a.athlete)return;var st=a.stats||[];
+            if(g.lg==='nba'){var ix=L.indexOf('PTS');if(ix>=0){var p=parseInt(st[ix],10);if(!isNaN(p)&&(!o[sd].top||p>o[sd].top.p))o[sd].top={n:a.athlete.displayName,p:p}}}
+            else{
+              var gi=L.indexOf('G'),ai=L.indexOf('A');
+              if(gi>=0&&ai>=0){var pt=(parseInt(st[gi],10)||0)*2+(parseInt(st[ai],10)||0);if(pt>0&&(!o[sd].top||pt>o[sd].top.pt))o[sd].top={n:a.athlete.displayName,pt:pt,g:parseInt(st[gi],10)||0,a:parseInt(st[ai],10)||0}}
+              var si=L.indexOf('SV'),sai=L.indexOf('SA');
+              if(si>=0&&sai>=0){var sv=parseInt(st[si],10),sa2=parseInt(st[sai],10);if(!isNaN(sv)&&!isNaN(sa2)&&sa2>0&&(!o[sd].gk||sa2>o[sd].gk.sa))o[sd].gk={n:a.athlete.displayName,sv:sv,sa:sa2}}
+            }
+          });
+        });
+      });
+    }
+    S.rev[g.id]={st:o?'ok':'err',t:Date.now(),o:o,x:1};
+  }).catch(function(){S.rev[g.id]={st:'err',t:Date.now()}}).then(function(){try{if(S.sheet&&S.sheet.type==='fgame'&&S.sheet.id===g.id)renderSheet()}catch(e){}});
+}
+function tNotes2(g,side,R,s){
+  var me=R.o[side],op=R.o[side==='a'?'h':'a'],M=me.M,O=op.M,W=[],F=[];
+  var nm=s?(side==='a'?s.na:s.nh):shortNm(g,side),on=s?(side==='a'?s.nh:s.na):shortNm(g,side==='a'?'h':'a');
+  var pts=side==='a'?g.sa:g.sh,ep=s?(side==='a'?s.pa:s.ph):null;
+  if(g.lg==='nba'){
+    var fg=bsNum(M,['fieldGoalPct']),fgo=bsNum(O,['fieldGoalPct']),t3=bsNum(M,['threePointFieldGoalPct']),to=bsNum(M,['turnovers','totalTurnovers']),reb=bsNum(M,['totalRebounds']),rebo=bsNum(O,['totalRebounds']),ast=bsNum(M,['assists']),pp=bsNum(M,['pointsInPaint']),fb=bsNum(M,['fastBreakPoints']),tog=bsNum(O,['turnovers','totalTurnovers']);
+    if(fg!=null){if(fg>=50)W.push('Shot well: '+fg+'% from the field.');else if(fg<=41)F.push('Shot poorly: only '+fg+'% from the field.')}
+    if(fgo!=null){if(fgo<=42)W.push('Defended well: held '+on+' to '+fgo+'% shooting.');else if(fgo>=50)F.push('Could not defend: '+on+' shot '+fgo+'%.')}
+    if(t3!=null){if(t3>=40)W.push('Hit from three: '+t3+'%.');else if(t3<=28)F.push('Cold from three: '+t3+'%.')}
+    if(reb!=null&&rebo!=null){if(reb-rebo>=8)W.push('Controlled the boards: '+reb+' rebounds to '+rebo+'.');else if(rebo-reb>=8)F.push('Lost the boards: '+reb+' rebounds to '+rebo+'.')}
+    if(to!=null){if(to>=17)F.push('Careless with the ball: '+to+' turnovers.');else if(to<=10)W.push('Took care of the ball: just '+to+' turnovers.')}
+    if(tog!=null&&tog>=17)W.push('Forced '+tog+' turnovers.');
+    if(ast!=null&&ast>=28)W.push('Moved the ball: '+ast+' assists.');
+    if(pp!=null){if(pp>=56)W.push('Won inside: '+pp+' points in the paint.');else if(pp<=34)F.push('Little inside scoring: '+pp+' points in the paint.')}
+    if(fb!=null&&fb>=20)W.push('Ran the floor: '+fb+' fast-break points.');
+    if(me.top&&me.top.p>=28)W.push(me.top.n+' led the way with '+me.top.p+' points.');
+    if(ep!=null){var d=pts-ep;if(d>=8)W.push('Scored '+pts+', about '+hbF0(d)+' more than I expected.');else if(d<=-8)F.push('Scored just '+pts+', about '+hbF0(-d)+' fewer than I expected.')}
+  }else{
+    var sh=bsNum(M,['shotsTotal','totalShots','shots','shotsOnGoal']),sho=bsNum(O,['shotsTotal','totalShots','shots','shotsOnGoal']),fo=bsNum(M,['faceoffPercent','faceoffWinPercent']),gv=bsNum(M,['giveaways']),tk=bsNum(M,['takeaways']),ppg=bsNum(M,['powerPlayGoals']),ppo=bsNum(M,['powerPlayOpportunities']),ppoO=bsNum(O,['powerPlayOpportunities']),ppgO=bsNum(O,['powerPlayGoals']);
+    if(sh!=null&&sho!=null){if(sh-sho>=8)W.push('Controlled the shots: '+sh+' to '+sho+'.');else if(sho-sh>=8)F.push('Got outshot: '+sh+' to '+sho+'.')}
+    if(ppo!=null&&ppo>=3){if(ppg>=1)W.push('Power play delivered: '+ppg+' goal'+(ppg>1?'s':'')+' on '+ppo+' chances.');else F.push('Power play failed: 0 for '+ppo+'.')}
+    if(ppoO!=null&&ppoO>=3&&ppgO===0)W.push('Penalty kill held: stopped all '+ppoO+' chances.');else if(ppgO>=2)F.push('Penalty kill leaked: gave up '+ppgO+' power-play goals.');
+    if(fo!=null){if(fo>=55)W.push('Won the faceoffs: '+fo+'%.');else if(fo<=45)F.push('Lost the faceoffs: '+fo+'%.')}
+    if(gv!=null&&gv>=10)F.push('Gave the puck away '+gv+' times.');
+    if(tk!=null&&tk>=9)W.push('Took the puck away '+tk+' times.');
+    if(me.gk){var sp=me.gk.sv/me.gk.sa;if(sp>=.93)W.push(me.gk.n+' stood tall: '+me.gk.sv+' saves on '+me.gk.sa+' shots.');else if(sp<=.88)F.push(me.gk.n+' struggled: '+me.gk.sv+' saves on '+me.gk.sa+' shots.')}
+    if(me.top&&me.top.pt>=3)W.push(me.top.n+' drove the offense with '+me.top.g+' goal'+(me.top.g===1?'':'s')+' and '+me.top.a+' assist'+(me.top.a===1?'':'s')+'.');
+    if(ep!=null){var dd=pts-ep;if(dd>=1.5)W.push('Scored '+pts+', about '+hbF1(dd)+' more than I expected.');else if(dd<=-1.5)F.push('Scored just '+pts+', about '+hbF1(-dd)+' fewer than I expected.')}
+  }
+  if(!W.length)W.push('Nothing stood out as a clear strength in this game.');
+  if(!F.length)F.push('Nothing stood out as a clear failure in this game.');
+  return {nm:nm,on:on,W:W,F:F};
+}
+function lessonStore2(g){
+  if(g.lg!=='nba'&&g.lg!=='nhl')return;
+  var R=S.rev[g.id];if(!R||R.st!=='ok'||!R.x||g.sa==null)return;
+  var s=S.snap[g.id],mh=g.sh-g.sa,pm=s?s.ph-s.pa:null;
+  ['a','h'].forEach(function(sd){
+    var ab=sd==='a'?g.a:g.h,key=g.lg+'|'+tabb(ab),L=S.les[key]||(S.les[key]=[]);
+    if(L.some(function(x){return x.gid===g.id}))return;
+    var n=tNotes2(g,sd,R,s),pf=sd==='a'?g.sa:g.sh,pa=sd==='a'?g.sh:g.sa;
+    L.push({gid:g.id,at:g.start,opp:n.on,res:(pf>pa?'W ':'L ')+pf+'-'+pa,W:n.W.slice(0,3),F:n.F.slice(0,3),dm:pm==null?null:(sd==='h'?mh-pm:-(mh-pm))});
+    L.sort(function(a,b){return a.at-b.at});if(L.length>4)L.splice(0,L.length-4);lessSave();
+  });
+}
+var reviewBlock84=reviewBlock;
+reviewBlock=function(g){
+  var h=reviewBlock84(g);
+  try{
+    if(kind(g)==='final'&&g.sa!=null&&(g.lg==='nba'||g.lg==='nhl')){
+      revEnsure2(g);lessonStore2(g);
+      var R=S.rev[g.id],s=S.snap[g.id];
+      if(R&&R.st==='ok'&&R.x){
+        var add='';
+        ['a','h'].forEach(function(sd){var n=tNotes2(g,sd,R,s);
+          add+='<h3>'+esc(n.nm)+': what went well and what failed</h3><div class="src"><b>Went well</b></div>'+pbList(n.W,'')+'<div class="src" style="margin-top:6px"><b>Failed</b></div>'+pbList(n.F,'')});
+        add+='<p class="src">These notes are saved and carry into each team’s next game. The next prediction also adjusts for how strong the opponents were.</p>';
+        var i=h.indexOf('<details');h=i>=0?h.slice(0,i)+add+h.slice(i):h+add;
+      }
+    }
+  }catch(e){}
+  return h;
+};
+var pickBlock84=pickBlock;
+pickBlock=function(g){
+  var h=pickBlock84(g);
+  try{
+    if(!h||kind(g)!=='up'||(g.lg!=='nba'&&g.lg!=='nhl'))return h;
+    var m=pickModel(g),H='',u=g.lg==='nhl'?'goal':'point';
+    ['a','h'].forEach(function(sd){
+      var ab=sd==='a'?g.a:g.h,L=S.les[g.lg+'|'+tabb(ab)],x=L&&L[L.length-1];if(!x)return;
+      H+='<p style="margin:8px 0 2px"><b>'+esc(shortNm(g,sd))+'</b> last game: '+esc(x.res)+' vs '+esc(x.opp)+'.</p>'+pbList(x.W.slice(0,2).map(function(t){return 'Went well: '+t}).concat(x.F.slice(0,2).map(function(t){return 'Failed: '+t})),'');
+    });
+    if(m.carry&&Math.abs(m.carry.shift)>=(g.lg==='nhl'?.03:.2))H+='<p class="src">Because of how each team performed against my last call, I moved my number by '+(g.lg==='nhl'?m.carry.shift.toFixed?Math.abs(m.carry.shift).toFixed(2):'':hbF1(Math.abs(m.carry.shift)))+' '+u+'s toward '+esc(m.carry.shift>0?shortNm(g,'h'):shortNm(g,'a'))+'.</p>';
+    if(m.sos&&m.sos.a!=null&&m.sos.h!=null){
+      var th=g.lg==='nhl'?.25:3,tf=function(v){return v>=th?'a tough schedule':v<=-th?'a soft schedule':'an average schedule'};
+      H+='<p class="src">Strength of schedule: '+esc(shortNm(g,'a'))+' has played '+tf(m.sos.a)+' and '+esc(shortNm(g,'h'))+' has played '+tf(m.sos.h)+'.'+(Math.abs(m.sos.shift)>=(g.lg==='nhl'?.03:.2)?' I moved my number toward '+esc(m.sos.shift>0?shortNm(g,'h'):shortNm(g,'a'))+' for that.':' That does not change the pick.')+'</p>';
+    }
+    var f=hbFold('Last game and strength of schedule',H);if(!f)return h;
+    var i=h.lastIndexOf('<details');return i>=0?h.slice(0,i)+f+h.slice(i):h+f;
+  }catch(e){return h}
+};
+function finalsPass2(){
+  var now=Date.now(),n=0;
+  ['nba','nhl'].forEach(function(lg){(S.feed[lg]||[]).forEach(function(g){
+    if(kind(g)!=='final'||g.sa==null||g.start<now-4*864e5)return;
+    var R=S.rev[g.id];
+    if(R&&R.st==='ok'){lessonStore2(g);return}
+    if(n<6){n++;revEnsure2(g)}
+  })});
+}
+var trackPicks84=trackPicks;
+trackPicks=function(){try{finalsPass2()}catch(e){}return trackPicks84.apply(this,arguments)};
+setTimeout(function(){try{finalsPass2()}catch(e){}},9000);
+/* report card by sport */
+var cardHtml84=cardHtml;
+cardHtml=function(){
+  var h=cardHtml84();if(!Object.keys(S.led).length)return h;
+  var by={};Object.keys(S.led).forEach(function(k){var x=S.led[k],b=by[x.lg]||(by[x.lg]=[0,0,0]);b[x.res==='W'?0:x.res==='L'?1:2]++});
+  var rows=Object.keys(by).map(function(lg){var b=by[lg];return '<div class="r" style="display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid var(--line)"><span>'+esc(lgName(lg))+'</span><b>'+b[0]+'-'+b[1]+(b[2]?'-'+b[2]:'')+'</b></div>'}).join('');
+  var i=h.lastIndexOf('</div>');return h.slice(0,i)+'<div class="src" style="margin-top:8px"><b>By sport</b></div>'+rows+h.slice(i);
 };
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
