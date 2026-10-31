@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v118, Oct 31';
+var BUILD='v119, Oct 31';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -7930,6 +7930,9 @@ function pickBlock(g){
   var sc=g.lg==='nhl'?0.2:1,shr=0.5*Math.abs(edge)/sc,conf=shr>=4?'Strong lean':shr>=2?'Lean':'Slight lean, thin edge';
   var mine=0.5*m.M+0.5*L;
   var big=Math.abs(L);
+  var ex=null;try{ex=expSig(g,pickSide)}catch(e){}
+  if(ex&&ex.rel==='agree')conf=conf==='Lean'?'Strong lean':conf==='Slight lean, thin edge'?'Lean':conf;
+  else if(ex&&ex.rel==='split')conf=conf==='Strong lean'?'Lean':'Split, thin edge';
   var head=pk+' '+sgnPts(lineForPick)+' covers';
   var Mf=fav==='h'?m.M:-m.M,sub,ps0=predScore(g,m,L,na,nh);
   var scTxt=ps0?(ps0.h>=ps0.a?esc(nh)+' '+hbF0(ps0.h)+', '+esc(na)+' '+hbF0(ps0.a):esc(na)+' '+hbF0(ps0.a)+', '+esc(nh)+' '+hbF0(ps0.h)):'';
@@ -7937,7 +7940,7 @@ function pickBlock(g){
   if(pickSide===fav)sub+=esc(pk)+' wins by about '+hbF0(Math.abs(Mf))+', more than the '+big+' it needs, so it covers.';
   else if(Mf>0)sub+=esc(favN)+' wins by about '+hbF0(Mf)+', which is less than the '+big+' it has to win by, so '+esc(pk)+' covers.';
   else sub+=esc(pk)+' wins the game outright, so it covers.';
-  h+='<h3>The pick</h3><div class="card bcard"><div class="label">Spread pick · '+esc(conf)+'</div><div class="teams" style="font-size:22px">'+esc(head)+'</div><p style="margin:8px 0 0;line-height:1.5">'+sub+' The spread of '+big+' was not used to build this. I only compare my result to it at the end.'+'</p></div>';
+  h+='<h3>The pick</h3><div class="card bcard"><div class="label">Spread pick · '+esc(conf)+'</div><div class="teams" style="font-size:22px">'+esc(head)+'</div><p style="margin:8px 0 0;line-height:1.5">'+sub+' The spread of '+big+' was not used to build this. I only compare my result to it at the end.'+(ex?(ex.rel==='agree'?' Outside analysts land on the same side, which adds some confidence.':' Outside analysts lean the other way (see the notes below), so treat this one as a lower-confidence call.'):'')+'</p></div>';
   /* WHY */
   var why=[],against=[];
   why.push('My number is '+esc(favN)+' '+((fav==='h'?m.M:-m.M)>=0?'by about '+hbF0(Math.abs(m.M)):'losing by about '+hbF0(Math.abs(m.M)))+' against a line of '+big+', which puts '+esc(pk)+' '+(pickSide===fav?'about '+hbF0(Math.abs(edge))+' points clear of it.':'about '+hbF0(Math.abs(edge))+' points of cushion.'));
@@ -8049,6 +8052,71 @@ feedSheet=function(g){
   var mk='aria-label="Close">×</button></div>',i=h.indexOf(mk);
   if(i<0)return h;i+=mk.length;
   return h.slice(0,i)+blk+h.slice(i);
+};
+
+/* v119: outside-analyst read, folded into the write-up and the confidence word. Source is never named. */
+var EXPERT=[
+ {t:['Notre Dame','Navy'],p:{k:'spread',tm:'Navy'},n:['Analysts lean Navy to stay inside a very large number. Navy’s recent struggles, including a loss to North Texas, have inflated the line.','Both teams want to run. That limits possessions and keeps the margin from stretching.']},
+ {t:['Marshall','Old Dominion'],p:{k:'ml',tm:'Old Dominion'},n:['Analysts like Old Dominion to win outright and think the late line move is an overreaction.']},
+ {t:['Kansas State','Colorado'],p:{k:'ml',tm:'Colorado'},n:['Analysts lean Colorado. Colorado has dropped five straight, four of them against ranked teams, so the losing streak overstates how it matches up here.','Kansas State has not won on the road this year.']},
+ {t:['UConn','Air Force'],p:{k:'ml',tm:'UConn'},n:['Analysts lean UConn based on the schedule each team has played and how close UConn’s results have been.']},
+ {t:['Utah State','Colorado State'],p:{k:'spread',tm:'Colorado State'},n:['Analysts see Colorado State keeping this close at home.']},
+ {t:['Arizona State','BYU'],p:{k:'spread',tm:'Arizona State'},n:['Analysts lean Arizona State to hang around. BYU is coming off an emotional rivalry game and has Utah next, which sets up a flat spot.']},
+ {t:['Florida International','Liberty'],p:{k:'spread',tm:'Liberty'},n:['Analysts back Liberty, which is on a roll and has won five straight by 16 or more. FIU’s offense is a liability.']},
+ {t:['UTEP','North Dakota State'],p:{k:'total',d:'under'},n:['Analysts lean toward a low-scoring game.']},
+ {t:['South Carolina','Oklahoma'],p:{k:'spread',tm:'South Carolina'},n:['Analysts lean South Carolina. Oklahoma quarterback John Mateer has been turning the ball over, and South Carolina’s Dylan Stewart can win against Oklahoma’s offensive line.']},
+ {t:['Appalachian State','Georgia Southern'],p:{k:'spread',tm:'Georgia Southern'},n:['Analysts like Georgia Southern coming off a bye.']},
+ {t:['Oklahoma State','Iowa State'],p:{k:'tt',tm:'Oklahoma State'},n:['Analysts expect Oklahoma State to score. It has put up 39 or more in five of its last six, and Iowa State’s pass defense ranks outside the top 100.','Quarterback Drew Mestemaker is the player to watch against that secondary.']},
+ {t:['Baylor','UCF'],p:{k:'total',d:'over'},n:['Analysts lean toward points on both sides.']},
+ {t:['Kent State','Sacramento State'],p:{k:'spread',tm:'Sacramento State'},n:['Analysts back Sacramento State. Kent State has not won on the road and lost to an FCS team, Tarleton State.']},
+ {t:['Michigan','Rutgers'],p:{k:'total',d:'over'},n:['Analysts lean to points. Michigan has scored 21 or fewer in five of its last six, but Rutgers allows 33.3 a game (127th) and 199 rushing yards a game, which is the biggest weakness against a run-first Michigan.','Michigan has faced top-20 pass defenses most of the year, which helps explain the thin offense. Who starts at quarterback is still unsettled.']},
+ {t:['Utah','Cincinnati'],p:{k:'spread',tm:'Utah'},n:['Analysts lean Utah. It is unbeaten, has an explosive offense and rallied past Houston. It is weaker on the road and has not played clean.','Cincinnati’s offense struggles when it steps up in class, and its defense ranks outside the top 100 in EPA per play and success rate allowed.','Both teams are in tricky spots. Utah has BYU next.']},
+ {t:['USC','Ohio State'],p:{k:'ml',tm:'USC'},n:['Analysts see value on USC. Ohio State’s offense is worse with freshman Luke Fahey at quarterback (57th in EPA per rush and rush success).','USC should lean on the run and shorten the game.']},
+ {t:['Oregon State','Fresno State'],p:{k:'tt',tm:'Oregon State'},n:['Analysts expect Oregon State to score. It has put up 33 or more in each of its last five (about 51 a game). Fresno State has allowed around 400 yards to San Diego State and more than 500 to Boise State.']},
+ {t:['Temple','East Carolina'],p:{k:'spread',tm:'Temple'},n:['Analysts lean Temple off a bye. East Carolina has lost two straight road games in overtime, and its offense ranks 102nd in total offense and 124th in yards per play.','Temple’s defense gave up 449 yards in a loss to Charlotte, and it changed its defensive play-caller.']},
+ {t:['Georgia','Florida'],p:{k:'tt',tm:'Georgia'},n:['Analysts expect Georgia to score a lot. Florida allows 34.8 a game in conference play, second most in the SEC, and Auburn, Missouri and South Carolina each scored 38 or more on it.','Florida’s quarterback and lead back are both banged up, which makes the Gators’ own scoring less certain. Georgia is strong coming off a bye.']},
+ {t:['Florida State','Clemson'],p:{k:'spread',tm:'Florida State'},n:['Analysts back Florida State. It ran for 281 yards on 6.1 a carry in its last home game, a 38-7 win over Virginia, and Clemson has struggled to defend the run.','Clemson ranks 111th in scoring and 128th in yards per play. Its defense has carried the team. Florida State’s defense is the weak point.']},
+ {t:['Arizona','Texas Tech'],p:{k:'spread',tm:'Arizona'},n:['Analysts lean Arizona. It has won three straight conference games by 20 or more, and quarterback Noah Fifita faces a Texas Tech pass defense that ranks 126th of 138 in yards allowed.','Texas Tech has had an easier schedule than its 6-1 record suggests.']},
+ {t:['Auburn','Ole Miss'],p:{k:'spread',tm:'Ole Miss'},n:['Analysts back Ole Miss to win big. Auburn’s Byrum Brown can extend plays with his legs, so Ole Miss must contain the quarterback run.','Ole Miss will be without running back Kewan Lacy, though his workload had already shrunk.']},
+ {t:['IND','JAX'],p:{k:'spread',tm:'JAX'},n:['Analysts back Jacksonville off the bye. The Jaguars lead the league in EPA per rush and rush success rate allowed.','Indianapolis is on its fourth road game in five weeks, has lost guard Quenton Nelson in a trade, and Daniel Jones leads the league in turnover-worthy plays. The Colts’ secondary has injuries.']},
+ {t:['CLE','PIT'],p:{k:'spread',tm:'CLE'},n:['Analysts lean Cleveland. The Browns have the sixth-ranked defense with 20 sacks, and Pittsburgh’s secondary is banged up (Ramsey, Echols, Slaughter).','Cleveland’s offense is the concern: 28th in the league at 19.0 a game and 30th on third down. Tackle Tytus Howard and center Elgton Jenkins missed Wednesday’s practice.','Expect a low-scoring game decided by about a field goal.']},
+ {t:['TEN','CIN'],p:{k:'total',d:'under'},n:['Analysts lean to a lower-scoring game. Tennessee is 1-6 and projects for roughly 16 to 19 points, and no opponent has topped 27 against its defense.']},
+ {t:['WAS','PHI'],p:{k:'total',d:'over'},n:['Analysts lean to points. Jayden Daniels is back and has 612 yards and four touchdowns in two games, and Philadelphia is the worst in the league at pressuring the quarterback (3.17%).','Philadelphia allows 131.4 rushing yards a game (27th). Saquon Barkley looked hurt but is not expected to miss, and DeVonta Smith is trending toward playing.']},
+ {t:['BOS','CHI'],p:{k:'spread',tm:'BOS'},n:['Analysts lean Boston. Chicago has 8 points, a minus-21 goal difference, and ranks 31st in goals scored, 29th in goals allowed and 32nd on the power play.','Boston has lost two straight in regulation while scoring one goal each time.']},
+ {t:['TOR','VAN'],p:{k:'ml',tm:'TOR'},n:['Analysts lean Toronto. Vancouver has lost 11 of 12, allows the most goals per game and has the third-worst penalty kill. Toronto is third in goals per game and fourth on the power play.']},
+ {t:['COL','CGY'],p:{k:'total',d:'over'},n:['Analysts lean to goals. Colorado has the second-most goals in the league, and the last meeting finished 7-3. Calgary has allowed 3.6 a game over its last five.']}
+];
+function expTm(g,side,key){
+  var nm=side==='a'?g.an:g.hn,ab=side==='a'?g.a:g.h;
+  if(g.lg!=='ncaafb'&&/^[A-Z]{2,4}$/.test(key))return nt(ab)===key;
+  var n=normName(nm),k=normName(key);
+  if(n===k)return true;
+  if(n.indexOf(k+' ')!==0)return false;
+  return !/^(state|southern|tech)\b/.test(n.slice(k.length+1));
+}
+function expFor(g){
+  if(!g||!g.an&&!g.a)return null;
+  var r=null;
+  EXPERT.forEach(function(x){if(r)return;
+    var a=x.t[0],b=x.t[1];
+    if((expTm(g,'a',a)&&expTm(g,'h',b))||(expTm(g,'a',b)&&expTm(g,'h',a)))r=x});
+  return r;
+}
+function expSig(g,pickSide){
+  var e=expFor(g);if(!e||!e.p)return null;
+  var p=e.p,side=null;
+  if(p.tm){if(expTm(g,'a',p.tm))side='a';else if(expTm(g,'h',p.tm))side='h'}
+  if(!side)return null;
+  if(p.k==='spread'||p.k==='ml')return {rel:side===pickSide?'agree':'split',side:side,k:p.k};
+  return null;
+}
+var cnFor78=cnFor;
+cnFor=function(g){
+  var b=null;try{b=cnFor78(g)}catch(e){}
+  var e=null;try{e=expFor(g)}catch(x){}
+  if(!e)return b;
+  var base=b&&b.n?b.n.slice():[];
+  return {n:base.concat(e.n),inj:b&&b.inj?b.inj:''};
 };
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
