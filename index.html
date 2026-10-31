@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v123, Oct 31';
+var BUILD='v124, Oct 31';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -8303,6 +8303,185 @@ vPropsLg=function(){
   return h+foot();
 };
 setTimeout(function(){try{atdLoad()}catch(e){}},4000);
+
+/* v124: touchdown counts from box scores; saved pre-game calls and a post-game review */
+S.atdT={};S.atdB={};
+function atdTeamRows(id,v){
+  var by={},n=0;
+  v.forEach(function(e){
+    var j=S.tbox[e.id];if(!j||!j.boxscore)return;
+    var tm=null;(j.boxscore.players||[]).forEach(function(x){if(String(x.team&&x.team.id)===String(id))tm=x});
+    if(!tm)return;n++;
+    (tm.statistics||[]).forEach(function(cat){
+      var nmc=String(cat.name||'').toLowerCase();if(nmc!=='rushing'&&nmc!=='receiving')return;
+      var ix=(cat.labels||[]).indexOf('TD');if(ix<0)return;
+      (cat.athletes||[]).forEach(function(a){
+        if(!a.athlete)return;var k=a.athlete.displayName,o=by[k]||(by[k]={n:k,r:0,c:0,seen:0}),td=parseInt((a.stats||[])[ix],10)||0;
+        if(nmc==='rushing')o.r+=td;else o.c+=td;o.seen++;
+      });
+    });
+  });
+  return {n:n,rows:Object.keys(by).map(function(k){return by[k]}).filter(function(o){return o.r+o.c>0})};
+}
+function atdEnsure(g){
+  if(g.lg!=='ncaafb'||typeof fetch!=='function'||window.claude)return;
+  try{usEnsure(g)}catch(e){}
+  var c=S.us[g.id];if(!c||c.st!=='ok'||!c.d)return;
+  ['a','h'].forEach(function(sd){
+    var P=c.d[sd],id=P&&P.id;if(!id)return;
+    var t=S.atdT[id];if(t&&Date.now()-t.at<30*60000)return;
+    if(S.atdB[id])return;S.atdB[id]=1;
+    tmSched('ncaafb',id).then(function(v){
+      var base='https://site.api.espn.com/apis/site/v2/sports/'+ESPN.ncaafb+'/summary?event=';
+      return Promise.all(v.slice(-14).map(function(e){
+        if(S.tbox[e.id]!==undefined)return;
+        return fetch(base+encodeURIComponent(e.id)).then(function(r){return r.ok?r.json():null}).then(function(j){S.tbox[e.id]=j}).catch(function(){S.tbox[e.id]=null});
+      })).then(function(){var r=atdTeamRows(id,v.slice(-14));r.at=Date.now();S.atdT[id]=r});
+    }).catch(function(){S.atdT[id]={n:0,rows:[],at:Date.now()-25*60000}}).then(function(){
+      delete S.atdB[id];
+      try{var ae=document.activeElement;if(!(ae&&ae.tagName==='INPUT')){render();if(S.sheet&&S.sheet.type==='fgame')renderSheet()}}catch(e){}
+    });
+  });
+}
+function atdGame(g){
+  var out=[];if(g.lg!=='ncaafb')return out;
+  var c=S.us[g.id];if(!c||c.st!=='ok'||!c.d)return out;
+  var m=null,T=null;try{m=pickModel(g);T=m&&m.T&&!m.T.missing?m.T:null}catch(e){}
+  [['a',g.a],['h',g.h]].forEach(function(sd){
+    var side=sd[0],ab=sd[1],P=c.d[side],t=P&&S.atdT[P.id];if(!t||!t.n)return;
+    var ex=[];try{ex=(injOut(g,side)||[]).map(normName)}catch(e){}
+    var f=1;
+    if(T&&m.sa!=null){var X=side==='a'?T.A:T.H,exp=side==='a'?m.sa:m.sh;if(X&&X.pf>0)f=Math.max(.8,Math.min(1.25,exp/X.pf))}
+    t.rows.forEach(function(r){
+      if(r.seen<2&&r.r+r.c<2)return;
+      var nm=normName(r.n);if(ex.some(function(x){return x.indexOf(nm)>=0||nm.indexOf(x)>=0}))return;
+      var td=r.r+r.c,lam=(td+0.24)/(t.n+2)*f,p=1-Math.exp(-lam);
+      out.push({n:r.n,t:ab,side:side,p:p,td:td,gp:t.n,r:r.r,c:r.c,g:g,gr:atdGradeOf(p)});
+    });
+  });
+  return out.sort(function(a,b){return b.p-a.p});
+}
+function atdLoad(){}
+function atdHtml(g){
+  if(g.lg!=='ncaafb'||kind(g)!=='up')return '';
+  try{atdEnsure(g)}catch(e){}
+  var c=S.us[g.id];
+  if(!c||c.st==='load'||(c.st==='ok'&&!(S.atdT[c.d.a.id]&&S.atdT[c.d.h.id])))return '<p class="src">Counting each team’s touchdown scorers from its recent games. This fills in on its own.</p>';
+  if(c.st==='err')return '<p class="src">The team game data did not load, so touchdown picks are not available yet. It retries on its own.</p>';
+  var L=atdGame(g);if(!L.length)return '<p class="src">No player on either team has enough touchdown history yet.</p>';
+  return '<p class="src" style="margin-top:0">Best chances to score a touchdown at any point. Graded from each player’s touchdowns in his team’s recent games and how many points I expect the team to score. Prices are not read, so compare with your book.</p>'+L.slice(0,5).map(function(o){return atdRow(o,false)}).join('');
+}
+var vPropsLg82=vPropsLg;
+vPropsLg=function(){
+  if(S.sport!=='ncaafb'||curCat()!=='atd')return vPropsLg82();
+  var now=Date.now(),gs=(S.feed.ncaafb||[]).filter(function(g){return kind(g)==='up'&&g.start>now&&g.start<now+36*36e5}).sort(function(a,b){return a.start-b.start});
+  gs.slice(0,14).forEach(function(g,i){setTimeout(function(){try{atdEnsure(g)}catch(e){}},i*500)});
+  var h='<h2>College football props</h2>'+propsChips()+modeSwitch('props');
+  h+='<div class="chips" role="group" aria-label="Prop type">'+CATS.ncaafb.map(function(c){return '<button class="chip" data-act="cat" data-v="'+c[0]+'" aria-pressed="'+(c[0]==='atd')+'">'+c[1]+'</button>'}).join('')+'</div>';
+  var all=[],pend=0;
+  gs.slice(0,14).forEach(function(g){var c=S.us[g.id];if(!c||c.st!=='ok'||!(S.atdT[c.d.a.id]&&S.atdT[c.d.h.id])){pend++;return}atdGame(g).slice(0,3).forEach(function(o){all.push(o)})});
+  all.sort(function(a,b){return b.p-a.p});
+  h+='<h3>Anytime touchdown</h3>';
+  if(!gs.length)h+='<div class="card empty">No college games in the next 36 hours.</div>';
+  else if(!all.length)h+='<div class="card empty">Counting touchdown scorers from each team’s recent games'+(pend?' ('+pend+' game'+(pend>1?'s':'')+' left)':'')+'. This fills in on its own.</div>';
+  else h+='<div class="card"><div class="src" style="margin:0 0 6px">Best chances to score at any point, best grade first. Built from touchdowns in each team’s recent games and my expected points for each team. Prices are not read, so compare each with your book’s price.</div>'+all.slice(0,25).map(function(o){return atdRow(o,true)}).join('')+(pend?'<p class="src" style="margin:8px 0 0">'+pend+' more game'+(pend>1?'s are':' is')+' still loading.</p>':'')+'</div>';
+  return h+foot();
+};
+
+/* ---- saved pre-game calls ---- */
+S.snap={};try{var sn=JSON.parse(localStorage.getItem('hitboard.snap.v1')||'null');if(sn&&typeof sn==='object')S.snap=sn}catch(e){}
+function snapSaveLS(){
+  var ks=Object.keys(S.snap);
+  if(ks.length>120){ks.sort(function(a,b){return (S.snap[a].at||0)-(S.snap[b].at||0)}).slice(0,ks.length-120).forEach(function(k){delete S.snap[k]})}
+  var hs=Object.keys(S.snap).filter(function(k){return S.snap[k].html});
+  if(hs.length>30){hs.sort(function(a,b){return (S.snap[a].at||0)-(S.snap[b].at||0)}).slice(0,hs.length-30).forEach(function(k){delete S.snap[k].html})}
+  try{localStorage.setItem('hitboard.snap.v1',JSON.stringify(S.snap))}catch(e){try{Object.keys(S.snap).forEach(function(k){delete S.snap[k].html});localStorage.setItem('hitboard.snap.v1',JSON.stringify(S.snap))}catch(e2){}}
+}
+function snapGame(g){
+  if(kind(g)!=='up'||!(g.start>Date.now()))return false;
+  var e=hbEval(g);if(!e||e.pending||!e.q)return false;
+  var m=e.m,old=S.snap[g.id]||{};
+  S.snap[g.id]={id:g.id,lg:g.lg,at:Date.now(),a:g.a,h:g.h,na:e.na,nh:e.nh,pk:e.pk,ps:e.pickSide,line:e.line,L:m.mk,M:m.M,pa:e.q.a,ph:e.q.h,grade:e.grade,rel:e.ex?e.ex.rel:null,
+    phs:m.ph?m.ph.map(function(p){return {t:p.t,team:p.team,exp:p.exp}}):(old.phs||null),html:old.html||null};
+  return true;
+}
+function snapAll(){
+  var now=Date.now(),ch=false;
+  ['ncaafb','nfl','nba','nhl'].forEach(function(lg){(S.feed[lg]||[]).forEach(function(g){
+    if(kind(g)==='up'&&g.start>now&&g.start<now+48*36e5){try{if(snapGame(g))ch=true}catch(e){}}})});
+  if(ch)snapSaveLS();
+}
+var trackPicks82=trackPicks;
+trackPicks=function(){try{snapAll()}catch(e){}return trackPicks82.apply(this,arguments)};
+setTimeout(function(){try{snapAll()}catch(e){}},6000);
+
+/* ---- post-game review ---- */
+S.rev={};
+function revEnsure(g){
+  if(g.lg!=='ncaafb'&&g.lg!=='nfl')return;
+  var r=S.rev[g.id];if(r&&(r.st==='load'||r.st==='ok'||(r.st==='err'&&Date.now()-r.t<2*60000)))return;
+  if(!g.sid||typeof fetch!=='function'||window.claude)return;
+  S.rev[g.id]={st:'load',t:Date.now()};
+  fetch('https://site.api.espn.com/apis/site/v2/sports/'+ESPN[g.lg]+'/summary?event='+encodeURIComponent(g.sid)).then(function(r){return r.ok?r.json():null}).then(function(j){
+    var o=null;
+    if(j&&j.boxscore&&j.boxscore.teams&&j.boxscore.teams.length===2){
+      var mp=function(t){var m={};(t.statistics||[]).forEach(function(s){m[s.name]=s.displayValue});return usSide(m)};
+      o={};j.boxscore.teams.forEach(function(x){o[x.homeAway==='home'?'h':'a']=mp(x)});
+      if(!o.a||!o.h||o.a.rush==null||o.h.rush==null)o=null;
+    }
+    S.rev[g.id]={st:o?'ok':'err',t:Date.now(),o:o};
+  }).catch(function(){S.rev[g.id]={st:'err',t:Date.now()}}).then(function(){try{if(S.sheet&&S.sheet.type==='fgame'&&S.sheet.id===g.id)renderSheet()}catch(e){}});
+}
+function revLevel(act,exp){var r=act/Math.max(exp,1);return r>=1.2?'well above':r>=1.08?'above':r<=.8?'well below':r<=.92?'below':'close to'}
+function reviewBlock(g){
+  var k=kind(g);if(k==='up')return '';
+  if(g.lg!=='ncaafb'&&g.lg!=='nfl'&&g.lg!=='nba'&&g.lg!=='nhl')return '';
+  var s=S.snap[g.id];
+  if(!s){return k==='final'?'<h3>How my call did</h3><div class="card"><p class="src" style="margin:0">No pre-game call was saved for this game. The app saves its call only while it is open before kickoff, so open it before a game starts to get a review afterward.</p></div>':'';}
+  var h='';
+  var pre=s.html?hbFold('Pre-game breakdown (saved before kickoff)',s.html):'';
+  var callTxt=s.pk+' '+sgnPts(s.line)+' covers · grade '+s.grade+'. Predicted: '+(s.ph>=s.pa?s.nh+' '+hbF0(s.ph)+', '+s.na+' '+hbF0(s.pa):s.na+' '+hbF0(s.pa)+', '+s.nh+' '+hbF0(s.ph))+'.';
+  if(k!=='final'||g.sa==null){
+    return '<h3>My pre-game call</h3><div class="card bcard"><div class="label">Game in progress</div><div class="teams" style="font-size:20px">'+esc(s.pk+' '+sgnPts(s.line))+'</div><p style="margin:8px 0 0;line-height:1.5">'+esc(callTxt)+' The review appears when the game ends.</p></div>'+pre;
+  }
+  revEnsure(g);
+  var mh=g.sh-g.sa,tm=s.ps==='h'?mh:-mh,v=tm+s.line,res=v>0?'Covered':v<0?'Missed':'Push';
+  var winP=s.ph>=s.pa?'h':'a',winA=mh>0?'h':'a',pm=s.ph-s.pa;
+  var mErr=Math.abs(mh-pm),totA=g.sa+g.sh,totP=s.pa+s.ph,tErr=totA-totP;
+  h+='<h3>How my call did</h3><div class="card bcard"><div class="label">Final · '+esc(g.a)+' '+g.sa+', '+esc(g.h)+' '+g.sh+'</div><div class="teams" style="font-size:22px">'+esc(s.pk+' '+sgnPts(s.line))+': '+res+'</div><p style="margin:8px 0 0;line-height:1.5">'+esc(callTxt)+' The pick was graded '+esc(s.grade)+'.</p></div>';
+  var L=[];
+  L.push('Winner: '+(winP===winA?'I had the right team winning.':'I had '+(winP==='h'?s.nh:s.na)+' winning, but '+(winA==='h'?s.nh:s.na)+' won.'));
+  L.push('Margin: I had '+(pm>=0?s.nh:s.na)+' by '+hbF0(Math.abs(pm))+'. It finished '+(mh>=0?s.nh:s.na)+' by '+Math.abs(mh)+', so I was off by '+hbF0(mErr)+' point'+(hbF0(mErr)===1?'':'s')+'.');
+  L.push('Total: I had about '+hbF0(totP)+' combined. It finished with '+totA+', '+(Math.abs(tErr)<3?'close to my number.':tErr>0?hbF0(tErr)+' more than I expected.':hbF0(-tErr)+' fewer than I expected.'));
+  var R=S.rev[g.id],dev=[];
+  if(R&&R.st==='ok'&&s.phs){
+    s.phs.forEach(function(p){
+      var act=(p.team==='a'?R.o.a:R.o.h)[p.t==='run'?'rush':'pass'];if(act==null)return;
+      var nm=p.team==='a'?s.na:s.nh,lv=revLevel(act,p.exp);
+      L.push(nm+' '+(p.t==='run'?'rushing':'passing')+': I expected about '+hbF0(p.exp)+' yards, and it got '+act+' ('+lv+' my number).');
+      var hurts=(p.team===s.ps)?(act<p.exp):(act>p.exp);dev.push({d:Math.abs(act-p.exp)/Math.max(p.exp,1),hurts:hurts,nm:nm,t:p.t,lv:lv});
+    });
+    L.push('Turnovers: '+s.na+' '+R.o.a.to+', '+s.nh+' '+R.o.h.to+'.');
+  }
+  var why='';
+  if(res==='Covered'){
+    var good=dev.filter(function(x){return !x.hurts&&x.d>=.12}).sort(function(a,b){return b.d-a.d})[0];
+    why='The pick covered'+(good?', helped most by '+good.nm+'’s '+(good.t==='run'?'run game':'passing game')+' coming in '+good.lv+' what I expected':'')+'. '+(mErr<=7?'My margin was close, so the numbers read this game well.':'The margin was off, so the pick covered with some luck in how the game ended.');
+  }else if(res==='Missed'){
+    var bad=dev.filter(function(x){return x.hurts&&x.d>=.12}).sort(function(a,b){return b.d-a.d})[0];
+    why='The pick missed'+(bad?'. The biggest swing was '+bad.nm+'’s '+(bad.t==='run'?'run game':'passing game')+', which finished '+bad.lv+' my number':'')+'. '+(mErr>=10?'My margin was off by '+hbF0(mErr)+', which is a real miss, not a near call. Opponent strength is not adjusted in my numbers, and that is the first thing to improve.':'It was a close miss, within a possession or two, and one turnover or long play can decide that.');
+  }else why='The game landed exactly on the number, so the pick pushes.';
+  h+='<h3>What happened</h3><ul class="pts" style="margin-top:2px">'+L.map(function(x){return '<li>'+esc(x)+'</li>'}).join('')+'</ul><p style="margin:8px 0;line-height:1.55"><b>Takeaway.</b> '+esc(why)+'</p>'+(R&&R.st==='load'?'<p class="src">Pulling the box score for the run and pass check. This fills in on its own.</p>':'');
+  return h+pre;
+}
+var pickBlock82=pickBlock;
+pickBlock=function(g){
+  var up=false;try{up=kind(g)==='up'}catch(e){}
+  if(!up){try{return reviewBlock(g)}catch(e){return ''}}
+  var h=pickBlock82(g);
+  try{if(h&&S.snap[g.id]){S.snap[g.id].html=h;snapSaveLS()}else if(h){snapGame(g);if(S.snap[g.id]){S.snap[g.id].html=h;snapSaveLS()}}}catch(e){}
+  return h;
+};
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
