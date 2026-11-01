@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v129, Oct 31';
+var BUILD='v130, Oct 31';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -9109,6 +9109,41 @@ pmSheet=function(s){
   }catch(e){}
   return h;
 };
+
+/* v130: NFL anytime TD rows state a prediction, chance, grade and the reason (role, game, opponent) */
+function ntdInfo(r){
+  var o={p:null,why:'',gr:''};
+  var n=nextOpp(nt(r.t));
+  var base=(r.h+0.5)/12,lam=-Math.log(1-base),f=1,txt=[];
+  txt.push('Scored in '+r.h+' of his last 10 games'+(r.td!=null?', '+r.td+' touchdowns this season':'')+'.');
+  var d=null;try{var k=normName(r.n);d=DEEP.filter(function(x){return nt(x.t)===nt(r.t)&&normName(x.n)===k}).sort(function(a,b){return b.g-a.g})[0]}catch(e){}
+  if(d){var q=String(d.note||'');
+    if(d.kind==='rush')txt.push('He is a '+d.pos+' with '+q.split(' carries')[0]+' carries in '+d.g+' games, so he gets the ball near the goal line.');
+    else if(d.kind==='rec')txt.push('He is a '+d.pos+' with '+q.split(' catches')[0]+' catches on '+(q.match(/on (\d+) targets/)||[0,'?'])[1]+' targets in '+d.g+' games.');
+    else if(d.kind==='pass')txt.push('He is the starting quarterback, so he can score by running or throwing.');
+  }
+  var have=false;
+  try{
+    var g=null;if(n)(S.feed.nfl||[]).forEach(function(x){if(!g&&kind(x)==='up'&&nt(x.a)+'@'+nt(x.h)===n.key)g=x});
+    var m=g&&pgCtx(g).m,T=m&&m.T&&!m.T.missing?m.T:null;
+    if(g&&m&&m.sa!=null&&T){
+      var side=nt(g.h)===nt(r.t)?'h':'a',exp=side==='h'?m.sh:m.sa,X=side==='h'?T.H:T.A,Y=side==='h'?T.A:T.H;
+      if(X&&X.pf>0){f=Math.max(.8,Math.min(1.25,exp/X.pf));have=true;
+        txt.push(shortNm(g,side)+' is expected to score about '+hbF0(exp)+' points'+(exp>=X.pf*1.08?', more than its usual '+hbF0(X.pf):exp<=X.pf*.92?', fewer than its usual '+hbF0(X.pf):', about its usual '+hbF0(X.pf))+'.');}
+      var ref=23;try{ref=leagueTotal('nfl')/2||23}catch(e){}
+      if(Y&&Y.pa>0)txt.push(n.opp+' allows '+Y.pa.toFixed(1)+' points a game'+(Y.pa>=ref*1.1?', a soft defense, which helps.':Y.pa<=ref*.9?', a tough defense, which hurts.':', about average.'));
+    }
+  }catch(e){}
+  var c=n&&covTxt(n.opp);if(c&&d&&d.kind==='rec')txt.push(n.opp+' plays '+c+'.');
+  if(!have)txt.push('The game model has not loaded for this matchup, so this uses his last 10 only.');
+  o.p=1-Math.exp(-lam*f);o.gr=atdGradeOf(o.p);o.why=txt.join(' ');
+  return o;
+}
+function tdRow(r,showGm){
+  var o={};try{o=ntdInfo(r)}catch(e){}
+  var x=o.p!=null?'<div class="src" style="margin-top:4px;line-height:1.45"><b>I predict he scores:</b> about a '+Math.round(o.p*100)+'% chance · grade '+esc(o.gr)+'. '+esc(o.why)+' Fair price '+fmtAm(fairAm(o.p))+'.</div>':'';
+  return '<tr><td><button class="pxname" data-act="prof" data-n="'+esc(r.n)+'" data-lg="nfl" data-team="'+esc(r.t)+'">'+esc(r.n)+'</button>'+badge(r.n,r.t)+' <span class="src">'+r.t+(showGm?' · '+r.gm:'')+'</span><br><span class="src">'+esc(matchTxt(r.t))+'</span>'+x+'</td><td><span class="hrpill '+(r.h>=6?'hi':r.h<=2?'lo':'mid')+'">'+r.h*10+'% ('+r.h+'/10)</span></td><td>'+(r.td==null?'—':r.td)+'</td></tr>';
+}
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
