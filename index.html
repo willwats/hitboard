@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v135, Nov 1';
+var BUILD='v136, Nov 1';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -2656,7 +2656,7 @@ function deepRows(){
 }
 function nflDeep(only){
   var kinds=[['rec','Receiving'],['rush','Rushing'],['pass','Passing']];if(only)kinds=kinds.filter(function(k){return k[0]===only});
-  var games=[];(S.feed.nfl||[]).forEach(function(g){if(kind(g)==='up')games.push({k:nt(g.a)+'@'+nt(g.h),s:g.start})});
+  var games=[];(S.feed.nfl||[]).forEach(function(g){if(kind(g)==='up'&&g.start<=Date.now()+40*3600000)games.push({k:nt(g.a)+'@'+nt(g.h),s:g.start})});
   games.sort(function(a,b){return a.s-b.s});
   var seen={},opts=['All'].concat(games.filter(function(x){if(seen[x.k])return false;seen[x.k]=1;return true}).map(function(x){return x.k}));
   var h='<p class="lede">Every player with real volume this season, not only the top few. Each row shows the next opponent, how often that defense plays man and zone, and the chance of clearing three yardage marks against that defense.</p>';
@@ -9377,6 +9377,54 @@ deepRows=function(){
     }catch(e){}
   });
   return rows;
+};
+
+/* v136: NFL props follow the live schedule only (next 40 hours); no fallback to the old saved schedule; season-ending injuries hidden */
+var SLATE_MS=40*3600000;
+nextOpp=function(team){
+  var now=Date.now(),have=(S.feed.nfl||[]).length>0,best=null;
+  (S.feed.nfl||[]).forEach(function(g){if(kind(g)!=='up')return;if(g.start>now+SLATE_MS)return;var a=nt(g.a),h=nt(g.h);if(a!==team&&h!==team)return;if(!best||g.start<best.start)best=g});
+  if(!best){
+    if(have)return null;
+    var x=nflNext0(team);return x?{opp:x.opp,txt:x.txt,start:null}:null;
+  }
+  var home=nt(best.h)===team,opp=home?nt(best.a):nt(best.h);
+  return {opp:opp,start:best.start,txt:(home?'vs ':'at ')+opp+', '+fmtTime(best.start),key:nt(best.a)+'@'+nt(best.h)};
+};
+var nflNext0=nflNext;
+nflNext=function(t){
+  if((S.feed.nfl||[]).length>0){var n=nextOpp(nt(t));return n?{id:null,txt:n.txt,opp:n.opp}:null}
+  return nflNext0(t);
+};
+var tdParse94=tdParse;
+tdParse=function(){return tdParse94().filter(function(r){try{return !!nextOpp(nt(r.t))}catch(e){return true}})};
+var avail94=avail;
+avail=function(name,team){
+  var r=avail94(name,team);
+  try{var t=nt(team),k=nameKeys(name),I=S.inj.nfl&&S.inj.nfl.idx,it=I&&(I[t+'|'+k[0]]||I[t+'|'+k[1]]);
+    if(it&&/season|injured reserve|\bIR\b|\bout\b/i.test((it.st||'')+' '+(it.d||'')))r.show=false;
+    if((S.feed.nfl||[]).length&&!nextOpp(t))r.show=false}catch(e){}
+  return r;
+};
+var vPropsLg94=vPropsLg;
+vPropsLg=function(){
+  var h=vPropsLg94();
+  try{
+    if(S.sport!=='nfl'||!(S.feed.nfl||[]).length)return h;
+    var now=Date.now(),on={},n=0,seen={};
+    S.feed.nfl.forEach(function(g){if(kind(g)!=='up'||g.start>now+SLATE_MS)return;var k=nt(g.a)+'@'+nt(g.h);if(!seen[k]){seen[k]=1;n++}on[nt(g.a)]=1;on[nt(g.h)]=1});
+    var off=Object.keys(TS).filter(function(t){return !on[t]}).sort();
+    var msg='<p class="src" style="margin:0 0 10px"><b>Slate check:</b> '+n+' game'+(n===1?'':'s')+' in the next 40 hours. Every matchup below comes from that live schedule. '+(off.length?'Not playing, so hidden: '+off.join(', ')+'. ':'')+'Players who are out for the season or on injured reserve are hidden too.</p>';
+    var i=h.indexOf('</h2>');if(i>=0)h=h.slice(0,i+5)+msg+h.slice(i+5);
+  }catch(e){}
+  return h;
+};
+
+var nflKick94=nflKick;
+nflKick=function(){
+  var all=KICKERS;
+  KICKERS=all.filter(function(k){return !(S.feed.nfl||[]).length||!!nextOpp(nt(k.t))});
+  try{return nflKick94()}finally{KICKERS=all}
 };
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
