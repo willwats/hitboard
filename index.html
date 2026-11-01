@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v140, Nov 1';
+var BUILD='v141, Nov 1';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -9777,6 +9777,86 @@ function parlayPropsBody(lg){
   try{h+=parlaysBody(lg)}catch(e){h+='<div class="card empty">Parlays could not be built right now.</div>'}
   return h;
 }
+
+/* v141: last meetings between the two teams, read from ESPN box scores, give every player his line from the last time they played this opponent */
+S.h2h={};
+function h2hKey(lg,team,opp){return lg+'|'+nt(team)+'|'+nt(opp)}
+function h2hLoad(lg,team,opp){
+  if(lg!=='nfl'&&lg!=='ncaafb')return;
+  if(window.claude||typeof fetch!=='function')return;
+  var key=h2hKey(lg,team,opp),c=S.h2h[key];
+  if(c&&(c.st==='load'||c.st==='ok'||(c.st==='err'&&Date.now()-c.t<90000)))return;
+  S.h2h[key]={st:'load',t:Date.now()};
+  var Y=new Date().getFullYear(),gj=function(u){return fetch(u).then(function(r){return r.ok?r.json():null}).catch(function(){return null})};
+  profTeamId(lg,team).then(function(id){
+    var base='https://site.api.espn.com/apis/site/v2/sports/'+ESPN[lg]+'/teams/'+id+'/schedule',urls=[];
+    [Y,Y-1,Y-2].forEach(function(y){urls.push(base+'?season='+y+'&seasontype=2');urls.push(base+'?season='+y+'&seasontype=3')});
+    return Promise.all(urls.map(gj)).then(function(js){
+      var ev={};
+      js.filter(Boolean).forEach(function(j){(j.events||[]).forEach(function(e){
+        var cp=(e.competitions||[])[0]||{},done=cp.status&&cp.status.type&&cp.status.type.completed;if(!done||!e.id||ev[e.id])return;
+        var me=null,op=null;(cp.competitors||[]).forEach(function(x){if(String(x.team&&x.team.id)===String(id))me=x;else op=x});
+        if(!me||!op||!op.team||!pmSame(op.team.abbreviation,opp))return;
+        var sc=function(x){var s=x&&x.score;return s==null?null:parseFloat(typeof s==='object'?(s.value!=null?s.value:s.displayValue):s)};
+        ev[e.id]={id:e.id,date:e.date,home:me.homeAway==='home',pf:sc(me),pa:sc(op),myId:String(id)};
+      })});
+      var list=Object.keys(ev).map(function(k){return ev[k]}).sort(function(a,b){return Date.parse(b.date)-Date.parse(a.date)}).slice(0,2);
+      if(!list.length)return {mt:[]};
+      return Promise.all(list.map(function(m){
+        return gj('https://site.api.espn.com/apis/site/v2/sports/'+ESPN[lg]+'/summary?event='+encodeURIComponent(m.id)).then(function(j){
+          var pl={};
+          if(j&&j.boxscore&&j.boxscore.players)j.boxscore.players.forEach(function(tm){
+            if(String(tm.team&&tm.team.id)!==m.myId)return;
+            (tm.statistics||[]).forEach(function(cat){
+              var nm=String(cat.name||'').toLowerCase();if(nm!=='passing'&&nm!=='rushing'&&nm!=='receiving')return;
+              var L=cat.labels||[];
+              (cat.athletes||[]).forEach(function(a){
+                if(!a.athlete)return;var k=normName(a.athlete.displayName),o=pl[k]||(pl[k]={});
+                var r={};L.forEach(function(l,i){r[l]=(a.stats||[])[i]});o[nm]=r;
+              });
+            });
+          });
+          return Object.assign({},m,{pl:pl,ok:!!j});
+        });
+      })).then(function(mt){return {mt:mt}});
+    });
+  }).then(function(r){S.h2h[key]={st:'ok',t:Date.now(),mt:r.mt}}).catch(function(e){S.h2h[key]={st:'err',t:Date.now(),e:String(e&&e.message||e)}}).then(function(){
+    try{if(S.sheet&&S.sheet.type==='pm')renderSheet()}catch(e){}
+  });
+}
+function h2hTxt(b){
+  var cat={rush:'rushing',crush:'rushing',rec:'receiving',crec:'receiving',pass:'passing',cpass:'passing'}[b.kind];if(!cat)return '';
+  var c=S.h2h[h2hKey(b.lg,b.tm,b.opp)];
+  if(!c||c.st==='load')return '<p class="src" style="margin:4px 0 0">Loading the last games between '+esc(nt(b.tm))+' and '+esc(b.opp)+'…</p>';
+  if(c.st==='err')return '<p class="src" style="margin:4px 0 0">The last games between the teams did not load ('+esc(c.e)+').</p>';
+  if(!c.mt.length)return '<p class="src" style="margin:4px 0 0">'+esc(nt(b.tm))+' and '+esc(b.opp)+' have not played each other in the last three seasons that ESPN lists.</p>';
+  var fmtD=function(d){var t=new Date(d);return isNaN(t)?'':t.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})};
+  var k=normName(b.nm),h='<p class="src" style="margin:8px 0 2px"><b>Last time '+esc(nt(b.tm))+' played '+esc(b.opp)+'</b> (ESPN box scores)</p><ul class="pts" style="margin-top:2px">';
+  c.mt.forEach(function(m){
+    var line=m.pl&&m.pl[k]&&m.pl[k][cat],res=(m.pf!=null&&m.pa!=null)?(m.pf>m.pa?'W ':m.pf<m.pa?'L ':'T ')+m.pf+'-'+m.pa:'';
+    var head=esc(fmtD(m.date))+(m.home?' at home':' on the road')+(res?' ('+res+')':'')+': ';
+    if(!m.ok){h+='<li>'+head+'box score did not load.</li>';return}
+    if(!line){h+='<li>'+head+'he has no '+cat+' line in that game, so he did not play or did not '+(cat==='passing'?'throw':cat==='rushing'?'carry':'catch')+' the ball.</li>';return}
+    var t=cat==='rushing'?(line.CAR||'?')+' carries, <b>'+line.YDS+' rushing yards</b>, '+(line.TD||0)+' TD':cat==='receiving'?(line.REC||'?')+' catches on '+(line.TGTS||'?')+' targets, <b>'+line.YDS+' receiving yards</b>, '+(line.TD||0)+' TD':(line['C/ATT']||'?')+', <b>'+line.YDS+' passing yards</b>, '+(line.TD||0)+' TD, '+(line.INT||0)+' INT';
+    h+='<li>'+head+t+'</li>';
+  });
+  return h+'</ul>';
+}
+/* add to the existing "against this opponent" section: when his own game log has nothing, show the team meetings */
+var pmVs99=pmVs;
+pmVs=function(b){
+  var base=pmVs99(b);
+  try{
+    if(b.lg!=='nfl'&&b.lg!=='ncaafb')return base;
+    if(/Last time against|Loading his games/.test(base))return base;
+    return base+h2hTxt(b);
+  }catch(e){return base}
+};
+var pmSheet99=pmSheet;
+pmSheet=function(s){
+  try{pmBlocks(s.lg,s.n,s.team).forEach(function(b){if(!b.kick&&b.opp&&(s.lg==='nfl'||s.lg==='ncaafb'))h2hLoad(s.lg,s.team,b.opp)})}catch(e){}
+  return pmSheet99(s);
+};
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
