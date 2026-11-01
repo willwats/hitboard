@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v142, Nov 1';
+var BUILD='v143, Nov 1';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -9904,6 +9904,137 @@ vPropsLg=function(){
   return vPropsLg100();
 };
 setTimeout(function(){try{var ae=document.activeElement;if(!(ae&&ae.tagName==='INPUT')&&!S.sheet)render()}catch(e){}},10500);
+
+/* v143: what each NFL defense gives up to QBs, RBs, WRs and TEs, built from ESPN box scores of each team's last 4 games */
+var DVP={ev:{},st:'idle',done:0,need:0,at:0};
+try{var _dv=JSON.parse(localStorage.getItem('hb.dvp.v1')||'{}');if(_dv&&_dv.ev)DVP.ev=_dv.ev}catch(e){}
+function dvSave(){try{var k=Object.keys(DVP.ev);if(k.length>200){k.sort(function(a,b){return DVP.ev[a].d<DVP.ev[b].d?-1:1}).slice(0,k.length-200).forEach(function(x){delete DVP.ev[x]})}localStorage.setItem('hb.dvp.v1',JSON.stringify({ev:DVP.ev}))}catch(e){}}
+function dvParse(j,eid,date){
+  var ids={};
+  try{((j.header&&j.header.competitions&&j.header.competitions[0]||{}).competitors||[]).forEach(function(c){ids[c.team.id]=nt(c.team.abbreviation)})}catch(e){}
+  var teams=(j.boxscore&&j.boxscore.players)||[];
+  if(teams.length<2)return null;
+  var off={};
+  teams.forEach(function(t){
+    var ab=ids[t.team.id]||nt(t.team.abbreviation||'');if(!ab)return;
+    var o={QB:{py:0,ry:0},RB:{ry:0,rec:0,recy:0},WR:{rec:0,recy:0},TE:{rec:0,recy:0},unk:{recy:0,ry:0}};
+    (t.statistics||[]).forEach(function(s){
+      var L=s.labels||[],ix=function(n){return L.indexOf(n)};
+      (s.athletes||[]).forEach(function(a){
+        var pos=a.athlete&&a.athlete.position&&(a.athlete.position.abbreviation||a.athlete.position);
+        var nm=a.athlete&&a.athlete.displayName,P=pos;
+        if(!P&&nm){var d=DEEP.filter(function(x){return normName(x.n)===normName(nm)})[0];P=d&&d.pos}
+        if(P==='FB'||P==='HB')P='RB';
+        var st=a.stats||[],g=function(i){return i<0?0:(parseFloat(st[i])||0)};
+        if(s.name==='passing'){o.QB.py+=g(ix('YDS'))}
+        else if(s.name==='rushing'){var y=g(ix('YDS'));if(P==='RB')o.RB.ry+=y;else if(P==='QB')o.QB.ry+=y;else if(P==='WR'||P==='TE'){}else o.unk.ry+=y}
+        else if(s.name==='receiving'){var r=g(ix('REC')),y2=g(ix('YDS'));if(P==='RB'){o.RB.rec+=r;o.RB.recy+=y2}else if(P==='WR'){o.WR.rec+=r;o.WR.recy+=y2}else if(P==='TE'){o.TE.rec+=r;o.TE.recy+=y2}else o.unk.recy+=y2}
+      });
+    });
+    off[ab]=o;
+  });
+  var ks=Object.keys(off);if(ks.length<2)return null;
+  var r={d:date,t:{}};
+  ks.forEach(function(a){var d=ks.filter(function(x){return x!==a})[0];r.t[d]=off[a]});  /* r.t[defense] = what the opposing offense did */
+  return r;
+}
+function dvLoad(){
+  if(window.claude||typeof fetch!=='function'||DVP.st==='busy')return;
+  if(DVP.at&&Date.now()-DVP.at<3*3600e3&&DVP.st==='ok')return;
+  DVP.st='busy';DVP.at=Date.now();
+  var base='https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard',games=[];
+  getJson(base).then(function(j){
+    var W=(j.week&&j.week.number)||0,ws=[];for(var w=W;w>=Math.max(1,W-5);w--)ws.push(w);
+    return Promise.all(ws.map(function(w){return getJson(base+'?seasontype=2&week='+w).catch(function(){return null})}));
+  }).then(function(arr){
+    arr.forEach(function(j){((j&&j.events)||[]).forEach(function(e){
+      var c=e.competitions&&e.competitions[0];if(!c||!c.status||!c.status.type||!c.status.type.completed)return;
+      var tm=(c.competitors||[]).map(function(x){return nt(x.team.abbreviation)});
+      games.push({id:e.id,date:e.date,teams:tm});
+    })});
+    var by={};games.forEach(function(g){g.teams.forEach(function(t){(by[t]=by[t]||[]).push(g)})});
+    var pick={};Object.keys(by).forEach(function(t){by[t].sort(function(a,b){return a.date<b.date?1:-1}).slice(0,4).forEach(function(g){pick[g.id]=g})});
+    var todo=Object.keys(pick).filter(function(id){return !DVP.ev[id]}).map(function(id){return pick[id]});
+    DVP.need=todo.length;DVP.done=0;DVP.keep=pick;
+    var i=0;
+    function worker(){
+      if(i>=todo.length)return Promise.resolve();
+      var g=todo[i++];
+      return getJson('https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event='+g.id).then(function(j){var r=dvParse(j,g.id,g.date);if(r)DVP.ev[g.id]=r}).catch(function(){}).then(function(){DVP.done++;if(DVP.done%8===0){var ae=document.activeElement;if(!(ae&&ae.tagName==='INPUT')&&!S.sheet)render()}return worker()});
+    }
+    return Promise.all([worker(),worker(),worker(),worker()]);
+  }).then(function(){DVP.st='ok';DVP.tab=null;dvSave();var ae=document.activeElement;if(!(ae&&ae.tagName==='INPUT')&&!S.sheet)render()},function(){DVP.st='err'});
+}
+/* per-defense per-game numbers, from each team's last 4 completed games */
+function dvTable(){
+  if(DVP.tab&&DVP.tabN===Object.keys(DVP.ev).length)return DVP.tab;
+  var by={};
+  Object.keys(DVP.ev).forEach(function(id){var e=DVP.ev[id];Object.keys(e.t).forEach(function(d){(by[d]=by[d]||[]).push({d:e.d,o:e.t[d]})})});
+  var tab={};
+  Object.keys(by).forEach(function(d){
+    var L=by[d].sort(function(a,b){return a.d<b.d?1:-1}).slice(0,4);if(L.length<3)return;
+    var n=L.length,sum=function(f){return L.reduce(function(t,x){return t+f(x.o)},0)/n};
+    var unk=sum(function(o){return o.unk.recy}),tot=sum(function(o){return o.RB.recy+o.WR.recy+o.TE.recy+o.unk.recy});
+    if(tot>0&&unk/tot>.25)return;  /* too many receivers without a known position: do not guess */
+    tab[d]={n:n,py:sum(function(o){return o.QB.py}),rbRy:sum(function(o){return o.RB.ry}),rbRec:sum(function(o){return o.RB.rec}),rbRecy:sum(function(o){return o.RB.recy}),wrRec:sum(function(o){return o.WR.rec}),wrRecy:sum(function(o){return o.WR.recy}),teRec:sum(function(o){return o.TE.rec}),teRecy:sum(function(o){return o.TE.recy})};
+  });
+  DVP.tab=tab;DVP.tabN=Object.keys(DVP.ev).length;return tab;
+}
+function dvRank(key,opp){
+  var T=dvTable(),ks=Object.keys(T);if(!T[opp]||ks.length<8)return null;
+  var arr=ks.map(function(k){return T[k][key]}).sort(function(a,b){return b-a});
+  var rk=arr.indexOf(T[opp][key])+1,avg=arr.reduce(function(a,b){return a+b},0)/arr.length;
+  return {rk:rk,of:ks.length,v:T[opp][key],avg:avg};
+}
+function dvTag(x){return x?(x.v>=x.avg*1.12?'gives up a lot':x.v<=x.avg*.88?'gives up little':'is about average'):''}
+function dvLine(opp,pos,cat){
+  var T=dvTable()[opp];if(!T)return null;
+  var f1=function(v){return v.toFixed(1)},y=function(v){return String(Math.round(v))};
+  if(pos==='RB'){
+    var a=dvRank(cat==='rush'?'rbRy':'rbRec',opp);if(!a)return null;
+    return opp+' gives up '+y(T.rbRy)+' rushing yards and '+f1(T.rbRec)+' catches for '+y(T.rbRecy)+' yards to running backs a game ('+(cat==='rush'?'run game':'catches')+': '+ordn(a.rk)+' most of '+a.of+', '+dvTag(a)+')';
+  }
+  if(pos==='WR'||pos==='TE'){
+    var k=pos==='WR'?'wr':'te',a2=dvRank(k+'Rec',opp);if(!a2)return null;
+    return opp+' gives up '+f1(T[k+'Rec'])+' catches for '+y(T[k+'Recy'])+' yards to '+(pos==='WR'?'wide receivers':'tight ends')+' a game ('+ordn(a2.rk)+' most of '+a2.of+', '+dvTag(a2)+')';
+  }
+  if(pos==='QB'){var a3=dvRank('py',opp);if(!a3)return null;return opp+' gives up '+y(T.py)+' passing yards a game ('+ordn(a3.rk)+' most of '+a3.of+', '+dvTag(a3)+')'}
+  return null;
+}
+var spRows101=spRows;
+spRows=function(lg,cat){
+  var rows=spRows101(lg,cat);
+  if(lg==='nfl'&&cat!=='kick'){try{rows.forEach(function(x){
+    var me=nt(x.t),p=(x.gk||'').split('@'),opp=p[0]===me?p[1]:p[0];
+    x.dv=opp?dvLine(opp,x.pos,cat):null;
+  })}catch(e){}}
+  return rows;
+};
+var spCard101=spCard;
+spCard=function(r){
+  var h=spCard101(r);
+  if(!r.dv)return h;
+  return h.slice(0,h.length-6)+'<div class="src" style="margin-top:6px">'+esc(r.dv)+'.</div></div>';
+};
+var pmDef101=pmDef;
+pmDef=function(b){
+  var o=pmDef101(b);
+  try{if(b.lg==='nfl'&&b.opp){var nm=b.nm||b.name||(b.p&&b.p.name),d=DEEP.filter(function(x){return normName(x.n)===normName(nm||'')})[0];var l=d&&dvLine(b.opp,d.pos,d.kind==='rush'?'rush':'rec');if(l)o=(o||[]).concat([l+'.'])}}catch(e){}
+  return o;
+};
+var vPropsLg101=vPropsLg;
+vPropsLg=function(){
+  var h=vPropsLg101();
+  try{
+    if(S.sport==='nfl'){
+      if(DVP.st==='idle'||DVP.st==='err')dvLoad();
+      var msg=DVP.st==='busy'&&DVP.need?'<p class="src" style="margin:0 0 10px">Loading what each defense gives up to running backs, receivers and tight ends: '+DVP.done+' of '+DVP.need+' games read. It saves on your phone, so later launches are quick.</p>':'';
+      var i=h.indexOf('</h2>');if(msg&&i>=0)h=h.slice(0,i+5)+msg+h.slice(i+5);
+    }
+  }catch(e){}
+  return h;
+};
+setTimeout(function(){try{dvLoad()}catch(e){}},4000);
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
