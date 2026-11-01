@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v136, Nov 1';
+var BUILD='v137, Nov 1';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -2596,7 +2596,7 @@ function loadRosters(){
 }
 function loadAvail(){
   if(window.claude||typeof fetch!=='function')return;
-  var now=Date.now();if(S.availBusy||now-S.availAt<4*60000)return;
+  var now=Date.now();if(S.availBusy||(!S.availForce&&now-S.availAt<4*60000))return;S.availForce=false;
   S.availBusy=true;
   Promise.all([loadInj('nfl'),loadInj('nba'),loadInj('mlb'),loadInj('nhl'),loadRosters(),loadRostersL()]).then(function(){
     S.availBusy=false;if(S.inj.nfl||S.inj.nba||Object.keys(S.ros).length)S.availAt=Date.now();
@@ -9425,6 +9425,31 @@ nflKick=function(){
   var all=KICKERS;
   KICKERS=all.filter(function(k){return !(S.feed.nfl||[]).length||!!nextOpp(nt(k.t))});
   try{return nflKick94()}finally{KICKERS=all}
+};
+
+/* v137: constant availability check; doubtful and inactive players are hidden along with out, IR and season-ending */
+OUT_RE=/^(out|injured reserve|ir\b|suspended|pup|non-football|reserve|physically unable|doubtful|inactive|season)/i;
+function availTick(force){
+  try{
+    if(typeof document!=='undefined'&&document.hidden)return;
+    S.availForce=true;loadAvail();
+  }catch(e){}
+}
+setInterval(availTick,120000);
+document.addEventListener('visibilitychange',function(){if(!document.hidden)availTick()});
+window.addEventListener('focus',function(){availTick()});
+var vPropsLg95=vPropsLg;
+vPropsLg=function(){
+  var h=vPropsLg95();
+  try{
+    var ok=S.inj&&S.inj[S.sport==='ncaafb'?'nfl':S.sport];
+    var msg=S.sport==='ncaafb'||S.sport==='ncaamb'
+      ?'<p class="src" style="margin:0 0 10px"><b>Availability:</b> ESPN does not publish a college injury report, so college players are not checked. Confirm who is playing before you bet.</p>'
+      :ok?'<p class="src" style="margin:0 0 10px"><b>Availability:</b> last checked '+esc(fmtClock(ok.at))+' and rechecked every 2 minutes while the app is open. Players who are out, doubtful, on injured reserve or inactive are hidden. Questionable players stay in with a tag.</p>'
+      :'<p class="src" style="margin:0 0 10px"><b>Availability:</b> the injury report has not loaded yet, so nobody is hidden. It retries every 2 minutes.</p>';
+    var i=h.indexOf('</h2>');if(i>=0)h=h.slice(0,i+5)+msg+h.slice(i+5);
+  }catch(e){}
+  return h;
 };
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
