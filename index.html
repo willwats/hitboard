@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v144, Nov 1';
+var BUILD='v145, Nov 1';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -10059,12 +10059,12 @@ function fxFor(name,team,opp){
   if(r&&opp&&r.opp!==opp)r=null;
   if(!y&&!r)return null;
   var a=[];
-  if(y)a.push('Yahoo analysts rank him '+y.pos+y.rank+' this week (of '+y.of+' listed)');
+  if(y)a.push('Fantasy rank this week: '+y.pos+y.rank+' of '+y.of+' listed');
   if(r){
     var f1=function(v){return v.toFixed(1)},p=[];
     if(r.pos==='QB')p.push(Math.round(r.pass)+' passing yds',Math.round(r.rush)+' rushing yds',f1(r.rtd)+' rushing TD');
     else{if(r.rush>=10)p.push(Math.round(r.rush)+' rushing yds');p.push(f1(r.rec)+' catches for '+Math.round(r.recy)+' yds',f1(r.rtd+r.ctd)+' TD')}
-    a.push('RotoWire projects '+p.join(', '));
+    a.push('Projected for this game: '+p.join(', '));
   }
   return a.join('. ');
 }
@@ -10074,8 +10074,34 @@ spRows=function(lg,cat){
   if(lg==='nfl'&&cat!=='kick'){try{rows.forEach(function(x){
     var me=nt(x.t),p=(x.gk||'').split('@'),opp=p[0]===me?p[1]:p[0];
     x.fx=fxFor(x.n,x.t,opp);
+    fxBlend(x,cat);
   })}catch(e){}}
   return rows;
+};
+
+/* blend outside projections into mine and nudge the matchup grade */
+function fxBlend(x,cat){
+  if(Date.now()>FX_END)return;
+  var me=nt(x.t),p=(x.gk||'').split('@'),opp=p[0]===me?p[1]:p[0],r=FXR[fxKey(x.n,x.t)];
+  if(!r||r.opp!==opp)return;
+  var ext=null,mine=x.proj;
+  if(cat==='rush'&&r.pos!=='QB')ext=r.rush;
+  else if(cat==='rec'&&r.pos!=='QB')ext=r.recy;
+  else if(cat==='recp'&&r.pos!=='QB')ext=r.rec;
+  else if(cat==='pass'&&r.pos==='QB')ext=r.pass;
+  else if(cat==='td'){var pe=1-Math.exp(-(r.rtd+r.ctd));if(mine!=null){x.proj=(mine+pe)/2;x.sort=x.proj;x.projTxt=Math.round(x.proj*100)+'%';x.blend=true}return}
+  if(ext==null||!(mine>0))return;
+  var avg=parseFloat(String(x.avgTxt||'').replace(/[^0-9.]/g,''));
+  var nv=(mine+ext)/2;x.proj=nv;x.sort=nv;x.blend=true;
+  x.projTxt=cat==='recp'?nv.toFixed(1):String(Math.round(nv));
+  if(avg>0){var op=Math.max(-15,Math.min(15,(ext/avg-1)*100)),base=x.pct==null?0:x.pct;x.pct=(base+op)/2;x.mg=mgGrade(x.pct)}
+}
+var fxNote=function(){return '<p class="src" style="margin:0 0 10px">Where an outside projection exists for this week’s game, the number shown blends it with mine, and the matchup grade moves with it.</p>'};
+var vPropsLg102=vPropsLg;
+vPropsLg=function(){
+  var h=vPropsLg102();
+  try{if(S.sport==='nfl'&&Date.now()<=FX_END){var i=h.indexOf('</h2>');if(i>=0)h=h.slice(0,i+5)+fxNote()+h.slice(i+5)}}catch(e){}
+  return h;
 };
 var spCard102=spCard;
 spCard=function(r){
