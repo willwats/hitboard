@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v132, Oct 31';
+var BUILD='v133, Nov 1';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -9035,7 +9035,7 @@ propSheet=function(p){if(S.sheet&&S.sheet.type==='pm')return pmSheet(S.sheet);re
 document.addEventListener('click',function(e){
   try{
     var el=e.target&&e.target.closest?e.target.closest('[data-act="prof"]'):null;
-    if(!el||el.dataset.full)return;
+    if(!el||el.dataset.full)return;if(e.target.closest('[data-act="fgame"]'))return;
     var lg=el.dataset.lg,nm=el.dataset.n,tm=el.dataset.team;
     if(lg!=='nfl'&&lg!=='nba'&&lg!=='ncaafb'&&lg!=='nhl')return;
     if(!pmBlocks(lg,nm,tm).length)return;
@@ -9216,6 +9216,48 @@ deepRows=function(){
     }catch(e){}
   });
   return rows;
+};
+
+/* v133: every prop row gets a live matchup and a Game preview button; kickers use this week's game */
+function gpFor(lg,team){
+  var ab=function(x){return lg==='nfl'?nt(x):x},t=ab(team),best=null;
+  (S.feed[lg]||[]).forEach(function(g){if(kind(g)==='final')return;if(ab(g.a)!==t&&ab(g.h)!==t)return;if(!best||g.start<best.start)best=g});
+  return best;
+}
+function gpBtn(g,label){return '<button class="btn" data-act="fgame" data-id="'+esc(g.id)+'" style="padding:6px 10px;font-size:13px;margin-top:6px">'+(label||'Game preview ›')+'</button>'}
+function kickCtx(t){
+  var n=nextOpp(nt(t));if(!n)return {adj:1,txt:'No game this week'};
+  var g=gpFor('nfl',t),tot=null;
+  try{if(g){var m=pgCtx(g).m;tot=m&&m.tot?m.tot:(g.dk&&g.dk.tt)||null}}catch(e){}
+  if(!tot&&g&&g.dk&&g.dk.tt)tot=g.dk.tt;
+  var adj=tot?Math.max(.85,Math.min(1.15,tot/45)):1;
+  return {adj:adj,txt:n.txt+(tot?' · total '+(+tot).toFixed(1):''),tot:tot};
+}
+var vPropsLg91=vPropsLg;
+vPropsLg=function(){
+  var h=vPropsLg91(),lg=S.sport;
+  try{
+    var teams={};(S.feed[lg]||[]).forEach(function(g){if(kind(g)!=='final'){teams[lg==='nfl'?nt(g.a):g.a]=1;teams[lg==='nfl'?nt(g.h):g.h]=1}});
+    h=h.replace(/<tr>(<td>[\s\S]*?)<\/td>/g,function(all,inner){
+      if(inner.indexOf('data-act="fgame"')>=0)return all;
+      var txt=inner.replace(/<[^>]+>/g,' '),toks=txt.match(/\b[A-Z][A-Za-z]{1,4}\b/g)||[],g=null;
+      for(var i=0;i<toks.length&&!g;i++){var k=lg==='nfl'?nt(toks[i]):toks[i];if(teams[k])g=gpFor(lg,toks[i])}
+      if(!g)return all;
+      return '<tr>'+inner+'<div>'+gpBtn(g)+'</div></td>';
+    });
+  }catch(e){}
+  return h;
+};
+var pmSheet91=pmSheet;
+pmSheet=function(s){
+  var h=pmSheet91(s);
+  try{
+    var g=gpFor(s.lg,s.team);if(!g)return h;
+    var i=h.indexOf('<h3>');if(i<0)i=h.length;
+    var card='<div class="card" style="margin:10px 0"><div class="label">Game preview</div><p style="margin:2px 0 6px;line-height:1.45">See how I expect '+esc(g.a+' @ '+g.h)+' to play out, with the score, the pace and what could change it.</p>'+gpBtn(g,'Open game preview ›')+'</div>';
+    h=h.slice(0,i)+card+h.slice(i);
+  }catch(e){}
+  return h;
 };
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
