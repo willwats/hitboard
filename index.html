@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v134, Nov 1';
+var BUILD='v135, Nov 1';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -9309,6 +9309,74 @@ vPropsLg=function(){
     });
   }catch(e){}
   return h;
+};
+
+/* v135: receptions projection for NFL receivers (catches per game, matchup, game script, usage) */
+function rcInfo(d){
+  var m=String(d.note||'').match(/(\d+) catches on (\d+) targets/);if(!m||!(d.g>0))return null;
+  var c=+m[1],t=+m[2],g=d.g,pos=d.pos,sum=0,n=0;
+  DEEP.forEach(function(x){if(x.kind!=='rec'||x.pos!==pos||x.g<3)return;var q=String(x.note||'').match(/(\d+) catches/);if(q){sum+=+q[1]/x.g;n++}});
+  var prior=n?sum/n:c/g,rate=(g*(c/g)+1*prior)/(g+1);
+  return {c:c,t:t,g:g,pg:c/g,tpg:t/g,avg:rate,cr:t>0?c/t:0};
+}
+function rcNb(mu,line){
+  var k=Math.max(mu,.5)/.3,p=mu/(mu+k),pm=Math.pow(k/(k+mu),k),cdf=0,need=Math.ceil(line),i;
+  for(i=0;i<need;i++){cdf+=pm;pm=pm*(i+k)/(i+1)*p}
+  return Math.max(0,Math.min(1,1-cdf));
+}
+function rcProj(d,pct,parts){
+  var r=rcInfo(d);if(!r)return null;
+  var f=Math.max(-18,Math.min(18,pct*0.7)),base=Math.max(-18,Math.min(18,(pct-(parts&&parts.m||0))*0.7));
+  return {r:r,f:f,mu:r.avg*(1+f/100),mu0:r.avg*(1+base/100)};
+}
+function rcHtml(b){
+  var d=DEEP.filter(function(x){return x.kind==='rec'&&normName(x.n)===normName(b.name||'')&&nt(x.t)===nt(b.team||'')})[0];
+  return d?rcBlock(d,b):'';
+}
+function rcBlock(d,b){
+  var P=rcProj(d,b.pct,b.parts);if(!P)return '';
+  var r=P.r,mu=P.mu,l0=Math.max(.5,Math.round(mu-1.5)-.5),lines=[0,1,2,3,4].map(function(i){return l0+i});
+  var h='<h3>Receptions</h3><div class="card"><div class="label">My prediction</div><div class="teams" style="font-size:22px">'+mu.toFixed(1)+' receptions</div>';
+  var why='He averages '+r.pg.toFixed(1)+' catches a game on '+r.tpg.toFixed(1)+' targets over '+r.g+' games, catching '+Math.round(r.cr*100)+'% of his targets.';
+  if(Math.abs(r.avg-r.pg)>=.3)why+=' With only '+r.g+' games, I pull it slightly toward the usual for his position, to '+r.avg.toFixed(1)+'.';
+  var m=Math.abs(P.f)<1.5?' The matchup and game change it very little.':P.f>0?' The matchup and game should add about '+(mu-r.avg).toFixed(1)+' catches.':' The matchup and game should cut about '+(r.avg-mu).toFixed(1)+' catches.';
+  h+='<p style="margin:4px 0 0;line-height:1.5">'+esc(why+m)+'</p>';
+  var ls=[];
+  try{var nx=nextOpp(nt(d.t));if(nx&&TS[nx.opp]){var own=mv(nx.opp,'dpass'),ref=leagueAvg('dpass'),rk=mrank(nx.opp,'dpass'),n=Object.keys(TS).length,q=own/ref;
+    ls.push(nx.opp+' allows '+hbF0(own)+' passing yards a game against a typical '+hbF0(ref)+' ('+(q<=.9?'a tough pass defense':q>=1.1?'a soft pass defense':'an average pass defense')+', '+ordn(rk)+' toughest of '+n+'). '+(q>=1.1?'More throws are completed against it.':q<=.9?'Fewer throws are completed against it.':''));
+    var cv=covTxt(nx.opp);if(cv)ls.push(nx.opp+' plays '+cv+'.')}}catch(e){}
+  (b.notes||[]).filter(function(t){return t.indexOf('Matchup:')!==0}).forEach(function(t){ls.push(t)});
+  if(ls.length)h+='<ul class="pts" style="margin-top:6px">'+ls.map(function(x){return '<li>'+esc(x)+'</li>'}).join('')+'</ul>';
+  h+='<div class="tblwrap" style="margin-top:8px"><table><thead><tr><th>Number</th><th>This matchup</th><th>Average defense</th><th>Fair price</th></tr></thead><tbody>'+lines.map(function(l){
+    var c1=rcNb(mu,l),c0=rcNb(P.mu0,l);
+    return '<tr><td>Over '+l.toFixed(1)+'</td><td><span class="hrpill '+(c1>=.7?'hi':c1<.4?'lo':'mid')+'" style="display:inline-block">'+Math.round(c1*100)+'%</span></td><td>'+Math.round(c0*100)+'%</td><td>'+fmtAm(fairAm(Math.min(.99,Math.max(.01,c1))))+'</td></tr>'}).join('')+'</tbody></table></div>';
+  return h+'<p class="src" style="margin:6px 0 0">Catch counts swing a lot from game to game, so I spread the chances wider than a plain average would.</p></div>';
+}
+var pmSheet93=pmSheet;
+pmSheet=function(s){
+  var h=pmSheet93(s);
+  try{
+    if(s.lg!=='nfl')return h;
+    var bl=pmBlocks('nfl',s.n,s.team),b=bl.filter(function(x){return x.kind==='rec'})[0];if(!b)return h;
+    var d=DEEP.filter(function(x){return x.kind==='rec'&&normName(x.n)===normName(s.n)&&nt(x.t)===nt(s.team)})[0];if(!d)return h;
+    var blk=rcBlock(d,b);if(!blk)return h;
+    var i=h.indexOf('<h3>Receiving yards</h3>');if(i<0)return h;
+    var j=h.indexOf('<h3>',i+10);if(j<0)j=h.indexOf('<div class="actions"');if(j<0)j=h.length;
+    return h.slice(0,j)+blk+h.slice(j);
+  }catch(e){}
+  return h;
+};
+var deepRows93=deepRows;
+deepRows=function(){
+  var rows=deepRows93();
+  rows.forEach(function(r){
+    try{
+      if(r.d.kind!=='rec'||r.nx.txt.indexOf('receptions')>=0)return;
+      var P=rcProj(r.d,r.pct,null);if(!P)return;
+      r.nx=Object.assign({},r.nx,{txt:r.nx.txt+' I project '+P.mu.toFixed(1)+' receptions (he averages '+P.r.pg.toFixed(1)+' on '+P.r.tpg.toFixed(1)+' targets a game).'});
+    }catch(e){}
+  });
+  return rows;
 };
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
