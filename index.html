@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v131, Oct 31';
+var BUILD='v132, Oct 31';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -9171,6 +9171,51 @@ nflTD=function(){
     if(i>=0&&j>i)h=h.slice(0,i)+by+h.slice(j);
   }catch(e){}
   return h;
+};
+
+/* v132: NFL players show how the defense they face does against their position and how they do against it */
+var VD_STAT={rush:'rushing yards',rec:'receiving yards',pass:'passing yards'};
+function vdTxt(d,nx,pct){
+  if(!nx||!TS[nx.opp])return '';
+  var dm=d.kind==='rush'?'drush':'dpass',own=mv(nx.opp,dm),ref=leagueAvg(dm),rk=mrank(nx.opp,dm),n=Object.keys(TS).length,r=own/ref;
+  var tag=r<=.9?'a tough defense':r>=1.1?'a soft defense':'an average defense';
+  var who=d.pos==='RB'?'running backs':d.pos==='QB'?'quarterbacks':d.pos==='TE'?'tight ends':d.pos==='WR'?'receivers':'players';
+  var s=nx.opp+' '+(d.kind==='rush'?'allows ':'allows ')+hbF0(own)+' '+(d.kind==='rush'?'rushing':'passing')+' yards a game to opponents against a typical '+hbF0(ref)+' ('+tag+', '+ordn(rk)+' toughest of '+n+'). ';
+  var u=VD_STAT[d.kind],av=d.avgS||d.avg;
+  s+='He averages '+hbF0(av)+' '+u+' a game';
+  if(pct!=null&&isFinite(pct)){var pr=av*(1+pct/100);s+=', and against this defense I predict '+hbF0(pr)+(Math.abs(pct)>=3?(pct>0?', '+hbF0(pr-av)+' more than usual':', '+hbF0(av-pr)+' fewer than usual'):', about his usual')}
+  s+='.';
+  if(d.kind==='rec'){var c=covTxt(nx.opp);if(c)s+=' They play '+c+'.'}
+  return s;
+}
+function vdFor(name,team){
+  var out=[];
+  try{
+    var nx=nextOpp(nt(team));if(!nx)return out;
+    var bl=pmBlocks('nfl',name,team);
+    bl.forEach(function(b){var d=DEEP.filter(function(x){return normName(x.n)===normName(name)&&nt(x.t)===nt(team)&&x.kind===b.kind})[0];if(d)out.push({g:d.g,t:vdTxt(d,nx,b.pct)})});
+    out.sort(function(a,b){return b.g-a.g});
+  }catch(e){}
+  return out.slice(0,2).map(function(o){return o.t}).filter(Boolean);
+}
+var tdRow89=tdRow;
+tdRow=function(r,showGm){
+  var h=tdRow89(r,showGm),v=[];
+  try{v=vdFor(r.n,r.t)}catch(e){}
+  if(!v.length)return h;
+  var add='<div class="src" style="margin-top:4px;line-height:1.45"><b>Against this defense:</b> '+v.map(esc).join(' ')+'</div>';
+  var i=h.indexOf('</td>');return h.slice(0,i)+add+h.slice(i);
+};
+var deepRows90=deepRows;
+deepRows=function(){
+  var rows=deepRows90();
+  rows.forEach(function(r){
+    try{
+      if(r.nx.txt.indexOf('Against this defense')>=0)return;
+      var t=vdTxt(r.d,r.nx,r.pct);if(t)r.nx=Object.assign({},r.nx,{txt:r.nx.txt+' '+t});
+    }catch(e){}
+  });
+  return rows;
 };
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
