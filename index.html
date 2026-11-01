@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v130, Oct 31';
+var BUILD='v131, Oct 31';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -9144,6 +9144,34 @@ function tdRow(r,showGm){
   var x=o.p!=null?'<div class="src" style="margin-top:4px;line-height:1.45"><b>I predict he scores:</b> about a '+Math.round(o.p*100)+'% chance · grade '+esc(o.gr)+'. '+esc(o.why)+' Fair price '+fmtAm(fairAm(o.p))+'.</div>':'';
   return '<tr><td><button class="pxname" data-act="prof" data-n="'+esc(r.n)+'" data-lg="nfl" data-team="'+esc(r.t)+'">'+esc(r.n)+'</button>'+badge(r.n,r.t)+' <span class="src">'+r.t+(showGm?' · '+r.gm:'')+'</span><br><span class="src">'+esc(matchTxt(r.t))+'</span>'+x+'</td><td><span class="hrpill '+(r.h>=6?'hi':r.h<=2?'lo':'mid')+'">'+r.h*10+'% ('+r.h+'/10)</span></td><td>'+(r.td==null?'—':r.td)+'</td></tr>';
 }
+
+/* v131: anytime TD rows use the live schedule for the opponent and grouping; wording fixes */
+function ntdGm(t){var n=nextOpp(nt(t));if(!n)return null;var a=n.txt.indexOf('vs ')===0;return a?nt(t)+' vs '+n.opp:nt(t)+' @ '+n.opp}
+var tdRow88=tdRow;
+tdRow=function(r,showGm){
+  var g=null;try{g=ntdGm(r.t)}catch(e){}
+  var h=tdRow88(r,showGm);
+  if(g&&r.gm){h=h.replace('<span class="src">'+r.t+(showGm?' · '+r.gm:'')+'</span>','<span class="src">'+esc(r.t)+(showGm?' · '+esc(g):'')+'</span>')}
+  h=h.replace(/ is expected to score about/,' are expected to score about').replace(/He is a QB with (\d+) carries in (\d+) games, so he gets the ball near the goal line\./,'He is a QB with $1 carries in $2 games, so he can score by running as well as throwing.');
+  return h;
+};
+var nflTD88=nflTD;
+nflTD=function(){
+  var h=nflTD88();
+  try{
+    var all=tdParse(),groups={},order=[];
+    all.forEach(function(r){var n=nextOpp(nt(r.t));if(!n)return;var k=n.key||(r.t+'@'+n.opp);if(!groups[k]){groups[k]={n:n,rows:[],teams:{}};order.push(k)}groups[k].rows.push(r);groups[k].teams[r.t]=1});
+    if(!order.length)return h;
+    order.sort(function(a,b){return (groups[a].n.start||9e15)-(groups[b].n.start||9e15)});
+    var head='<thead><tr><th>Player</th><th>TD in L10</th><th>TDs</th></tr></thead>';
+    var by='<h3>By game</h3>'+order.map(function(k){var G=groups[k],pr=k.split('@');var title=pr.length===2?pr[0]+' @ '+pr[1]:k;
+      var rows=G.rows.sort(function(a,b){return b.h-a.h||(b.td||0)-(a.td||0)});
+      return '<details class="card bcard"><summary><b>'+esc(title)+'</b> <span class="src">'+(G.n.start?esc(fmtTime(G.n.start)):'')+'</span></summary><div class="tblwrap" style="margin-top:8px"><table>'+head+'<tbody>'+rows.map(function(r){return tdRow(r,false)}).join('')+'</tbody></table></div></details>'}).join('');
+    var i=h.indexOf('<h3>By game</h3>'),j=h.indexOf('<p class="note" style="margin-top:12px">Last-10 rates');
+    if(i>=0&&j>i)h=h.slice(0,i)+by+h.slice(j);
+  }catch(e){}
+  return h;
+};
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
