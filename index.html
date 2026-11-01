@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v139, Nov 1';
+var BUILD='v140, Nov 1';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -9457,7 +9457,7 @@ var SP_CATS={
   nfl:[['pass','Passing yds'],['rush','Rushing yds'],['rec','Receiving yds'],['recp','Receptions'],['td','Anytime TD'],['kick','Kickers']],
   nba:null,nhl:null,ncaafb:null
 };
-function spCats(lg){return SP_CATS[lg]||(PXK[lg]||[])}
+function spCats(lg){return (SP_CATS[lg]||(PXK[lg]||[])).concat([['pl','Parlays']])}
 function spTag(r){return r<=.9?['lo','tough']:r>=1.1?['hi','soft']:['mid','average']}
 function spDefNfl(kd,opp){
   if(!opp||!TS[opp])return null;
@@ -9512,6 +9512,7 @@ vPropsLg=function(){
   var cats=spCats(lg),cat=cats.some(function(c){return c[0]===S.sc})?S.sc:cats[0][0];
   var h='<h2>'+name+' props</h2>'+propsChips()+modeSwitch('props');
   h+='<div class="chips" role="group" aria-label="Prop type">'+cats.map(function(c){return '<button class="chip" data-act="set" data-k="sc" data-v="'+c[0]+'" aria-pressed="'+(cat===c[0])+'">'+c[1]+'</button>'}).join('')+'</div>';
+  if(cat==='pl'){h+=parlayPropsBody(lg);return h}
   var rows=[];try{rows=spRows(lg,cat)}catch(e){rows=[]}
   var gm={};rows.forEach(function(r){if(r.gk)gm[r.gk]=r.gl});
   var gks=Object.keys(gm);
@@ -9597,11 +9598,12 @@ function pmBlockHtml(b){
   var dl=pmDef(b);if(dl.length)h+='<p class="src" style="margin:8px 0 2px"><b>The defense he faces</b></p><ul class="pts" style="margin-top:2px">'+dl.map(function(x){return '<li>'+esc(x)+'</li>'}).join('')+'</ul>';
   try{h+=pmVs(b)}catch(e){}
   var marks=pmMarks(b,mu),base=b.pct-b.parts.m,mid=null;
-  h+='<p class="src" style="margin:8px 0 2px"><b>Over and under chances</b></p><div class="tblwrap"><table><thead><tr><th>Number</th><th>Over</th><th>Under</th><th>Avg defense over</th></tr></thead><tbody>'+marks.map(function(l){
+  h+='<p class="src" style="margin:8px 0 2px"><b>Over and under chances</b> · tap one to add it to your parlay</p><div class="tblwrap"><table><thead><tr><th>Number</th><th>Over</th><th>Under</th><th>Avg defense over</th></tr></thead><tbody>'+marks.map(function(l){
     var c1=calc(p,l,-110,-110,b.pct),o1=c1.po,u1=c1.pu!=null?c1.pu:1-c1.po,c0=calc(p,l,-110,-110,base).po;
     if(mid==null||Math.abs(l-mu)<Math.abs(mid.l-mu))mid={l:l,c1:o1,c0:c0};
-    var pill=function(x){return '<span class="hrpill '+(x>=.7?'hi':x<.4?'lo':'mid')+'" style="display:inline-block">'+Math.round(x*100)+'%</span>'};
-    return '<tr><td>'+l.toFixed(1)+'</td><td>'+pill(o1)+'</td><td>'+pill(u1)+'</td><td>'+Math.round(c0*100)+'%</td></tr>';
+    var pill=function(x,sd){var on=false;try{on=inSlip(legKey({lg:b.lg,kind:'pm',name:b.nm,mk:(PM_NAME[b.kind]||b.kind)+' '+(sd==='o'?'over ':'under ')+l.toFixed(1)}))}catch(e){}
+      return '<span class="hrpill '+(x>=.7?'hi':x<.4?'lo':'mid')+'" data-act="pmadd" data-side="'+sd+'" data-l="'+l+'" data-k="'+b.kind+'" data-lg="'+b.lg+'" data-n="'+esc(b.nm)+'" data-team="'+esc(b.tm)+'" style="display:inline-block;cursor:pointer'+(on?';outline:2px solid currentColor':'')+'">'+(on?'✓ ':'')+Math.round(x*100)+'%</span>'};
+    return '<tr><td>'+l.toFixed(1)+'</td><td>'+pill(o1,'o')+'</td><td>'+pill(u1,'u')+'</td><td>'+Math.round(c0*100)+'%</td></tr>';
   }).join('')+'</tbody></table></div>';
   if(mid&&Math.abs(mid.c1-mid.c0)>=.02)h+='<p class="src" style="margin:6px 0 0">At '+mid.l.toFixed(1)+', a typical defense would give the over about '+Math.round(mid.c0*100)+'%. This defense and game make it about '+Math.round(mid.c1*100)+'%, '+(mid.c1<mid.c0?'lower':'higher')+'.</p>';
   return h+'</div>';
@@ -9639,6 +9641,142 @@ spCard=function(r){
   var i=h.lastIndexOf('</div></div></div>');
   return h.slice(0,i)+'</div></div><div style="margin-top:6px">'+add+'</div></div>';
 };
+
+/* v140: parlay grades in real time (live DraftKings game prices), correlation-adjusted chances, prop legs from my projections, parlay section in props */
+var GR=['F','D-','D','D+','C-','C','C+','B-','B','B+','A-','A'];
+function grIx(g){return Math.max(0,GR.indexOf(g))}
+function grMin(a,b){return GR[Math.min(grIx(a),grIx(b))]}
+function gradeEV(ev){return ev>=.12?'A':ev>=.08?'A-':ev>=.05?'B+':ev>=.02?'B':ev>=0?'B-':ev>=-.03?'C+':ev>=-.06?'C':ev>=-.10?'C-':ev>=-.15?'D':'F'}
+function gradeP(p){return p>=.55?'A':p>=.45?'A-':p>=.35?'B+':p>=.28?'B':p>=.22?'B-':p>=.17?'C+':p>=.12?'C':p>=.08?'C-':p>=.05?'D':'F'}
+function legType(l){
+  if(l.kind==='game')return l.t||'game';
+  var m=String(l.mk||'');
+  if(l.kind==='pm'){var k=l.pk||'';return /pass/.test(k)?'pass':/rush/.test(k)?'rush':/rec/.test(k)?'rec':'other'}
+  if(/touchdown|\btd\b/i.test(m))return 'td';
+  if(/pass/i.test(m))return 'pass';
+  if(/rush/i.test(m))return 'rush';
+  if(/rec/i.test(m))return 'rec';
+  return 'other';
+}
+function legPrice(l){
+  if(l.kind==='pm')return l.price!=null?l.price:null;
+  if(l.kind!=='game')return null;
+  var g=find(l.gid),dk=g&&g.dk;if(!dk)return null;
+  var v=null;
+  if(l.t==='ml'&&dk.ml)v=l.side==='h'?dk.ml.h:dk.ml.a;
+  else if(l.t==='sp'&&dk.px)v=l.side==='h'?dk.px.sh:dk.px.sa;
+  else if(l.t==='tot'&&dk.px)v=l.over?dk.px.to:dk.px.tu;
+  return (v!=null&&Math.abs(v)>=100)?v:null;
+}
+function legTeam(l){return String(l.team||'')}
+/* pairwise links between legs in the same game */
+function corrPairs(legs){
+  var out=[],f=1;
+  for(var i=0;i<legs.length;i++)for(var j=i+1;j<legs.length;j++){
+    var a=legs[i],b=legs[j];if(!a.gid||a.gid!==b.gid)continue;
+    var ta=legType(a),tb=legType(b),sameTeam=legTeam(a)&&legTeam(a)===legTeam(b),x=null;
+    var pair=function(u,v){return (ta===u&&tb===v)||(ta===v&&tb===u)};
+    var over=function(l){return l.kind==='pm'?!!l.over:true};
+    if(sameTeam&&pair('pass','rec')&&over(a)&&over(b))x=[1.12,a.name+' and '+b.name+' are a quarterback and his receiver. When one has a big day the other usually does too, which lifts the real chance of both.'];
+    else if(sameTeam&&pair('pass','rush')&&over(a)&&over(b))x=[.92,a.name+' and '+b.name+' work against each other. A team that throws a lot runs less, which lowers the chance of both.'];
+    else if(sameTeam&&ta==='rec'&&tb==='rec'&&over(a)&&over(b))x=[.97,a.name+' and '+b.name+' split the same targets, so both going over is slightly less likely than the multiplied number.'];
+    else if(pair('tot','pass')||pair('tot','rec')){var tl=ta==='tot'?a:b,pl=ta==='tot'?b:a;x=tl.over?(over(pl)?[1.06,'The over and '+pl.name+' passing or receiving over move together: more points means more throwing.']:[.94,'The over and an under on '+pl.name+' pull against each other.']):(over(pl)?[.92,'The under and an over on '+pl.name+' pull against each other, since low scoring usually means fewer yards through the air.']:[1.05,'The under and an under on '+pl.name+' move together.'])}
+    else if(pair('sp','rush')||pair('ml','rush')){var gl=ta==='rush'?b:a,rl=ta==='rush'?a:b;if(gl.side&&legTeam(rl)&&shortSide(gl,legTeam(rl))&&over(rl))x=[1.06,'A team that is winning runs the ball more late, so '+rl.name+' rushing over helps and is helped by the win.']}
+    else if(pair('td','td')&&sameTeam)x=[1.05,a.name+' and '+b.name+' score for the same team, so a high-scoring day helps both.'];
+    else if(pair('td','tot')){var tl2=ta==='tot'?a:b;if(tl2.over)x=[1.05,'An anytime touchdown and the over both need points.']}
+    if(x){f*=x[0];out.push(x)}
+  }
+  return {f:Math.max(.7,Math.min(1.35,f)),items:out};
+}
+function shortSide(g,team){try{var G=find(g.gid);if(!G)return false;var tm=g.side==='h'?G.h:G.a;return String(nt(tm))===String(nt(team))}catch(e){return false}}
+function parlayEval(legs,bookOdds){
+  var P0=1,minP=1,weak=null;
+  legs.forEach(function(l){P0*=l.p;if(l.p<minP){minP=l.p;weak=l}});
+  var c=corrPairs(legs),P=Math.min(P0*c.f,minP);
+  var dc=1,known=0;legs.forEach(function(l){var pr=legPrice(l);if(pr!=null){dc*=dec(pr);known++}});
+  var price=null,src='';
+  if(bookOdds!=null&&Math.abs(bookOdds)>=100){price=bookOdds;src='your book'}
+  else if(known===legs.length&&legs.length>0){var d=dc;price=d>=2?Math.round((d-1)*100):-Math.round(100/(d-1));src='DraftKings, from the live lines'}
+  var ev=price!=null?P*dec(price)-1:null;
+  var gq=gradeP(P),cap='A';
+  if(legs.length>=6)cap='C+';else if(legs.length>=4)cap='B';
+  if(minP<.45)cap=grMin(cap,'B-');
+  var gv=ev!=null?gradeEV(ev):null;
+  var grade=gv?grMin(gv,cap):grMin(gq,cap);
+  var why=[];
+  if(weak&&legs.length>1)why.push('Weakest leg: '+weak.name+(weak.kind==='game'?'':' '+weak.mk)+' at '+Math.round(weak.p*100)+'%.');
+  if(legs.length>=4)why.push(legs.length+' legs: every extra leg lowers the chance a lot, so the grade is capped.');
+  if(ev!=null)why.push('Priced at '+(price>0?'+':'')+price+' ('+src+'), the bet returns about '+(ev>=0?'+':'')+(ev*100).toFixed(0)+'% per dollar on my chance.');
+  else why.push('No price for '+(legs.length-known)+' leg'+(legs.length-known===1?'':'s')+'. Add your book’s parlay odds below to grade the value. Until then the grade only reflects the chance.');
+  return {P0:P0,P:P,f:c.f,notes:c.items.map(function(x){return x[1]}),price:price,src:src,ev:ev,gq:gq,gv:gv,grade:grade,why:why,known:known,n:legs.length};
+}
+function evalBox(e){
+  var col=GR.indexOf(e.grade)>=GR.indexOf('B-')?'var(--good,#1a8d5a)':GR.indexOf(e.grade)>=GR.indexOf('C-')?'inherit':'var(--bad,#c0392b)';
+  var h='<div class="card" style="margin:8px 0"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div><div class="label">Parlay grade'+(e.gv?'':' · chance only')+'</div><div class="src">Updates as the lines and my numbers change</div></div><span style="font-size:40px;font-weight:700;line-height:1;color:'+col+'">'+esc(e.grade)+'</span></div>';
+  h+='<div class="facts" style="margin-top:8px"><span>Chance <b>'+(e.P*100).toFixed(1)+'%</b></span><span>Fair odds <b>'+fairOdds(e.P)+'</b></span>'+(e.price!=null?'<span>Price <b>'+(e.price>0?'+':'')+e.price+'</b></span><span>Value <b>'+(e.ev>=0?'+':'')+(e.ev*100).toFixed(0)+'%</b></span>':'')+'</div>';
+  if(Math.abs(e.f-1)>=.01)h+='<p class="src" style="margin:6px 0 0">Straight multiplication gives '+(e.P0*100).toFixed(1)+'%. Links between the legs move it to '+(e.P*100).toFixed(1)+'%.</p>';
+  var items=e.why.concat(e.notes);
+  h+='<ul class="pts" style="margin-top:6px">'+items.map(function(t){return '<li>'+esc(t)+'</li>'}).join('')+'</ul>';
+  h+='<p class="src" style="margin:4px 0 0">Game legs use DraftKings prices from ESPN'+(S.feedAt?' as of '+esc(fmtClock(S.feedAt)):'')+'. Player prop prices are not available from ESPN here, so type your book’s price. Most parlays lose money over time, and these chances are estimates.</p></div>';
+  return h;
+}
+/* suggested parlays get a grade */
+var parlayCard98=parlayCard;
+parlayCard=function(title,desc,legs){
+  var h=parlayCard98(title,desc,legs);
+  try{if(legs.length>=2){var e=parlayEval(legs,null),i=h.indexOf('<ul class="pts" style="margin-top:8px">');if(i>=0)h=h.slice(0,i)+evalBox(e)+h.slice(i)}}catch(x){}
+  return h;
+};
+/* the slip: correlated chance, grade, live */
+slipProb=function(){try{return parlayEval(S.slip,null).P}catch(e){var p=1;S.slip.forEach(function(l){p*=l.p});return p}};
+var builderOutHtml98=builderOutHtml;
+builderOutHtml=function(){
+  var h=builderOutHtml98(),box='';
+  try{
+    var od=parseFloat(String(S.bo).replace(/[−–]/g,'-'));
+    if(S.slip.length>=2)box=evalBox(parlayEval(S.slip,Math.abs(od)>=100?od:null));
+  }catch(e){}
+  return box+h;
+};
+/* slip legs built from my projections stay live */
+var slipRefresh98=slipRefresh;
+slipRefresh=function(){
+  var all=S.slip.slice(),pm=all.filter(function(l){return l.kind==='pm'});
+  S.slip=all.filter(function(l){return l.kind!=='pm'});
+  try{slipRefresh98()}finally{
+    var keep=S.slip;S.slip=all.map(function(l){return l.kind==='pm'?l:keep.filter(function(k){return k.key===l.key})[0]||l});
+  }
+  pm.forEach(function(l){
+    try{
+      var b=pmBlocks(l.lg,l.name,l.team).filter(function(x){return x.kind===l.pk})[0];
+      if(!b){l.stale=true;return}
+      var c=calc(b.p,l.line,-110,-110,b.pct);l.p=l.over?c.po:(c.pu!=null?c.pu:1-c.po);l.stale=false;
+      l.src='My projection '+(b.avg*(1+b.pct/100)).toFixed(1);
+    }catch(e){l.stale=true}
+  });
+};
+document.addEventListener('click',function(e){
+  var el=e.target&&e.target.closest?e.target.closest('[data-act="pmadd"]'):null;if(!el)return;
+  e.stopImmediatePropagation();e.preventDefault();
+  try{
+    var d=el.dataset,line=parseFloat(d.l),over=d.side==='o',bl=pmBlocks(d.lg,d.n,d.team).filter(function(x){return x.kind===d.k})[0];if(!bl)return;
+    var c=calc(bl.p,line,-110,-110,bl.pct),p=over?c.po:(c.pu!=null?c.pu:1-c.po);
+    var leg={lg:d.lg,kind:'pm',name:d.n,team:d.team,mk:(PM_NAME[d.k]||d.k)+' '+(over?'over ':'under ')+line.toFixed(1),p:p,src:'My projection '+(bl.avg*(1+bl.pct/100)).toFixed(1),nx:{txt:bl.when||''},gid:feedGidFor(d.lg,d.team)||'',pk:d.k,line:line,over:over,price:null};
+    leg.key=legKey(leg);
+    var ix=-1;S.slip.forEach(function(q,i){if(q.key===leg.key)ix=i});
+    S.slip=S.slip.filter(function(q){return !(q.kind==='pm'&&q.name===leg.name&&q.pk===leg.pk&&q.key!==leg.key)});
+    ix=-1;S.slip.forEach(function(q,i){if(q.key===leg.key)ix=i});
+    if(ix>=0)S.slip.splice(ix,1);else if(S.slip.length<15)S.slip.push(leg);
+    saveSlip();try{updateSlipBar()}catch(x){}renderSheet();
+  }catch(x){}
+},true);
+/* props: parlay section */
+function parlayPropsBody(lg){
+  var n=S.slip.length,h='<p class="src" style="margin:4px 0 10px">Ready-made combinations of the strongest legs, each with a letter grade. Tap <b>Use in parlay builder</b> to load one, then add or remove legs. Open a player’s prediction and tap an over or under chance to add that leg.</p>';
+  h+='<p><button class="btn primary" data-act="slipopen"'+(n?'':' disabled')+'>'+(n?'Open my parlay ('+n+' leg'+(n===1?'':'s')+')':'My parlay is empty')+'</button></p>';
+  try{h+=parlaysBody(lg)}catch(e){h+='<div class="card empty">Parlays could not be built right now.</div>'}
+  return h;
+}
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
