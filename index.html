@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v128, Oct 31';
+var BUILD='v129, Oct 31';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -8356,7 +8356,7 @@ function atdGame(g){
       if(r.seen<2&&r.r+r.c<2)return;
       var nm=normName(r.n);if(ex.some(function(x){return x.indexOf(nm)>=0||nm.indexOf(x)>=0}))return;
       var td=r.r+r.c,lam=(td+0.24)/(t.n+2)*f,p=1-Math.exp(-lam);
-      out.push({n:r.n,t:ab,side:side,p:p,td:td,gp:t.n,r:r.r,c:r.c,g:g,gr:atdGradeOf(p)});
+      out.push({n:r.n,t:ab,side:side,p:p,td:td,gp:t.n,r:r.r,c:r.c,g:g,gr:atdGradeOf(p),ex:(T&&m.sa!=null?(side==='a'?m.sa:m.sh):null),pf:(T?(side==='a'?T.A.pf:T.H.pf):null),opa:(T?(side==='a'?T.H.pa:T.A.pa):null),on:shortNm(g,side==='a'?'h':'a'),tn:shortNm(g,side)});
     });
   });
   return out.sort(function(a,b){return b.p-a.p});
@@ -9043,6 +9043,72 @@ document.addEventListener('click',function(e){
     S.sheet={type:'pm',n:nm,lg:lg,team:tm};renderSheet();
   }catch(x){}
 },true);
+
+/* v129: a stated prediction and the reason for every prop and touchdown pick */
+function prFmt(kd,v){var big=!PXPOIS[kd]&&v>=20;return big?String(Math.round(v)):(Math.round(v*10)/10).toFixed(1)}
+function prPred(kd,avg,g,pct,parts,opp){
+  var u=PK_LAB[kd]||PM_NAME[kd]||'',mu=avg*(1+pct/100);
+  var amt=function(pc){var v=Math.abs(avg*pc/100);return (v>=3?String(Math.round(v)):v.toFixed(1))+' '+u};
+  var ph=[];
+  if(Math.abs(parts.m)>=1.2)ph.push((parts.m>0?'a soft':'a tough')+' matchup against '+opp+' '+(parts.m>0?'adds':'cuts')+' about '+amt(parts.m));
+  if(Math.abs(parts.s)>=1.2)ph.push('how the game should play out '+(parts.s>0?'adds':'cuts')+' about '+amt(parts.s));
+  if(Math.abs(parts.u)>=1.2)ph.push('teammates being out '+(parts.u>0?'adds':'cuts')+' about '+amt(parts.u));
+  var why='He averages '+prFmt(kd,avg)+' over '+g+' games'+(ph.length?'. '+ph.join('; ').replace(/^./,function(c){return c.toUpperCase()})+'.':', and nothing in the matchup, the game flow or usage changes that.');
+  return {mu:mu,n:prFmt(kd,mu),u:u,why:why};
+}
+/* sheet: prediction up front */
+var pmBlockHtml87=pmBlockHtml;
+pmBlockHtml=function(b){
+  var h=pmBlockHtml87(b),pr=prPred(b.kind,b.avg,b.g,b.pct,b.parts,b.opp);
+  var top='<div class="label" style="margin-top:8px">My prediction</div><div class="teams" style="font-size:22px">'+esc(pr.n)+' '+esc(pr.u)+'</div><p style="margin:4px 0 10px;line-height:1.5">'+esc(pr.why)+'</p>';
+  var i=h.indexOf('<div class="card">');
+  return i>=0?h.slice(0,i+'<div class="card">'.length)+top+h.slice(i+'<div class="card">'.length):h;
+};
+/* list rows: say it first */
+var pxCtx287=pxCtx2;
+pxCtx2=function(p){
+  var a=pxCtx287(p),pre='';
+  try{
+    if(p.g1&&p.lg&&p.lg!=='mlb'&&kind(p.g1)==='up'){
+      var pct=pxAdj(p),pr=prPred(p.kind,p.avg,p.g,pct,p._parts||{m:pct,s:0,u:0},p.opp);
+      pre='I predict '+pr.n+' '+pr.u+'. ';
+    }
+  }catch(e){}
+  return pre+a;
+};
+var deepRows87=deepRows;
+deepRows=function(){
+  var rows=deepRows87();
+  rows.forEach(function(r){
+    try{
+      var x=nflExtra(r.d,r.nx),base=r.pct-x.pct,pr=prPred(r.d.kind,r.d.avgS,r.d.g,r.pct,{m:base,s:x.parts.s,u:x.parts.u},r.nx.opp);
+      if(r.nx.txt.indexOf('I predict')<0)r.nx=Object.assign({},r.nx,{txt:'I predict '+pr.n+' '+pr.u+'. '+r.nx.txt});
+    }catch(e){}
+  });
+  return rows;
+};
+/* touchdowns: why */
+function atdWhyLong(o){
+  var s=atdWhy(o).replace(/^./,function(c){return c.toUpperCase()})+'.';
+  if(o.ex!=null&&o.pf>0)s+=' '+o.tn+' is expected to score about '+hbF0(o.ex)+' points'+(o.ex>=o.pf*1.08?', more than its usual '+hbF0(o.pf):o.ex<=o.pf*.92?', fewer than its usual '+hbF0(o.pf):', about its usual '+hbF0(o.pf))+'.';
+  var ref=29;try{ref=leagueTotal('ncaafb')/2||29}catch(e){}
+  if(o.opa!=null)s+=' '+o.on+' allows '+o.opa.toFixed(1)+' points a game'+(o.opa>=ref*1.1?', a soft defense, which helps.':o.opa<=ref*.9?', a tough defense, which hurts.':', about average.');
+  return s;
+}
+function atdRow(o,showGame){
+  var g=o.g;
+  return '<div data-act="prof" data-n="'+esc(o.n)+'" data-lg="ncaafb" data-team="'+esc(o.t)+'" style="padding:8px 0;border-top:1px solid var(--line);cursor:pointer"><div class="r" style="display:flex;justify-content:space-between;gap:8px;align-items:center"><div><b>'+esc(o.n)+'</b> <span class="src">'+esc(o.t)+'</span>'+(showGame?'<div class="src">'+esc(g.a+' @ '+g.h)+' · '+esc(gTime(g))+'</div>':'')+'<div class="src"><b>I predict he scores:</b> about a '+Math.round(o.p*100)+'% chance.</div><div class="src">'+esc(atdWhyLong(o))+'</div><div class="src">Fair price '+fmtAm(fairAm(o.p))+' · worth it if your book pays that or better</div></div><span style="font-size:26px;font-weight:700;line-height:1">'+esc(o.gr)+'</span></div></div>';
+}
+var pmSheet87=pmSheet;
+pmSheet=function(s){
+  var h=pmSheet87(s);
+  try{
+    var bl=pmBlocks(s.lg,s.n,s.team),g=bl[0]&&bl[0].p&&bl[0].p.g1;
+    if(s.lg==='ncaafb'&&g){var td=atdGame(g).filter(function(o){return normName(o.n)===normName(s.n)})[0];
+      if(td){var i=h.indexOf('<h3>Anytime touchdown</h3>');if(i>=0){var j=h.indexOf('</div>',i)+6;h=h.slice(0,i)+'<h3>Anytime touchdown</h3><div class="card"><div class="label">My prediction</div><div class="teams" style="font-size:22px">About a '+Math.round(td.p*100)+'% chance to score · grade '+esc(td.gr)+'</div><p style="margin:4px 0 0;line-height:1.5">'+esc(atdWhyLong(td))+' Fair price '+fmtAm(fairAm(td.p))+'.</p></div>'+h.slice(j)}}}
+  }catch(e){}
+  return h;
+};
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
