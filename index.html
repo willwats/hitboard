@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v143, Nov 1';
+var BUILD='v144, Nov 1';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -9991,6 +9991,10 @@ function dvLine(opp,pos,cat){
   var T=dvTable()[opp];if(!T)return null;
   var f1=function(v){return v.toFixed(1)},y=function(v){return String(Math.round(v))};
   if(pos==='RB'){
+    var ar=dvRank('rbRy',opp),ac=dvRank('rbRecy',opp);if(!ar||!ac)return null;
+    return opp+' gives up '+y(T.rbRy)+' rushing yards to running backs a game ('+ordn(ar.rk)+' most of '+ar.of+', '+dvTag(ar)+') and '+f1(T.rbRec)+' catches for '+y(T.rbRecy)+' receiving yards to running backs ('+ordn(ac.rk)+' most, '+dvTag(ac)+')';
+  }
+  if(false){
     var a=dvRank(cat==='rush'?'rbRy':'rbRec',opp);if(!a)return null;
     return opp+' gives up '+y(T.rbRy)+' rushing yards and '+f1(T.rbRec)+' catches for '+y(T.rbRecy)+' yards to running backs a game ('+(cat==='rush'?'run game':'catches')+': '+ordn(a.rk)+' most of '+a.of+', '+dvTag(a)+')';
   }
@@ -10035,6 +10039,56 @@ vPropsLg=function(){
   return h;
 };
 setTimeout(function(){try{dvLoad()}catch(e){}},4000);
+
+/* v144: Week 8 outside rankings and projections shown beside my own numbers. Fixed data for Week 8 only; hidden after Monday night. */
+var YH={"RB":[["J. Gibbs","DET","MIN"],["B. Robinson","ATL","TB"],["K. Walker III","KC","DEN"],["J. Williams","DAL","ARI"],["J. Cook III","BUF","BAL"],["D. Henry","BAL","BUF"],["K. Williams","LAR","LAC"],["C. Hubbard","CAR","GB"],["J. Jacobs","GB","CAR"],["J. Warren","PIT","CLE"],["B. Allen","NYJ","LV"],["B. Irving","TB","ATL"],["B. Tuten","JAC","IND"],["C. Brown","CIN","TEN"],["R. Stevenson","NE","MIA"],["A. Jeanty","LV","NYJ"],["J. Taylor","IND","JAC"],["D. Swift","CHI","SEA"],["O. Gordon II","MIA","NE"],["S. Barkley","PHI","WAS"],["T. Pollard","TEN","CIN"],["J. Love","ARI","DAL"],["Q. Judkins","CLE","PIT"],["B. Corum","LAR","LAC"],["R. White","WAS","PHI"],["J. Mason","MIN","DET"],["J. Coleman","DEN","KC"],["R. Dowdle","PIT","CLE"],["Z. Charbonnet","SEA","CHI"],["A. Jones Sr.","MIN","DET"],["O. Hampton","LAC","LAR"],["J.K. Dobbins","DEN","KC"],["M. Washington Jr.","LV","NYJ"],["S. Perine","CIN","TEN"],["E. Wilson","SEA","CHI"],["K. Gainwell","TB","ATL"],["T. Allgeier","ARI","DAL"],["J. Price","SEA","CHI"],["C. Rodriguez Jr.","JAC","IND"],["D. Sampson","CLE","PIT"],["B. Knight","ARI","DAL"],["J. Hill","BAL","BUF"],["K. Mitchell","LAC","LAR"],["M. Lloyd","GB","CAR"],["C. Kiner","NE","MIA"],["K. Vidal","LAC","LAR"],["R. Johnson","CHI","SEA"],["S. McGowan","IND","JAC"],["E. Johnson","KC","DEN"],["E. Mitchell","PHI","WAS"]],"WR":[["J. Smith-Njigba","SEA","CHI"],["P. Nacua","LAR","LAC"],["C. Lamb","DAL","ARI"],["J. Chase","CIN","TEN"],["Z. Flowers","BAL","BUF"],["A. St. Brown","DET","MIN"],["D. London","ATL","TB"],["C. Watson","GB","CAR"],["J. Jefferson","MIN","DET"],["T. Higgins","CIN","TEN"],["P. Washington","JAC","IND"],["G. Pickens","DAL","ARI"],["M. Golden","GB","CAR"],["T. McMillan","CAR","GB"],["J. Coker","CAR","GB"],["G. Wilson","NYJ","LV"],["DJ Moore","BUF","BAL"],["L. Burden III","CHI","SEA"],["M. Wilson","ARI","DAL"],["S. Diggs","WAS","PHI"],["DK Metcalf","PIT","CLE"],["J. Williams","DET","MIN"],["O. Cooper Jr.","NYJ","LV"],["L. McConkey","LAC","LAR"],["T. Tucker","LV","NYJ"],["M. Lemon","PHI","WAS"],["D. Boston","CLE","PIT"],["G. Bernard","PIT","CLE"],["KC Concepcion Jr.","CLE","PIT"],["C. Godwin Jr.","TB","ATL"],["J. Waddle","DEN","KC"],["R. Odunze","CHI","SEA"],["W. Robinson","TEN","CIN"],["K. Allen","IND","JAC"],["J. Addison","MIN","DET"],["A. Williams","WAS","PHI"],["R. Rice","KC","DEN"],["M. Washington","MIA","NE"],["J. Downs","IND","JAC"],["J. Meyers","JAC","IND"],["R. Flournoy","DAL","ARI"],["X. Worthy","KC","DEN"],["K. Shakir","BUF","BAL"],["D. Douglas","NE","MIA"],["K. Bourne","ARI","DAL"],["C. Douglas","MIA","NE"],["J. Lane","BAL","BUF"],["K. Coleman","BUF","BAL"],["C. Sutton","DEN","KC"],["D. Cooper","PHI","WAS"],["C. Kupp","SEA","CHI"],["T. Hurst III","TB","ATL"],["J. Dotson","ATL","TB"],["K. Mumpfield","LAR","LAC"],["Q. Johnston","LAC","LAR"],["T. Johnson","TB","ATL"],["T. Hunter","JAC","IND"],["R. Bateman","BAL","BUF"],["T. Harris","LAC","LAR"],["T. Burks","WAS","PHI"]],"TE":[["T. McBride","ARI","DAL"],["B. Bowers","LV","NYJ"],["T. Kraft","GB","CAR"],["C. Loveland","CHI","SEA"],["D. Goedert","PHI","WAS"],["S. LaPorta","DET","MIN"],["D. Kincaid","BUF","BAL"],["T. Kelce","KC","DEN"],["K. Pitts Sr.","ATL","TB"],["H. Henry","NE","MIA"],["T. Warren","IND","JAC"],["T.J. Hockenson","MIN","DET"],["B. Strange","JAC","IND"],["C. Okonkwo","WAS","PHI"],["H. Fannin Jr.","CLE","PIT"],["T. Higbee","LAR","LAC"],["P. Freiermuth","PIT","CLE"],["M. Andrews","BAL","BUF"],["M. Taylor","NYJ","LV"],["AJ Barner","SEA","CHI"],["M. Gesicki","CIN","TEN"],["M. Mayer","LV","NYJ"],["C. Parkinson","LAR","LAC"],["D. Waller","CAR","GB"],["E. Raridon","NE","MIA"],["C. Otton","TB","ATL"],["J. Ferguson","DAL","ARI"],["G. Dulcich","MIA","NE"],["D. Washington","PIT","CLE"],["K. Sadiq","NYJ","LV"],["E. Engram","DEN","KC"],["T. Tremble","CAR","GB"],["G. Helm","TEN","CIN"],["O. Gadsden II","LAC","LAR"],["C. Kolar","LAC","LAR"],["E. Higgins","ARI","DAL"],["D. Allen","LAR","LAC"],["D. Knox","BUF","BAL"],["N. Gray","KC","DEN"],["W. Mallory","IND","JAC"]],"QB":[["J. Allen","BUF","BAL"],["J. Burrow","CIN","TEN"],["L. Jackson","BAL","BUF"],["D. Maye","NE","MIA"],["D. Prescott","DAL","ARI"],["T. Lawrence","JAC","IND"],["J. Daniels","WAS","PHI"],["J. Love","GB","CAR"],["M. Stafford","LAR","LAC"],["J. Brissett","ARI","DAL"],["J. Goff","DET","MIN"],["K. Murray","MIN","DET"],["C. Williams","CHI","SEA"],["B. Young","CAR","GB"],["P. Mahomes II","KC","DEN"],["K. Cousins","LV","NYJ"],["S. Darnold","SEA","CHI"],["B. Mayfield","TB","ATL"],["A. Rodgers","PIT","CLE"],["G. Smith","NYJ","LV"],["M. Willis","MIA","NE"],["M. Penix Jr.","ATL","TB"],["Bo Nix","DEN","KC"],["D. Watson","CLE","PIT"],["T. McKee","PHI","WAS"],["J. Herbert","LAC","LAR"],["C. Ward","TEN","CIN"],["D. Jones","IND","JAC"]]};
+var RWP=[["QB","Josh Allen","BUF","BAL",259.98,37.26,0,0,0.93,0,23.9],["QB","Dak Prescott","DAL","ARI",300.86,14.84,0,0,0.06,0,22.01],["QB","Joe Burrow","CIN","TEN",294.69,15.19,0,0,0.2,0,21.83],["QB","Drake Maye","NE","MIA",253.0,38.31,0,0,0.24,0,20.42],["QB","Lamar Jackson","BAL","BUF",246.38,40.27,0,0,0.21,0,20.04],["QB","Trevor Lawrence","JAX","IND",249.46,19.17,0,0,0.23,0,19.31],["QB","Jayden Daniels","WAS","PHI",187.12,47.88,0,0,0.48,0,18.09],["QB","Jacoby Brissett","ARI","DAL",241.4,12.06,0,0,0.09,0,18.08],["QB","Bryce Young","CAR","GB",240.67,21.96,0,0,0.23,0,17.4],["QB","Kirk Cousins","LV","NYJ",229.16,7.56,0,0,0.07,0,16.77],["RB","Jahmyr Gibbs","DET","MIN",0,81.53,4.48,32.94,1.02,0.23,18.93],["RB","Bijan Robinson","ATL","TB",0,104.52,3.51,28.05,0.6,0.27,18.35],["RB","Kenneth Walker","KC","DEN",0,94.3,3.52,25.09,0.68,0.22,17.29],["RB","Kyren Williams","LAR","LAC",0,80.75,2.94,21.83,0.94,0.16,16.84],["RB","Javonte Williams","DAL","ARI",0,77.89,2.63,17.84,1.01,0.22,16.94],["RB","Chase Brown","CIN","TEN",0,74.32,3.47,24.38,0.56,0.25,14.61],["RB","James Cook","BUF","BAL",0,91.73,1.81,13.87,0.79,0.11,15.95],["RB","Jonathan Taylor","IND","JAX",0,69.94,2.12,16.58,0.89,0.06,14.33],["RB","Braelon Allen","NYJ","LV",0,80.59,2.27,15.86,0.62,0.12,14.02],["RB","Derrick Henry","BAL","BUF",0,78.73,1.22,10.41,0.93,0.08,14.9],["WR","Jaxon Smith-Njigba","SEA","CHI",0,2.48,7.3,120.69,0.02,0.91,17.91],["WR","CeeDee Lamb","DAL","ARI",0,1.06,6.71,107.89,0.0,0.72,15.25],["WR","Puka Nacua","LAR","LAC",0,3.24,7.36,107.3,0.04,0.52,14.45],["WR","Ja'Marr Chase","CIN","TEN",0,1.43,5.94,86.91,0.01,0.84,14.0],["WR","Zay Flowers","BAL","BUF",0,1.28,5.69,91.05,0.01,0.58,12.78],["WR","Justin Jefferson","MIN","DET",0,0.48,6.26,83.42,0.01,0.5,11.43],["WR","Garrett Wilson","NYJ","LV",0,0.8,5.77,74.93,0.01,0.58,11.1],["WR","Amon-Ra St. Brown","DET","MIN",0,1.43,5.65,70.4,0.01,0.63,11.05],["WR","Tee Higgins","CIN","TEN",0,0.36,4.62,86.71,0.0,0.45,11.45],["WR","Christian Watson","GB","CAR",0,0.62,4.18,74.83,0.01,0.69,11.78],["TE","Trey McBride","ARI","DAL",0,0.58,7.61,67.4,0.01,0.69,10.99],["TE","Brock Bowers","LV","NYJ",0,0.98,6.21,71.47,0.01,0.62,10.99],["TE","Travis Kelce","KC","DEN",0,0.0,4.33,54.94,0.0,0.29,7.22],["TE","Hunter Henry","NE","MIA",0,0.0,4.27,49.51,0.0,0.33,6.93],["TE","Tucker Kraft","GB","CAR",0,0.0,4.34,48.02,0.0,0.29,6.56],["TE","Sam LaPorta","DET","MIN",0,0.24,4.11,47.72,0.0,0.3,6.64],["TE","Harold Fannin","CLE","PIT",0,0.35,3.83,39.8,0.01,0.45,6.77],["TE","Dalton Kincaid","BUF","BAL",0,0.0,3.94,52.01,0.0,0.22,6.53],["TE","Dallas Goedert","PHI","WAS",0,0.0,3.48,40.48,0.0,0.42,6.63],["TE","Brenton Strange","JAX","IND",0,0.0,3.82,45.23,0.0,0.28,6.23]];
+var FX_END=Date.UTC(2026,10,3,13,0,0);
+function fxKey(n,t){
+  var w=String(n||'').toLowerCase().replace(/\./g,'').split(/\s+/).filter(function(x){return x&&!/^(jr|sr|ii|iii|iv|v)$/.test(x)});
+  if(!w.length)return '';
+  return w[0].charAt(0)+'|'+w[w.length-1].replace(/[^a-z]/g,'')+'|'+nt(String(t||'').toUpperCase());
+}
+var FXY={},FXR={};
+Object.keys(YH).forEach(function(pos){YH[pos].forEach(function(r,i){FXY[fxKey(r[0],r[1])]={pos:pos,rank:i+1,of:YH[pos].length,opp:nt(r[2])}})});
+RWP.forEach(function(r){FXR[fxKey(r[1],r[2])]={pos:r[0],opp:nt(r[3]),pass:r[4],rush:r[5],rec:r[6],recy:r[7],rtd:r[8],ctd:r[9],pts:r[10]}});
+function fxFor(name,team,opp){
+  if(Date.now()>FX_END)return null;
+  var k=fxKey(name,team),y=FXY[k],r=FXR[k];
+  if(y&&opp&&y.opp!==opp)y=null;
+  if(r&&opp&&r.opp!==opp)r=null;
+  if(!y&&!r)return null;
+  var a=[];
+  if(y)a.push('Yahoo analysts rank him '+y.pos+y.rank+' this week (of '+y.of+' listed)');
+  if(r){
+    var f1=function(v){return v.toFixed(1)},p=[];
+    if(r.pos==='QB')p.push(Math.round(r.pass)+' passing yds',Math.round(r.rush)+' rushing yds',f1(r.rtd)+' rushing TD');
+    else{if(r.rush>=10)p.push(Math.round(r.rush)+' rushing yds');p.push(f1(r.rec)+' catches for '+Math.round(r.recy)+' yds',f1(r.rtd+r.ctd)+' TD')}
+    a.push('RotoWire projects '+p.join(', '));
+  }
+  return a.join('. ');
+}
+var spRows102=spRows;
+spRows=function(lg,cat){
+  var rows=spRows102(lg,cat);
+  if(lg==='nfl'&&cat!=='kick'){try{rows.forEach(function(x){
+    var me=nt(x.t),p=(x.gk||'').split('@'),opp=p[0]===me?p[1]:p[0];
+    x.fx=fxFor(x.n,x.t,opp);
+  })}catch(e){}}
+  return rows;
+};
+var spCard102=spCard;
+spCard=function(r){
+  var h=spCard102(r);
+  if(!r.fx)return h;
+  return h.slice(0,h.length-6)+'<div class="src" style="margin-top:4px">'+esc(r.fx)+'.</div></div>';
+};
+var pmDef102=pmDef;
+pmDef=function(b){
+  var o=pmDef102(b);
+  try{if(b.lg==='nfl'&&b.opp){var nm=b.nm||b.name||(b.p&&b.p.name),tm=b.tm||b.team||(b.p&&b.p.team);var l=fxFor(nm,tm,nt(b.opp));if(l)o=(o||[]).concat([l+'.'])}}catch(e){}
+  return o;
+};
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
