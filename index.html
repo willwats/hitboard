@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v138, Nov 1';
+var BUILD='v139, Nov 1';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -9518,13 +9518,126 @@ vPropsLg=function(){
   if(S.sg&&gks.indexOf(S.sg)<0)S.sg='';
   if(gks.length>1)h+='<div class="chips" role="group" aria-label="Game">'+['']. concat(gks).map(function(k){return '<button class="chip" data-act="set" data-k="sg" data-v="'+esc(k)+'" aria-pressed="'+((S.sg||'')===k)+'">'+(k===''?'All games':esc(gm[k]))+'</button>'}).join('')+'</div>';
   if(S.sg)rows=rows.filter(function(r){return r.gk===S.sg});
-  rows.sort(function(a,b){return b.sort-a.sort});
+  var mgOk=rows.some(function(r){return r.mg});
+  if(mgOk&&S.ss==='mg')rows.sort(function(a,b){return (mgNum(b.mg)-mgNum(a.mg))||(b.sort-a.sort)});else rows.sort(function(a,b){return b.sort-a.sort});
+  if(mgOk)h+='<div class="chips" role="group" aria-label="Sort"><button class="chip" data-act="set" data-k="ss" data-v="" aria-pressed="'+(S.ss!=='mg')+'">Best projection</button><button class="chip" data-act="set" data-k="ss" data-v="mg" aria-pressed="'+(S.ss==='mg')+'">Best matchup grade</button></div>';
   var ia=S.inj&&S.inj[lg==='ncaafb'?'nfl':lg];
   h+='<p class="src" style="margin:4px 0 10px">Tap a player for my prediction and why. Matchups are this week’s games.'+(lg==='ncaafb'?' College injuries are not published, so confirm who is playing.':ia?' Injured players are hidden, checked '+esc(fmtClock(ia.at))+'.':' The injury report has not loaded yet.')+'</p>';
   if(!rows.length)h+='<div class="card empty">No players match. Teams without a game in the next 40 hours are hidden.</div>';
   else{var cap=S.dmore?rows.length:40;h+=rows.slice(0,cap).map(spCard).join('');if(rows.length>cap)h+='<p><button class="btn" data-act="dmore">Show all '+rows.length+'</button></p>'}
   h+='<p class="src" style="margin-top:12px">Projections are estimates from season numbers, the defense and the game. They are not sportsbook lines. <button class="linkbtn" data-act="set" data-k="pold" data-v="1">More tools: calculators, hit-rate tables, team trends</button></p>';
   return h;
+};
+
+/* v139: over and under chances, matchup grades with sorting, and how the player did the last time against this opponent */
+function mgGrade(p){return p>=10?'A':p>=7?'A-':p>=4.5?'B+':p>=2.5?'B':p>=1?'B-':p>-1?'C':p>-2.5?'C-':p>-4.5?'D+':p>-7?'D':p>-10?'D-':'F'}
+function mgNum(g){var o={'A':12,'A-':11,'B+':10,'B':9,'B-':8,'C':6,'C-':5,'D+':4,'D':3,'D-':2,'F':1};return o[g]||0}
+function mgPill(pct){var g=mgGrade(pct);return '<span class="hrpill '+(pct>=3?'hi':pct<=-2?'lo':'mid')+'" style="display:inline-block">Matchup '+g+'</span>'}
+var pmBlocks97=pmBlocks;
+pmBlocks=function(lg,name,team){var r=pmBlocks97(lg,name,team);r.forEach(function(b){b.nm=name;b.tm=team});return r};
+/* ---- history against the opponent ---- */
+S.pmH={};
+var PM_ST={rush:{t:/rush/i,l:'YDS'},crush:{t:/rush/i,l:'YDS'},rec:{t:/receiv/i,l:'YDS'},crec:{t:/receiv/i,l:'YDS'},pass:{t:/pass/i,l:'YDS'},cpass:{t:/pass/i,l:'YDS'},
+  npts:{l:'PTS'},nreb:{l:'REB'},nast:{l:'AST'},ntpm:{l:'3PT'},hg:{l:'G'},hp:{l:'PTS'},hs:{l:'SOG'},ha:{l:'A'},hsv:{l:'SV'}};
+function pmHistLoad(lg,name,team){
+  var key=lg+'|'+normName(name),c=S.pmH[key];
+  if(c&&(c.st==='load'||c.st==='ok'||(c.st==='err'&&Date.now()-c.t<60000)))return;
+  S.pmH[key]={st:'load',t:Date.now()};
+  var Y=new Date().getFullYear();
+  profAthlete(lg,team,name).then(function(a){
+    var base='https://site.web.api.espn.com/apis/common/v3/sports/'+ESPN[lg]+'/athletes/'+a.id+'/gamelog';
+    return Promise.all([base,base+'?season='+Y,base+'?season='+(Y+1),base+'?season='+(Y-1)].map(function(u){return fetch(u).then(function(r){return r.ok?r.json():null}).catch(function(){return null})}));
+  }).then(function(js){
+    var tabs=[],seen={};
+    js.filter(Boolean).forEach(function(j){try{profParse(j).forEach(function(s){s.tabsL.forEach(function(T){T.rows.forEach(function(r){var k=T.name+'|'+r.id;if(seen[k])return;seen[k]=1;tabs.push({tab:T.name,labels:T.labels,row:r,season:s.label})})})})}catch(e){}});
+    if(!tabs.length)throw new Error('no games returned');
+    S.pmH[key]={st:'ok',t:Date.now(),rows:tabs};
+  }).catch(function(e){S.pmH[key]={st:'err',t:Date.now(),e:String(e&&e.message||e)}}).then(function(){
+    if(S.sheet&&S.sheet.type==='pm'&&normName(S.sheet.n)===normName(name))renderSheet()
+  });
+}
+function pmSame(a,b){try{return String(nt(a)).toUpperCase()===String(nt(b)).toUpperCase()||(typeof tabb==='function'&&tabb(a)===tabb(b))}catch(e){return false}}
+function pmVs(b){
+  var key=b.lg+'|'+normName(b.nm||''),c=S.pmH[key],sp=PM_ST[b.kind];
+  if(!sp)return '';
+  var u=(PM_NAME[b.kind]||'').toLowerCase();
+  if(!c||c.st==='load')return '<p class="src" style="margin:8px 0 0">Loading his games against '+esc(b.opp||'this team')+'…</p>';
+  if(c.st==='err')return '<p class="src" style="margin:8px 0 0">His past games against '+esc(b.opp||'this team')+' did not load ('+esc(c.e)+').</p>';
+  var hit=[];
+  c.rows.forEach(function(x){
+    if(sp.t&&!sp.t.test(x.tab))return;
+    var i=x.labels.indexOf(sp.l);if(i<0)return;
+    if(!pmSame(x.row.opp,b.opp))return;
+    var v=pNum(x.row.stats[i]);if(v==null)return;
+    hit.push({d:String(x.row.date),v:v,home:x.row.home,res:x.row.res,score:x.row.score,s:x.season});
+  });
+  hit.sort(function(a,z){return z.d.localeCompare(a.d)});
+  if(!hit.length)return '<p class="src" style="margin:8px 0 0"><b>Against '+esc(b.opp)+':</b> no games against them in the seasons ESPN returned, so there is nothing to compare.</p>';
+  var fmtD=function(d){var t=new Date(d);return isNaN(t)?'':t.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})};
+  var f=function(v){return Math.abs(v)>=20?String(Math.round(v)):v.toFixed(Math.abs(v)<10&&v%1?1:0)};
+  var h='<p class="src" style="margin:8px 0 2px"><b>Last time against '+esc(b.opp)+'</b></p><ul class="pts" style="margin-top:2px">';
+  hit.slice(0,3).forEach(function(x,i){h+='<li>'+esc(fmtD(x.d))+(x.home===true?' at home':x.home===false?' on the road':'')+': <b>'+f(x.v)+' '+esc(u)+'</b>'+(x.res?' ('+esc(x.res)+(x.score?' '+esc(x.score):'')+')':'')+(i===0?(x.v>b.avg*1.1?', above his average of '+f(b.avg):x.v<b.avg*.9?', below his average of '+f(b.avg):', close to his average of '+f(b.avg)):'')+'</li>'});
+  h+='</ul>';
+  if(hit.length>=2){var av=hit.reduce(function(s,x){return s+x.v},0)/hit.length;h+='<p class="src" style="margin:2px 0 0">Across '+hit.length+' games against them he averaged '+f(av)+' '+esc(u)+', '+(av>b.avg*1.1?'more than':av<b.avg*.9?'less than':'about the same as')+' his season average of '+f(b.avg)+'. A few games is a small sample.</p>'}
+  return h;
+}
+/* ---- block with Over and Under ---- */
+function pmBlockHtml(b){
+  var p=b.p,mu=b.avg*(1+b.pct/100),d=PXPOIS[b.kind]&&mu<3?2:1,u=(PM_NAME[b.kind]||'').toLowerCase();
+  var h='<h3>'+esc(PM_NAME[b.kind]||b.kind)+' '+mgPill(b.pct)+'</h3><div class="card"><div class="facts"><span>Season average <b>'+b.avg.toFixed(d)+'</b></span><span>Projection <b>'+mu.toFixed(d)+'</b></span></div>';
+  if(b.ctx)h+='';
+  var amt=function(pc){var v=b.avg*pc/100;return (v>=0?'+':'-')+Math.abs(v).toFixed(Math.abs(v)<3?1:0)+' '+u};
+  h+='<p class="src" style="margin:8px 0 2px"><b>What moves the projection</b></p><ul class="pts" style="margin-top:2px">';
+  h+='<li>Starts at his season average over '+b.g+' games: '+b.avg.toFixed(d)+' '+esc(u)+'.</li>';
+  h+='<li>Opposing defense: '+(Math.abs(b.parts.m)<1.2?'about neutral.':b.pct!==undefined?esc(amt(b.parts.m))+(b.parts.m<0?' (a tough matchup lowers it).':' (a soft matchup raises it).'):'')+'</li>';
+  var nn=b.notes.filter(function(t){return t.indexOf('Matchup:')!==0});
+  nn.forEach(function(t){h+='<li>'+esc(t)+'</li>'});
+  if(!nn.length)h+='<li>No game-script or usage change for this player.</li>';
+  h+='</ul><p class="src" style="margin:4px 0 0">Matchup grade '+mgGrade(b.pct)+' is the combined effect of the defense, the game and usage. A or B means a good spot for the over. D or F means a hard spot, which favors the under.</p>';
+  var dl=pmDef(b);if(dl.length)h+='<p class="src" style="margin:8px 0 2px"><b>The defense he faces</b></p><ul class="pts" style="margin-top:2px">'+dl.map(function(x){return '<li>'+esc(x)+'</li>'}).join('')+'</ul>';
+  try{h+=pmVs(b)}catch(e){}
+  var marks=pmMarks(b,mu),base=b.pct-b.parts.m,mid=null;
+  h+='<p class="src" style="margin:8px 0 2px"><b>Over and under chances</b></p><div class="tblwrap"><table><thead><tr><th>Number</th><th>Over</th><th>Under</th><th>Avg defense over</th></tr></thead><tbody>'+marks.map(function(l){
+    var c1=calc(p,l,-110,-110,b.pct),o1=c1.po,u1=c1.pu!=null?c1.pu:1-c1.po,c0=calc(p,l,-110,-110,base).po;
+    if(mid==null||Math.abs(l-mu)<Math.abs(mid.l-mu))mid={l:l,c1:o1,c0:c0};
+    var pill=function(x){return '<span class="hrpill '+(x>=.7?'hi':x<.4?'lo':'mid')+'" style="display:inline-block">'+Math.round(x*100)+'%</span>'};
+    return '<tr><td>'+l.toFixed(1)+'</td><td>'+pill(o1)+'</td><td>'+pill(u1)+'</td><td>'+Math.round(c0*100)+'%</td></tr>';
+  }).join('')+'</tbody></table></div>';
+  if(mid&&Math.abs(mid.c1-mid.c0)>=.02)h+='<p class="src" style="margin:6px 0 0">At '+mid.l.toFixed(1)+', a typical defense would give the over about '+Math.round(mid.c0*100)+'%. This defense and game make it about '+Math.round(mid.c1*100)+'%, '+(mid.c1<mid.c0?'lower':'higher')+'.</p>';
+  return h+'</div>';
+}
+var pmSheet97=pmSheet;
+pmSheet=function(s){
+  try{var bl=pmBlocks(s.lg,s.n,s.team);if(bl.length&&!bl[0].kick&&PM_ST[bl[0].kind])pmHistLoad(s.lg,s.n,s.team)}catch(e){}
+  return pmSheet97(s);
+};
+/* ---- cards: matchup grade, over/under at the middle number, sort ---- */
+var spRows97=spRows;
+spRows=function(lg,cat){
+  var rows=spRows97(lg,cat);
+  try{
+    if(lg==='nfl'&&(cat==='pass'||cat==='rush'||cat==='rec')){
+      var dk0=S.dk;S.dk=cat;var by={};
+      try{deepRows().forEach(function(r){by[normName(r.d.n)+'|'+nt(r.d.t)]=r})}finally{S.dk=dk0}
+      rows.forEach(function(x){var r=by[normName(x.n)+'|'+nt(x.t)];if(!r)return;x.pct=r.pct;x.mg=mgGrade(r.pct);
+        var mark=roundHalf(r.d.avgS*(1+r.pct/100)),c=calc({avg:r.d.avgS,kind:r.d.kind,g:r.d.g},mark,-110,-110,r.pct);x.ou={l:mark,o:c.po,u:c.pu!=null?c.pu:1-c.po}})
+    }else if(lg!=='nfl'){
+      pxList(lg,cat).forEach(function(p){
+        var x=rows.filter(function(y){return y.n===p.name&&y.t===p.team})[0];if(!x)return;
+        var pct=pxAdj(p),mu=p.avg*(1+pct/100),mk=pxMarks(p,mu)[1],c=calc(p,mk,-110,-110,pct);x.pct=pct;x.mg=mgGrade(pct);x.ou={l:mk,o:c.po,u:c.pu!=null?c.pu:1-c.po}
+      });
+    }
+  }catch(e){}
+  return rows;
+};
+var spCard97=spCard;
+spCard=function(r){
+  var h=spCard97(r),add='';
+  if(r.mg)add+='<span class="hrpill '+(r.pct>=3?'hi':r.pct<=-2?'lo':'mid')+'" style="display:inline-block;margin-right:6px">Matchup '+r.mg+'</span>';
+  if(r.ou)add+='<span class="src">At '+r.ou.l.toFixed(1)+': over '+Math.round(r.ou.o*100)+'% · under '+Math.round(r.ou.u*100)+'%</span>';
+  if(!add)return h;
+  var i=h.lastIndexOf('</div></div></div>');
+  return h.slice(0,i)+'</div></div><div style="margin-top:6px">'+add+'</div></div>';
 };
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
