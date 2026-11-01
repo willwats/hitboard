@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v141, Nov 1';
+var BUILD='v142, Nov 1';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -9506,7 +9506,7 @@ function spCard(r){
 var vPropsLg96=vPropsLg;
 vPropsLg=function(){
   var lg=S.sport;
-  if(['nfl','nba','ncaafb','nhl'].indexOf(lg)<0)return vPropsLg96();
+  if(['nfl','nba','ncaafb','nhl','mlb'].indexOf(lg)<0)return vPropsLg96();
   var name=LG.filter(function(l){return l[0]===lg})[0][1];
   if(S.pold){var o=vPropsLg96(),i=o.indexOf('</h2>');return i<0?o:o.slice(0,i+5)+'<p style="margin:0 0 8px"><button class="btn" data-act="set" data-k="pold" data-v="">← Back to the simple view</button></p>'+o.slice(i+5)}
   var cats=spCats(lg),cat=cats.some(function(c){return c[0]===S.sc})?S.sc:cats[0][0];
@@ -9857,6 +9857,53 @@ pmSheet=function(s){
   try{pmBlocks(s.lg,s.n,s.team).forEach(function(b){if(!b.kick&&b.opp&&(s.lg==='nfl'||s.lg==='ncaafb'))h2hLoad(s.lg,s.team,b.opp)})}catch(e){}
   return pmSheet99(s);
 };
+
+/* v142: matchup grade on every prop card, no 50/50 over-under line, roster and injury check on every launch */
+var LAUNCH_AT=Date.now();
+var loadAvail0=loadAvail,_firstAvail=true;
+loadAvail=function(){if(_firstAvail){_firstAvail=false;S.availForce=true}return loadAvail0()};
+function mgPctFromDef(r,metric){
+  try{
+    var me=nt(r.t),parts=(r.gk||'').split('@'),opp=parts[0]===me?parts[1]:parts[0];
+    if(!opp||!TS[opp])return 0;
+    var f=mv(opp,metric)/leagueAvg(metric);
+    return Math.max(-12,Math.min(12,(f-1)*50));
+  }catch(e){return 0}
+}
+var spRows100=spRows;
+spRows=function(lg,cat){
+  var rows=spRows100(lg,cat);
+  try{
+    if(lg==='nfl'&&cat==='recp'){
+      var dk0=S.dk;S.dk='rec';var by={};
+      try{deepRows().forEach(function(r){by[normName(r.d.n)+'|'+nt(r.d.t)]=r})}finally{S.dk=dk0}
+      rows.forEach(function(x){var r=by[normName(x.n)+'|'+nt(x.t)];if(r){x.pct=r.pct;x.mg=mgGrade(r.pct)}});
+    }
+    rows.forEach(function(x){
+      if(x.mg)return;
+      var pct=0;
+      if(lg==='nfl'){
+        if(cat==='kick')pct=mgPctFromDef(x,'papg');
+        else pct=mgPctFromDef(x,(x.pos==='RB'||cat==='rush')?'drush':'dpass');
+      }else if(x.def&&x.def.tag){pct=x.def.tag[1]==='soft'?4:x.def.tag[1]==='tough'?-4:0}
+      x.pct=pct;x.mg=mgGrade(pct);
+    });
+  }catch(e){}
+  return rows;
+};
+var spCard100=spCard;
+spCard=function(r){r.ou=null;return spCard100(r)};
+function availGate(lg){return !S.inj[lg]&&!S.availAt&&Date.now()-LAUNCH_AT<10000}
+var vPropsLg100=vPropsLg;
+vPropsLg=function(){
+  var lg=S.sport;
+  if(['nfl','nba','nhl','mlb'].indexOf(lg)>=0&&availGate(lg)){
+    var nm=(LG.filter(function(l){return l[0]===lg})[0]||[0,lg])[1];
+    return '<h2>'+nm+' props</h2><div class="card empty">Updating rosters and the injury report before showing players…</div>';
+  }
+  return vPropsLg100();
+};
+setTimeout(function(){try{var ae=document.activeElement;if(!(ae&&ae.tagName==='INPUT')&&!S.sheet)render()}catch(e){}},10500);
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
