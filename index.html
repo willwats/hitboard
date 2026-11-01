@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v133, Nov 1';
+var BUILD='v134, Nov 1';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -9233,29 +9233,80 @@ function kickCtx(t){
   var adj=tot?Math.max(.85,Math.min(1.15,tot/45)):1;
   return {adj:adj,txt:n.txt+(tot?' · total '+(+tot).toFixed(1):''),tot:tot};
 }
-var vPropsLg91=vPropsLg;
-vPropsLg=function(){
-  var h=vPropsLg91(),lg=S.sport;
+
+/* v134: each prop row opens the player's own prediction (not a game preview); kickers get their own write-up; run and pass defense detail */
+function kkFind(name,team){var k=normName(name);return KICKERS.filter(function(x){return normName(x.n)===k&&(!team||nt(x.t)===nt(team))})[0]}
+var pmBlocks92=pmBlocks;
+pmBlocks=function(lg,name,team){
+  if(lg==='nfl'){var kk=kkFind(name,team);if(kk&&!DEEP.some(function(d){return normName(d.n)===normName(name)}))return [{kick:true,k:kk,lg:'nfl',kind:'kick',p:{g1:null},pos:'K'}]}
+  return pmBlocks92(lg,name,team);
+};
+function kkSheet(s){
+  var k=kkFind(s.n,s.team),t=k.t,c=kickCtx(t),pr=kickProj(k.fm/k.g,k.xm/k.g,c.adj),nx=nextOpp(nt(t)),g=gpFor('nfl',t);
+  var h='<div class="sh-head"><div><div class="label">NFL · '+esc(t)+' · K</div><h2>'+esc(k.n)+'</h2></div><button class="x" data-act="close" aria-label="Close">×</button></div>';
+  if(nx)h+='<p class="src" style="margin:0 0 6px">'+esc(nx.txt)+'</p>';
+  var fgG=k.fm/k.g*c.adj;
+  h+='<div class="card"><div class="label">My prediction</div><div class="teams" style="font-size:22px">About '+fgG.toFixed(1)+' field goals · '+pr.pts.toFixed(1)+' points</div>';
+  h+='<div class="tblwrap" style="margin-top:8px"><table><thead><tr><th>Prop</th><th>Chance</th><th>Fair price</th></tr></thead><tbody>'+
+   [['1+ field goal',pr.p1],['2+ field goals',pr.p2],['3+ field goals',pr.p3],['7+ points',pr.p7],['9+ points',pr.p9]].map(function(r){return '<tr><td>'+r[0]+'</td><td><span class="hrpill '+(r[1]>=.7?'hi':r[1]<.4?'lo':'mid')+'" style="display:inline-block">'+Math.round(r[1]*100)+'%</span></td><td>'+fmtAm(fairAm(Math.min(.99,Math.max(.01,r[1]))))+'</td></tr>'}).join('')+'</tbody></table></div></div>';
+  var L=[];
+  L.push('Starts from his season: '+k.fm+' of '+k.fa+' field goals ('+Math.round(k.fm/Math.max(k.fa,1)*100)+'%), long of '+k.lng+', over '+k.g+' games, so about '+(k.fm/k.g).toFixed(1)+' field goals and '+(k.xm/k.g).toFixed(1)+' extra points a game.');
+  if(k.a50>0)L.push('From 50 or more he is '+k.m50+' of '+k.a50+', so long tries are '+(k.m50/k.a50>=.7?'not a worry.':'a real risk.'));
   try{
+    if(g){
+      var m=pgCtx(g).m,T=m&&m.T&&!m.T.missing?m.T:null,side=nt(g.h)===nt(t)?'h':'a';
+      if(m&&m.sa!=null&&T){var exp=side==='h'?m.sh:m.sa,X=side==='h'?T.H:T.A,Y=side==='h'?T.A:T.H;
+        if(X&&X.pf>0)L.push(shortNm(g,side)+' are expected to score about '+hbF0(exp)+' points'+(exp>=X.pf*1.08?', more than their usual '+hbF0(X.pf)+'. More drives means more chances for field goals and extra points.':exp<=X.pf*.92?', fewer than their usual '+hbF0(X.pf)+'. Fewer scoring drives means fewer kicks.':', about their usual '+hbF0(X.pf)+'.'));
+        var fav=side==='h'?m.M:-m.M;
+        if(Math.abs(fav)>=7)L.push(fav>0?shortNm(g,side)+' are expected to win by about '+hbF0(fav)+', which means more touchdowns and extra points but fewer field goals late.':shortNm(g,side)+' are expected to trail by about '+hbF0(-fav)+', which can mean more field goal tries when drives stall.');}
+    }
+  }catch(e){}
+  if(c.tot)L.push('The game total is '+(+c.tot).toFixed(1)+' against an average of 45, so I '+(c.adj>1.01?'raised':c.adj<.99?'lowered':'kept')+' his numbers '+(Math.abs(c.adj-1)>=.01?'by '+Math.round(Math.abs(c.adj-1)*100)+'%':'the same')+'.');
+  try{
+    if(nx&&TS[nx.opp]){var pa=mv(nx.opp,'papg'),ref=leagueAvg('papg'),rk=mrank(nx.opp,'papg'),n=Object.keys(TS).length,r=pa/ref;
+      L.push(nx.opp+' allows '+pa.toFixed(1)+' points a game against a typical '+ref.toFixed(1)+' ('+(r<=.9?'a tough defense':r>=1.1?'a soft defense':'an average defense')+', '+ordn(rk)+' toughest of '+n+'). '+(r<=.9?'A defense that holds teams down gives his offense fewer chances.':r>=1.1?'A defense that gives up points means more drives for his offense.':''));}
+  }catch(e){}
+  h+='<h3>Why</h3><ul class="pts">'+L.map(function(x){return '<li>'+esc(x)+'</li>'}).join('')+'</ul>';
+  return h+'<p class="foot">Chances are estimates from his season numbers and the game. Check wind and rain and that he is active before betting. They are not sportsbook lines.</p>';
+}
+var pmSheet92=pmSheet;
+pmSheet=function(s){
+  try{if(s.lg==='nfl'){var kk=kkFind(s.n,s.team);if(kk&&!DEEP.some(function(d){return normName(d.n)===normName(s.n)}))return kkSheet(s)}}catch(e){}
+  return pmSheet92(s);
+};
+/* defense detail: how the opponent defends this stat */
+var pmDef92=pmDef;
+pmDef=function(b){
+  var o=pmDef92(b);
+  try{
+    if(b.lg==='nfl'&&b.opp&&TS[b.opp]){
+      var n=Object.keys(TS).length,d=mv(b.opp,'dypp'),dr=leagueAvg('dypp');
+      if(b.kind==='rush'){
+        o.push('How '+b.opp+' defends the run: it gives up '+hbF0(b.own)+' rushing yards a game, '+ordn(b.rk)+' toughest of '+n+', and '+d.toFixed(1)+' yards a play overall against a typical '+dr.toFixed(1)+'. '+(b.own/b.ref>=1.1?'Runners find room against it.':b.own/b.ref<=.9?'Runners have struggled against it.':'It is neither a wall nor a sieve against the run.'));
+      }else{
+        o.push('How '+b.opp+' defends the pass: it gives up '+hbF0(b.own)+' passing yards a game, '+ordn(b.rk)+' toughest of '+n+', and '+d.toFixed(1)+' yards a play overall against a typical '+dr.toFixed(1)+'. '+(b.own/b.ref>=1.1?'Passers and receivers find room against it.':b.own/b.ref<=.9?'Passers and receivers have struggled against it.':'It is about average against the pass.'));
+      }
+    }
+  }catch(e){}
+  return o;
+};
+/* every prop row without its own player link gets a prediction button */
+var vPropsLg92=vPropsLg;
+vPropsLg=function(){
+  var h=vPropsLg92(),lg=S.sport;
+  try{
+    if(lg!=='nfl'&&lg!=='nba'&&lg!=='ncaafb'&&lg!=='nhl')return h;
     var teams={};(S.feed[lg]||[]).forEach(function(g){if(kind(g)!=='final'){teams[lg==='nfl'?nt(g.a):g.a]=1;teams[lg==='nfl'?nt(g.h):g.h]=1}});
     h=h.replace(/<tr>(<td>[\s\S]*?)<\/td>/g,function(all,inner){
-      if(inner.indexOf('data-act="fgame"')>=0)return all;
-      var txt=inner.replace(/<[^>]+>/g,' '),toks=txt.match(/\b[A-Z][A-Za-z]{1,4}\b/g)||[],g=null;
-      for(var i=0;i<toks.length&&!g;i++){var k=lg==='nfl'?nt(toks[i]):toks[i];if(teams[k])g=gpFor(lg,toks[i])}
-      if(!g)return all;
-      return '<tr>'+inner+'<div>'+gpBtn(g)+'</div></td>';
+      if(inner.indexOf('data-act="prof"')>=0||inner.indexOf('data-act="fgame"')>=0)return all;
+      var nm=(inner.match(/<b>([^<]+)<\/b>/)||[])[1];if(!nm)return all;
+      var txt=inner.replace(/<[^>]+>/g,' ').replace(nm,' '),toks=txt.match(/\b[A-Z][A-Za-z]{1,4}\b/g)||[],tm=null;
+      for(var i=0;i<toks.length&&!tm;i++){var kk=lg==='nfl'?nt(toks[i]):toks[i];if(teams[kk])tm=toks[i]}
+      if(!tm)return all;
+      var nmu=nm.replace(/&amp;/g,'&').replace(/&#39;/g,"'");
+      try{if(!pmBlocks(lg,nmu,tm).length)return all}catch(e){return all}
+      return '<tr>'+inner+'<div><button class="btn" data-act="prof" data-n="'+esc(nmu)+'" data-lg="'+lg+'" data-team="'+esc(tm)+'" style="padding:6px 10px;font-size:13px;margin-top:6px">My prediction ›</button></div></td>';
     });
-  }catch(e){}
-  return h;
-};
-var pmSheet91=pmSheet;
-pmSheet=function(s){
-  var h=pmSheet91(s);
-  try{
-    var g=gpFor(s.lg,s.team);if(!g)return h;
-    var i=h.indexOf('<h3>');if(i<0)i=h.length;
-    var card='<div class="card" style="margin:10px 0"><div class="label">Game preview</div><p style="margin:2px 0 6px;line-height:1.45">See how I expect '+esc(g.a+' @ '+g.h)+' to play out, with the score, the pace and what could change it.</p>'+gpBtn(g,'Open game preview ›')+'</div>';
-    h=h.slice(0,i)+card+h.slice(i);
   }catch(e){}
   return h;
 };
