@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v147, Nov 3';
+var BUILD='v148, Nov 3';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -10446,6 +10446,142 @@ setTimeout(function(){try{trkLogAll();trkSettle()}catch(e){}},9000);
 setTimeout(trkDeep,20000);
 setInterval(function(){try{if(!document.hidden){trkLogAll();trkSettle()}}catch(e){}},10*60000);
 document.addEventListener('visibilitychange',function(){if(!document.hidden)setTimeout(function(){try{trkLogAll();trkSettle()}catch(e){}},1500)});
+
+/* v148: inside each game: player stats from the box score (live and final), my props for that game with how they are playing out, and the matchup */
+S.gbx={};
+function gbxEnsure(g,force){
+  if(window.claude||typeof fetch!=='function'||!g||!g.sid||kind(g)==='up')return;
+  var o=S.gbx[g.id],now=Date.now();
+  if(o&&o.st==='load')return;
+  if(o&&o.st==='ok'&&!force&&(kind(g)==='final'||now-o.t<40000))return;
+  if(o&&o.st==='err'&&now-o.t<60000)return;
+  S.gbx[g.id]={st:'load',t:now,j:o&&o.j};
+  fetch('https://site.api.espn.com/apis/site/v2/sports/'+ESPN[g.lg]+'/summary?event='+encodeURIComponent(g.sid)).then(function(r){return r.ok?r.json():null}).then(function(j){
+    S.gbx[g.id]=j&&j.boxscore?{st:'ok',t:Date.now(),j:j}:{st:'err',t:Date.now(),j:o&&o.j};
+  }).catch(function(){S.gbx[g.id]={st:'err',t:Date.now(),j:o&&o.j}}).then(function(){try{if(S.sheet&&S.sheet.type==='fgame'&&S.sheet.id===g.id)renderSheet()}catch(e){}});
+}
+setInterval(function(){try{
+  if(document.hidden||!S.sheet||S.sheet.type!=='fgame')return;
+  var g=find(S.sheet.id);if(g&&kind(g)==='live')gbxEnsure(g,true);
+}catch(e){}},45000);
+function gbxSame(a,b){a=String(a||'').toUpperCase();b=String(b||'').toUpperCase();return a===b||nt(a)===nt(b)}
+function gbxLine(parts){return parts.filter(function(x){return x}).join(', ')}
+function gbxRows(g,j){
+  var out={a:[],h:[]},lg=g.lg,teams=(j.boxscore&&j.boxscore.players)||[];
+  teams.forEach(function(t,ti){
+    var ab=t.team&&t.team.abbreviation,side=gbxSame(ab,g.a)?'a':gbxSame(ab,g.h)?'h':(ti===0?'a':'h'),R=out[side];
+    var num=function(st,i){var v=parseFloat(st[i]);return isNaN(v)?0:v};
+    if(lg==='nfl'||lg==='ncaafb'){
+      var grp={};(t.statistics||[]).forEach(function(s){grp[s.name]=s});
+      var top=function(name,n,fmt,keyLab){var s=grp[name];if(!s)return;var L=s.labels||[],yi=L.indexOf(keyLab||'YDS');
+        (s.athletes||[]).filter(function(a){return a.athlete&&(a.stats||[]).length}).sort(function(a,b){return num(b.stats,yi)-num(a.stats,yi)}).slice(0,n).forEach(function(a){R.push({n:a.athlete.displayName,l:fmt(a.stats,function(x){return L.indexOf(x)})})})};
+      top('passing',1,function(st,ix){return gbxLine([st[ix('C/ATT')]+' passing',num(st,ix('YDS'))+' yds',num(st,ix('TD'))+' TD',num(st,ix('INT'))+' INT'])});
+      top('rushing',3,function(st,ix){return gbxLine([num(st,ix('CAR'))+' carries',num(st,ix('YDS'))+' yds',num(st,ix('TD'))?num(st,ix('TD'))+' TD':''])});
+      top('receiving',4,function(st,ix){return gbxLine([num(st,ix('REC'))+' catches',num(st,ix('YDS'))+' yds',num(st,ix('TD'))?num(st,ix('TD'))+' TD':''])});
+    }else if(lg==='nba'||lg==='ncaamb'){
+      var P=[];(t.statistics||[]).forEach(function(s){var L=s.labels||[],ix=function(x){return L.indexOf(x)};
+        (s.athletes||[]).forEach(function(a){if(a.athlete&&(a.stats||[]).length&&ix('PTS')>=0)P.push({n:a.athlete.displayName,st:a.stats,ix:ix})})});
+      P.sort(function(a,b){return num(b.st,b.ix('PTS'))-num(a.st,a.ix('PTS'))}).slice(0,5).forEach(function(p){R.push({n:p.n,l:gbxLine([num(p.st,p.ix('PTS'))+' pts',num(p.st,p.ix('REB'))+' reb',num(p.st,p.ix('AST'))+' ast',p.ix('3PT')>=0?p.st[p.ix('3PT')]+' threes':'',p.ix('MIN')>=0?p.st[p.ix('MIN')]+' min':''])})});
+    }else if(lg==='nhl'){
+      var K=[];
+      (t.statistics||[]).forEach(function(s){var L=s.labels||[],ix=function(x){return L.indexOf(x)};
+        (s.athletes||[]).forEach(function(a){if(!a.athlete||!(a.stats||[]).length)return;
+          if(ix('SV')>=0&&ix('GA')>=0){R.push({n:a.athlete.displayName,l:gbxLine([num(a.stats,ix('SV'))+' saves',num(a.stats,ix('GA'))+' goals against']),gk:1});return}
+          var si=ix('S')>=0?ix('S'):ix('SOG'),G=num(a.stats,ix('G')),A=num(a.stats,ix('A')),S2=si>=0?num(a.stats,si):0;
+          K.push({n:a.athlete.displayName,sc:G*3+A*2+S2*.1,l:gbxLine([G+' goals',A+' assists',S2+' shots'])});
+        })});
+      K.sort(function(a,b){return b.sc-a.sc}).slice(0,5).forEach(function(k){R.push({n:k.n,l:k.l})});
+    }else if(lg==='mlb'){
+      var B=[],Pi=[];
+      (t.statistics||[]).forEach(function(s){var L=s.labels||[],ix=function(x){return L.indexOf(x)};
+        (s.athletes||[]).forEach(function(a){if(!a.athlete||!(a.stats||[]).length)return;
+          if(ix('IP')>=0){Pi.push({n:a.athlete.displayName,l:gbxLine([a.stats[ix('IP')]+' innings',num(a.stats,ix('K'))+' strikeouts',num(a.stats,ix('ER'))+' earned runs'])});return}
+          if(ix('AB')>=0){var H=num(a.stats,ix('H')),HR=num(a.stats,ix('HR')),RBI=num(a.stats,ix('RBI'));B.push({n:a.athlete.displayName,sc:H+HR*2+RBI,l:gbxLine([H+' for '+num(a.stats,ix('AB')),HR?HR+' HR':'',RBI?RBI+' RBI':''])})}
+        })});
+      B.sort(function(a,b){return b.sc-a.sc}).slice(0,4).forEach(function(b){R.push({n:b.n,l:b.l})});
+      if(Pi[0])R.unshift(Pi[0]);
+    }
+  });
+  return out;
+}
+function gbxPlayersHtml(g){
+  var o=S.gbx[g.id];
+  if(!o||!o.j){return o&&o.st==='load'?'<p class="src" style="margin:0">Loading player stats…</p>':'<p class="src" style="margin:0">Player stats are not available for this game yet.</p>'}
+  var R=gbxRows(g,o.j),h='';
+  ['a','h'].forEach(function(s){
+    if(!R[s].length)return;
+    h+='<div style="margin:6px 0 2px"><b>'+esc(s==='a'?g.an:g.hn)+'</b></div>'+R[s].map(function(r){return '<div style="padding:3px 0;border-top:1px solid var(--line)"><b>'+esc(r.n)+'</b> <span class="src">'+esc(r.l)+'</span></div>'}).join('');
+  });
+  if(!h)return '<p class="src" style="margin:0">No player lines have been posted yet.</p>';
+  return h+(kind(g)==='live'?'<p class="src" style="margin:6px 0 0">Live, updated '+esc(fmtClock(o.t))+'. Refreshes about every 45 seconds while this page is open.</p>':'');
+}
+function gbxFmt(r,v){return r.cat==='td'?Math.round(v*100)+'%':(r.raw<20?v.toFixed(1):String(Math.round(v)))}
+function gbxProps(g){
+  var recs=Object.keys(TRK.p).map(function(k){return TRK.p[k]}).filter(function(r){return r.sid===g.sid&&r.lg===g.lg});
+  if(!recs.length&&kind(g)==='up'){
+    S.gtl=S.gtl||{};if(!S.gtl[g.id]){S.gtl[g.id]=1;try{trkLogAll()}catch(e){}
+      recs=Object.keys(TRK.p).map(function(k){return TRK.p[k]}).filter(function(r){return r.sid===g.sid&&r.lg===g.lg})}
+  }
+  if(!recs.length)return '<p class="src" style="margin:0">No props were saved for this game. The app saves them before kickoff while it is open.</p>';
+  var CT=trkCats(g.lg),o=S.gbx[g.id],B=null,k=kind(g);
+  if(o&&o.j&&k!=='up'){try{B=g.lg==='nfl'?{P:trkParseBox(o.j)}:g.lg==='nhl'?{P:trkParseNhl(o.j)}:g.lg==='mlb'?{P:trkParseMlb(o.j)}:trkBox(g.lg,o.j)}catch(e){B=null}}
+  var rows=recs.map(function(r){
+    var v=null,st='';
+    if(r.done&&!r.void){v=r.act}
+    else if(B){try{v=trkValue(Object.assign({},r),B)}catch(e){v=null}}
+    return {r:r,v:v,void:r.void||v==='void'};
+  });
+  rows.sort(function(a,b){return (mgNum(b.r.mg)-mgNum(a.r.mg))||(b.r.raw/(b.r.avg||b.r.raw||1)-a.r.raw/(a.r.avg||a.r.raw||1))});
+  var line=function(x){
+    var r=x.r,nm=esc(r.n)+' <span class="src">'+esc(r.t)+' · '+esc(String(CT[r.cat]||r.cat).toLowerCase())+'</span>';
+    var proj=r.cat==='td'?'I say '+gbxFmt(r,r.raw)+' to score':'I project '+gbxFmt(r,r.raw);
+    var mg=r.mg?' <span class="hrpill '+(/^[AB]/.test(r.mg)?'hi':/^C/.test(r.mg)?'mid':'lo')+'" style="display:inline-block">Matchup '+esc(r.mg)+'</span>':'';
+    var res='';
+    if(k==='up')res='<span class="src">'+proj+'</span>';
+    else if(x.void)res='<span class="src">'+proj+' · did not play</span>';
+    else if(x.v==null)res='<span class="src">'+proj+' · stat not posted yet</span>';
+    else if(r.cat==='td')res='<span class="src">'+proj+' · </span><b>'+(x.v>0?'scored':(k==='final'?'did not score':'not yet'))+'</b>';
+    else if(k==='final')res='<span class="src">'+proj+' · had '+gbxFmt(r,x.v)+'</span> <b>'+(x.v>=r.raw?'over my number':'under my number')+'</b>';
+    else res='<span class="src">'+proj+' · '+gbxFmt(r,x.v)+' so far</span>';
+    return '<div style="padding:5px 0;border-top:1px solid var(--line)"><b>'+nm+'</b>'+mg+'<div>'+res+'</div></div>';
+  };
+  var head='';
+  if(k==='final'&&B){
+    var ys=rows.filter(function(x){return !x.void&&x.v!=null&&x.r.cat!=='td'}),hit=ys.filter(function(x){return x.v>=x.r.raw}).length,td=rows.filter(function(x){return !x.void&&x.v!=null&&x.r.cat==='td'}),ex=td.reduce(function(a,x){return a+x.r.raw},0),sc=td.filter(function(x){return x.v>0}).length;
+    head='<p style="margin:0 0 6px"><b>How my props played out:</b> '+(ys.length?hit+' of '+ys.length+' player lines finished at or over my number':'no yardage or count lines settled')+(td.length?'; '+sc+' touchdown scorer'+(sc===1?'':'s')+' against about '+(Math.round(ex*10)/10)+' I expected':'')+'.</p>';
+  }
+  var top=rows.slice(0,12),rest=rows.slice(12);
+  return head+top.map(line).join('')+(rest.length?'<details style="margin-top:6px"><summary class="src" style="cursor:pointer">All '+rows.length+' props for this game</summary>'+rest.map(line).join('')+'</details>':'');
+}
+function gbxCall(g){
+  var s=S.snap[g.id];if(!s||!(g.sa!=null&&g.sh!=null)||kind(g)==='up')return '';
+  var mh=g.sh-g.sa,tm=s.ps==='h'?mh:-mh,v=tm+s.line,txt=v>0?'covering':v<0?'not covering':'right on the number';
+  var fin=kind(g)==='final';
+  return '<p style="margin:0 0 6px"><b>My call:</b> '+esc(s.pk+' '+sgnPts(s.line))+' · grade '+esc(s.grade)+' · '+(fin?(v>0?'covered':v<0?'missed':'push'):txt+' right now')+'</p>';
+}
+function gbxMatchup(g){
+  if(g.lg!=='nfl')return '';
+  var rows=[];
+  [[g.a,g.h,g.an],[g.h,g.a,g.hn]].forEach(function(p){
+    var opp=nt(p[1]),L=['QB','RB','WR','TE'].map(function(pos){return dvLine(opp,pos,'rec')}).filter(function(x){return x});
+    if(L.length)rows.push('<div style="margin:6px 0 2px"><b>When '+esc(p[2])+' has the ball</b></div>'+L.map(function(x){return '<div class="src" style="padding:2px 0">'+esc(x)+'.</div>'}).join(''));
+  });
+  return rows.length?'<details style="margin-top:8px"><summary class="src" style="cursor:pointer">What each defense gives up by position</summary>'+rows.join('')+'</details>':'';
+}
+var feedSheet105=feedSheet;
+feedSheet=function(g){
+  var h=feedSheet105(g);
+  try{
+    if(['nfl','ncaafb','nba','ncaamb','nhl','mlb'].indexOf(g.lg)<0)return h;
+    var k=kind(g);if(k!=='up')gbxEnsure(g);
+    var sec='<div class="card" style="margin:10px 0"><b>Players and props in this game</b>';
+    sec+=gbxCall(g);
+    if(k!=='up')sec+='<div style="margin:6px 0 4px" class="src"><b>Player stats</b></div>'+gbxPlayersHtml(g);
+    sec+='<div style="margin:10px 0 4px" class="src"><b>My props for this game</b></div>'+gbxProps(g)+gbxMatchup(g)+'</div>';
+    var i=h.indexOf('</button></div>');
+    return i>=0?h.slice(0,i+15)+sec+h.slice(i+15):sec+h;
+  }catch(e){return h}
+};
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
