@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v145, Nov 1';
+var BUILD='v146, Nov 3';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -10115,6 +10115,193 @@ pmDef=function(b){
   try{if(b.lg==='nfl'&&b.opp){var nm=b.nm||b.name||(b.p&&b.p.name),tm=b.tm||b.team||(b.p&&b.p.team);var l=fxFor(nm,tm,nt(b.opp));if(l)o=(o||[]).concat([l+'.'])}}catch(e){}
   return o;
 };
+
+/* v146: prediction ledger. Saves each NFL prop projection before kickoff, settles it from the box score, and learns from the results. */
+var TRK={p:{},g:{}};
+try{var _t=JSON.parse(localStorage.getItem('hb.trk.v1')||'null');if(_t&&_t.p){TRK=_t;if(!TRK.g)TRK.g={}}}catch(e){}
+var TRK_DIRTY=false,TRK_BUSY=false,TRK_CATS={rush:'Rushing yards',pass:'Passing yards',rec:'Receiving yards',recp:'Receptions',td:'Anytime TD'};
+function trkSave(){
+  try{
+    var ks=Object.keys(TRK.p);if(ks.length>1500){ks.sort(function(a,b){return TRK.p[a].st-TRK.p[b].st}).slice(0,ks.length-1500).forEach(function(k){delete TRK.p[k]})}
+    var gs=Object.keys(TRK.g);if(gs.length>500){gs.sort(function(a,b){return (TRK.g[a].at||0)-(TRK.g[b].at||0)}).slice(0,gs.length-500).forEach(function(k){delete TRK.g[k]})}
+    localStorage.setItem('hb.trk.v1',JSON.stringify(TRK));TRK_DIRTY=false;
+  }catch(e){}
+}
+function trkLater(){if(TRK_DIRTY)return;TRK_DIRTY=true;setTimeout(trkSave,2500)}
+function trkGameFor(gk){var out=null;(S.feed.nfl||[]).forEach(function(g){if(kind(g)==='up'&&nt(g.a)+'@'+nt(g.h)===gk)out=g});return out}
+function trkLog(rows,cat){
+  var now=Date.now();
+  rows.forEach(function(x){
+    var g=trkGameFor(x.gk);if(!g||!g.sid||!(g.start>now)||!(x.rawProj>=0))return;
+    var id=g.sid+'|'+cat+'|'+normName(x.n),old=TRK.p[id];if(old&&old.done)return;
+    var avg=cat==='td'?null:parseFloat(String(x.avgTxt||'').replace(/[^0-9.]/g,''));
+    TRK.p[id]={id:id,cat:cat,n:x.n,t:x.t,sid:g.sid,st:g.start,raw:x.rawProj,avg:avg>0?avg:null,mg:x.mg||null,done:0,tries:old?old.tries||0:0};
+    trkLater();
+  });
+}
+function trkStats(cat){
+  var n=0,sa=0,sr=0;
+  Object.keys(TRK.p).forEach(function(k){var r=TRK.p[k];if(r.cat!==cat||!r.done||r.void)return;n++;sa+=cat==='td'?(r.act>0?1:0):r.act;sr+=r.raw});
+  return {n:n,sa:sa,sr:sr};
+}
+function trkMult(cat){
+  var s=trkStats(cat);if(s.n<15||!(s.sr>0))return 1;
+  var ratio=cat==='td'?(s.sa+3)/(s.sr+3):s.sa/s.sr,m=1+(ratio-1)*s.n/(s.n+25),lim=cat==='td'?.2:.12;
+  return Math.max(1-lim,Math.min(1+lim,m));
+}
+var spRows103=spRows;
+spRows=function(lg,cat){
+  var rows=spRows103(lg,cat);
+  if(lg==='nfl'&&TRK_CATS[cat]){try{
+    rows.forEach(function(x){x.rawProj=x.proj});
+    trkLog(rows,cat);
+    var m=trkMult(cat);
+    if(m!==1)rows.forEach(function(x){var v=x.proj*m;if(cat==='td')v=Math.min(.95,v);x.proj=v;x.sort=v;x.projTxt=cat==='td'?Math.round(v*100)+'%':cat==='recp'?v.toFixed(1):String(Math.round(v));x.lrn=m});
+  }catch(e){}}
+  return rows;
+};
+function trkLogAll(){try{['pass','rush','rec','recp','td'].forEach(function(c){spRows('nfl',c)})}catch(e){}}
+/* ---- settle from box scores ---- */
+function trkParseBox(j){
+  var P={};
+  ((j.boxscore&&j.boxscore.players)||[]).forEach(function(t){
+    var tm=nt((t.team&&t.team.abbreviation)||'');
+    (t.statistics||[]).forEach(function(s){
+      var L=s.labels||[],ix=function(n){return L.indexOf(n)};
+      (s.athletes||[]).forEach(function(a){
+        var nm=a.athlete&&a.athlete.displayName;if(!nm)return;
+        var k=normName(nm),o=P[k]||(P[k]={py:0,ry:0,rec:0,recy:0,td:0,seen:{}}),st=a.stats||[],g=function(i){return i<0?0:(parseFloat(st[i])||0)};
+        P[fxKey(nm,tm)]=o;
+        if(s.name==='passing'){o.py+=g(ix('YDS'));o.seen.pass=1}
+        else if(s.name==='rushing'){o.ry+=g(ix('YDS'));o.td+=g(ix('TD'));o.seen.rush=1}
+        else if(s.name==='receiving'){o.rec+=g(ix('REC'));o.recy+=g(ix('YDS'));o.td+=g(ix('TD'));o.seen.rec=1}
+      });
+    });
+  });
+  return P;
+}
+function trkSettleRec(r,P){
+  var o=P[normName(r.n)]||P[fxKey(r.n,r.t)];
+  if(!o||(!o.seen.pass&&!o.seen.rush&&!o.seen.rec)){
+    if(r.cat==='pass'){r.void=1;r.done=1;return}
+    r.act=0;r.zero=1;r.done=1;return;  /* not in the box score: counts as zero, so quiet games are not hidden */
+  }
+  r.act=r.cat==='rush'?o.ry:r.cat==='pass'?o.py:r.cat==='rec'?o.recy:r.cat==='recp'?o.rec:(o.td>0?1:0);
+  r.done=1;
+}
+var trkSnap0=snapGame;
+snapGame=function(g){var r=trkSnap0(g);try{if(r&&S.snap[g.id]){S.snap[g.id].sid=g.sid;S.snap[g.id].start=g.start}}catch(e){}return r};
+function trkSummary(lg,sid){
+  return fetch('https://site.api.espn.com/apis/site/v2/sports/'+ESPN[lg]+'/summary?event='+encodeURIComponent(sid)).then(function(r){return r.ok?r.json():null}).catch(function(){return null});
+}
+function trkSettle(){
+  if(window.claude||typeof fetch!=='function'||TRK_BUSY)return;
+  var now=Date.now(),jobs={};
+  Object.keys(TRK.p).forEach(function(k){var r=TRK.p[k];if(!r.done&&r.st<now-3*36e5&&(r.tries||0)<14&&(!r.nt||r.nt<now))jobs['nfl|'+r.sid]=['nfl',r.sid]});
+  Object.keys(S.snap).forEach(function(id){var s=S.snap[id];if(TRK.g[id]||!s.sid||!s.start||s.start>now-4*36e5||now-s.start>12*864e5||(s.tries||0)>=14||(s.nt&&s.nt>now))return;jobs[s.lg+'|'+s.sid]=[s.lg,s.sid]});
+  var L=Object.keys(jobs).slice(0,6);
+  if(!L.length){trkGames();return}
+  TRK_BUSY=true;
+  Promise.all(L.map(function(k){return trkSummary(jobs[k][0],jobs[k][1]).then(function(j){return {lg:jobs[k][0],sid:jobs[k][1],j:j}})})).then(function(res){
+    res.forEach(function(o){
+      var c=null,done=false;
+      try{c=o.j.header.competitions[0];done=!!(c.status&&c.status.type&&c.status.type.completed)}catch(e){}
+      var P=null;if(done&&o.lg==='nfl'){P=trkParseBox(o.j);if(Object.keys(P).length<10)P=null}
+      Object.keys(TRK.p).forEach(function(k){var r=TRK.p[k];if(r.done||r.sid!==o.sid||o.lg!=='nfl')return;r.tries=(r.tries||0)+1;if(!done||!P){r.nt=Date.now()+20*60000;return}trkSettleRec(r,P)});
+      Object.keys(S.snap).forEach(function(id){
+        var s=S.snap[id];if(TRK.g[id]||s.sid!==o.sid||s.lg!==o.lg)return;
+        s.tries=(s.tries||0)+1;
+        if(!done||!c){s.nt=Date.now()+20*60000;return}
+        var sc={};(c.competitors||[]).forEach(function(x){sc[x.homeAway]=parseFloat(x.score)});
+        if(!(sc.home>=0)||!(sc.away>=0)||s.M==null||s.L==null)return;
+        TRK.g[id]={lg:s.lg,M:s.M,L:s.L,ps:s.ps,gr:s.grade,mh:sc.home-sc.away,at:s.at};
+      });
+    });
+    TRK_BUSY=false;trkSave();try{snapSaveLS()}catch(e){}
+    var ae=document.activeElement;if(!(ae&&ae.tagName==='INPUT')&&!S.sheet)render();
+  }).catch(function(){TRK_BUSY=false});
+}
+function trkGames(){
+  var ch=false;
+  Object.keys(S.snap).forEach(function(id){
+    if(TRK.g[id])return;var s=S.snap[id],g=find(id);
+    if(!g||kind(g)!=='final'||g.sa==null||g.sh==null||s.M==null||s.L==null)return;
+    TRK.g[id]={lg:s.lg,M:s.M,L:s.L,ps:s.ps,gr:s.grade,mh:g.sh-g.sa,at:s.at};ch=true;
+  });
+  if(ch)trkSave();
+}
+/* ---- games: how well the model's margin tracks the real margin ---- */
+function trkK(lg){
+  var n=0,sxy=0,sxx=0,ae=0;
+  Object.keys(TRK.g).forEach(function(id){var r=TRK.g[id];if(r.lg!==lg)return;var x=r.M-r.L,y=r.mh-r.L;sxy+=x*y;sxx+=x*x;ae+=Math.abs(r.mh-r.M);n++});
+  if(n<15||!(sxx>0))return {k:1,n:n,b:null,mae:n?ae/n:null};
+  var b=sxy/sxx,k=1+(b-1)*n/(n+30);
+  return {k:Math.max(.5,Math.min(1.2,k)),n:n,b:b,mae:ae/n};
+}
+var hbEval103=hbEval;
+hbEval=function(g){
+  var e=hbEval103(g);
+  try{if(e&&!e.pending&&g&&g.lg){var K=trkK(g.lg).k;if(K!==1){e.shr=e.shr*K;e.grade=hbGradeOf(e.shr,e.ex);e.gn=hbGradeNum(e.grade)+e.shr/100}}}catch(x){}
+  return e;
+};
+/* ---- the Track record page ---- */
+var spCats103=spCats;
+spCats=function(lg){return spCats103(lg).concat([['tr','Track record']])};
+function trkBucket(mg){var c=String(mg||'').charAt(0);return c==='A'?'A':c==='B'?'B':c==='C'?'C':c?'D or F':null}
+function trkPct(v){return (v>=0?'+':'')+(v*100).toFixed(1)+'%'}
+function trackBody(){
+  var P=Object.keys(TRK.p).map(function(k){return TRK.p[k]}),set=P.filter(function(r){return r.done&&!r.void}),pend=P.filter(function(r){return !r.done}).length,voided=P.filter(function(r){return r.void}).length;
+  var h='<div class="card"><b>Track record</b><p class="src" style="margin:6px 0 0">Before each NFL game the app saves its projection for every prop on the board. After the game it checks the box score. The results below feed back into later projections and grades once there are enough of them, so the app corrects its own habits. A player who does not appear in the box score counts as zero. This starts counting from the first game after this update.</p></div>';
+  h+='<div class="card"><b>Props</b><p class="src" style="margin:4px 0 8px">'+set.length+' settled · '+pend+' waiting for games'+(voided?' · '+voided+' skipped (quarterback did not play)':'')+'</p>';
+  Object.keys(TRK_CATS).forEach(function(c){
+    var s=trkStats(c),m=trkMult(c),line;
+    if(!s.n)line='nothing settled yet';
+    else if(c==='td')line='I gave '+Math.round(s.sr*10)/10+' expected scorers; '+s.sa+' scored';
+    else line='I projected '+Math.round(s.sr)+' total; actual '+Math.round(s.sa)+' ('+trkPct(s.sa/s.sr-1)+')';
+    var adj=s.n<15?'learning starts at 15 settled ('+s.n+' so far)':m===1?'no adjustment needed':'now adjusted '+trkPct(m-1);
+    h+='<div style="padding:6px 0;border-top:1px solid var(--line)"><b>'+TRK_CATS[c]+'</b> <span class="src">'+s.n+' settled</span><div class="src">'+esc(line)+'. '+esc(adj)+'.</div></div>';
+  });
+  h+='</div>';
+  var B={};set.forEach(function(r){if(r.cat==='td'||!r.avg||!r.mg)return;var b=trkBucket(r.mg);(B[b]=B[b]||{n:0,s:0,beat:0});B[b].n++;B[b].s+=r.act/r.avg;if(r.act>=r.raw)B[b].beat++});
+  h+='<div class="card"><b>Do the matchup grades mean anything?</b><p class="src" style="margin:4px 0 6px">Average result compared with the player’s season average, grouped by the grade I gave the matchup. If grades work, A should sit above C.</p>';
+  var any=false;['A','B','C','D or F'].forEach(function(b){var x=B[b];if(!x)return;any=true;h+='<div style="display:flex;justify-content:space-between;padding:4px 0;border-top:1px solid var(--line)"><span>Grade '+b+' <span class="src">('+x.n+' picks)</span></span><span>'+trkPct(x.s/x.n-1)+' vs his average · beat my number '+Math.round(100*x.beat/x.n)+'%</span></div>'});
+  if(!any)h+='<p class="src" style="margin:0">Not enough settled yet.</p>';
+  h+='</div>';
+  var T={};set.filter(function(r){return r.cat==='td'}).forEach(function(r){var b=r.raw<.2?'under 20%':r.raw<.4?'20 to 40%':r.raw<.6?'40 to 60%':'60% and up';var x=T[b]||(T[b]={n:0,p:0,a:0});x.n++;x.p+=r.raw;x.a+=r.act>0?1:0});
+  if(Object.keys(T).length){h+='<div class="card"><b>Anytime TD: did the chances hold up?</b>';['under 20%','20 to 40%','40 to 60%','60% and up'].forEach(function(b){var x=T[b];if(!x)return;h+='<div style="display:flex;justify-content:space-between;padding:4px 0;border-top:1px solid var(--line)"><span>I said '+b+' <span class="src">('+x.n+')</span></span><span>average '+Math.round(100*x.p/x.n)+'% · scored '+Math.round(100*x.a/x.n)+'%</span></div>'});h+='</div>'}
+  h+='<div class="card"><b>Game picks</b><p class="src" style="margin:4px 0 6px">How close my predicted margin is to the real margin, by sport.</p>';
+  var gl=false;['nfl','ncaafb','nba','nhl'].forEach(function(lg){var K=trkK(lg);if(!K.n)return;gl=true;h+='<div style="padding:4px 0;border-top:1px solid var(--line)"><b>'+lg.toUpperCase()+'</b> <span class="src">'+K.n+' settled · off by '+K.mae.toFixed(1)+' points on average · '+(K.n<15?'learning starts at 15':K.k===1?'no adjustment':'edge now scaled to '+Math.round(K.k*100)+'% of the raw number')+'</span></div>'});
+  if(!gl)h+='<p class="src" style="margin:0">No finished game picks saved yet. The app saves its pick before kickoff and scores it after.</p>';
+  h+='</div>';
+  var R=set.slice().sort(function(a,b){return b.st-a.st}).slice(0,20);
+  if(R.length){h+='<div class="card"><b>Latest results</b>';R.forEach(function(r){var tdv=r.cat==='td',fmt=function(v){return tdv?Math.round(v*100)+'%':r.cat==='recp'?v.toFixed(1):String(Math.round(v))};
+    h+='<div style="padding:6px 0;border-top:1px solid var(--line)"><b>'+esc(r.n)+'</b> <span class="src">'+esc(r.t)+' · '+TRK_CATS[r.cat].toLowerCase()+'</span><div class="src">'+(tdv?'I said '+fmt(r.raw)+' to score. '+(r.act>0?'He scored.':'He did not score.'):'I projected '+fmt(r.raw)+'. He had '+fmt(r.act)+' ('+(r.act>=r.raw?'over':'under')+' by '+fmt(Math.abs(r.act-r.raw))+').')+'</div></div>'});h+='</div>'}
+  h+='<p class="src"><button class="linkbtn" data-act="trreset">'+(S.trconf?'Tap again to erase all saved results':'Erase saved results and start over')+'</button></p>';
+  return h;
+}
+var vPropsLg103=vPropsLg;
+vPropsLg=function(){
+  var h=vPropsLg103();
+  try{
+    if(S.sc==='tr'&&['nfl','nba','ncaafb','nhl','mlb'].indexOf(S.sport)>=0){
+      var i=h.indexOf('aria-label="Prop type"');
+      if(i>=0){var e=h.indexOf('</div>',i);if(e>=0)return h.slice(0,e+6)+trackBody()}
+    }
+    if(S.sport==='nfl'&&Object.keys(TRK_CATS).some(function(c){return trkMult(c)!==1})){
+      var j=h.indexOf('</h2>');if(j>=0)h=h.slice(0,j+5)+'<p class="src" style="margin:0 0 10px">Projections here are adjusted using my own settled results. See Track record.</p>'+h.slice(j+5);
+    }
+  }catch(x){}
+  return h;
+};
+document.addEventListener('click',function(e){
+  var el=e.target&&e.target.closest?e.target.closest('[data-act="trreset"]'):null;if(!el)return;
+  e.stopPropagation();e.preventDefault();
+  if(!S.trconf){S.trconf=1;render();return}
+  S.trconf=0;TRK={p:{},g:{}};try{localStorage.removeItem('hb.trk.v1')}catch(x){}render();
+},true);
+setTimeout(function(){try{trkLogAll();trkSettle()}catch(e){}},9000);
+setInterval(function(){try{if(!document.hidden){trkLogAll();trkSettle()}}catch(e){}},10*60000);
+document.addEventListener('visibilitychange',function(){if(!document.hidden)setTimeout(function(){try{trkLogAll();trkSettle()}catch(e){}},1500)});
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
