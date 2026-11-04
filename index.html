@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v148, Nov 3';
+var BUILD='v149, Nov 3';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -10581,6 +10581,94 @@ feedSheet=function(g){
     var i=h.indexOf('</button></div>');
     return i>=0?h.slice(0,i+15)+sec+h.slice(i+15):sec+h;
   }catch(e){return h}
+};
+
+/* v149: props use recent form (last games from box scores) and the last meeting with this opponent, on top of the matchup */
+var _tix={},_tixK='';
+function dlIdx(lg){
+  var key=S.dlV+'|'+Object.keys(S.dlog).length;
+  if(_tixK!==key){_tix={};_tixK=key}
+  if(_tix[lg])return _tix[lg];
+  var ix={};
+  Object.keys(S.dlog).forEach(function(k){var g=S.dlog[k];if(g.lg!==lg)return;g.s.forEach(function(sd){Object.keys(sd.p).forEach(function(nm){(ix[nm]=ix[nm]||[]).push({at:g.at,v:sd.p[nm],o:sd.o,t:sd.t})})})});
+  Object.keys(ix).forEach(function(nm){ix[nm].sort(function(a,b){return b.at-a.at})});
+  return (_tix[lg]=ix);
+}
+function dlTrend(lg,cat,name,opp){
+  var C=DL_LG[lg];if(!C||C.ix[cat]==null)return null;
+  var i=C.ix[cat],L=(dlIdx(lg)[normName(name)]||[]).filter(function(x){return x.v[i]!=null});
+  if(L.length<2)return null;
+  var rec=L.slice(0,4),vals=rec.map(function(x){return x.v[i]}),mean=vals.reduce(function(a,b){return a+b},0)/vals.length;
+  var ob=opp?dlAb(lg,opp):null,vs=ob?L.filter(function(x){return String(x.o).toUpperCase()===String(ob).toUpperCase()})[0]:null;
+  return {n:rec.length,vals:vals,mean:mean,vs:vs?vs.v[i]:null,total:L.length};
+}
+function trkTrendScale(lg){
+  var n=0,sxy=0,sxx=0;
+  Object.keys(TRK.p).forEach(function(k){var r=TRK.p[k];if(r.lg!==lg||!r.done||r.void||r.cat==='td'||!(r.raw>0)||r.tr==null||Math.abs(r.tr)<.005)return;var y=r.act/r.raw-1;sxy+=r.tr*y;sxx+=r.tr*r.tr;n++});
+  if(n<30||!(sxx>0))return {s:1,n:n,b:null};
+  var b=Math.max(0,Math.min(2,sxy/sxx));
+  return {s:1+(b-1)*n/(n+40),n:n,b:b};
+}
+function rowOpp106(lg,x){
+  if(lg==='nfl'){var me=nt(x.t),p=(x.gk||'').split('@');return p[0]===me?p[1]:p[0]}
+  var m=String(x.gk||'').match(/:([^@:]+)@([^:]+):/);if(!m)return null;
+  return dlAb(lg,x.t)===dlAb(lg,m[1])?m[2]:m[1];
+}
+function fmt106(v){return v<20&&v!==Math.round(v)?v.toFixed(1):String(Math.round(v))}
+var spRows106=spRows;
+spRows=function(lg,cat){
+  var rows=spRows106(lg,cat);
+  try{
+    var C=DL_LG[lg];if(!C||C.ix[cat]==null||cat==='td')return rows;
+    var ts=trkTrendScale(lg).s;
+    rows.forEach(function(x){
+      var avg=parseFloat(String(x.avgTxt||'').replace(/[^0-9.]/g,'')),opp=rowOpp106(lg,x),T=dlTrend(lg,cat,x.n,opp);
+      if(!T||!(avg>0)||!(x.proj>0))return;
+      var ratio=T.mean/avg,tr=Math.max(-.08,Math.min(.08,(ratio-1)*.25*Math.min(1,T.n/4))),tv=T.vs!=null?Math.max(-.04,Math.min(.04,(T.vs/avg-1)*.08)):0,tot=tr+tv,adj=tot*ts;
+      var v=x.proj*(1+adj);x.proj=v;x.sort=v;
+      var dec=/\./.test(String(x.projTxt));x.projTxt=dec?v.toFixed(1):String(Math.round(v));
+      x.hot=T.n>=3&&ratio>=1.15?1:T.n>=3&&ratio<=.85?-1:0;
+      x.trLine='Last '+T.n+' games: '+T.vals.map(fmt106).join(', ')+' (average '+fmt106(T.mean)+' against '+fmt106(avg)+' for the season)'+(T.vs!=null?' · last time against '+String(opp||'').toUpperCase()+': '+fmt106(T.vs):'');
+      // remember the adjustment so the tracker can check whether it helps
+      var g=lg==='nfl'?trkGameFor(lg,x.gk):(x.gk?find(x.gk):null);
+      if(g&&g.sid){var r=TRK.p[g.sid+'|'+lg+'|'+cat+'|'+normName(x.n)];if(r&&!r.done){r.tr=tot;trkLater()}}
+    });
+  }catch(e){}
+  return rows;
+};
+var spCard106=spCard;
+spCard=function(r){
+  var h=spCard106(r);
+  if(!r.trLine)return h;
+  var pill=r.hot>0?'<span class="hrpill hi" style="display:inline-block;margin-right:6px">Hot</span>':r.hot<0?'<span class="hrpill lo" style="display:inline-block;margin-right:6px">Cold</span>':'';
+  return h.slice(0,h.length-6)+'<div class="src" style="margin-top:4px">'+pill+esc(r.trLine)+'.</div></div>';
+};
+var pmDef106=pmDef;
+pmDef=function(b){
+  var o=pmDef106(b);
+  try{
+    var C=DL_LG[b.lg];
+    if(C&&C.ix[b.kind]!=null&&b.opp){
+      var nm=b.nm||b.name||(b.p&&b.p.name),T=dlTrend(b.lg,b.kind,nm,b.opp);
+      if(T)o=(o||[]).concat(['Recent form: last '+T.n+' games '+T.vals.map(fmt106).join(', ')+' (average '+fmt106(T.mean)+').'+(T.vs!=null?' Last time against '+String(b.opp).toUpperCase()+': '+fmt106(T.vs)+'.':'')]);
+    }
+  }catch(e){}
+  return o;
+};
+var trackBody106=trackBody;
+trackBody=function(){
+  var h=trackBody106();
+  try{
+    var lg=S.sport,P=Object.keys(TRK.p).map(function(k){return TRK.p[k]}).filter(function(r){return r.lg===lg&&r.done&&!r.void&&r.cat!=='td'&&r.raw>0&&r.tr!=null});
+    var B={hot:{n:0,s:0},cold:{n:0,s:0},flat:{n:0,s:0}};
+    P.forEach(function(r){var k=r.tr>=.03?'hot':r.tr<=-.03?'cold':'flat';B[k].n++;B[k].s+=r.act/r.raw-1});
+    var ts=trkTrendScale(lg),sec='<div class="card"><b>Do recent form and the last meeting help?</b><p class="src" style="margin:4px 0 6px">Projections include a small push from the last few games and the last time against this opponent. This compares the result with my starting number, so you can see whether that push points the right way.</p>';
+    ['hot','flat','cold'].forEach(function(k){var x=B[k];sec+='<div style="display:flex;justify-content:space-between;gap:8px;padding:4px 0;border-top:1px solid var(--line)"><span>'+(k==='hot'?'Pushed up':k==='cold'?'Pushed down':'Little push')+' <span class="src">('+x.n+')</span></span><span>'+(x.n?trkPct(x.s/x.n)+' against my starting number':'nothing settled yet')+'</span></div>'});
+    sec+='<p class="src" style="margin:6px 0 0">'+(ts.b==null?'The size of the push is learned after 30 settled picks ('+ts.n+' so far).':'The push is now scaled to '+Math.round(ts.s*100)+'% of its first size based on '+ts.n+' settled picks.')+'</p></div>';
+    var i=h.indexOf('<div class="card"><b>Game picks</b>');
+    h=i>=0?h.slice(0,i)+sec+h.slice(i):h+sec;
+  }catch(e){}
+  return h;
 };
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
