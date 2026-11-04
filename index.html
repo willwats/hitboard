@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v157, Nov 4';
+var BUILD='v158, Nov 4';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -11525,6 +11525,85 @@ document.addEventListener('click',function(e){
   if(el.dataset.act==='nwsref'){var lg=S.sheet&&S.sheet.lg||S.sport;nwsLoad(lg,true);if(S.sheet)renderSheet();return}
   injoSet(el.dataset.lg,el.dataset.n,el.dataset.v);
 },true);
+
+/* v158: Week 9 NFL practice and injury report, tonight's NBA reports and the NHL status report, as read on Wed Nov 4. Applied until they go stale; live feeds and news still win when they are more severe. */
+var INJ_SNAP={
+ nfl:{asOf:'Wed, Nov 4',until:Date.UTC(2026,10,10,12),items:[
+  ['Lamar Jackson','QB','Injured Reserve','Right thumb surgery, out at least four games'],
+  ['Tyler Huntley','QB','Out','Turf toe, out for the season'],
+  ['Joe Fagnano','QB','Limited','Ankle, a chance to play Thursday'],
+  ['Tyler Loop','K','Questionable','Groin, did not practice, could go on injured reserve'],
+  ['Jaylinn Hawkins','S','Questionable','Knee, did not practice'],
+  ['Justice Hill','RB','Limited','Groin'],['Olaivavega Ioane','G','Limited','Knee'],['John Simpson','G','Limited','Back'],['Roger Rosengarten','OT','Limited','Ankle'],['Ronnie Stanley','OT','Limited','Ankle'],['Trey Hendrickson','LB','Limited','Finger, ribs'],['Roquan Smith','LB','Limited','Foot'],
+  ['Bhayshul Tuten','RB','Questionable','Ankle and foot, did not practice, game-time call'],
+  ['Travon Walker','DE','Questionable','Ribs, did not practice'],
+  ['DaVon Hamilton','DT','Out','Torn quad, out for the season'],
+  ['Eric Murray','S','Out','Elbow, out for the season'],
+  ['Chris Rodriguez Jr.','RB','Limited','Hand'],['Jakobi Meyers','WR','Limited','Hamstring and ankle'],['Ezra Cleveland','OL','Limited','Knee and ankle'],['Jarrian Jones','CB','Limited','Ankle'],['Antonio Johnson','S','Limited','Ankle'],
+  ['Jeremiyah Love','RB','Questionable','New ankle injury, update later this week'],
+  ['Kendrick Bourne','WR','Out','Fractured tibia, out for the season'],
+  ['Zachariah Branch','WR','Out','Hamstring, will not play Week 9'],
+  ['Samson Ebukam','DE','Out','Hamstring, will not play Week 9'],
+  ['Brian Robinson','RB','Limited','Hamstring'],['Divine Deablo','LB','Limited','Forearm'],['Yasir Abdullah','LB','Limited','Hamstring'],
+  ['Cashius Howell','DE','Out','Wrist surgery, weeks, trending toward injured reserve'],
+  ['Cedric Johnson','DE','Questionable','Ankle, day to day'],['DJ Turner II','CB','Questionable','Heel, day to day'],
+  ['Grady Jarrett','DT','Questionable','Groin'],['Kentavius Street','DT','Questionable','Knee'],
+  ['Jake Ferguson','TE','Questionable','Ankle, a chance to play Sunday'],['Malachi Lawrence','LB','Questionable','Ankle, could miss a few weeks'],['Caleb Downs','CB','Questionable','Concussion protocol'],['P.J. Locke','S','Questionable','Concussion protocol'],
+  ['Cade Mays','C','Questionable','Ankle'],['Jack Campbell','LB','Out','Neck, hospitalized'],['Jimmy Rolder','LB','Out','Hamstring, out for the season'],
+  ['Dean Connors','RB','Out','Fractured hand, surgery planned, injured reserve candidate'],['Terrance Ferguson','TE','Injured Reserve','Ankle'],['Myles Garrett','LB','Injured Reserve','Knee, returning to practice'],['Grant Stuard','LB','Questionable','Hamstring, week to week'],
+  ['Kyler Murray','QB','Questionable','Hamstring soreness, availability unclear'],['Christian Darrisaw','T','Questionable','Shoulder soreness'],['Theo Jackson','S','Questionable','Quad soreness'],
+  ['Sam Darnold','QB','Out','Quad, week to week, not on injured reserve'],['Drew Lock','QB','Questionable','Elbow, expected to start'],['Leonard Williams','DT','Questionable','Stinger'],
+  ['YaYa Diaby','LB','Out','Grade 2 MCL sprain'],
+  ['Javon Kinlaw','DT','Out','Season-ending MCL surgery'],['Jeremy McNichols','RB','Questionable','Mid-foot, believed serious'],
+  ['Deshaun Watson','QB','Questionable','Concussion protocol'],['Mack Hollins','WR','Injured Reserve','Calf, returning to practice']]},
+ nba:{asOf:'Wed, Nov 4, tonight’s games',until:Date.UTC(2026,10,5,7),items:[
+  ['Yves Missi','C','Out','Left knee bone bruise'],['Trey Murphy III','F','Questionable','Patella tendinopathy'],['Jordan Poole','G','Probable','Ankle'],
+  ['Jaren Jackson Jr.','F','Out','Right MCL tear'],['Jusuf Nurkic','C','Out','Plantar tear'],['Mo Bamba','C','Questionable','Ankle sprain'],
+  ['Jordan Goodwin','G','Questionable','Calf soreness'],['Rasheer Fleming','F','Questionable','Ankle sprain'],['Mark Williams','C','Out','Shoulder surgery'],
+  ['Anthony Edwards','G','Out','Knee, illness'],['Jaden McDaniels','F','Out','Knee'],
+  ['Marcus Sasser','G','Questionable','Hip strain'],['Cade Cunningham','G','Out','Lung, pneumothorax'],['Isaiah Stewart','F','Out','Calf strain'],
+  ['Alpha Diallo','F','Probable','Wrist sprain'],['Cameron Johnson','F','Probable','Lower body'],['Spencer Jones','F','Out','Hamstring'],['Julian Strawther','G','Out','Knee sprain'],
+  ['Nate Bittle','C','Out','Avulsion fracture'],['Kawhi Leonard','F','Out','Knee'],['Jakob Poeltl','C','Questionable','Shoulder bursitis']]},
+ nhl:{asOf:'Wed, Nov 4',until:Date.UTC(2026,10,6,12),items:[
+  ['Miro Heiskanen','D','Day-to-Day','Undisclosed, likely out Thursday'],['Mathew Barzal','C','Out','Knee, no return timeline'],['Matias Maccelli','LW','Out','Lower body, 2 to 4 weeks'],['Ryan Pulock','D','Out','Upper body, 2 to 4 weeks'],
+  ['John Gibson','G','Questionable','Lower body, Thursday'],['Evgeni Malkin','C','Day-to-Day','Lower body, expected back Thursday'],['Igor Shesterkin','G','Out','Knee, out for the season'],
+  ['John Tavares','C','Day-to-Day','Lower body, could return Saturday'],['Linus Ullmark','G','Injured Reserve','Lower body, 1 to 2 weeks'],['Isaac Howard','LW','Out','A couple of weeks']]}
+};
+function snapRank(s){s=String(s||'');return OUT_BASE.test(s)?3:HOLD_RE.test(s)?2:s?1:0}
+function injSnapApply(lg){
+  var D=INJ_SNAP[lg];if(!D||Date.now()>D.until)return '';
+  var I=S.inj[lg]||(S.inj[lg]={at:Date.now(),by:{},idx:{}});if(!I.by)I.by={};if(!I.idx)I.idx={};
+  var sig=[];
+  D.items.forEach(function(x){
+    var name=x[0],st=x[2],note=x[3];
+    if(INJO[lg+'|'+normName(name)])return;
+    var t=nwsTeamOf(lg,name);if(!t)return;
+    var key=lg==='nfl'?nt(t):t,k=nameKeys(name),ex=I.idx[key+'|'+k[0]]||I.idx[key+'|'+k[1]];
+    if(ex){if(snapRank(ex.st)>=snapRank(st))return;ex.st=st;ex.d=note;ex.x=1;sig.push(name+st);return}
+    var it={n:name,pos:x[1]||'',st:st,d:note,x:1};(I.by[key]=I.by[key]||[]).push(it);I.idx[key+'|'+k[0]]=it;I.idx[key+'|'+k[1]]=it;sig.push(name+st);
+  });
+  return sig.join('|');
+}
+var injApplyExtra115=injApplyExtra;
+injApplyExtra=function(lg){var a=injApplyExtra115(lg)||'',b='';try{b=injSnapApply(lg)}catch(e){}return a+(b?'|'+b:'')};
+function snapHtml(lg){
+  var D=INJ_SNAP[lg];if(!D)return '';
+  if(Date.now()>D.until)return '<h3>Injury report</h3><p class="src">The report I loaded ('+esc(D.asOf)+') is out of date. The live injury feed and news above still apply.</p>';
+  var by={3:[],2:[],1:[]};D.items.forEach(function(x){by[Math.max(1,snapRank(x[2]))].push(x)});
+  var row=function(x){return '<div style="padding:4px 0;border-top:1px solid var(--line)"><b>'+esc(x[0])+'</b> <span class="src">'+esc(x[1])+' · '+esc(x[2])+' · '+esc(x[3])+'</span></div>'};
+  var h='<h3>Injury report as of '+esc(D.asOf)+'</h3><p class="src" style="margin:0 0 6px">Players listed Out, Doubtful, Day-to-Day, Questionable or on injured reserve are held out of props. Limited and Probable players stay in.</p>';
+  if(by[3].length)h+='<p class="src" style="margin:6px 0 2px"><b>Out or on injured reserve</b></p>'+by[3].map(row).join('');
+  if(by[2].length)h+='<p class="src" style="margin:8px 0 2px"><b>Questionable or day to day</b></p>'+by[2].map(row).join('');
+  if(by[1].length)h+='<details style="margin-top:8px"><summary class="src" style="cursor:pointer">Limited in practice or probable ('+by[1].length+')</summary>'+by[1].map(row).join('')+'</details>';
+  return h;
+}
+var injSheet115=injSheet;
+injSheet=function(s){
+  var h=injSheet115(s);
+  try{var b=snapHtml(s.lg);if(b){var i=h.indexOf('<h3>Latest news</h3>');h=i>=0?h.slice(0,i)+b+h.slice(i):h+b}}catch(e){}
+  return h;
+};
+setTimeout(function(){try{injApplyAll(true)}catch(e){}},9000);
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
