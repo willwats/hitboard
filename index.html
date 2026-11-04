@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v154, Nov 4';
+var BUILD='v155, Nov 4';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -10721,7 +10721,7 @@ function pfBody(s){
     if(st)h+='<p style="margin:10px 0 0">Status: <span class="tag warn" style="font-size:11px;padding:1px 6px">'+esc(st)+'</span></p>'}catch(e){}
   // next game
   h+='<h3>Next game</h3>';
-  if(!rows.length)h+='<div class="card empty">No upcoming projection for this player right now (no game found, or he is ruled out). His past games are below.</div>';
+  if(!rows.length)h+='<div class="card empty">'+(function(){try{var it=injIt108({lg:lg,n:nm,t:s.team});if(it&&it.st)return 'He is listed '+esc(it.st)+(it.d?' ('+esc(it.d)+')':'')+', so he is held out of props. His past games are below.'}catch(e){}return 'No upcoming projection for this player right now (no game found). His past games are below.'})()+'</div>';
   else{
     h+=pfGameLine(lg,rows[0].r);
     rows.forEach(function(x){
@@ -11266,6 +11266,102 @@ document.addEventListener('click',function(e){
   S.pctx={};_pfC={};try{trkSweepOut()}catch(x){}
   renderSheet();try{render()}catch(x){}
 },true);
+
+/* v155: every rostered player is searchable (injured or not), and each roster's own injury tags back up the injury report so no one listed out slips through */
+S.psRos={};
+function psWalk(o,out,seen){
+  if(Array.isArray(o)){o.forEach(function(c){psWalk(c,out,seen)});return}
+  if(!o||typeof o!=='object')return;
+  if(o.id&&typeof o.fullName==='string'&&!seen[o.id]){
+    seen[o.id]=1;var inj=o.injuries&&o.injuries[0],st=inj?(inj.status||(inj.type&&inj.type.description)||''):'';
+    out.push({n:o.fullName,id:o.id,pos:(o.position&&(o.position.abbreviation||o.position.name))||'',st:st});
+  }
+  Object.keys(o).forEach(function(k){if(o[k]&&typeof o[k]==='object')psWalk(o[k],out,seen)});
+}
+function psTeamsFor(lg){
+  return rosFetch('https://site.api.espn.com/apis/site/v2/sports/'+ESPN[lg]+'/teams?limit=500').then(function(j){
+    var m=[];((j.sports||[{}])[0].leagues||[{}])[0].teams.forEach(function(t){t=t.team||t;m.push({id:t.id,ab:t.abbreviation})});
+    S.rosTeams[lg]=m;
+    if(lg==='ncaafb'){var want=[];(S.feed.ncaafb||[]).forEach(function(g){want.push(g.a,g.h)});return m.filter(function(x){return want.some(function(w){return sameTm(x.ab,w)})})}
+    return m;
+  });
+}
+function psMergeInj(lg,list,ab){
+  if(lg==='ncaafb')return;
+  var I=S.inj[lg];if(!I){I=S.inj[lg]={at:Date.now(),by:{},idx:{}}}
+  if(!I.by)I.by={};if(!I.idx)I.idx={};
+  var key=lg==='nfl'?nt(ab):ab;
+  list.forEach(function(a){
+    if(!a.st)return;var k=nameKeys(a.n);
+    if(I.idx[key+'|'+k[0]]||I.idx[key+'|'+k[1]])return;
+    var it={n:a.n,pos:a.pos,st:a.st,d:''};(I.by[key]=I.by[key]||[]).push(it);I.idx[key+'|'+k[0]]=it;I.idx[key+'|'+k[1]]=it;
+  });
+}
+function psLoad(lg,force){
+  if(window.claude||typeof fetch!=='function')return;
+  var c=S.psRos[lg];
+  if(c&&(c.st==='load'||(c.st==='ok'&&!force&&Date.now()-c.at<4*36e5)))return;
+  S.psRos[lg]={st:'load',at:Date.now(),list:c&&c.list||[],n:0,tot:0};
+  psTeamsFor(lg).then(function(ts){
+    var cur=S.psRos[lg];cur.tot=ts.length;var all=[],i=0;
+    var batch=function(){
+      var part=ts.slice(i,i+6);i+=6;if(!part.length)return Promise.resolve();
+      return Promise.all(part.map(function(t){return rosFetch('https://site.api.espn.com/apis/site/v2/sports/'+ESPN[lg]+'/teams/'+t.id+'/roster').then(function(j){
+        var L=[];psWalk(j.athletes||j,L,{});if(!L.length)return;
+        L.forEach(function(a){a.t=t.ab;all.push(a)});psMergeInj(lg,L,t.ab);cur.n++;
+      }).catch(function(){})})).then(batch);
+    };
+    return batch().then(function(){
+      if(all.length)S.psRos[lg]={st:'ok',at:Date.now(),list:all,n:cur.n,tot:ts.length};
+      else S.psRos[lg]={st:'err',at:Date.now(),list:c&&c.list||[],n:0,tot:ts.length};
+      var I=S.inj[lg];if(I)I.at=Math.max(I.at||0,Date.now());
+      S.pctx={};_pfC={};try{injSnap();trkSweepOut()}catch(e){}
+    });
+  }).catch(function(){S.psRos[lg]={st:'err',at:Date.now(),list:c&&c.list||[],n:0,tot:0}}).then(function(){
+    try{if(S.sheet&&S.sheet.type==='psr'&&S.sheet.lg===lg)renderSearchRes();else if(!S.sheet&&!(document.activeElement&&document.activeElement.tagName==='INPUT'))render()}catch(e){}
+  });
+}
+setTimeout(function(){['nfl','nba','nhl','mlb'].forEach(function(l){psLoad(l)})},8000);
+setInterval(function(){try{['nfl','nba','nhl','mlb'].forEach(function(l){psLoad(l)})}catch(e){}},4*36e5);
+/* search index: players with projections first, then everyone on a roster, then anyone with a finished game on file */
+var pfIndex112=pfIndex;
+pfIndex=function(lg){
+  var base=pfIndex112(lg),by={};base.forEach(function(o){by[normName(o.n)]=o});
+  var out=base.slice(),R=S.psRos[lg];
+  if(R&&R.list)R.list.forEach(function(a){
+    var k=normName(a.n);if(!k)return;var o=by[k];
+    if(o){o.st=a.st||o.st;if(!o.pos)o.pos=a.pos;if(!o.t)o.t=a.t;return}
+    o={n:a.n,t:a.t,pos:a.pos,lg:lg,cats:[],up:false,st:a.st};by[k]=o;out.push(o);
+  });
+  return out;
+};
+function pfResults(lg,q){
+  var R=S.psRos[lg],ld=R&&R.st==='load',note='';
+  if(!R)psLoad(lg);
+  if(ld||(!R))note='<p class="src" style="margin:6px 0">Loading every roster…'+(R&&R.tot?' '+R.n+' of '+R.tot+' teams.':'')+' Players with projections are searchable now.</p>';
+  else if(R.st==='err'&&(!R.list||!R.list.length))note='<p class="src" style="margin:6px 0">Rosters could not be loaded, so only players with projections or past games are searchable.</p>';
+  if(normName(q).length<2)return '<p class="src" style="margin:10px 0">Type at least two letters of a player’s name or team.</p>'+note;
+  var L=pfSearch(lg,q);
+  if(!L.length)return note+'<div class="card empty">No player matching “'+esc(q)+'” in '+esc(lgName(lg))+'.</div>';
+  return note+L.map(function(o){
+    var out=o.st&&OUT_RE.test(o.st),tag=o.st?' <span class="tag warn" style="font-size:10px;padding:1px 6px">'+esc(o.st)+'</span>':'';
+    return '<div class="card" data-act="pfopen" data-n="'+esc(o.n)+'" data-lg="'+lg+'" data-team="'+esc(o.t)+'" style="padding:10px 12px;margin:0 0 6px;cursor:pointer"><div><b>'+esc(o.n)+'</b> <span class="src">'+esc(o.t)+(o.pos?' · '+esc(o.pos):'')+'</span>'+tag+'</div><div class="src" style="margin-top:2px">'+(out?'Held out of props because of the injury listing':o.up?esc(o.cats.join(' · ')):'No upcoming projection · past games only')+'</div></div>'}).join('');
+}
+function renderSearchRes(){var r=document.getElementById('pfres');if(r&&S.sheet&&S.sheet.type==='psr')r.innerHTML=pfResults(S.sheet.lg,S.sheet.q||'')}
+var pfSearchSheet112=pfSearchSheet;
+pfSearchSheet=function(s){psLoad(s.lg);return pfSearchSheet112(s)};
+/* props page: say plainly whether the injury report loaded */
+var vPropsLg112=vPropsLg;
+vPropsLg=function(){
+  var h=vPropsLg112();
+  try{
+    var lg=S.sport;if(['nfl','nba','nhl','mlb'].indexOf(lg)<0||h.indexOf('data-act="injtrk">')<0)return h;
+    var I=S.inj[lg],n=0;if(I&&I.by)Object.keys(I.by).forEach(function(k){n+=I.by[k].length});
+    var msg=I&&n?'Injury report: '+n+' players listed, updated '+esc(fmtClock(I.at))+'. Anyone listed is held out below.':'Injury report has not loaded yet, so injured players may still show. Tap Refresh on the Games page.';
+    var e=h.indexOf('</p>',h.indexOf('data-act="injtrk">'));if(e>0)h=h.slice(0,e+4)+'<p class="src" style="margin:-4px 0 8px">'+msg+'</p>'+h.slice(e+4);
+  }catch(x){}
+  return h;
+};
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
