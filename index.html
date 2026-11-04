@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v158, Nov 4';
+var BUILD='v159, Nov 4';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -7293,7 +7293,7 @@ vGames=function(){
   if(S.gd==='prev')return h;
   var key='aria-label="Day">',i=h.indexOf(key);if(i<0)return h;
   var j=h.indexOf('</div>',i);if(j<0)return h;j+=6;
-  var box='<div style="margin:10px 0 4px"><input type="search" id="gsq" placeholder="Search a team or city" value="'+esc(S.gq||'')+'" autocomplete="off" autocapitalize="none" aria-label="Search teams" style="width:100%"></div><div id="gsr">'+(S.gq?gqResults():'')+'</div>';
+  var box='<div style="margin:10px 0 4px"><input type="search" id="gsq" placeholder="Search a player, team or city" value="'+esc(S.gq||'')+'" autocomplete="off" autocapitalize="none" aria-label="Search players and teams" style="width:100%"></div><div id="gsr">'+(S.gq?gqResults():'')+'</div>';
   if(String(S.gq||'').trim()){
     var f=h.lastIndexOf('<p class="foot">');
     return h.slice(0,j)+box+(f>=j?h.slice(f):'');
@@ -7388,10 +7388,10 @@ vGames=vGames4;
     hd.style.alignItems='center';
   }
   var root=document.createElement('div');root.id='srchRoot';
-  root.innerHTML='<div class="bar"><input type="search" id="gsq" placeholder="Search a team or city" autocomplete="off" autocapitalize="none" aria-label="Search teams"><button class="btn" type="button" id="srchX">Cancel</button></div><div class="res" id="gsr"></div>';
+  root.innerHTML='<div class="bar"><input type="search" id="gsq" placeholder="Search a player, team or city" autocomplete="off" autocapitalize="none" aria-label="Search players and teams"><button class="btn" type="button" id="srchX">Cancel</button></div><div class="res" id="gsr"></div>';
   document.body.appendChild(root);
   var inp=root.querySelector('#gsq'),res=root.querySelector('#gsr');
-  function hint(){return '<p class="src" style="margin-top:14px">Type a team, city or nickname to see its upcoming games across every sport, with the lines. Only games the app has loaded are searched, which is the next several days.</p>'}
+  function hint(){return '<p class="src" style="margin-top:14px">Type a player, team, city or nickname. Players open their full profile, and teams show upcoming games across every sport, with the lines. Only games the app has loaded are searched, which is the next several days.</p>'}
   function show(){res.innerHTML=(S.gq&&S.gq.trim())?gqResults():hint()}
   function open(){root.classList.add('on');inp.value=S.gq||'';show();setTimeout(function(){inp.focus()},30)}
   function close(){root.classList.remove('on');inp.blur()}
@@ -11604,6 +11604,34 @@ injSheet=function(s){
   return h;
 };
 setTimeout(function(){try{injApplyAll(true)}catch(e){}},9000);
+
+/* v159: one search box finds players and teams */
+var gqResults116=gqResults;
+gqResults=function(){
+  var q=String(S.gq||'').trim(),pl='',tm='';
+  try{tm=gqResults116()}catch(e){tm=''}
+  if(normName(q).length>=2){
+    try{
+      var all=[],loading=false;
+      ['nfl','nba','ncaafb','nhl','mlb'].forEach(function(lg){
+        if(!S.psRos[lg]){try{psLoad(lg)}catch(e){}}
+        else if(S.psRos[lg].st==='load')loading=true;
+        pfSearch(lg,q).forEach(function(o){o._lg=lg;all.push(o)});
+      });
+      all.sort(function(a,b){return a._s-b._s||a.n.localeCompare(b.n)});
+      var teamHit=/No upcoming games found/.test(tm);
+      if(all.length){
+        pl='<div class="src" style="margin:12px 0 6px"><b>Players</b></div>'+all.slice(0,10).map(function(o){
+          var out=o.st&&OUT_RE.test(o.st),tag=o.st?' <span class="tag warn" style="font-size:10px;padding:1px 6px">'+esc(o.st)+'</span>':'';
+          return '<div class="card" data-act="pfopen" data-n="'+esc(o.n)+'" data-lg="'+o._lg+'" data-team="'+esc(o.t)+'" style="padding:10px 12px;margin:0 0 6px;cursor:pointer"><div><b>'+esc(o.n)+'</b> <span class="src">'+esc(o.t)+(o.pos?' · '+esc(o.pos):'')+' · '+esc(lgName(o._lg))+'</span>'+tag+'</div><div class="src" style="margin-top:2px">'+(out?'Held out of props because of the injury listing':o.up?esc(o.cats.join(' · ')):'No upcoming projection · past games only')+'</div></div>';
+        }).join('');
+        if(teamHit)tm='';
+        else tm='<div class="src" style="margin:12px 0 0"><b>Teams and games</b></div>'+tm;
+      }else if(loading)pl='<p class="src" style="margin:10px 0 0">Loading rosters, players will appear here shortly.</p>';
+    }catch(e){}
+  }
+  return pl+tm;
+};
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
