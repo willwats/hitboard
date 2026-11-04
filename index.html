@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v159, Nov 4';
+var BUILD='v160, Nov 4';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -6328,7 +6328,7 @@ function vToday(){
 }
 /* ---- first-open tour ---- */
 var TOUR=[
- {tab:'today',hl:'today',t:'Today',x:'Start here. The best bets across every sport, plus anything worth double-checking on your open bets. Tap a bet to see the reason and the matchup behind it. If nothing clears the edge bar, it says no bet.'},
+ {tab:'today',hl:'today',t:'Home',x:'Start here. The best bets across every sport, plus anything worth double-checking on your open bets. Tap a bet to see the reason and the matchup behind it. If nothing clears the edge bar, it says no bet.'},
  {tab:'games',hl:'games',t:'Games',x:'Every game with live scores, lines and the model’s read. Tap a game for the breakdown, each team’s last five games and player props.'},
  {tab:'props',hl:'props',t:'Props',x:'Player props by type, then by game. Tap a player for season stats and game-by-game results.'},
  {tab:'picks',hl:'picks',t:'My bets',x:'Upload a DraftKings screenshot or log a bet. The app reads each leg, then tracks scores and player stats live and shows whether you are covering.'},
@@ -6356,7 +6356,7 @@ document.addEventListener('change',function(e){
   else if(t.id==='bk_unit'){S.bank.unit=Math.max(1,parseFloat(t.value)||10);bankSave();render()}
 });
 TABS=TABS.filter(function(t){return t[0]!=='parlay'});
-TABS.unshift(['today','Today','<path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>']);
+TABS.unshift(['today','Home','<path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>']);
 NAVG.today=['today','parlay','builder'];
 setTimeout(function(){try{clCapture();pushHeadsUp()}catch(e){}},4000);
 setInterval(function(){try{clCapture();pushHeadsUp()}catch(e){}},60000);
@@ -11631,6 +11631,46 @@ gqResults=function(){
     }catch(e){}
   }
   return pl+tm;
+};
+
+/* v160: Home tab, injury tracker on Home under best bets, no player-search button on Props */
+S.injHome=S.injHome||null;
+function injHomeLg(){var l=S.injHome||(['nfl','nba','ncaafb','nhl','mlb'].indexOf(S.sport)>=0?S.sport:'nfl');return l}
+function injHomeHtml(){
+  var lg=injHomeLg(),h='';
+  try{injSnap()}catch(e){}
+  try{h=injSheet({type:'inj',lg:lg})}catch(e){return ''}
+  h=h.replace(/<div class="sh-head">[\s\S]*?<button class="x"[^>]*>×<\/button><\/div>/,'');
+  h=h.replace(/data-act="injsport"/g,'data-act="injhome"');
+  var I=S.inj[lg==='ncaafb'?'nfl':lg],n=0;if(I&&I.by)Object.keys(I.by).forEach(function(k){n+=I.by[k].length});
+  var st=lg==='ncaafb'?'':'<p class="src" style="margin:8px 0 0">'+(n?'Injury report: '+n+' players listed, updated '+esc(fmtClock(I.at))+'. Anyone ruled out is held out of props and picks.':'The injury report has not loaded yet, so injured players may still show. Tap Refresh on the Games page.')+'</p>';
+  return '<h3>Injury tracker</h3><div class="card">'+h+st+'</div>';
+}
+var vToday117=vToday;
+vToday=function(){
+  var h=vToday117();
+  try{
+    h=h.replace('<h2>Today</h2>','<h2>Home</h2>');
+    var i=h.indexOf('<h3>Best bets right now</h3>');
+    if(i>=0){
+      var j=h.indexOf('<h3>',i+10);if(j<0){j=h.lastIndexOf('<p class="foot">');if(j<0)j=h.length}
+      h=h.slice(0,j)+injHomeHtml()+h.slice(j);
+    }
+  }catch(e){}
+  return h;
+};
+document.addEventListener('click',function(e){
+  var el=e.target&&e.target.closest?e.target.closest('[data-act="injhome"]'):null;if(!el)return;
+  e.stopImmediatePropagation();e.preventDefault();
+  S.injHome=el.dataset.v;render();
+},true);
+var vPropsLg117=vPropsLg;
+vPropsLg=function(){
+  var h=vPropsLg117();
+  try{
+    h=h.replace(/<p style="margin:0 0 10px"><button class="btn" data-act="psearch">[\s\S]*?<\/p>(<p class="src" style="margin:-4px 0 8px">Injury report[\s\S]*?<\/p>|<p class="src" style="margin:-4px 0 8px">The injury report[\s\S]*?<\/p>)?/,'');
+  }catch(e){}
+  return h;
 };
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
