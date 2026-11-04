@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v152, Nov 4';
+var BUILD='v153, Nov 4';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -10953,7 +10953,7 @@ spRows=function(lg,cat){
       if(x.pos==='QB')return;
       var f=1,why='';
       var pct=function(v){return Math.round(Math.abs(1-v)*100)};
-      var lead='Starting QB '+q.starter+' is ruled out'+(q.backup?', so '+q.backup+' starts':', so his backup starts')+'. ';
+      var lead='Starting QB '+q.starter+' is ruled out'+(q.backup?', so '+q.backup+' starts':', so his backup starts')+'. '+(q.ln?'In '+q.ln+' earlier games without a starting QB, receivers got '+q.lp+'% of their usual yards. ':'');
       if(cat==='rush'){if(x.pos!=='RB')return;f=1.03;why=lead+'Teams lean on the run with a backup QB, so I added about 3%.'}
       else if(x.pos==='RB'){f=cat==='td'?1+(q.f-1)*.4:1+(q.f-1)*.5;why=lead+'That lowers the passing game, which trims his chances by about '+pct(f)+'%.'}
       else{f=cat==='td'?1+(q.f-1)*.8:q.f;why=lead+'That lowers the passing game by about '+pct(f)+'% for his receivers.'}
@@ -10973,6 +10973,210 @@ spCard=function(r){
   return h.slice(0,h.length-6)+'<div class="src" style="margin-top:4px"><b>'+esc(r.qn)+'</b></div></div>';
 };
 /* passing yards for a team whose starter is out: show his badge and a note on the backup */
+
+/* v153: injury tracker. Logs who is out and for how long, flags high-value players, learns from earlier games how teammates did when a key player missed, and tracks players coming back */
+var INJ={p:{},g:{}};
+try{var _ij=JSON.parse(localStorage.getItem('hb.inj.v1')||'null');if(_ij&&_ij.p){INJ=_ij;if(!INJ.g)INJ.g={}}}catch(e){}
+function injSave(){try{
+  var now=Date.now();
+  Object.keys(INJ.p).forEach(function(k){if(now-(INJ.p[k].last||0)>150*864e5)delete INJ.p[k]});
+  Object.keys(INJ.g).forEach(function(k){if(now-(INJ.g[k].start||0)>120*864e5)delete INJ.g[k]});
+  localStorage.setItem('hb.inj.v1',JSON.stringify(INJ))}catch(e){}}
+function injOutSt(st){st=String(st||'');return OUT_RE.test(st)||/doubtful/i.test(st)}
+var INJ_THR={npts:[18,'points'],nreb:[9,'rebounds'],nast:[6.5,'assists'],cpass:[180,'passing yards'],crush:[70,'rushing yards'],crec:[60,'receiving yards'],hp:[.9,'points'],hg:[.4,'goals'],hsv:[25,'saves'],mk:[5.5,'strikeouts'],mh:[1.2,'hits'],mhr:[.2,'home runs']};
+var INJ_GRP={QB:'starting quarterback',RB:'lead running back',WR:'top receiver',STAR:'top scorer'};
+/* is this player high value? returns {grp, why} or null */
+function injValue(lg,team,name){
+  var k=normName(name);
+  try{
+    if(lg==='nfl'){
+      var t=nt(team),D=DEEP.filter(function(d){return nt(d.t)===t}),me=D.filter(function(d){return normName(d.n)===k}).sort(function(a,b){return b.avgS-a.avgS})[0];
+      if(!me)return null;
+      var same=D.filter(function(d){return d.kind===me.kind}).sort(function(a,b){return b.avgS-a.avgS}),tot=same.reduce(function(s,d){return s+d.avgS},0),share=tot>0?me.avgS/tot:0;
+      if(me.kind==='pass'&&same[0]===me&&me.avgS>=120)return {grp:'QB',why:'starting QB, '+Math.round(me.avgS)+' passing yards a game'};
+      if(me.kind==='rush'&&share>=.35&&me.avgS>=35)return {grp:'RB',why:'lead back, '+Math.round(share*100)+'% of the team’s rushing'};
+      if(me.kind==='rec'&&share>=.2&&me.avgS>=40)return {grp:'WR',why:'top receiver, '+Math.round(me.avgS)+' receiving yards a game'};
+      return null;
+    }
+    var best=null;
+    PROPS.forEach(function(p){if(p.lg!==lg||normName(p.name)!==k||tabb(p.team)!==tabb(team))return;var th=INJ_THR[p.kind];if(th&&p.avg>=th[0]&&(!best||p.avg/th[0]>best.r))best={r:p.avg/th[0],grp:'STAR',why:'averages '+(p.avg<20?p.avg.toFixed(1):Math.round(p.avg))+' '+th[1]}});
+    return best;
+  }catch(e){return null}
+}
+/* log every injury report: who, when, status changes, value */
+function injSnap(){
+  var now=Date.now(),ch=false;
+  ['nfl','nba','nhl','mlb'].forEach(function(lg){
+    var I=S.inj[lg];if(!I||!I.by||!Object.keys(I.by).length)return;
+    var seen={};
+    Object.keys(I.by).forEach(function(tk){I.by[tk].forEach(function(it){
+      var key=lg+'|'+tk+'|'+normName(it.n);seen[key]=1;
+      var rec=INJ.p[key];if(!rec){rec=INJ.p[key]={lg:lg,t:tk,n:it.n,pos:it.pos||'',first:now,hist:[]};ch=true}
+      var st=it.st||'Listed',lastH=rec.hist[rec.hist.length-1];
+      if(!lastH||lastH[1]!==st){rec.hist.push([now,st]);if(rec.hist.length>12)rec.hist.shift();ch=true}
+      rec.cur=st;rec.last=now;rec.d=it.d||rec.d||'';
+      var v=injValue(lg,tk,it.n);rec.k=v?v.grp:'';rec.w=v?v.why:'';
+    })});
+    Object.keys(INJ.p).forEach(function(key){var rec=INJ.p[key];if(rec.lg!==lg||seen[key]||rec.cur==='Cleared')return;rec.cur='Cleared';rec.hist.push([now,'Cleared']);rec.last=now;ch=true});
+    (S.feed[lg]||[]).forEach(function(g){
+      if(kind(g)!=='up'||!(g.start>now)||!g.sid)return;
+      var outs=[];
+      ['a','h'].forEach(function(sd){(I.by[injKey(g,sd)]||[]).forEach(function(it){
+        var tk=injKey(g,sd),v=injValue(lg,tk,it.n);
+        outs.push({t:tk,n:it.n,pos:it.pos||'',st:it.st||'',out:injOutSt(it.st)?1:0,k:v?v.grp:'',w:v?v.why:''})})});
+      INJ.g[lg+'|'+g.sid]={lg:lg,sid:g.sid,gid:g.id,a:g.a,h:g.h,start:g.start,at:now,outs:outs};ch=true;
+    });
+  });
+  if(ch)injSave();
+}
+var loadInj110=loadInj;
+loadInj=function(lg){var p=loadInj110(lg);return p&&p.then?p.then(function(r){try{injSnap()}catch(e){}return r}):p};
+setTimeout(function(){try{injSnap()}catch(e){}},15000);
+setInterval(function(){try{injSnap()}catch(e){}},300000);
+
+/* what happened to teammates when a key player was missing, read from every earlier game already on file */
+var _ilC={};
+function injLearn(lg){
+  var key=S.dlV+'|'+Object.keys(S.dlog).length+'|'+lg;if(_ilC[lg]&&_ilC[lg].k===key)return _ilC[lg].v;
+  var out={L:{},ev:[]},C=DL_LG[lg];
+  if(!C){_ilC[lg]={k:key,v:out};return out}
+  try{
+    var ix=dlIdx(lg),cats=Object.keys(C.ix),base={};
+    Object.keys(ix).forEach(function(nm){base[nm]={};cats.forEach(function(c){var i=C.ix[c],vs=ix[nm].map(function(x){return x.v[i]}).filter(function(v){return v!=null});if(vs.length>=3)base[nm][c]={a:vs.reduce(function(a,b){return a+b},0)/vs.length,n:vs.length}})});
+    // key players per team (newest team wins)
+    var teamOf={},key2={};
+    Object.keys(ix).forEach(function(nm){teamOf[nm]=ix[nm][0].t});
+    var pick=function(cat,n,min,grp,filter){
+      var byT={};Object.keys(base).forEach(function(nm){var b=base[nm][cat];if(!b||b.a<min)return;if(filter&&!filter(nm))return;(byT[teamOf[nm]]=byT[teamOf[nm]]||[]).push({nm:nm,a:b.a})});
+      Object.keys(byT).forEach(function(t){byT[t].sort(function(x,y){return y.a-x.a}).slice(0,n).forEach(function(x){(key2[t]=key2[t]||[]).push({nm:x.nm,grp:grp})})});
+    };
+    if(lg==='nfl'){pick('pass',1,100,'QB');pick('rush',1,25,'RB');pick('rec',2,25,'WR')}
+    else pick('npts',2,14,'STAR');
+    var eff={QB:'rec',RB:'rush',WR:'rec',STAR:'npts'};
+    var games=Object.keys(S.dlog).map(function(k){return S.dlog[k]}).filter(function(g){return g.lg===lg});
+    games.forEach(function(g){
+      g.s.forEach(function(sd){
+        (key2[sd.t]||[]).forEach(function(kp){
+          if(sd.p[kp.nm])return; // he played
+          var cat=eff[kp.grp],i=C.ix[cat],sum=0,n=0;
+          Object.keys(sd.p).forEach(function(nm){
+            if((key2[sd.t]||[]).some(function(q){return q.nm===nm&&q.grp===kp.grp}))return;
+            var b=base[nm]&&base[nm][cat],v=sd.p[nm][i];if(!b||b.a<C.min[i]||v==null)return;
+            sum+=Math.min(3,v/b.a);n++;
+          });
+          if(n<3)return;
+          var m=sum/n,L=out.L[kp.grp]=out.L[kp.grp]||{n:0,s:0,cat:cat};L.n++;L.s+=m;
+          out.ev.push({grp:kp.grp,nm:kp.nm,t:sd.t,o:sd.o,at:g.at,m:m,n:n});
+        });
+      });
+    });
+    Object.keys(out.L).forEach(function(g){out.L[g].mean=out.L[g].s/out.L[g].n});
+    out.ev.sort(function(a,b){return b.at-a.at});
+  }catch(e){}
+  _ilC[lg]={k:key,v:out};return out;
+}
+/* use what was learned for the missing starting QB, once enough games back it up */
+var nflQbOut110=nflQbOut;
+nflQbOut=function(team){
+  var q=nflQbOut110(team);if(!q)return q;
+  try{var L=injLearn('nfl').L.QB;
+    if(L&&L.n>=3){var w=L.n/(L.n+4),f=q.f*(1-w)+L.mean*w;q.f=Math.max(.78,Math.min(1.02,f));q.ln=L.n;q.lp=Math.round(L.mean*100)}
+  }catch(e){}
+  return q;
+};
+/* players coming back: how his first game back compared with his usual */
+function injReturns(lg){
+  var C=DL_LG[lg],out=[];if(!C)return out;
+  var ix=dlIdx(lg);
+  Object.keys(INJ.p).forEach(function(key){
+    var r=INJ.p[key];if(r.lg!==lg||r.cur!=='Cleared')return;
+    var lastOut=0;r.hist.forEach(function(h){if(injOutSt(h[1]))lastOut=Math.max(lastOut,h[0])});if(!lastOut)return;
+    var L=ix[normName(r.n)]||[],back=L.filter(function(x){return x.at>lastOut}).sort(function(a,b){return a.at-b.at})[0];if(!back)return;
+    var prior=L.filter(function(x){return x.at<lastOut}),cat=Object.keys(C.ix).filter(function(c){var i=C.ix[c];return back.v[i]!=null&&prior.filter(function(x){return x.v[i]!=null}).length>=3}).sort(function(a,b){return (back.v[C.ix[b]]||0)-(back.v[C.ix[a]]||0)})[0];
+    if(!cat)return;var i=C.ix[cat],vs=prior.map(function(x){return x.v[i]}).filter(function(v){return v!=null}),avg=vs.reduce(function(a,b){return a+b},0)/vs.length;
+    if(!(avg>0))return;
+    out.push({n:r.n,t:r.t,pos:r.pos,cat:C.names[i],v:back.v[i],avg:avg,at:back.at,k:r.k});
+  });
+  return out.sort(function(a,b){return b.at-a.at});
+}
+/* ---------- screens ---------- */
+function injFmt(v){return v<20&&v!==Math.round(v)?v.toFixed(1):String(Math.round(v))}
+function injEffect(grp,lg){
+  return grp==='QB'?'Passing game and his receivers':grp==='RB'?'Rushing game, with more work for the backups':grp==='WR'?'Targets move to the other receivers':'Shots and points move to teammates';
+}
+function injBanner(g){
+  try{
+    var I=S.inj[g.lg];if(!I||!I.by)return '';
+    var key=[],other=[],watch=[];
+    ['a','h'].forEach(function(sd){(I.by[injKey(g,sd)]||[]).forEach(function(it){
+      var v=injValue(g.lg,injKey(g,sd),it.n),o=injOutSt(it.st),tm=sd==='a'?g.an:g.hn;
+      if(o&&v)key.push('<b>'+esc(it.n)+'</b> <span class="src">'+esc(shortNm?shortNm(g,sd):tm)+' · '+esc(it.pos||'')+' · '+esc(it.st)+'</span><br><span class="src">'+esc(v.why.charAt(0).toUpperCase()+v.why.slice(1))+'. '+esc(injEffect(v.grp,g.lg))+'.</span>');
+      else if(o)other.push(it.n);
+      else if(v)watch.push(it.n+' ('+it.st+')');
+    })});
+    if(!key.length&&!other.length&&!watch.length)return '';
+    var h='<div style="margin:0 0 10px;padding:8px 10px;border-radius:8px;border:1px solid var(--line)">';
+    if(key.length)h+='<div style="margin-bottom:4px"><span class="tag warn" style="font-size:11px;padding:1px 6px">Key player out</span></div>'+key.map(function(x){return '<div style="margin:4px 0">'+x+'</div>'}).join('')+'<p class="src" style="margin:4px 0 0">Props for his teammates are adjusted for this.</p>';
+    if(other.length)h+='<p class="src" style="margin:6px 0 0">Also out: '+esc(other.slice(0,8).join(', '))+(other.length>8?' and '+(other.length-8)+' more':'')+'.</p>';
+    if(watch.length)h+='<p class="src" style="margin:6px 0 0">Key players to watch: '+esc(watch.slice(0,6).join(', '))+'.</p>';
+    return h+'</div>';
+  }catch(e){return ''}
+}
+var gbxProps110=gbxProps;
+gbxProps=function(g){return injBanner(g)+gbxProps110(g)};
+function injSheet(s){
+  var lg=s.lg,h='<div class="sh-head"><div><div class="label">Injury tracker</div><h2>Injuries</h2></div><button class="x" data-act="close" aria-label="Close">×</button></div>';
+  h+='<div class="chips" role="group" aria-label="Sport" style="margin-top:10px">'+['nfl','nba','ncaafb','nhl','mlb'].map(function(l){return '<button class="chip" data-act="injsport" data-v="'+l+'" aria-pressed="'+(lg===l)+'">'+esc(lgName(l))+'</button>'}).join('')+'</div>';
+  var I=S.inj[lg==='ncaafb'?'nfl':lg];
+  if(lg==='ncaafb')return h+'<div class="card empty" style="margin-top:10px">Injury reports are not available for college football.</div>';
+  // key players out, upcoming games
+  var now=Date.now(),games=(S.feed[lg]||[]).filter(function(g){return kind(g)==='up'&&g.start>now}),rows=[],watch=[],other=0;
+  games.forEach(function(g){['a','h'].forEach(function(sd){((I&&I.by&&I.by[injKey(g,sd)])||[]).forEach(function(it){
+    var v=injValue(lg,injKey(g,sd),it.n),o=injOutSt(it.st);
+    if(o&&v)rows.push({g:g,sd:sd,it:it,v:v});else if(!o&&v)watch.push({g:g,sd:sd,it:it,v:v});else if(o)other++;
+  })})});
+  h+='<h3>Key players out for upcoming games</h3>';
+  if(!I||!I.by)h+='<div class="card empty">The injury report has not loaded yet. Tap Refresh on the Games page.</div>';
+  else if(!rows.length)h+='<p class="src">No high-value players are ruled out for the games on the schedule right now.'+(other?' '+other+' other player'+(other===1?' is':'s are')+' out.':'')+'</p>';
+  else h+=rows.map(function(x){var g=x.g;return '<div class="card" data-act="fgame" data-id="'+esc(g.id)+'" style="padding:10px 12px;margin:0 0 8px;cursor:pointer"><div><span class="tag warn" style="font-size:10px;padding:1px 6px">Key</span> <b>'+esc(x.it.n)+'</b> <span class="src">'+esc(injKey(g,x.sd))+' · '+esc(x.it.pos||'')+' · '+esc(x.it.st)+'</span></div><div class="src" style="margin-top:2px">'+esc(x.v.why.charAt(0).toUpperCase()+x.v.why.slice(1))+'.</div><div class="src">Affects: '+esc(injEffect(x.v.grp,lg))+'. '+esc(g.an)+' @ '+esc(g.hn)+', '+esc(new Date(g.start).toLocaleString(undefined,{weekday:'short',hour:'numeric',minute:'2-digit'}))+'</div></div>'}).join('');
+  if(watch.length)h+='<h3>Key players to watch</h3><p class="src" style="margin:0 0 6px">Listed but not ruled out. If one is ruled out, his team’s props change.</p>'+watch.slice(0,12).map(function(x){return '<div style="padding:5px 0;border-top:1px solid var(--line)"><b>'+esc(x.it.n)+'</b> <span class="src">'+esc(injKey(x.g,x.sd))+' · '+esc(x.it.pos||'')+' · '+esc(x.it.st)+' · '+esc(x.v.why)+'</span></div>'}).join('');
+  // learned effects
+  var LN=injLearn(lg),names={QB:'starting QB',RB:'lead back',WR:'top two receivers',STAR:'top two scorers'},ctx={QB:'Receivers',RB:'Other runners',WR:'Other receivers',STAR:'Teammates’ points'};
+  h+='<h3>What happened when a key player missed</h3>';
+  var gs=Object.keys(LN.L);
+  if(!gs.length)h+='<p class="src">Not enough earlier games on file yet. This fills in as the app reads finished games.</p>';
+  else{
+    h+='<p class="src" style="margin:0 0 6px">From earlier games this season where a team’s key player did not appear in the box score, how the rest of his team did against their own usual numbers.</p>';
+    h+='<div class="tblwrap"><table><thead><tr><th>Key player missing</th><th class="lc">Games</th><th class="lc">Teammates got</th></tr></thead><tbody>'+gs.map(function(g){var L=LN.L[g],p=Math.round(L.mean*100);return '<tr><td>'+esc(names[g]||g)+' <span class="src">'+esc(ctx[g]||'')+'</span></td><td class="lc">'+L.n+'</td><td class="lc"><span class="hrpill '+(p>=105?'hi':p<=92?'lo':'mid')+'" style="display:inline-block">'+p+'% of usual</span></td></tr>'}).join('')+'</tbody></table></div>';
+    if(lg==='nfl'&&LN.L.QB)h+='<p class="src" style="margin:6px 0 0">'+(LN.L.QB.n>=3?'The projections for receivers use this ('+LN.L.QB.n+' games) when their starting QB is out.':'Needs 3 games before it replaces my starting estimate of about 9% lower.')+'</p>';
+    h+='<p class="src" style="margin:8px 0 2px"><b>Recent examples</b></p>'+LN.ev.slice(0,8).map(function(e){return '<div style="padding:4px 0;border-top:1px solid var(--line)"><b>'+esc(pfPretty(e.nm))+'</b> <span class="src">'+esc(e.t)+' missed '+esc(new Date(e.at).toLocaleDateString(undefined,{month:'short',day:'numeric'}))+' vs '+esc(e.o)+' · teammates got '+Math.round(e.m*100)+'% of usual ('+e.n+' players)</span></div>'}).join('');
+  }
+  // returning
+  var R=injReturns(lg);
+  h+='<h3>Back from injury</h3>';
+  if(!R.length)h+='<p class="src">No one tracked has returned yet. When a player I logged as out plays again, his first game back is compared with his usual here.</p>';
+  else h+=R.slice(0,10).map(function(r){var p=Math.round(100*r.v/r.avg);return '<div style="padding:5px 0;border-top:1px solid var(--line)"><b>'+esc(r.n)+'</b> <span class="src">'+esc(r.t)+' · first game back '+esc(new Date(r.at).toLocaleDateString(undefined,{month:'short',day:'numeric'}))+'</span><div class="src">'+esc(r.cat)+': '+injFmt(r.v)+' against a usual '+injFmt(r.avg)+' <span class="hrpill '+(p>=105?'hi':p<=85?'lo':'mid')+'" style="display:inline-block">'+p+'%</span></div></div>'}).join('');
+  // log
+  var log=Object.keys(INJ.p).map(function(k){return INJ.p[k]}).filter(function(r){return r.lg===lg&&r.k}).sort(function(a,b){return (b.last||0)-(a.last||0)}).slice(0,12);
+  h+='<h3>Key players I have been tracking</h3>';
+  if(!log.length)h+='<p class="src">Nothing logged yet. The app saves each injury report while it is open.</p>';
+  else h+=log.map(function(r){var d=function(t){return new Date(t).toLocaleDateString(undefined,{month:'short',day:'numeric'})};return '<div style="padding:5px 0;border-top:1px solid var(--line)"><b>'+esc(r.n)+'</b> <span class="src">'+esc(r.t)+' · '+esc(r.pos)+' · '+esc(r.w||'')+'</span><div class="src">'+r.hist.slice(-4).map(function(x){return d(x[0])+' '+esc(x[1])}).join(' → ')+'</div></div>'}).join('');
+  return h+'<p class="foot">Status comes from the injury report each time the app loads. A player counts as out if he is listed out, doubtful or on injured reserve. A “key” player is a starting QB, a lead back, a top receiver, or a top scorer.</p>';
+}
+var propSheet110=propSheet;
+propSheet=function(p){var s=S.sheet;if(s&&s.type==='inj')return injSheet(s);return propSheet110(p)};
+document.addEventListener('click',function(e){
+  var el=e.target&&e.target.closest?e.target.closest('[data-act="injtrk"],[data-act="injsport"]'):null;if(!el)return;
+  e.stopImmediatePropagation();e.preventDefault();
+  if(el.dataset.act==='injtrk'){S.sheet={type:'inj',lg:['nfl','nba','ncaafb','nhl','mlb'].indexOf(S.sport)>=0?S.sport:'nfl'};try{injSnap()}catch(x){}renderSheet()}
+  else{S.sheet.lg=el.dataset.v;renderSheet()}
+},true);
+var vPropsLg110=vPropsLg;
+vPropsLg=function(){
+  var h=vPropsLg110();
+  try{var j=h.indexOf('data-act="psearch">');if(j>=0&&h.indexOf('data-act="injtrk"')<0){var e=h.indexOf('</button>',j);h=h.slice(0,e+9)+' <button class="btn" data-act="injtrk">Injury tracker</button>'+h.slice(e+9)}}catch(x){}
+  return h;
+};
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
