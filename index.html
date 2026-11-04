@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v160, Nov 4';
+var BUILD='v161, Nov 4';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -6328,7 +6328,7 @@ function vToday(){
 }
 /* ---- first-open tour ---- */
 var TOUR=[
- {tab:'today',hl:'today',t:'Home',x:'Start here. The best bets across every sport, plus anything worth double-checking on your open bets. Tap a bet to see the reason and the matchup behind it. If nothing clears the edge bar, it says no bet.'},
+ {tab:'today',hl:'today',t:'Home',x:'Start here. The latest news across every sport, anything worth double-checking on your open bets, and the injury tracker. Best bets are under Games.'},
  {tab:'games',hl:'games',t:'Games',x:'Every game with live scores, lines and the model’s read. Tap a game for the breakdown, each team’s last five games and player props.'},
  {tab:'props',hl:'props',t:'Props',x:'Player props by type, then by game. Tap a player for season stats and game-by-game results.'},
  {tab:'picks',hl:'picks',t:'My bets',x:'Upload a DraftKings screenshot or log a bet. The app reads each leg, then tracks scores and player stats live and shows whether you are covering.'},
@@ -11669,6 +11669,46 @@ vPropsLg=function(){
   var h=vPropsLg117();
   try{
     h=h.replace(/<p style="margin:0 0 10px"><button class="btn" data-act="psearch">[\s\S]*?<\/p>(<p class="src" style="margin:-4px 0 8px">Injury report[\s\S]*?<\/p>|<p class="src" style="margin:-4px 0 8px">The injury report[\s\S]*?<\/p>)?/,'');
+  }catch(e){}
+  return h;
+};
+
+/* v161: Home leads with Latest news; best bets live under Games */
+S.newsHome=S.newsHome||'all';
+function newsHomeHtml(){
+  var sel=S.newsHome,lgs=['nfl','nba','ncaafb','nhl','mlb'];
+  lgs.forEach(function(l){try{if(!S.nws[l]||(!S.nws[l].at&&!S.nws[l].busy))nwsLoad(l)}catch(e){}});
+  var h='<h3>Latest news</h3><div class="chips" role="group" aria-label="News sport">'+[['all','All']].concat(lgs.map(function(l){return [l,lgName(l)]})).map(function(c){return '<button class="chip" data-act="newshome" data-v="'+c[0]+'" aria-pressed="'+(sel===c[0])+'">'+esc(c[1])+'</button>'}).join('')+'</div>';
+  var L=[],loaded=false,busy=false;
+  lgs.forEach(function(l){
+    if(sel!=='all'&&sel!==l)return;var N=S.nws[l];if(!N)return;if(N.at)loaded=true;if(N.busy)busy=true;
+    (N.items||[]).forEach(function(i){if(!i.tx||nwsTags(i.h).length)L.push({i:i,l:l})});
+  });
+  L.sort(function(a,b){return b.i.at-a.i.at});
+  if(!L.length)return h+'<div class="card empty" style="margin-top:8px">'+(loaded?'No recent headlines for this sport.':(busy?'Loading the latest headlines…':'Headlines have not loaded yet. They load a few seconds after the app opens.'))+' <button class="linkbtn" data-act="nwsrefall">Refresh</button></div>';
+  h+='<div class="card" style="margin-top:8px;padding-top:4px;padding-bottom:4px">'+L.slice(0,12).map(function(x,k){
+    var i=x.i,tg=nwsTags(i.h+' '+i.d).map(function(t){return '<span class="tag" style="font-size:10px;padding:1px 6px;margin-right:4px">'+esc(t)+'</span>'}).join('');
+    var t=i.url?'<a href="'+esc(i.url)+'" target="_blank" rel="noopener" style="color:inherit"><b>'+esc(i.h)+'</b></a>':'<b>'+esc(i.h)+'</b>';
+    return '<div style="padding:8px 0;'+(k?'border-top:1px solid var(--line)':'')+'"><div class="src" style="margin:0 0 2px"><span class="tag" style="font-size:10px;padding:1px 6px;margin-right:4px">'+esc(lgName(x.l))+'</span>'+tg+esc(nwsAgo(i.at))+'</div>'+t+(i.d&&!i.tx?'<div class="src" style="margin-top:2px">'+esc(i.d.length>140?i.d.slice(0,137)+'…':i.d)+'</div>':'')+'</div>';
+  }).join('')+'</div><p class="src" style="margin:6px 0 0"><button class="linkbtn" data-act="nwsrefall">Refresh news</button></p>';
+  return h;
+}
+document.addEventListener('click',function(e){
+  var el=e.target&&e.target.closest?e.target.closest('[data-act="newshome"],[data-act="nwsrefall"]'):null;if(!el)return;
+  e.stopImmediatePropagation();e.preventDefault();
+  if(el.dataset.act==='newshome'){S.newsHome=el.dataset.v;render();return}
+  ['nfl','nba','ncaafb','nhl','mlb'].forEach(function(l){try{nwsLoad(l,true)}catch(x){}});
+},true);
+var vToday118=vToday;
+vToday=function(){
+  var h=vToday118();
+  try{
+    var a=h.indexOf('<h3>Best bets right now</h3>'),b=h.indexOf('<h3>Injury tracker</h3>');
+    if(a>=0&&b>a)h=h.slice(0,a)+h.slice(b);
+    /* the tracker keeps injuries only; headlines have their own section */
+    var t=h.indexOf('<h3>Injury tracker</h3>');
+    if(t>=0){var n=h.indexOf('<h3>Latest news</h3>',t);if(n>=0){var e=h.indexOf('<h3>',n+10),c=h.indexOf('</div><h3>',n);var end=e>=0?e:-1;if(end>=0)h=h.slice(0,n)+h.slice(end);else{var ce=h.indexOf('</div>',n);h=h.slice(0,n)+h.slice(ce)}}}
+    h=h.replace(/(<h2>Home<\/h2>)<p class="lede">[\s\S]*?<\/p>/,'$1<p class="lede">Headlines first, then what is worth double-checking. Best bets are under Games.</p>'+newsHomeHtml());
   }catch(e){}
   return h;
 };
