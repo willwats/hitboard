@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v150, Nov 3';
+var BUILD='v151, Nov 3';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -10798,6 +10798,111 @@ var pmSheet107=pmSheet;
 pmSheet=function(s){
   var h=pmSheet107(s);
   return h.replace('data-act="prof" data-full="1"','data-act="pfopen"').replace('>Game log, splits and charts<','>Full profile: trends, past games, my projections<');
+};
+
+/* v151: each game's props as expandable cards (why, matchup, form, live progress, result) with a Follow button; followed props are listed in Track record */
+TRK.f=TRK.f||{};
+S.gpo=S.gpo||{};
+// keep the reasons with the saved projection so the game page can explain it even after kickoff
+var spRows108=spRows;
+spRows=function(lg,cat){
+  var rows=spRows108(lg,cat);
+  try{
+    if(TRK_LGS.indexOf(lg)<0||!trkCats(lg)[cat])return rows;
+    rows.forEach(function(x){
+      var g=lg==='nfl'?trkGameFor(lg,x.gk):(x.gk?find(x.gk):null);if(!g||!g.sid)return;
+      var r=TRK.p[g.sid+'|'+lg+'|'+cat+'|'+normName(x.n)];if(!r||r.done)return;
+      r.pj=x.proj;r.d=x.def&&x.def.txt?String(x.def.txt).slice(0,140):null;r.dt=x.def&&x.def.tag?x.def.tag[1]:null;r.tl=x.trLine?String(x.trLine).slice(0,170):null;r.h=x.hot||0;r.ps=x.pos||null;r.un=x.unit?String(x.unit).slice(0,40):null;
+      if(cat==='td')r.un='chance to score';
+    });
+  }catch(e){}
+  return rows;
+};
+function gbxById(lg,sid){var o=null;(S.feed[lg]||[]).forEach(function(g){if(String(g.sid)===String(sid))o=g});return o}
+function pjOf(r){return r.pj!=null?r.pj:r.raw}
+function pjFmt(r,v){return r.cat==='td'?Math.round(v*100)+'%':(pjOf(r)<20?v.toFixed(1):String(Math.round(v)))}
+function gbxProps(g){
+  TRK.f=TRK.f||{};
+  var recs=Object.keys(TRK.p).map(function(k){return TRK.p[k]}).filter(function(r){return r.sid===g.sid&&r.lg===g.lg});
+  var k=kind(g);
+  if(!recs.length&&k==='up'){
+    S.gtl=S.gtl||{};if(!S.gtl[g.id]){S.gtl[g.id]=1;try{trkLogAll()}catch(e){}
+      recs=Object.keys(TRK.p).map(function(q){return TRK.p[q]}).filter(function(r){return r.sid===g.sid&&r.lg===g.lg})}
+  }
+  if(!recs.length)return '<p class="src" style="margin:0">No props were saved for this game. The app saves them before kickoff while it is open.</p>';
+  var CT=trkCats(g.lg),o=S.gbx[g.id],B=null;
+  if(o&&o.j&&k!=='up'){try{B=g.lg==='nfl'?{P:trkParseBox(o.j)}:g.lg==='nhl'?{P:trkParseNhl(o.j)}:g.lg==='mlb'?{P:trkParseMlb(o.j)}:trkBox(g.lg,o.j)}catch(e){B=null}}
+  var rows=recs.map(function(r){
+    var v=null;
+    if(r.done&&!r.void)v=r.act;else if(B){try{v=trkValue(Object.assign({},r),B)}catch(e){v=null}}
+    return {r:r,v:v,void:!!r.void||v==='void'};
+  });
+  rows.sort(function(a,b){return (TRK.f[b.r.id]?1:0)-(TRK.f[a.r.id]?1:0)||(mgNum(b.r.mg)-mgNum(a.r.mg))||(b.r.raw/(b.r.avg||b.r.raw||1)-a.r.raw/(a.r.avg||a.r.raw||1))});
+  var pill=function(c,t){return '<span class="hrpill '+c+'" style="display:inline-block">'+t+'</span>'};
+  var item=function(x){
+    var r=x.r,pj=pjOf(r),td=r.cat==='td',fol=!!TRK.f[r.id],lab=String(CT[r.cat]||r.cat).toLowerCase();
+    var mg=r.mg?' '+pill(/^[AB]/.test(r.mg)?'hi':/^C/.test(r.mg)?'mid':'lo','Matchup '+esc(r.mg)):'';
+    var st,right,prog='';
+    if(x.void){st='did not play';right='<span class="src">did not play</span>'}
+    else if(k==='up'){right='<b>'+pjFmt(r,pj)+'</b>';st='waiting for kickoff'}
+    else if(x.v==null){right='<b>'+pjFmt(r,pj)+'</b>';st='stat not posted yet'}
+    else if(td){var sc=x.v>0;right=sc?pill('hi','Scored'):(k==='final'?pill('lo','No TD'):'<span class="src">not yet</span>');st=sc?'scored':'chance was '+pjFmt(r,pj)}
+    else{
+      var over=x.v>=pj;
+      right=k==='final'?'<b>'+pjFmt(r,x.v)+'</b> '+pill(over?'hi':'lo',over?'Over':'Under'):'<b>'+pjFmt(r,x.v)+'</b> <span class="src">of '+pjFmt(r,pj)+'</span>';
+      st=k==='final'?'finished with '+pjFmt(r,x.v)+' against my '+pjFmt(r,pj):pjFmt(r,x.v)+' so far';
+      prog='<div style="height:5px;background:var(--line);border-radius:3px;margin-top:5px;overflow:hidden"><div style="height:100%;width:'+Math.min(100,Math.round(100*x.v/Math.max(pj,.01)))+'%;background:'+(over?'#1a9f5a':'#8a8f98')+'"></div></div>';
+    }
+    var why='';
+    if(r.d)why+='<li>'+esc(r.d)+'.</li>';
+    if(r.tl)why+='<li>'+(r.h>0?pill('hi','Hot')+' ':r.h<0?pill('lo','Cold')+' ':'')+esc(r.tl)+'.</li>';
+    if(!r.tl){try{var T=dlTrend(r.lg,r.cat,r.n,null);if(T)why+='<li>Last '+T.n+' games: '+T.vals.map(fmt106).join(', ')+' (average '+fmt106(T.mean)+').</li>'}catch(e){}}
+    if(r.avg!=null)why+='<li>Season average '+(r.avg<20?r.avg.toFixed(1):Math.round(r.avg))+(r.un?' '+esc(r.un):'')+'; my number is '+pjFmt(r,pj)+'.</li>';
+    if(td&&r.avg==null)why+='<li>My chance to score is '+pjFmt(r,pj)+'.</li>';
+    var nowTxt=x.void?'He did not play.':k==='up'?'Saved before kickoff. The result will show here and in Track record.':st.charAt(0).toUpperCase()+st.slice(1)+'.';
+    return '<details data-pid="'+esc(r.id)+'"'+(S.gpo[r.id]?' open':'')+' style="border-top:1px solid var(--line)"><summary style="cursor:pointer;padding:7px 0;list-style:none"><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><div style="min-width:0"><b>'+(fol?'★ ':'')+esc(r.n)+'</b> <span class="src">'+esc(r.t)+' · '+esc(lab)+'</span>'+mg+'</div><div style="text-align:right;white-space:nowrap">'+right+' <span class="src">▾</span></div></div>'+prog+'</summary>'+
+      '<div style="padding:2px 0 10px"><p style="margin:0 0 4px"><b>'+esc(nowTxt)+'</b></p>'+(why?'<ul class="pts" style="margin:4px 0 6px">'+why+'</ul>':'')+
+      '<div class="actions" style="margin-top:6px"><button class="btn'+(fol?' primary':'')+'" data-act="pfollow" data-id="'+esc(r.id)+'" style="padding:6px 10px;font-size:13px">'+(fol?'★ Following':'☆ Follow this prop')+'</button><button class="btn" data-act="pfopen" data-n="'+esc(r.n)+'" data-lg="'+r.lg+'" data-team="'+esc(r.t)+'" style="padding:6px 10px;font-size:13px">Player profile</button></div></div></details>';
+  };
+  var head='',nf=rows.filter(function(x){return TRK.f[x.r.id]}).length;
+  if(k==='final'&&B){
+    var ys=rows.filter(function(x){return !x.void&&x.v!=null&&x.r.cat!=='td'}),hit=ys.filter(function(x){return x.v>=pjOf(x.r)}).length,td=rows.filter(function(x){return !x.void&&x.v!=null&&x.r.cat==='td'}),sc=td.filter(function(x){return x.v>0}).length,ex=td.reduce(function(a,x){return a+pjOf(x.r)},0);
+    head='<p style="margin:0 0 6px"><b>How my props played out:</b> '+(ys.length?hit+' of '+ys.length+' player lines finished at or over my number':'no yardage or count lines settled')+(td.length?'; '+sc+' touchdown scorer'+(sc===1?'':'s')+' against about '+(Math.round(ex*10)/10)+' expected':'')+'.</p>';
+  }
+  head+='<p class="src" style="margin:0 0 4px">'+rows.length+' props · tap one for the reasons'+(nf?' · '+nf+' followed':'')+'. Followed props sit at the top.</p>';
+  var top=rows.slice(0,15),rest=rows.slice(15);
+  return head+top.map(item).join('')+(rest.length?'<details style="margin-top:6px"><summary class="src" style="cursor:pointer">All '+rows.length+' props for this game</summary>'+rest.map(item).join('')+'</details>':'');
+}
+document.addEventListener('toggle',function(e){var d=e.target;if(d&&d.dataset&&d.dataset.pid){if(d.open)S.gpo[d.dataset.pid]=1;else delete S.gpo[d.dataset.pid]}},true);
+document.addEventListener('click',function(e){
+  var el=e.target&&e.target.closest?e.target.closest('[data-act="pfollow"]'):null;if(!el)return;
+  e.stopImmediatePropagation();e.preventDefault();
+  var id=el.dataset.id;if(TRK.f[id])delete TRK.f[id];else TRK.f[id]=1;
+  trkLater();if(S.sheet)renderSheet();else render();
+},true);
+// followed props across all games, at the top of Track record
+function followCard(){
+  TRK.f=TRK.f||{};
+  var ids=Object.keys(TRK.f).filter(function(id){return TRK.p[id]});
+  var h='<div class="card"><b>Props I am following</b>';
+  if(!ids.length)return h+'<p class="src" style="margin:4px 0 0">Open a game, tap a prop and choose Follow. Followed props show here with their result.</p></div>';
+  var rs=ids.map(function(id){return TRK.p[id]}).sort(function(a,b){return (a.done?1:0)-(b.done?1:0)||(a.done?b.st-a.st:a.st-b.st)});
+  h+='<p class="src" style="margin:4px 0 6px">'+rs.filter(function(r){return !r.done}).length+' waiting or live · '+rs.filter(function(r){return r.done&&!r.void}).length+' settled</p>';
+  h+=rs.slice(0,25).map(function(r){
+    var CT=trkCats(r.lg),pj=pjOf(r),td=r.cat==='td',g=gbxById(r.lg,r.sid),res;
+    if(r.done&&r.void)res='<span class="src">did not play</span>';
+    else if(r.done&&td)res=r.act>0?'<span class="hrpill hi" style="display:inline-block">Scored</span>':'<span class="hrpill lo" style="display:inline-block">No TD</span>';
+    else if(r.done){var ov=r.act>=pj;res='<b>'+pjFmt(r,r.act)+'</b> <span class="hrpill '+(ov?'hi':'lo')+'" style="display:inline-block">'+(ov?'Over':'Under')+'</span>'}
+    else res='<span class="src">'+(r.st>Date.now()?new Date(r.st).toLocaleString(undefined,{weekday:'short',hour:'numeric',minute:'2-digit'}):'in progress')+'</span>';
+    return '<div'+(g?' data-act="fgame" data-id="'+esc(g.id)+'" style="cursor:pointer;':' style="')+'display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid var(--line)"><div style="min-width:0"><b>'+esc(r.n)+'</b> <span class="src">'+esc(String(CT[r.cat]||r.cat).toLowerCase())+' · I said '+pjFmt(r,pj)+'</span></div><div style="text-align:right;white-space:nowrap">'+res+'</div></div>';
+  }).join('');
+  return h+'</div>';
+}
+var trackBody108=trackBody;
+trackBody=function(){
+  var h=trackBody108();
+  try{var c=followCard(),i=h.indexOf('<div class="card"');h=i>=0?h.slice(0,i)+c+h.slice(i):h+c}catch(e){}
+  return h;
 };
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
