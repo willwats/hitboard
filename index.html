@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v155, Nov 4';
+var BUILD='v156, Nov 4';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -11187,7 +11187,7 @@ OUT_RE={test:function(s){s=String(s||'');return OUT_BASE.test(s)||(!S.showQ&&HOL
 function injAdj(g){
   var o={a:0,h:0,notes:[]};
   try{
-    if(g.lg!=='nfl'&&g.lg!=='nba')return o;
+    if(g.lg!=='nfl'&&g.lg!=='nba'&&g.lg!=='nhl')return o;
     var I=S.inj[g.lg];if(!I||!I.by)return o;
     ['a','h'].forEach(function(sd){
       var tk=injKey(g,sd),nm=sd==='a'?g.an:g.hn;
@@ -11197,8 +11197,8 @@ function injAdj(g){
           o[sd]+=pts;o.notes.push('Starting QB '+q.starter+(OUT_BASE.test(q.st||'')?' is out':' is listed '+q.st+' and treated as out')+', so the model takes about '+pts.toFixed(1)+' points off '+nm+'.')}
       }else{
         var n=0;(I.by[tk]||[]).forEach(function(it){
-          if(!OUT_RE.test(it.st||''))return;var v=injValue('nba',tk,it.n);
-          if(v&&n<2){n++;o[sd]+=2;o.notes.push(it.n+' ('+v.why+') is '+(OUT_BASE.test(it.st||'')?'out':'listed '+it.st)+', so the model takes about 2 points off '+nm+'.')}
+          if(!OUT_RE.test(it.st||''))return;var v=injValue(g.lg,tk,it.n),amt=g.lg==='nhl'?.3:2;
+          if(v&&n<2){n++;o[sd]+=amt;o.notes.push(it.n+' ('+v.why+') is '+(OUT_BASE.test(it.st||'')?'out':'listed '+it.st)+', so the model takes about '+amt+(g.lg==='nhl'?' goals':' points')+' off '+nm+'.')}
         });
       }
     });
@@ -11274,6 +11274,7 @@ function psWalk(o,out,seen){
   if(!o||typeof o!=='object')return;
   if(o.id&&typeof o.fullName==='string'&&!seen[o.id]){
     seen[o.id]=1;var inj=o.injuries&&o.injuries[0],st=inj?(inj.status||(inj.type&&inj.type.description)||''):'';
+    if(!st&&o.status){var sn=String(o.status.name||o.status.type||o.status.abbreviation||'');if(/reserve|injured|\bir\b|suspend|\bpup\b|non.?football|inactive/i.test(sn)&&!/active$/i.test(sn.trim()))st=/reserve|\bir\b/i.test(sn)&&!/pup|non.?football|suspend/i.test(sn)?'Injured Reserve':sn}
     out.push({n:o.fullName,id:o.id,pos:(o.position&&(o.position.abbreviation||o.position.name))||'',st:st});
   }
   Object.keys(o).forEach(function(k){if(o[k]&&typeof o[k]==='object')psWalk(o[k],out,seen)});
@@ -11362,6 +11363,21 @@ vPropsLg=function(){
   }catch(x){}
   return h;
 };
+
+/* v156: players on injured reserve (or otherwise ruled out) are also removed from the picks, the parlay builder and the best-bets lists */
+function heldNames(lg){
+  var I=S.inj[lg];if(!I||!I.by)return [];var out=[];
+  Object.keys(I.by).forEach(function(k){I.by[k].forEach(function(it){if(OUT_RE.test(it.st||'')){var n=normName(it.n);if(n.indexOf(' ')>0)out.push(n)}})});
+  return out;
+}
+function dropHeld(lg,arr,txt){
+  var H=heldNames(lg);if(!H.length)return arr;
+  return arr.filter(function(x){var t=normName(txt(x)||'');return !H.some(function(n){return t.indexOf(n)>=0})});
+}
+var legListC113=legListC;
+legListC=function(lg){return dropHeld(lg,legListC113(lg),function(l){return (l.name||'')+' '+(l.mk||'')})};
+var straightList113=straightList;
+straightList=function(lg){return dropHeld(lg,straightList113(lg),function(b){return b.label==='Game bet'?'':(b.title||'')+' '+(b.sub||'')})};
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
