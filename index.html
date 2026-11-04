@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v151, Nov 3';
+var BUILD='v152, Nov 4';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -10823,11 +10823,13 @@ function pjOf(r){return r.pj!=null?r.pj:r.raw}
 function pjFmt(r,v){return r.cat==='td'?Math.round(v*100)+'%':(pjOf(r)<20?v.toFixed(1):String(Math.round(v)))}
 function gbxProps(g){
   TRK.f=TRK.f||{};
-  var recs=Object.keys(TRK.p).map(function(k){return TRK.p[k]}).filter(function(r){return r.sid===g.sid&&r.lg===g.lg});
+  try{trkSweepOut()}catch(e){}
+  var all=Object.keys(TRK.p).map(function(k){return TRK.p[k]}).filter(function(r){return r.sid===g.sid&&r.lg===g.lg});
+  var removed=all.filter(function(r){return r.ro}),recs=all.filter(function(r){return !r.ro});
   var k=kind(g);
   if(!recs.length&&k==='up'){
     S.gtl=S.gtl||{};if(!S.gtl[g.id]){S.gtl[g.id]=1;try{trkLogAll()}catch(e){}
-      recs=Object.keys(TRK.p).map(function(q){return TRK.p[q]}).filter(function(r){return r.sid===g.sid&&r.lg===g.lg})}
+      recs=Object.keys(TRK.p).map(function(q){return TRK.p[q]}).filter(function(r){return r.sid===g.sid&&r.lg===g.lg&&!r.ro})}
   }
   if(!recs.length)return '<p class="src" style="margin:0">No props were saved for this game. The app saves them before kickoff while it is open.</p>';
   var CT=trkCats(g.lg),o=S.gbx[g.id],B=null;
@@ -10854,13 +10856,14 @@ function gbxProps(g){
       prog='<div style="height:5px;background:var(--line);border-radius:3px;margin-top:5px;overflow:hidden"><div style="height:100%;width:'+Math.min(100,Math.round(100*x.v/Math.max(pj,.01)))+'%;background:'+(over?'#1a9f5a':'#8a8f98')+'"></div></div>';
     }
     var why='';
+    if(r.qn)why+='<li><b>'+esc(r.qn)+'</b></li>';
     if(r.d)why+='<li>'+esc(r.d)+'.</li>';
     if(r.tl)why+='<li>'+(r.h>0?pill('hi','Hot')+' ':r.h<0?pill('lo','Cold')+' ':'')+esc(r.tl)+'.</li>';
     if(!r.tl){try{var T=dlTrend(r.lg,r.cat,r.n,null);if(T)why+='<li>Last '+T.n+' games: '+T.vals.map(fmt106).join(', ')+' (average '+fmt106(T.mean)+').</li>'}catch(e){}}
     if(r.avg!=null)why+='<li>Season average '+(r.avg<20?r.avg.toFixed(1):Math.round(r.avg))+(r.un?' '+esc(r.un):'')+'; my number is '+pjFmt(r,pj)+'.</li>';
     if(td&&r.avg==null)why+='<li>My chance to score is '+pjFmt(r,pj)+'.</li>';
     var nowTxt=x.void?'He did not play.':k==='up'?'Saved before kickoff. The result will show here and in Track record.':st.charAt(0).toUpperCase()+st.slice(1)+'.';
-    return '<details data-pid="'+esc(r.id)+'"'+(S.gpo[r.id]?' open':'')+' style="border-top:1px solid var(--line)"><summary style="cursor:pointer;padding:7px 0;list-style:none"><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><div style="min-width:0"><b>'+(fol?'★ ':'')+esc(r.n)+'</b> <span class="src">'+esc(r.t)+' · '+esc(lab)+'</span>'+mg+'</div><div style="text-align:right;white-space:nowrap">'+right+' <span class="src">▾</span></div></div>'+prog+'</summary>'+
+    return '<details data-pid="'+esc(r.id)+'"'+(S.gpo[r.id]?' open':'')+' style="border-top:1px solid var(--line)"><summary style="cursor:pointer;padding:7px 0;list-style:none"><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><div style="min-width:0"><b>'+(fol?'★ ':'')+esc(r.n)+'</b> <span class="src">'+esc(r.t)+' · '+esc(lab)+'</span>'+stTag108(r)+mg+'</div><div style="text-align:right;white-space:nowrap">'+right+' <span class="src">▾</span></div></div>'+prog+'</summary>'+
       '<div style="padding:2px 0 10px"><p style="margin:0 0 4px"><b>'+esc(nowTxt)+'</b></p>'+(why?'<ul class="pts" style="margin:4px 0 6px">'+why+'</ul>':'')+
       '<div class="actions" style="margin-top:6px"><button class="btn'+(fol?' primary':'')+'" data-act="pfollow" data-id="'+esc(r.id)+'" style="padding:6px 10px;font-size:13px">'+(fol?'★ Following':'☆ Follow this prop')+'</button><button class="btn" data-act="pfopen" data-n="'+esc(r.n)+'" data-lg="'+r.lg+'" data-team="'+esc(r.t)+'" style="padding:6px 10px;font-size:13px">Player profile</button></div></div></details>';
   };
@@ -10870,6 +10873,7 @@ function gbxProps(g){
     head='<p style="margin:0 0 6px"><b>How my props played out:</b> '+(ys.length?hit+' of '+ys.length+' player lines finished at or over my number':'no yardage or count lines settled')+(td.length?'; '+sc+' touchdown scorer'+(sc===1?'':'s')+' against about '+(Math.round(ex*10)/10)+' expected':'')+'.</p>';
   }
   head+='<p class="src" style="margin:0 0 4px">'+rows.length+' props · tap one for the reasons'+(nf?' · '+nf+' followed':'')+'. Followed props sit at the top.</p>';
+  if(removed.length){var rn={};removed.forEach(function(r){rn[r.n]=1});head+='<p class="src" style="margin:0 0 6px">Removed because they are ruled out: '+esc(Object.keys(rn).slice(0,8).join(', '))+(Object.keys(rn).length>8?' and '+(Object.keys(rn).length-8)+' more':'')+'. Props for their teammates are adjusted for it.</p>'}
   var top=rows.slice(0,15),rest=rows.slice(15);
   return head+top.map(item).join('')+(rest.length?'<details style="margin-top:6px"><summary class="src" style="cursor:pointer">All '+rows.length+' props for this game</summary>'+rest.map(item).join('')+'</details>':'');
 }
@@ -10880,6 +10884,7 @@ document.addEventListener('click',function(e){
   var id=el.dataset.id;if(TRK.f[id])delete TRK.f[id];else TRK.f[id]=1;
   trkLater();if(S.sheet)renderSheet();else render();
 },true);
+function stTag108(r){try{var it=injIt108(r);return it&&it.st?' '+'<span class="tag warn" style="font-size:10px;padding:1px 6px">'+esc(it.st)+'</span>':''}catch(e){return ''}}
 // followed props across all games, at the top of Track record
 function followCard(){
   TRK.f=TRK.f||{};
@@ -10904,6 +10909,70 @@ trackBody=function(){
   try{var c=followCard(),i=h.indexOf('<div class="card"');h=i>=0?h.slice(0,i)+c+h.slice(i):h+c}catch(e){}
   return h;
 };
+
+/* v152: players ruled out are removed from game props, and a missing starting QB lowers his teammates' numbers */
+function injIt108(r){
+  var I=S.inj[r.lg==='ncaafb'?'nfl':r.lg];if(!I||!I.idx)return null;
+  var key=r.lg==='nfl'?nt(r.t):r.t,k=nameKeys(r.n);
+  return I.idx[key+'|'+k[0]]||I.idx[key+'|'+k[1]]||null;
+}
+function isOutInj(r){var it=injIt108(r);return !!(it&&OUT_RE.test(it.st||''))}
+/* a prop saved earlier for a player who is now ruled out is voided so it does not count as a miss; it comes back if he is cleared */
+function trkSweepOut(){
+  var now=Date.now(),ch=false;
+  Object.keys(TRK.p).forEach(function(id){
+    var r=TRK.p[id];if(!(r.st>now))return;
+    var out=isOutInj(r);
+    if(out&&!r.ro){r.ro=1;r.done=1;r.void=1;r.act=null;ch=true}
+    else if(!out&&r.ro){r.ro=0;r.done=0;r.void=0;ch=true}
+  });
+  if(ch)trkLater();
+}
+setInterval(function(){try{trkSweepOut()}catch(e){}},60000);
+setTimeout(function(){try{trkSweepOut()}catch(e){}},12000);
+function nflQbOut(team){
+  var t=nt(team),I=S.inj.nfl&&S.inj.nfl.idx;if(!I)return null;
+  var qbs=DEEP.filter(function(d){return d.kind==='pass'&&nt(d.t)===t}).sort(function(a,b){return b.avgS-a.avgS});
+  if(!qbs.length)return null;
+  var st=qbs[0],k=nameKeys(st.n),it=I[t+'|'+k[0]]||I[t+'|'+k[1]];
+  if(!it||!OUT_RE.test(it.st||''))return null;
+  var bk=qbs.slice(1).filter(function(d){var kk=nameKeys(d.n),i2=I[t+'|'+kk[0]]||I[t+'|'+kk[1]];return !(i2&&OUT_RE.test(i2.st||''))})[0];
+  var ratio=bk&&bk.g>=2&&st.avgS>0?bk.avgS/st.avgS:null;
+  var f=ratio!=null?1+Math.max(-.14,Math.min(-.04,.4*(ratio-1))):.91;
+  return {starter:st.n,backup:bk&&bk.n||null,f:f,t:t};
+}
+var spRows109=spRows;
+spRows=function(lg,cat){
+  var rows=spRows109(lg,cat);
+  try{
+    if(lg!=='nfl'||['rec','recp','td','rush'].indexOf(cat)<0)return rows;
+    var QC={};
+    rows.forEach(function(x){
+      var t=nt(x.t);if(!(t in QC))QC[t]=nflQbOut(x.t);
+      var q=QC[t];if(!q||!(x.proj>0))return;
+      if(x.pos==='QB')return;
+      var f=1,why='';
+      var pct=function(v){return Math.round(Math.abs(1-v)*100)};
+      var lead='Starting QB '+q.starter+' is ruled out'+(q.backup?', so '+q.backup+' starts':', so his backup starts')+'. ';
+      if(cat==='rush'){if(x.pos!=='RB')return;f=1.03;why=lead+'Teams lean on the run with a backup QB, so I added about 3%.'}
+      else if(x.pos==='RB'){f=cat==='td'?1+(q.f-1)*.4:1+(q.f-1)*.5;why=lead+'That lowers the passing game, which trims his chances by about '+pct(f)+'%.'}
+      else{f=cat==='td'?1+(q.f-1)*.8:q.f;why=lead+'That lowers the passing game by about '+pct(f)+'% for his receivers.'}
+      var v=x.proj*f;if(cat==='td')v=Math.min(.95,v);
+      x.proj=v;x.sort=v;x.projTxt=cat==='td'?Math.round(v*100)+'%':(/\./.test(String(x.projTxt))?v.toFixed(1):String(Math.round(v)));
+      x.qn=why;
+      var g=trkGameFor(lg,x.gk);
+      if(g&&g.sid){var r=TRK.p[g.sid+'|'+lg+'|'+cat+'|'+normName(x.n)];if(r&&!r.done){r.pj=v;r.qn=why}}
+    });
+  }catch(e){}
+  return rows;
+};
+var spCard109=spCard;
+spCard=function(r){
+  var h=spCard109(r);
+  if(!r.qn)return h;
+  return h.slice(0,h.length-6)+'<div class="src" style="margin-top:4px"><b>'+esc(r.qn)+'</b></div></div>';
+};
+/* passing yards for a team whose starter is out: show his badge and a note on the backup */
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
