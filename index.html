@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v156, Nov 4';
+var BUILD='v157, Nov 4';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -11378,6 +11378,153 @@ var legListC113=legListC;
 legListC=function(lg){return dropHeld(lg,legListC113(lg),function(l){return (l.name||'')+' '+(l.mk||'')})};
 var straightList113=straightList;
 straightList=function(lg){return dropHeld(lg,straightList113(lg),function(b){return b.label==='Game bet'?'':(b.title||'')+' '+(b.sub||'')})};
+
+/* v157: big news from each sport's news feed (injured reserve, season-ending, ruled out, trades), a news panel in the injury tracker, and a manual "mark as out" switch */
+var INJO={};
+try{INJO=JSON.parse(localStorage.getItem('hb.injo.v1')||'{}')||{}}catch(e){INJO={}}
+function injoSave(){try{localStorage.setItem('hb.injo.v1',JSON.stringify(INJO))}catch(e){}}
+S.nws={};
+var NWS_LG=['nfl','nba','nhl','mlb','ncaafb'];
+function nwsTeamOf(lg,name){
+  var k=normName(name),R=S.psRos&&S.psRos[lg];
+  if(R&&R.list){var a=R.list.filter(function(x){return normName(x.n)===k})[0];if(a)return a.t}
+  if(lg==='nfl'){var d=DEEP.filter(function(x){return normName(x.n)===k})[0];if(d)return d.t}
+  var p=PROPS.filter(function(x){return x.lg===lg&&normName(x.name)===k})[0];return p?p.team:null;
+}
+function nwsClass(t){
+  t=String(t||'').toLowerCase();
+  if(/\b(activated|returns? to|return(s|ing) from|cleared to|designated for return|removed from the injury|back from)\b/.test(t))return 'back';
+  if(/placed .{0,70}\bon (injured reserve|ir\b|reserve\/injured)|place[sd]? .{0,70}(on|onto) (injured reserve|ir\b)|(out|done) for the season|season-ending|ends? his (20\d\d )?season|ending his (20\d\d )?season|rest of the (20\d\d )?season|\bon ir\b|\binjured reserve\b/.test(t))return 'Injured Reserve';
+  if(/ruled out|will miss|expected to miss|(is|are) out (for|vs|against|this|thursday|sunday|monday|saturday|friday)|suspended/.test(t))return 'Out';
+  return '';
+}
+function nwsTags(t){
+  t=String(t||'').toLowerCase();var o=[];
+  if(/\btrad(e|ed|es|ing)\b|acquir/.test(t))o.push('Trade');
+  if(/\b(waive[sd]?|release[sd]?|cut|signs?|signed|re-?sign|claimed|activated|elevated)\b/.test(t))o.push('Roster move');
+  if(/injur|surgery|\bir\b|ruled out|miss|questionable|doubtful|season-ending/.test(t))o.push('Injury');
+  return o;
+}
+function nwsNames(lg,a){
+  var out=[],seen={};
+  (a.categories||[]).forEach(function(c){
+    if(c&&c.type==='athlete'){var n=c.description||(c.athlete&&c.athlete.description)||'';if(n&&!seen[normName(n)]){seen[normName(n)]=1;out.push(n)}}
+  });
+  if(out.length)return out;
+  var R=S.psRos&&S.psRos[lg],txt=normName((a.headline||'')+' '+(a.description||''));
+  if(R&&R.list)R.list.forEach(function(p){var k=normName(p.n);if(k.indexOf(' ')>0&&!seen[k]&&txt.indexOf(k)>=0){seen[k]=1;out.push(p.n)}});
+  return out;
+}
+function nwsLoad(lg,force){
+  if(window.claude||typeof fetch!=='function')return;
+  var c=S.nws[lg];if(c&&c.busy)return;if(c&&!force&&Date.now()-c.at<20*60000)return;
+  var cur=S.nws[lg]=c||{items:[],flags:{},at:0};cur.busy=1;
+  var base='https://site.api.espn.com/apis/site/v2/sports/'+ESPN[lg];
+  var gj=function(u){return fetch(u).then(function(r){return r.ok?r.json():null}).catch(function(){return null})};
+  Promise.all([gj(base+'/news?limit=60'),gj(base+'/transactions?limit=80')]).then(function(js){
+    var items=[],now=Date.now();
+    ((js[0]&&js[0].articles)||[]).forEach(function(a){
+      if(!a.headline)return;
+      items.push({h:a.headline,d:a.description||'',at:Date.parse(a.published||a.lastModified||'')||now,url:a.links&&a.links.web&&a.links.web.href||'',names:nwsNames(lg,a)});
+    });
+    ((js[1]&&js[1].transactions)||[]).forEach(function(t){
+      if(!t.description)return;var a={headline:t.description,description:'',categories:[]};
+      items.push({h:t.description,d:'',at:Date.parse(t.date||'')||now,url:'',names:nwsNames(lg,a),tx:1});
+    });
+    items.sort(function(a,b){return a.at-b.at});
+    var flags={};
+    items.forEach(function(it){
+      if(now-it.at>16*864e5)return;
+      var cls=nwsClass(it.h+' '+it.d),hl=normName(it.h);
+      if(!cls)return;
+      it.names.forEach(function(n){
+        var k=normName(n);if(!k)return;
+        if(cls==='back'){delete flags[k];return}
+        // name must be in the headline (or the only player the story is about)
+        if(hl.indexOf(k)<0&&!(it.names.length===1&&cls==='Injured Reserve'))return;
+        if(cls==='Out'&&now-it.at>6*864e5)return;
+        flags[k]={n:n,st:cls,h:it.h,at:it.at};
+      });
+    });
+    items.sort(function(a,b){return b.at-a.at});
+    cur.items=items.slice(0,60);cur.flags=flags;cur.at=Date.now();cur.ok=!!((js[0]&&js[0].articles)||(js[1]&&js[1].transactions));
+  }).then(function(){cur.busy=0;try{injApplyAll(true)}catch(e){}if(S.sheet&&S.sheet.type==='inj')renderSheet()});
+}
+/* put news flags and my own marks into the injury list every other screen already reads */
+function injApplyExtra(lg){
+  var I=S.inj[lg];if(!I){I=S.inj[lg]={at:Date.now(),by:{},idx:{}}}
+  if(!I.by)I.by={};if(!I.idx)I.idx={};
+  var sig=[],add=function(name,st,note){
+    var t=nwsTeamOf(lg,name);if(!t)return;
+    var key=lg==='nfl'?nt(t):t,k=nameKeys(name),ex=I.idx[key+'|'+k[0]]||I.idx[key+'|'+k[1]];
+    if(ex){if(OUT_BASE.test(ex.st||''))return;ex.st=st;ex.d=note;ex.x=1;sig.push(name+st);return}
+    var it={n:name,pos:'',st:st,d:note,x:1};(I.by[key]=I.by[key]||[]).push(it);I.idx[key+'|'+k[0]]=it;I.idx[key+'|'+k[1]]=it;sig.push(name+st);
+  };
+  var N=S.nws[lg],fl=(N&&N.flags)||{};
+  Object.keys(fl).forEach(function(k){if(INJO[lg+'|'+k])return;add(fl[k].n,fl[k].st,'From the news: '+fl[k].h)});
+  Object.keys(INJO).forEach(function(key){
+    var p=key.split('|');if(p[0]!==lg)return;var o=INJO[key];
+    if(o.v==='out')add(o.n,'Out','Marked out by me');
+    else if(o.v==='clear'){
+      var t=nwsTeamOf(lg,o.n);if(!t)return;var tk=lg==='nfl'?nt(t):t,kk=nameKeys(o.n),ex=I.idx[tk+'|'+kk[0]]||I.idx[tk+'|'+kk[1]];
+      if(ex){ex.st='';ex.d='Marked as playing by me';sig.push(o.n+'clear')}
+    }
+  });
+  return sig.join('|');
+}
+var _iaSig='';
+function injApplyAll(force){
+  var sg=NWS_LG.filter(function(l){return l!=='ncaafb'}).map(function(l){return injApplyExtra(l)||''}).join('#');
+  if(sg!==_iaSig||force){_iaSig=sg;S.pctx={};try{_pfC={}}catch(e){}try{injSnap();trkSweepOut()}catch(e){}
+    if(!S.sheet&&!(document.activeElement&&document.activeElement.tagName==='INPUT'))try{render()}catch(e){}}
+}
+var loadInj114=loadInj;
+loadInj=function(lg){var p=loadInj114(lg);return p&&p.then?p.then(function(r){try{injApplyExtra(lg)}catch(e){}return r}):p};
+setTimeout(function(){NWS_LG.forEach(function(l){nwsLoad(l)})},20000);
+setInterval(function(){try{NWS_LG.forEach(function(l){nwsLoad(l)});injApplyAll()}catch(e){}},60000);
+function injoSet(lg,name,v){
+  var k=lg+'|'+normName(name);
+  if(v==='reset')delete INJO[k];else INJO[k]={v:v,n:name};
+  injoSave();
+  // a reset needs the original status back, so reload the report
+  if(v==='reset'){try{loadInj(lg).then(function(){injApplyAll(true);if(S.sheet)renderSheet()})}catch(e){}}
+  injApplyAll(true);if(S.sheet)renderSheet();
+}
+/* ---- screens ---- */
+function nwsAgo(t){var m=Math.round((Date.now()-t)/60000);return m<60?Math.max(1,m)+' min ago':m<1440?Math.round(m/60)+' h ago':Math.round(m/1440)+' d ago'}
+function nwsHtml(lg){
+  var N=S.nws[lg],h='<h3>Latest news</h3>';
+  if(!N||!N.at)return h+'<p class="src">'+(N&&N.busy?'Loading…':'Not loaded yet.')+' <button class="linkbtn" data-act="nwsref">Load now</button></p>';
+  var fl=Object.keys(N.flags||{}).map(function(k){return N.flags[k]});
+  if(fl.length)h+='<p class="src" style="margin:0 0 6px">Players flagged from the news (held out of props):</p>'+fl.map(function(f){var o=INJO[lg+'|'+normName(f.n)];return '<div style="padding:6px 0;border-top:1px solid var(--line)"><b>'+esc(f.n)+'</b> <span class="tag warn" style="font-size:10px;padding:1px 6px">'+esc(o&&o.v==='clear'?'Marked as playing':f.st)+'</span><div class="src">'+esc(f.h)+' · '+esc(nwsAgo(f.at))+'</div><button class="btn" data-act="injovr" data-lg="'+lg+'" data-n="'+esc(f.n)+'" data-v="'+(o&&o.v==='clear'?'reset':'clear')+'" style="padding:4px 10px;font-size:12px;margin-top:4px">'+(o&&o.v==='clear'?'Treat as out again':'He is playing, show him')+'</button></div>'}).join('');
+  var L=(N.items||[]).filter(function(i){return nwsTags(i.h+' '+i.d).length}).slice(0,10);
+  if(!L.length)h+='<p class="src">No injury, roster or trade headlines in the last two weeks.</p>';
+  else h+='<p class="src" style="margin:8px 0 2px">Injuries, roster moves and trades</p>'+L.map(function(i){return '<div style="padding:6px 0;border-top:1px solid var(--line)">'+nwsTags(i.h+' '+i.d).map(function(t){return '<span class="tag" style="font-size:10px;padding:1px 6px;margin-right:4px">'+esc(t)+'</span>'}).join('')+(i.url?'<a href="'+esc(i.url)+'" target="_blank" rel="noopener">'+esc(i.h)+'</a>':esc(i.h))+' <span class="src">'+esc(nwsAgo(i.at))+'</span></div>'}).join('');
+  return h+'<p class="src" style="margin:6px 0 0">Updated '+esc(fmtClock(N.at))+'. <button class="linkbtn" data-act="nwsref">Refresh news</button></p>';
+}
+var injSheet114=injSheet;
+injSheet=function(s){
+  var h=injSheet114(s);
+  try{if(s.lg!=='ncaafb'||true){var nl=nwsHtml(s.lg);h=h.replace('<h3>What happened when a key player missed</h3>',nl+'<h3>What happened when a key player missed</h3>');if(h.indexOf(nl)<0)h+=nl}}catch(e){}
+  return h;
+};
+var pfSheet114=pfSheet;
+pfSheet=function(s){
+  var h=pfSheet114(s);
+  try{
+    var held=OUT_RE.test((injIt108({lg:s.lg,n:s.n,t:s.team})||{}).st||''),o=INJO[s.lg+'|'+normName(s.n)];
+    var b=o&&o.v==='out'?['reset','Remove my “out” mark','I marked him out.']:o&&o.v==='clear'?['reset','Go back to the injury report','I marked him as playing.']:held?['clear','He is playing, show him','He is held out of props.']:['out','Mark as out','Hide him from props and adjust his teammates.'];
+    var btn='<p style="margin:8px 0 0"><button class="btn" data-act="injovr" data-lg="'+s.lg+'" data-n="'+esc(s.n)+'" data-v="'+b[0]+'" style="padding:6px 10px;font-size:13px">'+b[1]+'</button> <span class="src">'+b[2]+'</span></p>';
+    var i=h.indexOf('</p>');h=i>=0?h.slice(0,i+4)+btn+h.slice(i+4):h+btn;
+  }catch(e){}
+  return h;
+};
+document.addEventListener('click',function(e){
+  var el=e.target&&e.target.closest?e.target.closest('[data-act="injovr"],[data-act="nwsref"]'):null;if(!el)return;
+  e.stopImmediatePropagation();e.preventDefault();
+  if(el.dataset.act==='nwsref'){var lg=S.sheet&&S.sheet.lg||S.sport;nwsLoad(lg,true);if(S.sheet)renderSheet();return}
+  injoSet(el.dataset.lg,el.dataset.n,el.dataset.v);
+},true);
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
