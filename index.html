@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v161, Nov 4';
+var BUILD='v162, Nov 4';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -11709,6 +11709,37 @@ vToday=function(){
     var t=h.indexOf('<h3>Injury tracker</h3>');
     if(t>=0){var n=h.indexOf('<h3>Latest news</h3>',t);if(n>=0){var e=h.indexOf('<h3>',n+10),c=h.indexOf('</div><h3>',n);var end=e>=0?e:-1;if(end>=0)h=h.slice(0,n)+h.slice(end);else{var ce=h.indexOf('</div>',n);h=h.slice(0,n)+h.slice(ce)}}}
     h=h.replace(/(<h2>Home<\/h2>)<p class="lede">[\s\S]*?<\/p>/,'$1<p class="lede">Headlines first, then what is worth double-checking. Best bets are under Games.</p>'+newsHomeHtml());
+  }catch(e){}
+  return h;
+};
+
+/* v162: Home is short: injury tracker collapsed, repeated sections dropped */
+var injHomeHtml119=injHomeHtml;
+injHomeHtml=function(){
+  var h=injHomeHtml119();
+  try{
+    h=h.replace(/Anyone listed with an injury[^<]*/,'Anyone listed with an injury is held out of props and picks. ').replace(/Players listed Questionable or Day-to-Day appear in props\.[^<]*/,'Questionable players are shown in props. Out, Doubtful and IR stay hidden. ');
+    var p=h.split('<h3>');if(p.length<3)return h;
+    var out=p[0],past='',tail='';
+    for(var i=1;i<p.length;i++){
+      var e=p[i].indexOf('</h3>');if(e<0){out+='<h3>'+p[i];continue}
+      var t=p[i].slice(0,e),body=p[i].slice(e+5);
+      if(/^Injury tracker$/.test(t)){out+='<h3>'+t+'</h3>'+body;continue}
+      if(i===p.length-1){var k=body.lastIndexOf('</div>');if(k>=0){tail=body.slice(k);body=body.slice(0,k)}}
+      if(/^Key players I have been tracking/i.test(t))continue;
+      if(/^(What happened|Back from injury)/i.test(t)){past+='<p style="margin:10px 0 2px"><b>'+t+'</b></p>'+body;continue}
+      out+='<details'+(/^Key players out/i.test(t)?' open':'')+' style="border-top:1px solid var(--line);margin-top:8px"><summary style="font-weight:600;padding:10px 0;cursor:pointer">'+t+'</summary>'+body+'</details>';
+    }
+    if(past)out+='<details style="border-top:1px solid var(--line);margin-top:8px"><summary style="font-weight:600;padding:10px 0;cursor:pointer">How injuries have played out</summary>'+past+'</details>';
+    return out+tail;
+  }catch(x){return h}
+};
+var vToday119=vToday;
+vToday=function(){
+  var h=vToday119();
+  try{
+    h=h.replace(/(<h2>Home<\/h2>)<p class="lede">[\s\S]*?<\/p>/,'$1');
+    h=h.replace(/<button class="btn" data-act="tour">Take the tour<\/button>/,'');
   }catch(e){}
   return h;
 };
