@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v165, Nov 4';
+var BUILD='v166, Nov 5';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -6328,7 +6328,7 @@ function vToday(){
 }
 /* ---- first-open tour ---- */
 var TOUR=[
- {tab:'today',hl:'today',t:'Home',x:'Start here. The latest news across every sport, anything worth double-checking on your open bets, and the injury tracker. Best bets are under Games.'},
+ {tab:'today',hl:'today',t:'Home',x:'Start here. Anything worth double-checking on your open bets, and the injury tracker. Best bets are under Games.'},
  {tab:'games',hl:'games',t:'Games',x:'Every game with live scores, lines and the model’s read. Tap a game for the breakdown, each team’s last five games and player props.'},
  {tab:'props',hl:'props',t:'Props',x:'Player props by type, then by game. Tap a player for season stats and game-by-game results.'},
  {tab:'picks',hl:'picks',t:'My bets',x:'Upload a DraftKings screenshot or log a bet. The app reads each leg, then tracks scores and player stats live and shows whether you are covering.'},
@@ -11779,6 +11779,10 @@ renderSheet=function(){
     }
   }catch(e){}
 };
+
+/* v166: no news feed on screen. News still runs quietly to flag injured players. */
+newsHomeHtml=function(){return ''};
+nwsHtml=function(){return ''};
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
