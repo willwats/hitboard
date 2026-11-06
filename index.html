@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v169, Nov 6';
+var BUILD='v170, Nov 6';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -11897,8 +11897,8 @@ function pbRows(lg,cat){
 }
 function pbCard(o){
   var r=o.r,c=o.c,ln=o.ln,pill='';
-  if(o.tr!=null&&o.tr>=.12)pill='<span class="hrpill hi" style="display:inline-block;margin-left:6px">Hot</span>';
-  else if(o.tr!=null&&o.tr<=-.12)pill='<span class="hrpill lo" style="display:inline-block;margin-left:6px">Cold</span>';
+  if(o.tr!=null&&o.tr>=.10)pill='<span class="hrpill hi" style="display:inline-block;margin-left:6px">Hot</span>';
+  else if(o.tr!=null&&o.tr<=-.10)pill='<span class="hrpill lo" style="display:inline-block;margin-left:6px">Cold</span>';
   var d=r.def&&r.def.tag?'<span class="hrpill '+r.def.tag[0]+'" style="display:inline-block;margin-left:4px">'+r.def.tag[1]+'</span>':'';
   var l2=c?'Last 5 <b>'+fmt106(c.l5.avg)+'</b> · Last 10 <b>'+fmt106(c.l10.avg)+'</b> · Season <b>'+fmt106(c.s.avg)+'</b> <span class="src">('+c.s.n+' games)</span>':esc(r.avgTxt||'');
   var l3=c?'Over '+ln.v+': '+c.l5.h.o+' of '+c.l5.n+' last 5 · '+c.l10.h.o+' of '+c.l10.n+' last 10'+(ln.own?'':' <span class="src">(reference line)</span>'):'<span class="src">No game log for this stat yet.</span>';
@@ -11916,8 +11916,8 @@ function vBoard(){
   h+='<div class="chips" role="group" aria-label="Stat">'+cats.map(function(c){return '<button class="chip" data-act="set" data-k="bc" data-v="'+c[0]+'" aria-pressed="'+(cat===c[0])+'">'+esc(c[1])+'</button>'}).join('')+'</div>';
   h+='<div class="chips" role="group" aria-label="Filter">'+[['all','All'],['hot','Hot'],['cold','Cold'],['over','70%+ over']].map(function(c){return '<button class="chip" data-act="set" data-k="bf" data-v="'+c[0]+'" aria-pressed="'+(S.bf===c[0])+'">'+c[1]+'</button>'}).join('')+'<span class="src" style="align-self:center;margin:0 4px">Sort</span>'+[['trend','Trending'],['hit','Hit rate'],['proj','Projection']].map(function(c){return '<button class="chip" data-act="set" data-k="bs" data-v="'+c[0]+'" aria-pressed="'+(S.bs===c[0])+'">'+c[1]+'</button>'}).join('')+'</div>';
   var rows=pbRows(lg,cat),logs=rows.some(function(o){return o.c});
-  if(S.bf==='hot')rows=rows.filter(function(o){return o.tr!=null&&o.tr>=.12});
-  else if(S.bf==='cold')rows=rows.filter(function(o){return o.tr!=null&&o.tr<=-.12});
+  if(S.bf==='hot')rows=rows.filter(function(o){return o.tr!=null&&o.tr>=.10});
+  else if(S.bf==='cold')rows=rows.filter(function(o){return o.tr!=null&&o.tr<=-.10});
   else if(S.bf==='over')rows=rows.filter(function(o){return o.rate!=null&&o.rate>=.7});
   var key=S.bs==='hit'?function(o){return o.rate==null?-1:o.rate+(o.c?o.c.l10.n/1000:0)}:S.bs==='proj'?function(o){return o.r.sort||0}:function(o){return o.tr==null?-9:o.tr};
   rows.sort(function(a,b){return key(b)-key(a)});
@@ -12131,6 +12131,24 @@ TOUR.length=0;
  {tab:'injuries',hl:'injuries',t:'Injuries',x:'Who is out, by sport. Anyone ruled out leaves the props and adjusts the game outlook.'},
  {tab:'picks',hl:'picks',t:'My slip',x:'Upload a sportsbook slip screenshot or log a bet, and the app tracks it live.'}].forEach(function(s){TOUR.push(s)});
 S.tab='picks2';try{render()}catch(e){}
+
+/* v170: say why Hot and Cold are missing, and read game logs when they are not there */
+var vBoard127=vBoard;
+vBoard=function(){
+  var h=vBoard127();
+  try{
+    var lg=S.sport,n=Object.keys(S.dlog).filter(function(k){return S.dlog[k].lg===lg}).length,msg='';
+    h=h.replace(/<p class="note">(Reading finished games|No finished games are loaded)[\s\S]*?<\/p>/,'');
+    if(window.claude)msg='<p class="note"><b>Hot, Cold and hit rates are off in this preview link.</b> They need finished-game box scores, and those load only in the installed app. Open Hitboard from your home screen (willwats.github.io/hitboard) to see them.</p>';
+    else if(lg==='nhl'||lg==='mlb')msg='';
+    else if(!n){
+      msg='<p class="note">'+(S.dlBusy?'<b>Reading finished games…</b> '+esc(S.dlMsg||'')+' Hot, Cold and hit rates appear when this finishes, usually within a minute.':'<b>No game logs yet for '+esc(lgName(lg))+'.</b> Hot, Cold and hit rates need them. <button class="linkbtn" data-act="dldeep">Read games now</button>')+'</p>';
+      try{var t=+localStorage.getItem('hb.deepAt2')||0;if(!S.dlBusy&&Date.now()-t>30*60000){localStorage.setItem('hb.deepAt2',String(Date.now()));setTimeout(function(){try{dlogSync(true)}catch(e){}},50)}}catch(e){}
+    }else msg='<p class="src" style="margin:0 0 8px">Form comes from '+n+' finished '+esc(lgName(lg))+' games this season.'+(S.dlBusy?' Reading more…':'')+'</p>';
+    var i=h.indexOf('</p>',h.indexOf('Tap a player for the full breakdown'));if(i>=0&&msg)h=h.slice(0,i+4)+msg+h.slice(i+4);
+  }catch(e){}
+  return h;
+};
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
