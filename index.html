@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v166, Nov 5';
+var BUILD='v167, Nov 6';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -4296,7 +4296,7 @@ function scY(){return window.pageYOffset||0}
 function scSet(y){window.scrollTo(0,y)}
 function scTop(){scSet(0)}
 function render(){
-  var _y=scY(),_h={home:vHome,games:vGames,scores:vScores,div:vDiv,record:vRecord,props:vProps,parlay:vParlay,picks:vPicks,about:vAbout,more:vMore,builder:vBuilder,hb:vHb,today:vToday}[S.tab](),_v=$('#view');
+  var _y=scY(),_h={home:vHome,players:vPlayers,injuries:vInjuries,games:vGames,scores:vScores,div:vDiv,record:vRecord,props:vProps,parlay:vParlay,picks:vPicks,about:vAbout,more:vMore,builder:vBuilder,hb:vHb,today:vToday}[S.tab](),_v=$('#view');
   if(_v.__h!==_h){_v.innerHTML=_h;_v.__h=_h}
   $('#stamp').innerHTML='Feed '+esc(fmtClock(S.feedAt))+'<br>'+(S.live?'live':'snapshot');
   renderNav();updateSlipBar();
@@ -6348,7 +6348,7 @@ function tourShow(i){
   if(nx)nx.onclick=function(){tourShow(i+1)};if(bk2)bk2.onclick=function(){tourShow(i-1)};
   document.getElementById('tourS').onclick=tourEnd;
 }
-function tourEnd(){var el=document.getElementById('tour');if(el)el.remove();tourHl(null);try{localStorage.setItem('hitboard.tour.v1','1')}catch(e){}S.tab='today';try{render()}catch(e){}}
+function tourEnd(){var el=document.getElementById('tour');if(el)el.remove();tourHl(null);try{localStorage.setItem('hitboard.tour.v1','1')}catch(e){}S.tab='props';try{render()}catch(e){}}
 function tourStart(){tourShow(0)}
 document.addEventListener('change',function(e){
   var t=e.target;if(!t||!t.id)return;
@@ -11783,6 +11783,249 @@ renderSheet=function(){
 /* v166: no news feed on screen. News still runs quietly to flag injured players. */
 newsHomeHtml=function(){return ''};
 nwsHtml=function(){return ''};
+
+/* v167: game-log data for the research board: home/away, result, minutes; teammate presence comes from each box score */
+var dlExtract123=dlExtract;
+dlExtract=function(lg,j){
+  var t=dlExtract123(lg,j);if(!t)return t;
+  try{
+    var cp=((j.header&&j.header.competitions)||[])[0]||{},cs=cp.competitors||[],bb=lg==='nba'||lg==='ncaamb';
+    cs.forEach(function(c){
+      var ab=dlAb(lg,c.team&&c.team.abbreviation),o=cs.filter(function(y){return y!==c})[0],a=parseFloat(c.score),b=o?parseFloat(o.score):NaN;
+      t.forEach(function(x){if(x.t!==ab)return;x.h=c.homeAway==='home'?1:0;x.w=(!isNaN(a)&&!isNaN(b)&&a!==b)?(a>b?1:0):null});
+    });
+    if(bb)((j.boxscore&&j.boxscore.players)||[]).forEach(function(tm){
+      var ab=dlAb(lg,tm.team&&tm.team.abbreviation),x=t.filter(function(y){return y.t===ab})[0];if(!x)return;x.mn=x.mn||{};
+      (tm.statistics||[]).forEach(function(cat){var L=cat.labels||[],mi=L.indexOf('MIN');if(mi<0)return;(cat.athletes||[]).forEach(function(a){if(!a.athlete)return;var m=parseFloat((a.stats||[])[mi]);if(!isNaN(m))x.mn[normName(a.athlete.displayName)]=m})});
+    });
+    t.forEach(function(x){if(x.h==null)x.h=-1});
+  }catch(e){}
+  return t;
+};
+/* games read before this version lack home/away and result; re-read a few at a time, twice at most each */
+function dlBackfill(){
+  if(S.dlBusy||typeof fetch!=='function'||window.claude)return;
+  var todo=Object.keys(S.dlog).filter(function(k){var g=S.dlog[k];return g.s&&g.s[0]&&g.s[0].h===undefined&&(g.bt||0)<2}).sort(function(a,b){return S.dlog[b].at-S.dlog[a].at}).slice(0,24);
+  if(!todo.length)return;
+  S.dlBusy=true;var got=0;
+  Promise.all(todo.map(function(k){
+    var g=S.dlog[k],id=k.split('|')[1];g.bt=(g.bt||0)+1;
+    return fetch('https://site.api.espn.com/apis/site/v2/sports/'+ESPN[g.lg]+'/summary?event='+encodeURIComponent(id)).then(function(r){return r.ok?r.json():null}).then(function(j){
+      if(!j)return;var s=dlExtract(g.lg,j);if(s){g.s=s;got++}
+    }).catch(function(){});
+  })).then(function(){S.dlBusy=false;if(got){try{dlSave()}catch(e){}S.dlV++;_dlE=null}});
+}
+setTimeout(function(){try{dlBackfill()}catch(e){}},15000);
+setInterval(function(){try{if(!document.hidden)dlBackfill()}catch(e){}},4*60000);
+
+/* per-player game logs with team context */
+var _pbK='',_pbI={};
+function pbIdx(lg){
+  var key=S.dlV+'|'+Object.keys(S.dlog).length;
+  if(_pbK!==key){_pbI={};_pbK=key}
+  if(_pbI[lg])return _pbI[lg];
+  var P={},T={};
+  Object.keys(S.dlog).forEach(function(k){var g=S.dlog[k];if(g.lg!==lg||!g.s)return;
+    g.s.forEach(function(sd){
+      var ent={at:g.at,w:sd.w==null?null:sd.w,h:sd.h==null||sd.h<0?null:sd.h,pres:sd.p,mn:sd.mn||null,o:sd.o};
+      (T[sd.t]=T[sd.t]||[]).push(ent);
+      Object.keys(sd.p).forEach(function(nm){(P[nm]=P[nm]||[]).push({at:g.at,v:sd.p[nm],o:sd.o,t:sd.t,h:ent.h,w:ent.w,mn:sd.mn&&sd.mn[nm]!=null?sd.mn[nm]:null,ent:ent})});
+    });
+  });
+  Object.keys(P).forEach(function(n){P[n].sort(function(a,b){return b.at-a.at})});
+  Object.keys(T).forEach(function(t){T[t].sort(function(a,b){return a.at-b.at})});
+  return (_pbI[lg]={P:P,T:T});
+}
+function pbMean(a,i){return a.length?a.reduce(function(s,x){return s+x.v[i]},0)/a.length:null}
+function pbHit(a,i,line){var o=0,u=0,p=0;a.forEach(function(x){var v=x.v[i];if(v>line)o++;else if(v<line)u++;else p++});return {n:a.length,o:o,u:u,p:p}}
+function pbWin(a,i,line){return {n:a.length,avg:pbMean(a,i),h:pbHit(a,i,line)}}
+/* full=false gives just the windows (fast, used by the board); full=true adds the splits */
+function pbCalc(lg,cat,name,line,opp,full){
+  var C=DL_LG[lg];if(!C||C.ix[cat]==null)return null;
+  var i=C.ix[cat],I=pbIdx(lg),all=(I.P[normName(name)]||[]).filter(function(x){return x.v[i]!=null});
+  if(!all.length)return null;
+  var R={i:i,all:all,l5:pbWin(all.slice(0,5),i,line),l10:pbWin(all.slice(0,10),i,line),s:pbWin(all,i,line),team:all[0].t};
+  var mn=all.filter(function(x){return x.mn!=null}).slice(0,5);R.mn5=mn.length>=3?mn.reduce(function(s,x){return s+x.mn},0)/mn.length:null;
+  if(!full)return R;
+  var sp=[],add=function(label,a){if(a.length)sp.push({label:label,n:a.length,avg:pbMean(a,i),h:pbHit(a,i,line)})};
+  add('Home',all.filter(function(x){return x.h===1}));add('Away',all.filter(function(x){return x.h===0}));
+  if(opp){var ob=String(dlAb(lg,opp)).toUpperCase();add('Against '+ob,all.filter(function(x){return String(x.o).toUpperCase()===ob}))}
+  var TG=I.T[R.team]||[],aw=[],al=[];
+  all.forEach(function(x){var k=TG.indexOf(x.ent);if(k<1)return;var pv=TG[k-1];if(pv.w==null||x.at-pv.at>14*864e5)return;(pv.w?aw:al).push(x)});
+  add('After a team win',aw);add('After a team loss',al);
+  R.sp=sp;
+  /* teammates: the biggest producers on this team. Missing from the box score = did not play (or had no stat) */
+  var tm={},nT=TG.length;
+  TG.forEach(function(e){Object.keys(e.pres).forEach(function(k){var v=e.pres[k];(tm[k]=tm[k]||{g:0,s:{}});tm[k].g++;v.forEach(function(x,j){if(x!=null){tm[k].s[j]=(tm[k].s[j]||0)+x}})})});
+  var me=normName(name),cands={},ixs=Object.keys(C.ix).map(function(c){return C.ix[c]});
+  ixs.forEach(function(j){
+    var L=Object.keys(tm).filter(function(k){return k!==me&&tm[k].g>=Math.max(3,nT*.5)&&tm[k].s[j]>0}).sort(function(a,b){return tm[b].s[j]/tm[b].g-tm[a].s[j]/tm[a].g}).slice(0,j===i?3:2);
+    L.forEach(function(k){cands[k]=1});
+  });
+  var out=[];
+  Object.keys(cands).forEach(function(k){
+    var wo=all.filter(function(x){return x.ent.pres[k]===undefined}),wi=all.filter(function(x){return x.ent.pres[k]!==undefined});
+    if(wo.length<1||wi.length<2)return;
+    var nm=pfPretty(k),outNow=false;try{outNow=isOutInj({lg:lg,t:R.team,n:nm})}catch(e){}
+    out.push({k:k,n:nm,wo:{n:wo.length,avg:pbMean(wo,i),h:pbHit(wo,i,line)},wi:{n:wi.length,avg:pbMean(wi,i),h:pbHit(wi,i,line)},out:outNow});
+  });
+  out.sort(function(a,b){return (b.out-a.out)||(b.wo.n-a.wo.n)});
+  R.tm=out.slice(0,6);
+  return R;
+}
+
+/* v167: research board. Props ranked by recent form and hit rate, with a full breakdown window */
+var PB_L={};try{PB_L=JSON.parse(localStorage.getItem('hb.lines.v1')||'{}')||{}}catch(e){PB_L={}}
+function pbLKey(lg,cat,n){return lg+'|'+cat+'|'+normName(n)}
+function pbLine(lg,cat,n,proj){
+  var v=PB_L[pbLKey(lg,cat,n)];if(v!=null)return {v:v,own:true};
+  var d=Math.round((proj||0)*2)/2;return {v:d>0?d:.5,own:false};
+}
+function pbLSave(){try{localStorage.setItem('hb.lines.v1',JSON.stringify(PB_L))}catch(e){}}
+var PB_SKIP={pl:1,td:1,kick:1};
+function pbCats(lg){return spCats(lg).filter(function(c){return !PB_SKIP[c[0]]})}
+function pbPct(a,b){return b?Math.round(100*a/b)+'%':'n/a'}
+function pbRows(lg,cat){
+  var rows=[];try{rows=spRows(lg,cat)}catch(e){rows=[]}
+  return rows.map(function(r){
+    var ln=pbLine(lg,cat,r.n,r.proj),opp=null,c=null;
+    try{opp=rowOpp106(lg,r)}catch(e){}
+    try{c=pbCalc(lg,cat,r.n,ln.v,opp,false)}catch(e){}
+    var tr=c&&c.l5.n>=3&&c.s.avg>0?c.l5.avg/c.s.avg-1:null,rate=c&&c.l10.n>=5?c.l10.h.o/c.l10.n:null;
+    return {r:r,ln:ln,c:c,tr:tr,rate:rate,opp:opp,cat:cat};
+  });
+}
+function pbCard(o){
+  var r=o.r,c=o.c,ln=o.ln,pill='';
+  if(o.tr!=null&&o.tr>=.12)pill='<span class="hrpill hi" style="display:inline-block;margin-left:6px">Hot</span>';
+  else if(o.tr!=null&&o.tr<=-.12)pill='<span class="hrpill lo" style="display:inline-block;margin-left:6px">Cold</span>';
+  var d=r.def&&r.def.tag?'<span class="hrpill '+r.def.tag[0]+'" style="display:inline-block;margin-left:4px">'+r.def.tag[1]+'</span>':'';
+  var l2=c?'Last 5 <b>'+fmt106(c.l5.avg)+'</b> · Last 10 <b>'+fmt106(c.l10.avg)+'</b> · Season <b>'+fmt106(c.s.avg)+'</b> <span class="src">('+c.s.n+' games)</span>':esc(r.avgTxt||'');
+  var l3=c?'Over '+ln.v+': '+c.l5.h.o+' of '+c.l5.n+' last 5 · '+c.l10.h.o+' of '+c.l10.n+' last 10'+(ln.own?'':' <span class="src">(reference line)</span>'):'<span class="src">No game log for this stat yet.</span>';
+  var st='';try{var it=injIt108({lg:r.lg,t:r.t,n:r.n});if(it&&it.st)st=' <span class="tag warn" style="font-size:10px;padding:1px 6px">'+esc(it.st)+'</span>'}catch(e){}
+  return '<div class="card" data-act="pbk" data-n="'+esc(r.n)+'" data-lg="'+r.lg+'" data-cat="'+o.cat+'" data-team="'+esc(r.t)+'" data-opp="'+esc(o.opp||'')+'" data-proj="'+(r.proj||0)+'" data-ptx="'+esc(r.projTxt||'')+'" data-unit="'+esc(r.unit||'')+'" data-when="'+esc(r.when||'')+'" data-def="'+esc(r.def&&r.def.txt||'')+'" style="padding:12px;margin:0 0 8px;cursor:pointer">'+
+    '<div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><div style="min-width:0"><div><b>'+esc(r.n)+'</b>'+pill+st+'</div><div class="src">'+esc(r.t)+(r.pos?' · '+esc(r.pos):'')+' · '+esc(r.gl||'')+(r.when?' · '+esc(r.when):'')+'</div></div>'+
+    '<div style="text-align:right;flex:none"><div style="font-size:20px;font-weight:700">'+esc(r.projTxt||'')+'</div><div class="src">'+esc(r.unit||'projected')+'</div></div></div>'+
+    '<div style="margin-top:6px;font-size:13.5px">'+l2+'</div><div style="margin-top:2px;font-size:13.5px">'+l3+d+'</div></div>';
+}
+S.bf=S.bf||'all';S.bs=S.bs||'trend';S.bn=40;
+function vBoard(){
+  var lg=S.sport;if(['nfl','nba','ncaafb','nhl','mlb'].indexOf(lg)<0){lg='nfl';S.sport='nfl'}
+  var cats=pbCats(lg),cat=cats.some(function(c){return c[0]===S.bc})?S.bc:cats[0][0];
+  var h='<h2>Props</h2><div class="chips" role="group" aria-label="Sport">'+LG.filter(function(l){return l[0]!=='ncaamb'}).map(function(l){return '<button class="chip" data-act="sport" data-v="'+l[0]+'" aria-pressed="'+(S.sport===l[0])+'">'+l[1]+'</button>'}).join('')+'</div>';
+  h+='<div class="chips" role="group" aria-label="Stat">'+cats.map(function(c){return '<button class="chip" data-act="set" data-k="bc" data-v="'+c[0]+'" aria-pressed="'+(cat===c[0])+'">'+esc(c[1])+'</button>'}).join('')+'</div>';
+  h+='<div class="chips" role="group" aria-label="Filter">'+[['all','All'],['hot','Hot'],['cold','Cold'],['over','70%+ over']].map(function(c){return '<button class="chip" data-act="set" data-k="bf" data-v="'+c[0]+'" aria-pressed="'+(S.bf===c[0])+'">'+c[1]+'</button>'}).join('')+'<span class="src" style="align-self:center;margin:0 4px">Sort</span>'+[['trend','Trending'],['hit','Hit rate'],['proj','Projection']].map(function(c){return '<button class="chip" data-act="set" data-k="bs" data-v="'+c[0]+'" aria-pressed="'+(S.bs===c[0])+'">'+c[1]+'</button>'}).join('')+'</div>';
+  var rows=pbRows(lg,cat),logs=rows.some(function(o){return o.c});
+  if(S.bf==='hot')rows=rows.filter(function(o){return o.tr!=null&&o.tr>=.12});
+  else if(S.bf==='cold')rows=rows.filter(function(o){return o.tr!=null&&o.tr<=-.12});
+  else if(S.bf==='over')rows=rows.filter(function(o){return o.rate!=null&&o.rate>=.7});
+  var key=S.bs==='hit'?function(o){return o.rate==null?-1:o.rate+(o.c?o.c.l10.n/1000:0)}:S.bs==='proj'?function(o){return o.r.sort||0}:function(o){return o.tr==null?-9:o.tr};
+  rows.sort(function(a,b){return key(b)-key(a)});
+  var n0=S.bn||40,more=rows.length>n0;
+  h+='<p class="src" style="margin:4px 0 10px">Tap a player for the full breakdown. Hot and Cold compare the last 5 games with the season. No sportsbook lines are available here, so the reference line is the projection rounded to the nearest half. Enter your book’s line inside a player to see the hit rate against it. Ruled-out players are hidden.</p>';
+  if(S.sport==='nhl'||S.sport==='mlb')h+='<p class="note">Game logs for '+lgName(S.sport)+' are not read yet, so these rows show projections and season rates only. Hit rates and splits cover football and basketball.</p>';
+  else if(!logs)h+='<p class="note">'+(S.dlBusy?'Reading finished games…':'No finished games are loaded yet.')+' Hit rates and trends appear once the app has read this season’s box scores. That can take a minute after opening.</p>';
+  if(!rows.length)h+='<div class="card empty">No players match these filters. Teams without a game in the next 40 hours are hidden.</div>';
+  else h+=rows.slice(0,n0).map(pbCard).join('')+(more?'<p style="text-align:center"><button class="btn" data-act="set" data-k="bn" data-v="'+(n0+40)+'">Show more ('+(rows.length-n0)+')</button></p>':'');
+  return h+foot();
+}
+function pbSheet(s){
+  var lg=s.lg,c=null;
+  try{c=pbCalc(lg,s.cat,s.n,s.line,s.opp,true)}catch(e){c=null}
+  var st='';try{var it=injIt108({lg:lg,t:s.team,n:s.n});if(it&&it.st)st=' <span class="tag warn" style="font-size:10px;padding:1px 6px">'+esc(it.st)+'</span>'}catch(e){}
+  var catName=(pbCats(lg).filter(function(x){return x[0]===s.cat})[0]||[0,s.cat])[1];
+  var h='<div class="sh-head"><div><div class="label">'+esc(lgName(lg))+' · '+esc(s.team)+'</div><h2>'+esc(s.n)+st+'</h2><div class="src">'+esc(catName)+(s.when?' · '+esc(s.when):'')+(s.opp?' · vs '+esc(String(s.opp).toUpperCase()):'')+'</div></div><button class="x" data-act="close" aria-label="Close">×</button></div>';
+  h+='<div class="card" style="margin-top:10px"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div><div class="src">My projection</div><div style="font-size:22px;font-weight:700">'+esc(s.ptx||'')+'</div><div class="src">'+esc(s.unit||'')+'</div></div>'+
+    '<div style="text-align:right"><div class="src">Line'+(PB_L[pbLKey(lg,s.cat,s.n)]!=null?'':' (reference)')+'</div><div style="display:flex;gap:6px;align-items:center;justify-content:flex-end"><button class="x" data-act="pbstep" data-d="-0.5" aria-label="Lower the line">−</button><input id="pbline" type="number" step="0.5" value="'+s.line+'" inputmode="decimal" aria-label="Line" style="width:84px;text-align:center"><button class="x" data-act="pbstep" data-d="0.5" aria-label="Raise the line">+</button></div></div></div>'+
+    (s.def?'<p class="src" style="margin:8px 0 0">'+esc(s.def)+'</p>':'')+'</div>';
+  if(!c)return h+'<div class="card empty" style="margin-top:8px">No game log for this stat yet. The app reads finished games for football and basketball, so the breakdown fills in as it does.</div><div class="actions"><button class="btn" data-act="pfopen" data-n="'+esc(s.n)+'" data-lg="'+lg+'" data-team="'+esc(s.team)+'">Full profile</button></div>';
+  var win=function(lb,w){return '<div style="flex:1;min-width:0"><div class="src">'+lb+'</div><div style="font-size:18px;font-weight:700">'+(w.n?fmt106(w.avg):'–')+'</div><div class="src">Over '+w.h.o+' of '+w.n+(w.n?' ('+pbPct(w.h.o,w.n)+')':'')+'</div></div>'};
+  h+='<h3>Hit rate against '+s.line+'</h3><div class="card" style="display:flex;gap:10px">'+win('Last 5',c.l5)+win('Last 10',c.l10)+win('Season',c.s)+'</div>';
+  if(c.mn5!=null)h+='<p class="src" style="margin:6px 0 0">Minutes, last 5 games: '+fmt106(c.mn5)+' a game.</p>';
+  h+='<h3>Game log</h3><div class="card" style="padding:4px 12px">'+c.all.slice(0,10).map(function(x,k){
+    var v=x.v[c.i],o=v>s.line?'O':v<s.line?'U':'P',cl=o==='O'?'hi':o==='U'?'lo':'mid';
+    return '<div style="display:flex;justify-content:space-between;gap:8px;padding:7px 0;'+(k?'border-top:1px solid var(--line)':'')+'"><span>'+esc(new Date(x.at).toLocaleDateString('en-US',{month:'short',day:'numeric'}))+' · '+(x.h===0?'@ ':'vs ')+esc(String(x.o||'').toUpperCase())+(x.w!=null?' · '+(x.w?'W':'L'):'')+(x.mn!=null?' · '+Math.round(x.mn)+' min':'')+'</span><span><b>'+fmt106(v)+'</b> <span class="hrpill '+cl+'" style="display:inline-block;margin-left:4px">'+o+'</span></span></div>';
+  }).join('')+'</div>';
+  if(c.sp&&c.sp.length){
+    h+='<h3>Splits</h3><div class="tblwrap"><table><thead><tr><th>Split</th><th>Games</th><th>Average</th><th>Over '+s.line+'</th></tr></thead><tbody>'+c.sp.map(function(x){return '<tr><td>'+esc(x.label)+'</td><td>'+x.n+(x.n<4?' <span class="src">small</span>':'')+'</td><td>'+fmt106(x.avg)+'</td><td>'+x.h.o+' of '+x.n+'</td></tr>'}).join('')+'</tbody></table></div>';
+  }
+  if(c.tm&&c.tm.length){
+    var now=c.tm.filter(function(x){return x.out});
+    if(now.length)h+='<div class="card" style="margin-top:10px"><b>Key teammate out now</b>'+now.map(function(x){return '<div class="src" style="margin-top:4px">'+esc(x.n)+' is ruled out. In '+x.wo.n+' game'+(x.wo.n>1?'s':'')+' without him, '+esc(s.n)+' averaged <b>'+fmt106(x.wo.avg)+'</b>, against '+fmt106(x.wi.avg)+' with him ('+x.wi.n+' games).'+(x.wo.n<3?' Small sample.':'')+'</div>'}).join('')+'</div>';
+    h+='<h3>With and without teammates</h3><div class="tblwrap"><table><thead><tr><th>Teammate</th><th>Without</th><th>With</th></tr></thead><tbody>'+c.tm.map(function(x){return '<tr><td>'+esc(x.n)+(x.out?' <span class="tag warn" style="font-size:10px;padding:1px 6px">Out</span>':'')+'</td><td>'+fmt106(x.wo.avg)+' <span class="src">('+x.wo.n+')</span></td><td>'+fmt106(x.wi.avg)+' <span class="src">('+x.wi.n+')</span></td></tr>'}).join('')+'</tbody></table></div><p class="src" style="margin:6px 0 0">A teammate counts as without when he does not appear in the box score. In football that can also mean he played with no stats, and samples are often small, so treat these as clues.</p>';
+  }else h+='<p class="src" style="margin:10px 0 0">No teammate splits yet: they need games with and without a teammate in this season’s box scores.</p>';
+  return h+'<div class="actions"><button class="btn" data-act="pfopen" data-n="'+esc(s.n)+'" data-lg="'+lg+'" data-team="'+esc(s.team)+'">Full profile</button></div>';
+}
+var propSheet124=propSheet;
+propSheet=function(p){return S.sheet&&S.sheet.type==='pbk'?pbSheet(S.sheet):propSheet124(p)};
+document.addEventListener('click',function(e){
+  var el=e.target&&e.target.closest?e.target.closest('[data-act="pbk"],[data-act="pbstep"]'):null;if(!el)return;
+  e.stopImmediatePropagation();e.preventDefault();
+  var d=el.dataset;
+  if(d.act==='pbk'){
+    var pj=parseFloat(d.proj)||0,ln=pbLine(d.lg,d.cat,d.n,pj);
+    S.sheet={type:'pbk',n:d.n,lg:d.lg,cat:d.cat,team:d.team,opp:d.opp,proj:pj,ptx:d.ptx,unit:d.unit,when:d.when,def:d.def,line:ln.v};renderSheet();
+    var sc=document.querySelector('#sheetRoot .sheet');if(sc)sc.scrollTop=0;
+  }else if(S.sheet&&S.sheet.type==='pbk'){
+    var v=Math.max(0,Math.round((S.sheet.line+parseFloat(d.d))*2)/2);S.sheet.line=v;PB_L[pbLKey(S.sheet.lg,S.sheet.cat,S.sheet.n)]=v;pbLSave();renderSheet();
+  }
+},true);
+document.addEventListener('change',function(e){
+  var t=e.target;if(!t||t.id!=='pbline'||!S.sheet||S.sheet.type!=='pbk')return;
+  var v=parseFloat(t.value);if(!(v>=0))return;S.sheet.line=v;PB_L[pbLKey(S.sheet.lg,S.sheet.cat,S.sheet.n)]=v;pbLSave();renderSheet();
+},true);
+/* players page: the search lives here as well as in the top bar */
+S.pls=S.pls||'nfl';S.plq=S.plq||'';
+function vPlayers(){
+  if(['nfl','nba','ncaafb','nhl','mlb'].indexOf(S.pls)<0)S.pls='nfl';
+  var h='<h2>Players</h2><div class="chips" role="group" aria-label="Sport">'+LG.filter(function(l){return l[0]!=='ncaamb'}).map(function(l){return '<button class="chip" data-act="set" data-k="pls" data-v="'+l[0]+'" aria-pressed="'+(S.pls===l[0])+'">'+l[1]+'</button>'}).join('')+'</div>';
+  h+='<input type="search" id="plq" placeholder="Type a name or team" value="'+esc(S.plq)+'" autocomplete="off" autocapitalize="none" aria-label="Search players" style="width:100%;text-align:left;font-family:inherit;margin:8px 0">';
+  return h+'<div id="plres">'+pfResults(S.pls,S.plq)+'</div>'+foot();
+}
+document.addEventListener('input',function(e){
+  var t=e.target;if(!t||t.id!=='plq')return;S.plq=t.value;var r=document.getElementById('plres');if(r)r.innerHTML=pfResults(S.pls,S.plq);
+},true);
+function vInjuries(){
+  var h='';try{h=injHomeHtml().replace('<h3>Injury tracker</h3>','')}catch(e){h='<div class="card empty">The injury report has not loaded yet.</div>'}
+  return '<h2>Injuries</h2>'+h+foot();
+}
+
+/* v167: research layout. Tabs: Props, Games, Players, Injuries, My slip. No best-bet lists or home page. */
+TABS=[
+ ['props','Props','<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'],
+ ['games','Games','<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>'],
+ ['players','Players','<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/>'],
+ ['injuries','Injuries','<circle cx="12" cy="12" r="9"/><path d="M12 7v10M7 12h10"/>'],
+ ['picks','My slip','<path d="M5 4h14v17l-7-4-7 4z"/>']
+];
+NAVG={props:['props','hb'],games:['games','scores','div','home','more','about'],players:['players'],injuries:['injuries'],picks:['picks','record','builder','parlay']};
+vProps=function(){return vBoard()};
+/* heads-up on open bets moves to My slip */
+var vPicks125=vPicks;
+vPicks=function(){
+  var h=vPicks125();
+  try{
+    var t=vToday(),a=t.indexOf('<h3>Heads up'),b=a<0?-1:t.indexOf('<h3>',a+8);
+    if(a>=0){var hu=b>a?t.slice(a,b):t.slice(a,t.indexOf('<p class="foot">',a)>a?t.indexOf('<p class="foot">',a):t.length);h=h.replace('<h2>My bets</h2>','<h2>My slip</h2>'+hu)}
+    else h=h.replace('<h2>My bets</h2>','<h2>My slip</h2>');
+  }catch(e){h=h.replace('<h2>My bets</h2>','<h2>My slip</h2>')}
+  return h;
+};
+var vGames125=vGames;
+vGames=function(){
+  var h=vGames125();
+  try{var a=h.indexOf('<h3>Best bets:');if(a>=0){var b=h.indexOf('<h3>',a+10);if(b>a)h=h.slice(0,a)+h.slice(b)}}catch(e){}
+  return h;
+};
+var foot125=foot;
+foot=function(){var h=foot125();try{if(S.tab==='props'||S.tab==='games'||S.tab==='players'||S.tab==='injuries')h=h.replace(/<br><span class="src">Display[\s\S]*?<\/span><br><span class="src">Rosters[\s\S]*?<\/span>/,'')}catch(e){}return h};
+TOUR.length=0;
+[{tab:'props',hl:'props',t:'Props',x:'Players ranked by recent form. Hot and Cold compare the last 5 games with the season. Tap a player for hit rates against a line you set, a game log, splits and how he does with or without a teammate.'},
+ {tab:'games',hl:'games',t:'Games',x:'Every game with scores, lines and the model’s read. Tap a game for the matchup breakdown.'},
+ {tab:'players',hl:'players',t:'Players',x:'Search any player in every sport and open the full profile.'},
+ {tab:'injuries',hl:'injuries',t:'Injuries',x:'Who is out, by sport. Anyone ruled out is removed from the props and adjusts the game outlook.'},
+ {tab:'picks',hl:'picks',t:'My slip',x:'Upload a sportsbook slip screenshot or log a bet. The app reads each leg and tracks it live against scores and player stats.'}].forEach(function(s){TOUR.push(s)});
+S.tab='props';try{render()}catch(e){}
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
