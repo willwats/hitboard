@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v170, Nov 6';
+var BUILD='v171, Nov 6';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -11908,18 +11908,18 @@ function pbCard(o){
     '<div style="text-align:right;flex:none"><div style="font-size:20px;font-weight:700">'+esc(r.projTxt||'')+'</div><div class="src">'+esc(r.unit||'projected')+'</div></div></div>'+
     '<div style="margin-top:6px;font-size:13.5px">'+l2+'</div><div style="margin-top:2px;font-size:13.5px">'+l3+d+'</div></div>';
 }
-S.bf=S.bf||'all';S.bs=S.bs||'trend';S.bn=40;
+S.bf=S.bf||'all';S.pbs=S.pbs||'trend';S.bn=40;
 function vBoard(){
   var lg=S.sport;if(['nfl','nba','ncaafb','nhl','mlb'].indexOf(lg)<0){lg='nfl';S.sport='nfl'}
   var cats=pbCats(lg),cat=cats.some(function(c){return c[0]===S.bc})?S.bc:cats[0][0];
   var h='<h2>Props</h2><div class="chips" role="group" aria-label="Sport">'+LG.filter(function(l){return l[0]!=='ncaamb'}).map(function(l){return '<button class="chip" data-act="sport" data-v="'+l[0]+'" aria-pressed="'+(S.sport===l[0])+'">'+l[1]+'</button>'}).join('')+'</div>';
   h+='<div class="chips" role="group" aria-label="Stat">'+cats.map(function(c){return '<button class="chip" data-act="set" data-k="bc" data-v="'+c[0]+'" aria-pressed="'+(cat===c[0])+'">'+esc(c[1])+'</button>'}).join('')+'</div>';
-  h+='<div class="chips" role="group" aria-label="Filter">'+[['all','All'],['hot','Hot'],['cold','Cold'],['over','70%+ over']].map(function(c){return '<button class="chip" data-act="set" data-k="bf" data-v="'+c[0]+'" aria-pressed="'+(S.bf===c[0])+'">'+c[1]+'</button>'}).join('')+'<span class="src" style="align-self:center;margin:0 4px">Sort</span>'+[['trend','Trending'],['hit','Hit rate'],['proj','Projection']].map(function(c){return '<button class="chip" data-act="set" data-k="bs" data-v="'+c[0]+'" aria-pressed="'+(S.bs===c[0])+'">'+c[1]+'</button>'}).join('')+'</div>';
+  h+='<div class="chips" role="group" aria-label="Filter">'+[['all','All'],['hot','Hot'],['cold','Cold'],['over','70%+ over']].map(function(c){return '<button class="chip" data-act="set" data-k="bf" data-v="'+c[0]+'" aria-pressed="'+(S.bf===c[0])+'">'+c[1]+'</button>'}).join('')+'<span class="src" style="align-self:center;margin:0 4px">Sort</span>'+[['trend','Trending'],['hit','Hit rate'],['proj','Projection']].map(function(c){return '<button class="chip" data-act="set" data-k="pbs" data-v="'+c[0]+'" aria-pressed="'+(S.pbs===c[0])+'">'+c[1]+'</button>'}).join('')+'</div>';
   var rows=pbRows(lg,cat),logs=rows.some(function(o){return o.c});
   if(S.bf==='hot')rows=rows.filter(function(o){return o.tr!=null&&o.tr>=.10});
   else if(S.bf==='cold')rows=rows.filter(function(o){return o.tr!=null&&o.tr<=-.10});
   else if(S.bf==='over')rows=rows.filter(function(o){return o.rate!=null&&o.rate>=.7});
-  var key=S.bs==='hit'?function(o){return o.rate==null?-1:o.rate+(o.c?o.c.l10.n/1000:0)}:S.bs==='proj'?function(o){return o.r.sort||0}:function(o){return o.tr==null?-9:o.tr};
+  var key=S.pbs==='hit'?function(o){return o.rate==null?-1:o.rate+(o.c?o.c.l10.n/1000:0)}:S.pbs==='proj'?function(o){return o.r.sort||0}:function(o){return o.tr==null?-9:o.tr};
   rows.sort(function(a,b){return key(b)-key(a)});
   var n0=S.bn||40,more=rows.length>n0;
   h+='<p class="src" style="margin:4px 0 10px">Tap a player for the full breakdown. Hot and Cold compare the last 5 games with the season. No sportsbook lines are available here, so the reference line is the projection rounded to the nearest half. Enter your book’s line inside a player to see the hit rate against it. Ruled-out players are hidden.</p>';
@@ -12149,6 +12149,33 @@ vBoard=function(){
   }catch(e){}
   return h;
 };
+
+/* v171: filter and sort live together in a side panel; the board says how many players have game logs */
+S.bdr=false;
+var BF_L={all:'All',hot:'Hot',cold:'Cold',over:'70%+ over'},BS_L={trend:'Trending',hit:'Hit rate',proj:'Projection'};
+var vBoard128=vBoard;
+vBoard=function(){
+  var h=vBoard128();
+  try{
+    h=h.replace(/<div class="chips" role="group" aria-label="Filter">[\s\S]*?<\/div>/,'<div style="margin:2px 0 10px"><button class="btn" data-act="bdrawer" style="width:100%;text-align:left">Filter and sort: <b>'+BF_L[S.bf||'all']+'</b> · <b>'+BS_L[S.pbs||'trend']+'</b> ›</button></div>');
+    var lg=S.sport,cats=pbCats(lg),cat=cats.some(function(c){return c[0]===S.bc})?S.bc:cats[0][0],rows=[];
+    if(lg!=='nhl'&&lg!=='mlb'){try{rows=pbRows(lg,cat)}catch(e){rows=[]}}
+    var w=rows.filter(function(o){return o.c&&o.c.l5.n>=3}).length;
+    if(rows.length){
+      var line='<p class="src" style="margin:0 0 8px">Game logs match '+w+' of '+rows.length+' players on this stat.'+(S.bf==='hot'||S.bf==='cold'?' Hot needs the last 5 games 10% above the season average, Cold 10% below, with at least 3 games.':'')+'</p>';
+      var i=h.indexOf('</p>',h.indexOf('Tap a player for the full breakdown'));if(i>=0)h=h.slice(0,i+4)+line+h.slice(i+4);
+    }
+    if(S.bdr){
+      var opt=function(k,L,cur){return Object.keys(L).map(function(v){return '<button class="chip" data-act="set" data-k="'+k+'" data-v="'+v+'" aria-pressed="'+(cur===v)+'" style="width:100%;text-align:left;margin:0 0 6px">'+L[v]+'</button>'}).join('')};
+      h+='<div class="scrim" data-act="bdrawer" style="z-index:50"></div><aside role="dialog" aria-label="Filter and sort" style="position:fixed;top:0;right:0;bottom:0;width:min(84vw,320px);background:var(--bg);border-left:1px solid var(--line);z-index:51;padding:16px;overflow:auto;box-shadow:-8px 0 24px rgba(0,0,0,.25)"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><b>Filter and sort</b><button class="btn" data-act="bdrawer">Done ✕</button></div><div class="src" style="margin:0 0 6px"><b>Show</b></div>'+opt('bf',BF_L,S.bf||'all')+'<div class="src" style="margin:14px 0 6px"><b>Sort by</b></div>'+opt('pbs',BS_L,S.pbs||'trend')+'</aside>';
+    }
+  }catch(e){}
+  return h;
+};
+document.addEventListener('click',function(e){
+  var el=e.target&&e.target.closest?e.target.closest('[data-act="bdrawer"]'):null;if(!el)return;
+  e.stopImmediatePropagation();e.preventDefault();S.bdr=!S.bdr;render();
+},true);
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
