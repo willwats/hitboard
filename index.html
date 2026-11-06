@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v167, Nov 6';
+var BUILD='v168, Nov 6';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -9380,7 +9380,7 @@ deepRows=function(){
 };
 
 /* v136: NFL props follow the live schedule only (next 40 hours); no fallback to the old saved schedule; season-ending injuries hidden */
-var SLATE_MS=40*3600000;
+var SLATE_MS=8*864e5;
 nextOpp=function(team){
   var now=Date.now(),have=(S.feed.nfl||[]).length>0,best=null;
   (S.feed.nfl||[]).forEach(function(g){if(kind(g)!=='up')return;if(g.start>now+SLATE_MS)return;var a=nt(g.a),h=nt(g.h);if(a!==team&&h!==team)return;if(!best||g.start<best.start)best=g});
@@ -9414,7 +9414,7 @@ vPropsLg=function(){
     var now=Date.now(),on={},n=0,seen={};
     S.feed.nfl.forEach(function(g){if(kind(g)!=='up'||g.start>now+SLATE_MS)return;var k=nt(g.a)+'@'+nt(g.h);if(!seen[k]){seen[k]=1;n++}on[nt(g.a)]=1;on[nt(g.h)]=1});
     var off=Object.keys(TS).filter(function(t){return !on[t]}).sort();
-    var msg='<p class="src" style="margin:0 0 10px"><b>Slate check:</b> '+n+' game'+(n===1?'':'s')+' in the next 40 hours. Every matchup below comes from that live schedule. '+(off.length?'Not playing, so hidden: '+off.join(', ')+'. ':'')+'Players who are out for the season or on injured reserve are hidden too.</p>';
+    var msg='<p class="src" style="margin:0 0 10px"><b>Slate check:</b> '+n+' game'+(n===1?'':'s')+' in the next 8 days. Every matchup below comes from that live schedule. '+(off.length?'Not playing, so hidden: '+off.join(', ')+'. ':'')+'Players who are out for the season or on injured reserve are hidden too.</p>';
     var i=h.indexOf('</h2>');if(i>=0)h=h.slice(0,i+5)+msg+h.slice(i+5);
   }catch(e){}
   return h;
@@ -9524,7 +9524,7 @@ vPropsLg=function(){
   if(mgOk)h+='<div class="chips" role="group" aria-label="Sort"><button class="chip" data-act="set" data-k="ss" data-v="" aria-pressed="'+(S.ss!=='mg')+'">Best projection</button><button class="chip" data-act="set" data-k="ss" data-v="mg" aria-pressed="'+(S.ss==='mg')+'">Best matchup grade</button></div>';
   var ia=S.inj&&S.inj[lg==='ncaafb'?'nfl':lg];
   h+='<p class="src" style="margin:4px 0 10px">Tap a player for my prediction and why. Matchups are this week’s games.'+(lg==='ncaafb'?' College injuries are not published, so confirm who is playing.':ia?' Injured players are hidden, checked '+esc(fmtClock(ia.at))+'.':' The injury report has not loaded yet.')+'</p>';
-  if(!rows.length)h+='<div class="card empty">No players match. Teams without a game in the next 40 hours are hidden.</div>';
+  if(!rows.length)h+='<div class="card empty">No players match. Teams without a game in the next 8 days are hidden.</div>';
   else{var cap=S.dmore?rows.length:40;h+=rows.slice(0,cap).map(spCard).join('');if(rows.length>cap)h+='<p><button class="btn" data-act="dmore">Show all '+rows.length+'</button></p>'}
   h+='<p class="src" style="margin-top:12px">Projections are estimates from season numbers, the defense and the game. They are not sportsbook lines. <button class="linkbtn" data-act="set" data-k="pold" data-v="1">More tools: calculators, hit-rate tables, team trends</button></p>';
   return h;
@@ -11882,7 +11882,7 @@ function pbLine(lg,cat,n,proj){
   var d=Math.round((proj||0)*2)/2;return {v:d>0?d:.5,own:false};
 }
 function pbLSave(){try{localStorage.setItem('hb.lines.v1',JSON.stringify(PB_L))}catch(e){}}
-var PB_SKIP={pl:1,td:1,kick:1};
+var PB_SKIP={pl:1,td:1,kick:1,tr:1};
 function pbCats(lg){return spCats(lg).filter(function(c){return !PB_SKIP[c[0]]})}
 function pbPct(a,b){return b?Math.round(100*a/b)+'%':'n/a'}
 function pbRows(lg,cat){
@@ -11925,7 +11925,7 @@ function vBoard(){
   h+='<p class="src" style="margin:4px 0 10px">Tap a player for the full breakdown. Hot and Cold compare the last 5 games with the season. No sportsbook lines are available here, so the reference line is the projection rounded to the nearest half. Enter your book’s line inside a player to see the hit rate against it. Ruled-out players are hidden.</p>';
   if(S.sport==='nhl'||S.sport==='mlb')h+='<p class="note">Game logs for '+lgName(S.sport)+' are not read yet, so these rows show projections and season rates only. Hit rates and splits cover football and basketball.</p>';
   else if(!logs)h+='<p class="note">'+(S.dlBusy?'Reading finished games…':'No finished games are loaded yet.')+' Hit rates and trends appear once the app has read this season’s box scores. That can take a minute after opening.</p>';
-  if(!rows.length)h+='<div class="card empty">No players match these filters. Teams without a game in the next 40 hours are hidden.</div>';
+  if(!rows.length)h+='<div class="card empty">No players match these filters. Teams without a game in the next 8 days are hidden.</div>';
   else h+=rows.slice(0,n0).map(pbCard).join('')+(more?'<p style="text-align:center"><button class="btn" data-act="set" data-k="bn" data-v="'+(n0+40)+'">Show more ('+(rows.length-n0)+')</button></p>':'');
   return h+foot();
 }
