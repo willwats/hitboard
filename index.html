@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v177, Nov 6';
+var BUILD='v178, Nov 6';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -12283,7 +12283,7 @@ function angRecord(){
       var nk=normName(r.n),k=lg+'|'+nk+'|'+a.o.cat+'|'+new Date(gm.start).toISOString().slice(0,10);
       if(have[k])return;have[k]=1;
       var tags=angTags(a.why);
-      ANG.push({k:k,lg:lg,n:r.n,nk:nk,cat:a.o.cat,cn:a.cc[1],dir:a.dir,ln:a.o.ln.v,t:r.t,opp:a.o.opp||'',start:gm.start,tags:tags,ns:a.why.length,at:now,res:null,v:null});ch=true;
+      ANG.push({k:k,gid:gm.id,lg:lg,n:r.n,nk:nk,cat:a.o.cat,cn:a.cc[1],dir:a.dir,ln:a.o.ln.v,t:r.t,opp:a.o.opp||'',start:gm.start,tags:tags,ns:a.why.length,at:now,res:null,v:null});ch=true;
     });
   });
   if(ch)angSave();
@@ -12347,6 +12347,58 @@ function lgTag177(h,g){
 }
 var feedCard177=feedCard;feedCard=function(g){return lgTag177(feedCard177.apply(this,arguments),g)};
 var feedSheet177=feedSheet;feedSheet=function(g){return lgTag177(feedSheet177.apply(this,arguments),g)};
+try{render()}catch(e){}
+
+/* v178: each game window shows the props the app predicted for it and tracks them against the box score */
+function pdStat(c){return String(c).replace(/^[nc](?=(pts|reb|ast|tpm)$)/,'').replace(/^c(?=(pass|rush|rec)$)/,'')}
+function pdRows(g){
+  var rows=[],j=null,bx=S.box&&S.box[g.id];if(bx&&bx.j)j=bx.j;
+  var k=kind(g),done=k==='final';
+  var val=function(name,stat){if(!j)return null;try{var v=boxNum(j,name,stat);return v==null||isNaN(v)?null:v}catch(e){return null}};
+  var add=function(name,team,over,ln,stat,label,res){
+    var v=val(name,stat),st,tone;
+    if(res==='W'||res==='L'){st=res==='W'?'Hit':'Missed';tone=res==='W'?'good':'warn'}
+    else if(v==null){st=k==='up'?'Not started':'Waiting for box score';tone=''}
+    else if(over&&v>ln||!over&&v>ln&&false){st='Hit';tone='good'}
+    else if(!over&&v>ln){st='Missed';tone='warn'}
+    else if(done){st=over?'Missed':'Hit';tone=over?'warn':'good'}
+    else{st='In play';tone=''}
+    rows.push({n:name,t:team,txt:(over?'Over ':'Under ')+ln+' '+label,v:v,st:st,tone:tone});
+  };
+  ANG.forEach(function(x){
+    if(x.gid!==g.id&&!(x.gid==null&&x.start===g.start&&(x.t===g.a||x.t===g.h||x.t===g.an||x.t===g.hn)))return;
+    add(x.n,x.t,x.dir==='Over',x.ln,pdStat(x.cat),x.cn,x.res);
+  });
+  (S.auto||[]).forEach(function(x){
+    if(x.gid!==g.id)return;
+    var SN={pts:'points',reb:'rebounds',ast:'assists',tpm:'threes',rush:'rushing yards',pass:'passing yards',rec:'receiving yards'};
+    add(x.name,x.team,true,x.thr,x.stat,SN[x.stat]||x.stat,x.res==='P'?null:x.res);
+  });
+  return rows;
+}
+function pdHtml(g){
+  try{angRecord()}catch(e){}
+  var R=pdRows(g);
+  var h='<h3>Props the app predicted</h3>';
+  if(!R.length){
+    return h+'<p class="note" style="margin-top:0">'+(g.lg==='ncaamb'||g.lg==='nhl'||g.lg==='mlb'?'The app does not make player prop suggestions for '+esc(lgName(g.lg))+' yet.':'No prop was suggested for this game. Props are saved when the Picks tab shows them, which needs this season’s game logs for the teams.')+'</p>';
+  }
+  var w=R.filter(function(r){return r.st==='Hit'}).length,l=R.filter(function(r){return r.st==='Missed'}).length;
+  h+='<div class="facts"><span>Hit <b>'+w+'</b></span><span>Missed <b>'+l+'</b></span><span>Open <b>'+(R.length-w-l)+'</b></span></div>';
+  h+=R.map(function(r){return '<div class="card" style="padding:10px 12px;margin:0 0 6px"><div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><span><b>'+esc(r.n)+'</b> <span class="src">'+esc(r.t||'')+'</span><br><span class="src">'+esc(r.txt)+(r.v!=null?' · so far '+fmt106(r.v):'')+'</span></span><span class="tag '+r.tone+'">'+esc(r.st)+'</span></div></div>'}).join('');
+  return h+'<p class="src">The line is the one the app shows, not your sportsbook’s. Results are saved to the Results tab.</p>';
+}
+var feedSheet178=feedSheet;feedSheet=function(g){
+  var h=feedSheet178.apply(this,arguments);
+  try{
+    var bx=S.box&&S.box[g.id];
+    if(kind(g)!=='up'&&!(bx&&bx.j)&&!S._pdTry){S._pdTry={};}
+    if(kind(g)!=='up'&&!(bx&&bx.j)&&S._pdTry&&!S._pdTry[g.id]){S._pdTry[g.id]=1;boxFetch(g).then(function(){if(S.sheet&&S.sheet.id===g.id)renderSheet()})}
+    var sec=pdHtml(g),i=h.indexOf('<h2 style="margin-top:22px">');
+    if(i<0)i=h.indexOf('<details class="more"');
+    return i>=0?h.slice(0,i)+sec+h.slice(i):h+sec;
+  }catch(e){return h}
+};
 try{render()}catch(e){}
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
