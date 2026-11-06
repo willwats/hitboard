@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v168, Nov 6';
+var BUILD='v169, Nov 6';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -4296,7 +4296,7 @@ function scY(){return window.pageYOffset||0}
 function scSet(y){window.scrollTo(0,y)}
 function scTop(){scSet(0)}
 function render(){
-  var _y=scY(),_h={home:vHome,players:vPlayers,injuries:vInjuries,games:vGames,scores:vScores,div:vDiv,record:vRecord,props:vProps,parlay:vParlay,picks:vPicks,about:vAbout,more:vMore,builder:vBuilder,hb:vHb,today:vToday}[S.tab](),_v=$('#view');
+  var _y=scY(),_h={home:vHome,picks2:vPicks2,players:vPlayers,injuries:vInjuries,games:vGames,scores:vScores,div:vDiv,record:vRecord,props:vProps,parlay:vParlay,picks:vPicks,about:vAbout,more:vMore,builder:vBuilder,hb:vHb,today:vToday}[S.tab](),_v=$('#view');
   if(_v.__h!==_h){_v.innerHTML=_h;_v.__h=_h}
   $('#stamp').innerHTML='Feed '+esc(fmtClock(S.feedAt))+'<br>'+(S.live?'live':'snapshot');
   renderNav();updateSlipBar();
@@ -12026,6 +12026,111 @@ TOUR.length=0;
  {tab:'injuries',hl:'injuries',t:'Injuries',x:'Who is out, by sport. Anyone ruled out is removed from the props and adjusts the game outlook.'},
  {tab:'picks',hl:'picks',t:'My slip',x:'Upload a sportsbook slip screenshot or log a bet. The app reads each leg and tracks it live against scores and player stats.'}].forEach(function(s){TOUR.push(s)});
 S.tab='props';try{render()}catch(e){}
+
+/* v169: Picks tab. Game picks priced against DraftKings; player angles from form, matchup and teammates */
+S.pks=S.pks||'all';
+function pkGame(lg){
+  var now=Date.now(),out=[];
+  (S.feed[lg]||[]).forEach(function(g){
+    if(kind(g)!=='up'||!(g.start>now)||g.start>now+8*864e5)return;
+    var b=picksFor(g);if(!b)return;var px=(g.dk&&g.dk.px)||{},ml=(g.dk&&g.dk.ml)||{};
+    b.forEach(function(x){
+      if(!x.t||x.p==null)return;
+      var pr=x.t==='sp'?(x.side==='h'?px.sh:px.sa):x.t==='tot'?(x.over?px.to:px.tu):(x.side==='h'?ml.h:ml.a),assumed=false;
+      if(pr==null||!isFinite(pr)){if(x.t==='ml')return;pr=-110;assumed=true}
+      var edge=x.p-amBe(pr);
+      if(edge>=EDGE_MIN&&edge<=EDGE_MAX)out.push({g:g,x:x,pr:pr,assumed:assumed,edge:edge});
+    });
+  });
+  return out.sort(function(a,b){return b.edge-a.edge});
+}
+function pkGameCard(i){
+  var x=i.x;
+  return '<div class="card" data-act="bbgame" data-id="'+esc(i.g.id)+'" data-t="'+x.t+'" style="margin-bottom:8px;cursor:pointer"><div class="r" style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><div><b>'+esc(x.pick)+'</b> <span class="src">'+esc(lgName(i.g.lg))+' · '+esc(HB_T[x.t])+' · '+fmtAm(i.pr)+(i.assumed?' (assumed)':'')+'</span></div>'+hbPill('Edge +'+(i.edge*100).toFixed(1)+'%','hi')+'</div>'+
+    '<div class="src">'+esc(i.g.a+' @ '+i.g.h)+' · '+esc(gTime(i.g))+'</div>'+consBadge(i.g,i.x)+'<div class="src">Model '+Math.round(x.p*100)+'% vs '+Math.round(amBe(i.pr)*100)+'% needed at DraftKings</div><div class="src">Tap for the reason and matchup</div></div>';
+}
+/* player angles: each signal is a plain fact; two or more pointing the same way make a suggestion */
+function pkAngles(lg){
+  var out=[];
+  pbCats(lg).forEach(function(cc){
+    pbRows(lg,cc[0]).forEach(function(o){
+      var c=o.c,r=o.r;if(!c||c.l5.n<3)return;
+      var ov=[],un=[];
+      if(o.tr!=null){
+        if(o.tr>=.10)ov.push('Last 5 games average '+fmt106(c.l5.avg)+', '+Math.round(o.tr*100)+'% above his season '+fmt106(c.s.avg));
+        else if(o.tr<=-.10)un.push('Last 5 games average '+fmt106(c.l5.avg)+', '+Math.round(-o.tr*100)+'% below his season '+fmt106(c.s.avg));
+      }
+      if(o.rate!=null){
+        if(o.rate>=.7)ov.push('Cleared '+o.ln.v+' in '+c.l10.h.o+' of his last '+c.l10.n);
+        else if(o.rate<=.3)un.push('Stayed under '+o.ln.v+' in '+(c.l10.n-c.l10.h.o-c.l10.h.p)+' of his last '+c.l10.n);
+      }
+      var pc=typeof r.pct==='number'?r.pct:null;
+      if(pc!=null){
+        if(pc>=4)ov.push('Favorable matchup'+(r.def&&r.def.txt?': '+r.def.txt:''));
+        else if(pc<=-4)un.push('Tough matchup'+(r.def&&r.def.txt?': '+r.def.txt:''));
+      }
+      if(ov.length+un.length>=1){
+        try{
+          var f=pbCalc(lg,cc[0],r.n,o.ln.v,o.opp,true);
+          if(f&&f.tm)f.tm.forEach(function(t){
+            if(!t.out||t.wo.n<2||t.wi.avg<=0)return;var d=t.wo.avg/t.wi.avg-1;
+            if(d>=.10)ov.push(t.n+' is out. Without him he averages '+fmt106(t.wo.avg)+' ('+t.wo.n+' games) vs '+fmt106(t.wi.avg)+' with him');
+            else if(d<=-.10)un.push(t.n+' is out. Without him he averages '+fmt106(t.wo.avg)+' ('+t.wo.n+' games) vs '+fmt106(t.wi.avg)+' with him');
+          });
+        }catch(e){}
+      }
+      var net=ov.length-un.length;if(Math.abs(net)<2)return;
+      out.push({o:o,cc:cc,dir:net>0?'Over':'Under',why:net>0?ov:un,against:net>0?un:ov,score:Math.abs(net)*10+Math.abs(o.tr||0)*10});
+    });
+  });
+  return out.sort(function(a,b){return b.score-a.score});
+}
+function pkAngleCard(a){
+  var o=a.o,r=o.r,c=o.c;
+  return '<div class="card" data-act="pbk" data-n="'+esc(r.n)+'" data-lg="'+r.lg+'" data-cat="'+o.cat+'" data-team="'+esc(r.t)+'" data-opp="'+esc(o.opp||'')+'" data-proj="'+(r.proj||0)+'" data-ptx="'+esc(r.projTxt||'')+'" data-unit="'+esc(r.unit||'')+'" data-when="'+esc(r.when||'')+'" data-def="'+esc(r.def&&r.def.txt||'')+'" style="padding:12px;margin:0 0 8px;cursor:pointer">'+
+    '<div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><div style="min-width:0"><div><b>'+esc(r.n)+'</b> <span class="src">'+esc(r.t)+(r.pos?' · '+esc(r.pos):'')+'</span></div><div class="src">'+esc(a.cc[1])+' · '+esc(r.gl||'')+(r.when?' · '+esc(r.when):'')+'</div></div>'+
+    '<div style="text-align:right;flex:none">'+hbPill(a.dir+' '+o.ln.v,a.dir==='Over'?'hi':'lo')+'<div class="src">projected '+esc(r.projTxt||'')+'</div></div></div>'+
+    '<ul class="pts" style="margin:8px 0 0">'+a.why.map(function(w){return '<li>'+esc(w)+'</li>'}).join('')+'</ul>'+
+    (a.against.length?'<div class="src" style="margin-top:4px">Against: '+esc(a.against.join('; '))+'</div>':'')+'</div>';
+}
+function vPicks2(){
+  var lgs=['nfl','nba','ncaafb','nhl','mlb'],sel=S.pks==='all'?lgs:[S.pks];
+  var h='<h2>Picks</h2><div class="chips" role="group" aria-label="Sport">'+[['all','All']].concat(lgs.map(function(l){return [l,lgName(l)]})).map(function(c){return '<button class="chip" data-act="set" data-k="pks" data-v="'+c[0]+'" aria-pressed="'+(S.pks===c[0])+'">'+c[1]+'</button>'}).join('')+'</div>';
+  var G=[];sel.forEach(function(l){try{pkGame(l).forEach(function(i){G.push(i)})}catch(e){}});
+  G.sort(function(a,b){return b.edge-a.edge});
+  h+='<h3>Game lines vs DraftKings</h3><p class="src" style="margin:0 0 8px">Spread, total and moneyline picks where the model’s probability beats the price DraftKings is offering by at least 2%. Games in the next 8 days. Injuries are already built into the model.</p>';
+  if(!G.length)h+='<div class="card empty"><b>No game pick clears the bar right now.</b> Lines load as games get closer. Passing is a fine play.</div>';
+  else h+=G.slice(0,10).map(pkGameCard).join('');
+  var A=[];sel.forEach(function(l){if(l==='nhl'||l==='mlb')return;try{pkAngles(l).forEach(function(a){A.push(a)})}catch(e){}});
+  A.sort(function(a,b){return b.score-a.score});
+  h+='<h3>Player angles</h3><p class="src" style="margin:0 0 8px">ESPN does not carry DraftKings’ player-prop prices, so these are angles, not priced bets. Each one needs two or more reasons pointing the same way: recent form, the matchup, how often he cleared the number, and teammates who are out. Check your book’s line before using one.</p>';
+  if(S.pks==='nhl'||S.pks==='mlb')h+='<div class="card empty">Player angles need game logs, which cover football and basketball. NHL and MLB show game picks only.</div>';
+  else if(!A.length)h+='<div class="card empty">No player has two or more signals lining up yet. Angles fill in once the app has read this season’s box scores for the teams that play soon.</div>';
+  else{
+    var ovs=A.filter(function(a){return a.dir==='Over'}).slice(0,8),uns=A.filter(function(a){return a.dir==='Under'}).slice(0,5);
+    if(ovs.length)h+='<p class="src" style="margin:8px 0 6px"><b>Leaning over</b></p>'+ovs.map(pkAngleCard).join('');
+    if(uns.length)h+='<p class="src" style="margin:8px 0 6px"><b>Leaning under</b></p>'+uns.map(pkAngleCard).join('');
+  }
+  h+='<p class="src" style="margin:10px 0 0">Place bets yourself at your sportsbook. Scan your slip in My slip to track it.</p>';
+  return h+foot();
+}
+TABS=[
+ ['picks2','Picks','<path d="M12 3l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.5 6.6 19.5l1.2-6L3.3 9.3l6.1-.7z"/>'],
+ ['props','Props','<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'],
+ ['games','Games','<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>'],
+ ['injuries','Injuries','<circle cx="12" cy="12" r="9"/><path d="M12 7v10M7 12h10"/>'],
+ ['picks','My slip','<path d="M5 4h14v17l-7-4-7 4z"/>']
+];
+NAVG.picks2=['picks2'];
+NAVG.props=['props'];
+NAVG.players=['players'];
+TOUR.length=0;
+[{tab:'picks2',hl:'picks2',t:'Picks',x:'Suggestions. Game picks where the model beats DraftKings’ price, and player angles built from recent form, the matchup and teammates who are out.'},
+ {tab:'props',hl:'props',t:'Props',x:'Every player ranked by recent form. Tap one for hit rates against a line you set, a game log, splits and teammate effects.'},
+ {tab:'games',hl:'games',t:'Games',x:'Games with scores and lines. Tap a game for the matchup breakdown.'},
+ {tab:'injuries',hl:'injuries',t:'Injuries',x:'Who is out, by sport. Anyone ruled out leaves the props and adjusts the game outlook.'},
+ {tab:'picks',hl:'picks',t:'My slip',x:'Upload a sportsbook slip screenshot or log a bet, and the app tracks it live.'}].forEach(function(s){TOUR.push(s)});
+S.tab='picks2';try{render()}catch(e){}
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
