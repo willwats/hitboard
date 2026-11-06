@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v175, Nov 6';
+var BUILD='v176, Nov 6';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -4296,7 +4296,7 @@ function scY(){return window.pageYOffset||0}
 function scSet(y){window.scrollTo(0,y)}
 function scTop(){scSet(0)}
 function render(){
-  var _y=scY(),_h={home:vHome,picks2:vPicks2,players:vPlayers,injuries:vInjuries,games:vGames,scores:vScores,div:vDiv,record:vRecord,props:vProps,parlay:vParlay,picks:vPicks,about:vAbout,more:vMore,builder:vBuilder,hb:vHb,today:vToday}[S.tab](),_v=$('#view');
+  var _y=scY(),_h={home:vHome,picks2:vPicks2,players:vPlayers,injuries:vInjuries,results:vResults,games:vGames,scores:vScores,div:vDiv,record:vRecord,props:vProps,parlay:vParlay,picks:vPicks,about:vAbout,more:vMore,builder:vBuilder,hb:vHb,today:vToday}[S.tab](),_v=$('#view');
   if(_v.__h!==_h){_v.innerHTML=_h;_v.__h=_h}
   $('#stamp').innerHTML='Feed '+esc(fmtClock(S.feedAt))+'<br>'+(S.live?'live':'snapshot');
   renderNav();updateSlipBar();
@@ -12261,6 +12261,85 @@ document.addEventListener('click',function(e){
   document.addEventListener('visibilitychange',function(){if(!document.hidden)setTimeout(check,800)});
   setInterval(function(){if(!document.hidden)check()},10*60000);
 })();
+
+/* v176: Results tab replaces Injuries (injuries live in each game breakdown). Tracks every player angle and grades it on the box score. */
+var ANG=[];try{var _ra=localStorage.getItem('hb.angles.v1');if(_ra){var _aa=JSON.parse(_ra);if(Array.isArray(_aa))ANG=_aa}}catch(e){}
+function angSave(){try{localStorage.setItem('hb.angles.v1',JSON.stringify(ANG.slice(-1500)))}catch(e){}}
+function angTags(why){
+  var t=[];(why||[]).forEach(function(w){
+    var k=/^Last 5 games/.test(w)?'Recent form':/^(Cleared|Stayed under)/.test(w)?'Hit rate on the line':/^(Favorable|Tough) matchup/.test(w)?'Matchup':/ is out\./.test(w)?'Teammate out':null;
+    if(k&&t.indexOf(k)<0)t.push(k)});
+  return t;
+}
+function angRecord(){
+  if(window.claude&&window.claude.use)return;
+  var now=Date.now(),have={},ch=false;ANG.forEach(function(x){have[x.k]=1});
+  ['nfl','nba','ncaafb'].forEach(function(lg){
+    var A=[];try{A=pkAngles(lg)}catch(e){}
+    A.forEach(function(a){
+      var r=a.o.r,when=r.gk||null;
+      var gm=null;try{(S.feed[lg]||[]).forEach(function(g){if(kind(g)==='up'&&g.start>now&&(g.a===r.t||g.h===r.t||g.an===r.t||g.hn===r.t||g.a===r.team||g.h===r.team))if(!gm||g.start<gm.start)gm=g})}catch(e){}
+      if(!gm||gm.start>now+8*864e5)return;
+      var nk=normName(r.n),k=lg+'|'+nk+'|'+a.o.cat+'|'+new Date(gm.start).toISOString().slice(0,10);
+      if(have[k])return;have[k]=1;
+      var tags=angTags(a.why);
+      ANG.push({k:k,lg:lg,n:r.n,nk:nk,cat:a.o.cat,cn:a.cc[1],dir:a.dir,ln:a.o.ln.v,t:r.t,opp:a.o.opp||'',start:gm.start,tags:tags,ns:a.why.length,at:now,res:null,v:null});ch=true;
+    });
+  });
+  if(ch)angSave();
+}
+function angGrade(){
+  var now=Date.now(),ch=false;
+  ['nfl','nba','ncaafb'].forEach(function(lg){
+    var pend=ANG.filter(function(x){return x.lg===lg&&!x.res&&now>x.start+4*36e5});if(!pend.length)return;
+    var I=pbIdx(lg),C=DL_LG[lg];
+    pend.forEach(function(x){
+      var i=C&&C.ix[x.cat];if(i==null)return;
+      var L=(I.P[x.nk]||[]).filter(function(e){return e.at>=x.start-6*36e5&&e.at<=x.start+30*36e5&&e.v[i]!=null})[0];
+      if(L){var v=L.v[i];x.v=v;x.res=v===x.ln?'P':((v>x.ln)===(x.dir==='Over')?'W':'L');ch=true}
+      else if(now>x.start+4*864e5){x.res='P';ch=true}
+    });
+  });
+  if(ch)angSave();
+}
+function angRows(arr,keyFn){return grpRows(arr,keyFn,1,function(){return .524})}
+function vResults(){
+  try{angRecord();angGrade()}catch(e){}
+  var h='<h2>Results</h2><p class="src" style="margin:0 0 8px">Every player angle and game pick the app shows is saved and graded on the final box score or score. This shows which kinds of suggestion actually hit.</p>';
+  var G=ANG.filter(function(x){return x.res==='W'||x.res==='L'}),W=G.filter(function(x){return x.res==='W'}).length,O=ANG.filter(function(x){return !x.res}).length;
+  h+='<h3>Player angles</h3>';
+  if(!ANG.length)h+='<div class="card empty">No angles are saved yet. They are recorded when the Picks tab shows them, for football and basketball, then graded after the game once the box score is read.</div>';
+  else{
+    h+='<div class="facts"><span>Graded <b>'+G.length+'</b></span><span>Hit <b>'+(G.length?pct1(W/G.length):'—')+'</b></span><span>Waiting <b>'+O+'</b></span></div>';
+    var X=[];ANG.forEach(function(x){(x.tags.length?x.tags:['Other']).forEach(function(t){X.push({res:x.res,t:t})})});
+    h+=grpTable('By reason',angRows(X,function(x){return x.t}),'An angle with several reasons counts once under each one.','Break-even');
+    h+=grpTable('Over or under',angRows(ANG,function(x){return x.dir}),null,'Break-even');
+    h+=grpTable('Number of reasons',angRows(ANG,function(x){return x.ns>=3?'3 or more':'2'}),'Checks whether more agreeing signals really means a better pick.','Break-even');
+    h+=grpTable('By sport',angRows(ANG,function(x){return lgName(x.lg)}),null,'Break-even');
+    h+=grpTable('By stat',angRows(ANG,function(x){return x.cn}),null,'Break-even');
+    var recent=ANG.filter(function(x){return x.res}).sort(function(a,b){return b.start-a.start}).slice(0,12);
+    if(recent.length)h+='<h3>Recent</h3>'+recent.map(function(x){return '<div class="card" style="padding:10px 12px;margin:0 0 6px"><div style="display:flex;justify-content:space-between;gap:8px"><span><b>'+esc(x.n)+'</b> <span class="src">'+esc(x.dir+' '+x.ln+' '+x.cn)+'</span></span><span><b>'+(x.res==='W'?'Hit':x.res==='L'?'Missed':'No result')+'</b>'+(x.v!=null?' <span class="src">('+fmt106(x.v)+')</span>':'')+'</span></div></div>'}).join('');
+    h+='<p class="src">The line used is the one shown in the app, which defaults to the player’s projection rounded to a half point, not your sportsbook’s number. A hit rate here is a guide to which reasons matter, not a record of bets. Ratings of “ahead” or “behind” need 20 graded picks.</p>';
+  }
+  h+='<h3>Game picks</h3>';
+  var E=S.log.filter(function(x){return x.res==='W'||x.res==='L'});
+  if(!E.length)h+='<div class="card empty">No game picks are graded yet. Picks are saved while the game is upcoming and graded on the final score.</div>';
+  else{
+    var T={ml:'Moneyline',sp:'Spread',tot:'Total'};
+    h+='<div class="tblwrap"><table><thead><tr><th>Bet</th><th>W-L</th><th>Hit</th></tr></thead><tbody>'+Object.keys(T).map(function(t){var d=E.filter(function(x){return x.t===t}),w=d.filter(function(x){return x.res==='W'}).length;return '<tr><td>'+T[t]+'</td><td>'+w+'-'+(d.length-w)+'</td><td>'+(d.length?pct1(w/d.length):'—')+'</td></tr>'}).join('')+'</tbody></table></div>';
+  }
+  h+='<div class="actions" style="margin-top:10px"><button class="btn" data-act="set" data-k="tab" data-v="record">Full record by sport</button></div>';
+  return h+foot();
+}
+TABS=TABS.map(function(t){return t[0]==='injuries'?['results','Results','<path d="M4 19V9M10 19V5M16 19v-7M22 19H2M4 6l5 3 5-5 6 4"/>']:t});
+NAVG.results=['results','record'];delete NAVG.injuries;
+TOUR=TOUR.filter(function(s){return s.tab!=='injuries'});
+TOUR.splice(3,0,{tab:'results',hl:'results',t:'Results',x:'Every angle and game pick the app shows is saved and graded after the game, so you can see which reasons actually hit. Injuries are in each game’s breakdown.'});
+try{['nfl','nba','nhl'].forEach(function(l){if(!S.inj[l])setTimeout(function(){loadInj(l).then(function(){if(S.sheet)renderSheet()})},3000)})}catch(e){}
+setTimeout(function(){try{angRecord();angGrade()}catch(e){}},25000);
+setInterval(function(){try{angRecord();angGrade()}catch(e){}},10*60*1000);
+if(S.tab==='injuries')S.tab='picks2';
+try{render()}catch(e){}
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
