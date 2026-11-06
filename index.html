@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v173, Nov 6';
+var BUILD='v174, Nov 6';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -12234,6 +12234,31 @@ document.addEventListener('click',function(e){
   var el=e.target&&e.target.closest?e.target.closest('[data-act="dlread"]'):null;if(!el)return;
   e.stopImmediatePropagation();e.preventDefault();dlRead(el.dataset.v||S.sport);
 },true);
+
+/* v174: the app checks for a newer version and offers a one-tap update */
+(function(){
+  if(window.claude||typeof fetch!=='function'||location.protocol==='file:')return;
+  var busy=false;
+  function check(){
+    if(busy)return;busy=true;
+    fetch(location.pathname+'?v='+Date.now(),{cache:'no-store'}).then(function(r){return r.ok?r.text():''}).then(function(t){
+      var m=t.match(/var BUILD='(v\d+)/),mine=String(BUILD).match(/^(v\d+)/);
+      if(m&&mine&&m[1]!==mine[1]&&!document.getElementById('upd')){
+        var d=document.createElement('div');d.id='upd';d.setAttribute('role','alert');
+        d.style.cssText='position:fixed;left:12px;right:12px;top:max(10px,env(safe-area-inset-top));z-index:90;background:#1f6f43;color:#fff;border-radius:12px;padding:12px 14px;display:flex;gap:10px;align-items:center;justify-content:space-between;box-shadow:0 6px 24px rgba(0,0,0,.4);font:600 15px system-ui';
+        d.innerHTML='<span>A new version ('+m[1]+') is ready.</span><button id="updgo" style="background:#fff;color:#1f6f43;border:0;border-radius:8px;padding:8px 14px;font:700 15px system-ui">Update</button>';
+        document.body.appendChild(d);
+        document.getElementById('updgo').onclick=function(){
+          var done=function(){location.reload()};
+          Promise.all([window.caches?caches.keys().then(function(ks){return Promise.all(ks.map(function(k){return caches.delete(k)}))}):0,navigator.serviceWorker?navigator.serviceWorker.getRegistrations().then(function(rs){return Promise.all(rs.map(function(r){return r.unregister()}))}):0]).then(done,done);
+        };
+      }
+    }).catch(function(){}).then(function(){busy=false});
+  }
+  setTimeout(check,2500);
+  document.addEventListener('visibilitychange',function(){if(!document.hidden)setTimeout(check,800)});
+  setInterval(function(){if(!document.hidden)check()},10*60000);
+})();
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
