@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v178, Nov 6';
+var BUILD='v179, Nov 6';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -6000,7 +6000,7 @@ S.dlog={};S.dlV=0;S.dlBusy=false;S.dlMsg='';
 try{var rdl=JSON.parse(localStorage.getItem('hitboard.dlog.v1')||'null');if(rdl&&typeof rdl==='object')S.dlog=rdl}catch(e){}
 function dlSave(){
   var ks=Object.keys(S.dlog);
-  if(ks.length>700){ks.sort(function(a,b){return S.dlog[a].at-S.dlog[b].at}).slice(0,ks.length-700).forEach(function(k){delete S.dlog[k]})}
+  if(ks.length>1100){ks.sort(function(a,b){return S.dlog[a].at-S.dlog[b].at}).slice(0,ks.length-1100).forEach(function(k){delete S.dlog[k]})}
   try{localStorage.setItem('hitboard.dlog.v1',JSON.stringify(S.dlog))}catch(e){try{var k2=Object.keys(S.dlog).sort(function(a,b){return S.dlog[a].at-S.dlog[b].at});k2.slice(0,Math.floor(k2.length/3)).forEach(function(k){delete S.dlog[k]});localStorage.setItem('hitboard.dlog.v1',JSON.stringify(S.dlog))}catch(e2){}}
 }
 function dlAb(lg,a){a=String(a||'').toUpperCase();return lg==='nfl'?nt(a):tabb(a)}
@@ -11910,9 +11910,9 @@ function pbCard(o){
 }
 S.bf=S.bf||'all';S.pbs=S.pbs||'trend';S.bn=40;
 function vBoard(){
-  var lg=S.sport;if(['nfl','nba','ncaafb','nhl','mlb'].indexOf(lg)<0){lg='nfl';S.sport='nfl'}
+  var lg=S.sport;if(['nfl','nba','ncaafb','ncaamb','nhl','mlb'].indexOf(lg)<0){lg='nfl';S.sport='nfl'}
   var cats=pbCats(lg),cat=cats.some(function(c){return c[0]===S.bc})?S.bc:cats[0][0];
-  var h='<h2>Props</h2><div class="chips" role="group" aria-label="Sport">'+LG.filter(function(l){return l[0]!=='ncaamb'}).map(function(l){return '<button class="chip" data-act="sport" data-v="'+l[0]+'" aria-pressed="'+(S.sport===l[0])+'">'+l[1]+'</button>'}).join('')+'</div>';
+  var h='<h2>Props</h2><div class="chips" role="group" aria-label="Sport">'+LG.map(function(l){return '<button class="chip" data-act="sport" data-v="'+l[0]+'" aria-pressed="'+(S.sport===l[0])+'">'+l[1]+'</button>'}).join('')+'</div>';
   h+='<div class="chips" role="group" aria-label="Stat">'+cats.map(function(c){return '<button class="chip" data-act="set" data-k="bc" data-v="'+c[0]+'" aria-pressed="'+(cat===c[0])+'">'+esc(c[1])+'</button>'}).join('')+'</div>';
   h+='<div class="chips" role="group" aria-label="Filter">'+[['all','All'],['hot','Hot'],['cold','Cold'],['over','70%+ over']].map(function(c){return '<button class="chip" data-act="set" data-k="bf" data-v="'+c[0]+'" aria-pressed="'+(S.bf===c[0])+'">'+c[1]+'</button>'}).join('')+'<span class="src" style="align-self:center;margin:0 4px">Sort</span>'+[['trend','Trending'],['hit','Hit rate'],['proj','Projection']].map(function(c){return '<button class="chip" data-act="set" data-k="pbs" data-v="'+c[0]+'" aria-pressed="'+(S.pbs===c[0])+'">'+c[1]+'</button>'}).join('')+'</div>';
   var rows=pbRows(lg,cat),logs=rows.some(function(o){return o.c});
@@ -12094,7 +12094,7 @@ function pkAngleCard(a){
     (a.against.length?'<div class="src" style="margin-top:4px">Against: '+esc(a.against.join('; '))+'</div>':'')+'</div>';
 }
 function vPicks2(){
-  var lgs=['nfl','nba','ncaafb','nhl','mlb'],sel=S.pks==='all'?lgs:[S.pks];
+  var lgs=['nfl','nba','ncaafb','ncaamb','nhl','mlb'],sel=S.pks==='all'?lgs:[S.pks];
   var h='<h2>Picks</h2><div class="chips" role="group" aria-label="Sport">'+[['all','All']].concat(lgs.map(function(l){return [l,lgName(l)]})).map(function(c){return '<button class="chip" data-act="set" data-k="pks" data-v="'+c[0]+'" aria-pressed="'+(S.pks===c[0])+'">'+c[1]+'</button>'}).join('')+'</div>';
   var G=[];sel.forEach(function(l){try{pkGame(l).forEach(function(i){G.push(i)})}catch(e){}});
   G.sort(function(a,b){return b.edge-a.edge});
@@ -12182,6 +12182,7 @@ S.dgMsg='';S.dgBusy=false;
 function dlRead(lg){
   if(window.claude||typeof fetch!=='function'||S.dgBusy||!DL_LG[lg])return;
   S.dgBusy=true;S.dgMsg='Looking for finished '+lgName(lg)+' games…';render();
+  var want={};try{(S.feed[lg]||[]).forEach(function(g){want[dlAb(lg,g.a)]=1;want[dlAb(lg,g.h)]=1})}catch(e){}
   var C=DL_LG[lg],now=new Date(),fd=function(d){return d.getFullYear()+('0'+(d.getMonth()+1)).slice(-2)+('0'+d.getDate()).slice(-2)};
   var st=C.start,a=new Date(+st.slice(0,4),+st.slice(4,6)-1,+st.slice(6,8)),wins=[];
   while(a<=now&&wins.length<80){wins.push(fd(a));a=new Date(a.getFullYear(),a.getMonth(),a.getDate()+1)}
@@ -12197,9 +12198,9 @@ function dlRead(lg){
     return go();
   };
   sbAll().then(function(js){
-    js.forEach(function(j){((j&&j.events)||[]).forEach(function(e){listed++;var c=(e.competitions||[])[0]||{},ok=c.status&&c.status.type&&c.status.type.completed;if(ok&&e.id)done.push({id:e.id,at:Date.parse(e.date)||0})})});
+    js.forEach(function(j){((j&&j.events)||[]).forEach(function(e){listed++;var c=(e.competitions||[])[0]||{},ok=c.status&&c.status.type&&c.status.type.completed;if(ok&&e.id)done.push({id:e.id,at:Date.parse(e.date)||0,ab:(c.competitors||[]).map(function(q){return dlAb(lg,q.team&&q.team.abbreviation)})})})});
     if(!listed){say('Could not load the schedule from ESPN. '+(http||errs[0]||'No answer')+'.');return null}
-    var todo=done.filter(function(g){var k=lg+'|'+g.id,x=S.dlog[k];return !x||!x.s||!x.s[0]||x.s[0].h===undefined}).sort(function(x,y){return y.at-x.at}).slice(0,80);
+    var todo=done.filter(function(g){var k=lg+'|'+g.id,x=S.dlog[k];return !x||!x.s||!x.s[0]||x.s[0].h===undefined}).sort(function(x,y){var w=function(g){return g.ab.some(function(a){return want[a]})?0:1};return (w(x)-w(y))||(y.at-x.at)}).slice(0,80);S['dgMore_'+lg]=todo.length>=80;
     if(!todo.length){say(done.length+' finished '+lgName(lg)+' games found and all are already saved.');return null}
     var i=0;
     var next=function(){
@@ -12215,7 +12216,7 @@ function dlRead(lg){
       if(read){try{dlSave()}catch(e){}S.dlV++;_dlE=null}
       say(read+' of '+todo.length+' box scores saved'+(bad?'; '+bad+' had no usable player stats':'')+(fail?'; '+fail+' could not be loaded'+(http?' ('+http+')':''):'')+(errs.length&&!read?'. '+errs[0]:'')+'.');
     });
-  }).catch(function(e){say('Stopped: '+String(e&&e.message||e).slice(0,80))}).then(function(){S.dgBusy=false;render()});
+  }).catch(function(e){say('Stopped: '+String(e&&e.message||e).slice(0,80))}).then(function(){S.dgBusy=false;render();if(S['dgMore_'+lg]&&(S.dgRep=(S.dgRep||0)+1)<=10)setTimeout(function(){try{dlRead(lg)}catch(e){}},3000)});
 }
 var vBoard129=vBoard;
 vBoard=function(){
@@ -12274,7 +12275,7 @@ function angTags(why){
 function angRecord(){
   if(window.claude&&window.claude.use)return;
   var now=Date.now(),have={},ch=false;ANG.forEach(function(x){have[x.k]=1});
-  ['nfl','nba','ncaafb'].forEach(function(lg){
+  ['nfl','nba','ncaafb','ncaamb'].forEach(function(lg){
     var A=[];try{A=pkAngles(lg)}catch(e){}
     A.forEach(function(a){
       var r=a.o.r,when=r.gk||null;
@@ -12290,7 +12291,7 @@ function angRecord(){
 }
 function angGrade(){
   var now=Date.now(),ch=false;
-  ['nfl','nba','ncaafb'].forEach(function(lg){
+  ['nfl','nba','ncaafb','ncaamb'].forEach(function(lg){
     var pend=ANG.filter(function(x){return x.lg===lg&&!x.res&&now>x.start+4*36e5});if(!pend.length)return;
     var I=pbIdx(lg),C=DL_LG[lg];
     pend.forEach(function(x){
@@ -12381,7 +12382,7 @@ function pdHtml(g){
   var R=pdRows(g);
   var h='<h3>Props the app predicted</h3>';
   if(!R.length){
-    return h+'<p class="note" style="margin-top:0">'+(g.lg==='ncaamb'||g.lg==='nhl'||g.lg==='mlb'?'The app does not make player prop suggestions for '+esc(lgName(g.lg))+' yet.':'No prop was suggested for this game. Props are saved when the Picks tab shows them, which needs this season’s game logs for the teams.')+'</p>';
+    return h+'<p class="note" style="margin-top:0">'+(g.lg==='nhl'||g.lg==='mlb'?'The app does not make player prop suggestions for '+esc(lgName(g.lg))+' yet.':'No prop was suggested for this game. Props are saved when the Picks tab shows them, which needs this season’s game logs for the teams.')+'</p>';
   }
   var w=R.filter(function(r){return r.st==='Hit'}).length,l=R.filter(function(r){return r.st==='Missed'}).length;
   h+='<div class="facts"><span>Hit <b>'+w+'</b></span><span>Missed <b>'+l+'</b></span><span>Open <b>'+(R.length-w-l)+'</b></span></div>';
@@ -12399,6 +12400,49 @@ var feedSheet178=feedSheet;feedSheet=function(g){
     return i>=0?h.slice(0,i)+sec+h.slice(i):h+sec;
   }catch(e){return h}
 };
+try{render()}catch(e){}
+
+/* v178: college basketball props. Players and projections come from the game logs, since there is no other player feed. */
+SP_CATS.ncaamb=[['npts','Points'],['nreb','Rebounds'],['nast','Assists'],['ntpm','Threes']];
+function mbAllow(i){
+  var tot=0,n=0,by={};
+  Object.keys(S.dlog).forEach(function(k){var g=S.dlog[k];if(g.lg!=='ncaamb'||!g.s)return;
+    g.s.forEach(function(sd){var sum=0,ok=false;Object.keys(sd.p).forEach(function(nm){var v=sd.p[nm][i];if(v!=null){sum+=v;ok=true}});
+      if(!ok||!sd.o)return;var b=by[sd.o]=by[sd.o]||{s:0,n:0};b.s+=sum;b.n++;tot+=sum;n++})});
+  return {by:by,avg:n?tot/n:null};
+}
+function spRowsMb(cat){
+  var C=DL_LG.ncaamb,i=C.ix[cat];if(i==null)return [];
+  var now=Date.now(),I=pbIdx('ncaamb'),out=[],al=mbAllow(i);
+  var games=(S.feed.ncaamb||[]).filter(function(g){return kind(g)==='up'&&g.start>now&&g.start<now+SLATE_MS});
+  if(!games.length)return [];
+  var byTeam={};
+  Object.keys(I.P).forEach(function(nm){
+    var e=I.P[nm].filter(function(x){return x.v[i]!=null});if(e.length<3||now-e[0].at>25*864e5)return;
+    var l5=e.slice(0,5),a5=l5.reduce(function(s,x){return s+x.v[i]},0)/l5.length;if(a5<C.min[i])return;
+    var av=e.reduce(function(s,x){return s+x.v[i]},0)/e.length;
+    (byTeam[e[0].t]=byTeam[e[0].t]||[]).push({nm:nm,a5:a5,av:av,n:e.length});
+  });
+  games.forEach(function(g){
+    [[g.a,g.h,0],[g.h,g.a,1]].forEach(function(s){
+      var t=dlAb('ncaamb',s[0]),o=dlAb('ncaamb',s[1]),pl=byTeam[t]||[];
+      var b=al.by[o],pct=0,def=null;
+      if(b&&b.n>=3&&al.avg){var f=(b.s/b.n)/al.avg;pct=Math.max(-12,Math.min(12,(f-1)*100*.8));
+        def={txt:o+' allows '+fmt106(b.s/b.n)+' '+C.names[i].toLowerCase()+' a game to opposing players · '+(f>=1.05?'soft':f<=.95?'tough':'average'),tag:f<=.95?['lo','tough']:f>=1.05?['hi','soft']:['mid','average']}}
+      pl.forEach(function(p){
+        var mu=(.6*p.a5+.4*p.av)*(1+pct/100);
+        out.push({n:pfPretty(p.nm),t:t,pos:'',lg:'ncaamb',when:(s[2]?'vs ':'at ')+s[1]+', '+fmtTime(g.start),gk:g.id+':'+g.a+'@'+g.h+':',gl:g.a+' @ '+g.h,def:def,pct:pct,proj:mu,projTxt:fmt106(mu),unit:C.names[i].toLowerCase(),avgTxt:'avg '+fmt106(p.av),sort:mu});
+      });
+    });
+  });
+  return out.sort(function(a,b){return b.sort-a.sort}).slice(0,80);
+}
+var spRows134=spRows;
+spRows=function(lg,cat){return lg==='ncaamb'?spRowsMb(cat):spRows134.apply(this,arguments)};
+/* keep every league's logs filling in the background, one at a time */
+['nfl','nba','ncaafb','ncaamb'].forEach(function(lg,k){
+  setTimeout(function(){try{if(window.claude)return;var go=function(){if(S.dgBusy){setTimeout(go,20000);return}S.dgRep=0;dlRead(lg)};go()}catch(e){}},30000+k*70000);
+});
 try{render()}catch(e){}
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
