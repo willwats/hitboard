@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v174, Nov 6';
+var BUILD='v175, Nov 6';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -12184,17 +12184,19 @@ function dlRead(lg){
   S.dgBusy=true;S.dgMsg='Looking for finished '+lgName(lg)+' games…';render();
   var C=DL_LG[lg],now=new Date(),fd=function(d){return d.getFullYear()+('0'+(d.getMonth()+1)).slice(-2)+('0'+d.getDate()).slice(-2)};
   var st=C.start,a=new Date(+st.slice(0,4),+st.slice(4,6)-1,+st.slice(6,8)),wins=[];
-  var span=(lg==='nba'||lg==='ncaamb')?2:6;while(a<=now&&wins.length<40){var b=new Date(Math.min(a.getTime()+span*864e5,now.getTime()));wins.push(fd(a)+'-'+fd(b));a=new Date(b.getTime()+864e5)}
+  while(a<=now&&wins.length<80){wins.push(fd(a));a=new Date(a.getFullYear(),a.getMonth(),a.getDate()+1)}
   var base='https://site.api.espn.com/apis/site/v2/sports/'+ESPN[lg],errs=[],listed=0,done=[],read=0,bad=0,fail=0,http='';
   var say=function(t){S.dgMsg=t;try{var ae=document.activeElement;if(!(ae&&ae.tagName==='INPUT')&&!S.sheet)render()}catch(e){}};
-  Promise.all(wins.map(function(w){
+  var sbAll=function(){var out=[],i=0;var nx=function(){var part=wins.slice(i,i+8);i+=8;if(!part.length)return Promise.resolve(out);return Promise.all(part.map(sb1)).then(function(r){r.forEach(function(x){out.push(x)});say('Looking for finished games… '+Math.min(i,wins.length)+' of '+wins.length+' days');return nx()})};return nx()};
+  var sb1=function(w){
     var vs=lg==='ncaafb'?['&groups=80&limit=300','&groups=80','']:lg==='ncaamb'?['&groups=50&limit=300','&groups=50','']:['&limit=100','','&limit=400'],k=0;
     var go=function(){
       if(k>=vs.length)return Promise.resolve(null);
-      return fetch(base+'/scoreboard?dates='+w+vs[k++]).then(function(r){if(!r.ok){http='HTTP '+r.status;return go()}return r.json()}).catch(function(e){errs.push(String(e&&e.message||e).slice(0,60));return go()});
+      return fetch(base+'/scoreboard?dates='+w+vs[k++]).then(function(r){if(!r.ok){http='HTTP '+r.status+' ('+vs[k-1]+')';return go()}return r.json()}).catch(function(e){errs.push(String(e&&e.message||e).slice(0,60));return go()});
     };
     return go();
-  })).then(function(js){
+  };
+  sbAll().then(function(js){
     js.forEach(function(j){((j&&j.events)||[]).forEach(function(e){listed++;var c=(e.competitions||[])[0]||{},ok=c.status&&c.status.type&&c.status.type.completed;if(ok&&e.id)done.push({id:e.id,at:Date.parse(e.date)||0})})});
     if(!listed){say('Could not load the schedule from ESPN. '+(http||errs[0]||'No answer')+'.');return null}
     var todo=done.filter(function(g){var k=lg+'|'+g.id,x=S.dlog[k];return !x||!x.s||!x.s[0]||x.s[0].h===undefined}).sort(function(x,y){return y.at-x.at}).slice(0,80);
