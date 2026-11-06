@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v179, Nov 6';
+var BUILD='v180, Nov 6';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -12443,6 +12443,38 @@ spRows=function(lg,cat){return lg==='ncaamb'?spRowsMb(cat):spRows134.apply(this,
 ['nfl','nba','ncaafb','ncaamb'].forEach(function(lg,k){
   setTimeout(function(){try{if(window.claude)return;var go=function(){if(S.dgBusy){setTimeout(go,20000);return}S.dgRep=0;dlRead(lg)};go()}catch(e){}},30000+k*70000);
 });
+try{render()}catch(e){}
+
+/* v180: weather on every prop (football and baseball; basketball is indoors) */
+function wxGameFor(lg,team){
+  if(!wxLeagueOn(lg))return null;
+  var now=Date.now(),ab=function(x){return lg==='nfl'?nt(String(x||'').toUpperCase()):dlAb(lg,x)},t=ab(team),best=null;
+  (S.feed[lg]||[]).forEach(function(g){
+    if(kind(g)!=='up'||g.start<now-36e5||g.start>now+SLATE_MS)return;
+    if(ab(g.a)!==t&&ab(g.h)!==t)return;
+    if(!best||g.start<best.start)best=g;
+  });
+  return best;
+}
+function wxPropHtml(lg,team){
+  try{
+    var g=wxGameFor(lg,team);if(!g)return '';
+    var s=wxShort(g);if(!s)return '';
+    s=s.replace(/<button[^>]*>.*?<\/button>/g,'').trim();if(!s)return '';
+    return '<div class="src" style="margin-top:4px">'+s+'</div>';
+  }catch(e){return ''}
+}
+function wxAdd135(h,lg,team){
+  var w=wxPropHtml(lg,team);if(!w)return h;
+  var i=h.lastIndexOf('</div>');return i<0?h:h.slice(0,i)+w+h.slice(i);
+}
+var pbCard135=pbCard;pbCard=function(o){return wxAdd135(pbCard135.apply(this,arguments),o.r.lg,o.r.t)};
+var pkAngleCard135=pkAngleCard;pkAngleCard=function(a){return wxAdd135(pkAngleCard135.apply(this,arguments),a.o.r.lg,a.o.r.t)};
+var pbSheet135=pbSheet;pbSheet=function(s){
+  var h=pbSheet135.apply(this,arguments);
+  try{var w=wxPropHtml(s.lg,s.team);if(w){var i=h.indexOf('<h3');if(i>=0)h=h.slice(0,i)+'<div class="card" style="margin-top:8px;padding:10px 12px">'+w.replace(' style="margin-top:4px"','')+'</div>'+h.slice(i)}}catch(e){}
+  return h;
+};
 try{render()}catch(e){}
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
