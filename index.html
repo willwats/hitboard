@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v186, Nov 7';
+var BUILD='v187, Nov 7';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -12838,6 +12838,7 @@ function mbAllow(lg,i){
       if(!ok||!sd.o)return;var b=by[sd.o]=by[sd.o]||{s:0,n:0};b.s+=sum;b.n++;tot+=sum;n++})});
   return {by:by,avg:n?tot/n:null};
 }
+var SP_ONLY=null;
 function spRowsLog(lg,cat){
   var C=DL_LG[lg],i=C.ix[cat];if(i==null)return [];
   var now=Date.now(),I=pbIdx(lg),out=[],al=mbAllow(lg,i);
@@ -12856,13 +12857,15 @@ function spRowsLog(lg,cat){
       var b=al.by[o],pct=0,def=null;
       if(b&&b.n>=3&&al.avg){var f=(b.s/b.n)/al.avg;pct=Math.max(-12,Math.min(12,(f-1)*100*.8));
         def={txt:o+' allows '+fmt106(b.s/b.n)+' '+C.names[i].toLowerCase()+' a game to opposing players · '+(f>=1.05?'soft':f<=.95?'tough':'average'),tag:f<=.95?['lo','tough']:f>=1.05?['hi','soft']:['mid','average']}}
+      pl=pl.slice().sort(function(a,b){return b.a5-a.a5}).slice(0,6);
+      if(SP_ONLY&&!SP_ONLY[t]&&!SP_ONLY[o])return;
       pl.forEach(function(p){
         var mu=(.6*p.a5+.4*p.av)*(1+pct/100);
         out.push({n:pfPretty(p.nm),t:t,pos:'',lg:lg,when:(s[2]?'vs ':'at ')+s[1]+', '+fmtTime(g.start),gk:g.id+':'+g.a+'@'+g.h+':',gl:g.a+' @ '+g.h,def:def,pct:pct,proj:mu,projTxt:fmt106(mu),unit:C.names[i].toLowerCase(),avgTxt:'avg '+fmt106(p.av),sort:mu});
       });
     });
   });
-  return out.sort(function(a,b){return b.sort-a.sort}).slice(0,80);
+  return out.sort(function(a,b){return b.sort-a.sort});
 }
 
 var spRows141=spRows;
@@ -12877,7 +12880,9 @@ spRows=function(lg,cat){
 /* the game window lists the props for the game even when none were saved before */
 function gpRows(g){
   var lg=g.lg,ab=function(x){return lg==='nfl'?nt(String(x||'').toUpperCase()):dlAb(lg,x)},ta=ab(g.a),th=ab(g.h),out=[];
+  SP_ONLY={};SP_ONLY[ta]=1;SP_ONLY[th]=1;
   try{pbCats(lg).forEach(function(c){pbRows(lg,c[0]).forEach(function(o){var t=ab(o.r.t);if(t!==ta&&t!==th)return;var G=gradeBest(lg,o.cat,o.r,o);o.gs=G?G.sum:-99;o.gr=G;out.push(o)})})}catch(e){}
+  SP_ONLY=null;
   return out.sort(function(a,b){return b.gs-a.gs});
 }
 var gbxProps141=gbxProps;
@@ -12890,6 +12895,27 @@ gbxProps=function(g){
     var seen={},L=[];R.forEach(function(o){var k=normName(o.r.n);if((seen[k]=(seen[k]||0)+1)>2)return;if(L.length<12)L.push(o)});
     return '<p class="src" style="margin:0 0 8px">Props the app would suggest for this game, best grade first. These are live from the props board, not saved before kickoff.</p>'+L.map(pbCard).join('');
   }catch(e){return h}
+};
+try{render()}catch(e){}
+
+
+/* v187: say how many games on the slate have props */
+function pbCover(lg){
+  var now=Date.now(),G=(S.feed[lg]||[]).filter(function(g){return kind(g)==='up'&&g.start>now&&g.start<now+SLATE_MS});
+  if(G.length<2)return '';
+  var ab=function(x){return lg==='nfl'?nt(String(x||'').toUpperCase()):dlAb(lg,x)},T={};
+  pbCats(lg).forEach(function(c){try{spRows(lg,c[0]).forEach(function(r){T[ab(r.t)]=1})}catch(e){}});
+  var n=G.filter(function(g){return T[ab(g.a)]||T[ab(g.h)]}).length;
+  return '<p class="src" style="margin:0 0 8px">Props are available for <b>'+n+' of '+G.length+'</b> '+esc(lgName(lg))+' games coming up.'+(n<G.length?' The rest need more box scores. The app keeps reading them in the background, teams playing soonest first.':'')+'</p>';
+}
+var vBoard187=vBoard;
+vBoard=function(){
+  var h=vBoard187();
+  try{
+    var lg=S.sport,c=pbCover(lg);
+    if(c){var i=h.indexOf('aria-label="Show"');if(i>=0){var j=h.indexOf('</div>',i);if(j>=0)h=h.slice(0,j+6)+c+h.slice(j+6)}}
+  }catch(e){}
+  return h;
 };
 try{render()}catch(e){}
 
