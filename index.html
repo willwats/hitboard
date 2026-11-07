@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v187, Nov 7';
+var BUILD='v188, Nov 7';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -12916,6 +12916,61 @@ vBoard=function(){
     if(c){var i=h.indexOf('aria-label="Show"');if(i>=0){var j=h.indexOf('</div>',i);if(j>=0)h=h.slice(0,j+6)+c+h.slice(j+6)}}
   }catch(e){}
   return h;
+};
+try{render()}catch(e){}
+
+/* v188: season stats next to every player in a game window, and a season-stats list for upcoming games */
+function ssLine(lg,name){
+  try{
+    var C=DL_LG[lg];if(!C)return '';
+    var P=pbIdx(lg).P[normName(name)];if(!P||!P.length)return '';
+    var fb=lg==='nfl'||lg==='ncaafb',parts=[],short=fb?['pass yds','rush yds','rec yds']:['pts','reb','ast','3pm'];
+    C.names.forEach(function(nm,i){
+      var v=P.filter(function(e){return e.v[i]!=null});if(!v.length)return;
+      var sum=v.reduce(function(s,e){return s+e.v[i]},0),avg=sum/v.length;
+      if(avg<C.min[i]*(fb?1:.5))return;
+      var l5=v.slice(0,5),a5=l5.reduce(function(s,e){return s+e.v[i]},0)/l5.length;
+      parts.push('<b>'+fmt106(avg)+'</b> '+short[i]+(fb?' a game ('+Math.round(sum).toLocaleString()+' total)':'')+(l5.length>=3&&Math.abs(a5-avg)>=avg*.12?' <span class="src">last '+l5.length+': '+fmt106(a5)+'</span>':''));
+    });
+    if(!parts.length)return '';
+    return '<div class="src" style="margin-top:2px">Season, '+P.length+' game'+(P.length>1?'s':'')+' logged: '+parts.join(' · ')+'</div>';
+  }catch(e){return ''}
+}
+var gbxPlayersHtml143=gbxPlayersHtml;
+gbxPlayersHtml=function(g){
+  var h=gbxPlayersHtml143.apply(this,arguments);
+  try{
+    h=h.replace(/(<div style="padding:3px 0;border-top:1px solid var\(--line\)"><b>)([^<]*)(<\/b> <span class="src">[^<]*<\/span>)(<\/div>)/g,function(m,a,n,b,c){
+      var nm=n.replace(/&amp;/g,'&').replace(/&#39;|&#x27;/g,"'").replace(/&quot;/g,'"');
+      return a+n+b+ssLine(g.lg,nm)+c;
+    });
+  }catch(e){}
+  return h;
+};
+/* upcoming games: season stats for each team's main players */
+function ssTeam(lg,team,tm){
+  var C=DL_LG[lg],I=pbIdx(lg),now=Date.now(),L=[];
+  Object.keys(I.P).forEach(function(k){
+    var e=I.P[k];if(!e.length||e[0].t!==team||now-e[0].at>25*864e5)return;
+    var best=0;C.names.forEach(function(nm,i){var v=e.filter(function(x){return x.v[i]!=null});if(v.length){var a=v.reduce(function(s,x){return s+x.v[i]},0)/v.length;best=Math.max(best,a/C.min[i])}});
+    if(best>=1)L.push({k:k,s:best});
+  });
+  L.sort(function(a,b){return b.s-a.s});
+  return L.slice(0,6).map(function(x){var n=pfPretty(x.k);return '<div style="padding:5px 0;border-top:1px solid var(--line)"><b>'+esc(n)+'</b>'+ssLine(lg,n)+'</div>'}).join('');
+}
+var feedSheet143=feedSheet;
+feedSheet=function(g){
+  var h=feedSheet143.apply(this,arguments);
+  try{
+    if(kind(g)!=='up'||!DL_LG[g.lg])return h;
+    var lg=g.lg,ab=function(x){return lg==='nfl'?nt(String(x||'').toUpperCase()):dlAb(lg,x)};
+    var A=ssTeam(lg,ab(g.a)),B=ssTeam(lg,ab(g.h));
+    var sec='<h3>Season stats for the key players</h3>';
+    if(!A&&!B)sec+='<p class="src" style="margin-top:0">Season stats appear once the app has read box scores for these teams.</p>';
+    else sec+=[[g.an||g.a,A],[g.hn||g.h,B]].map(function(t){return t[1]?'<div style="margin:8px 0 2px"><b>'+esc(t[0])+'</b></div>'+t[1]:''}).join('')+'<p class="src" style="margin:6px 0 0">Built from the box scores the app has read this season. Football lines only count games where the player had a logged stat line.</p>';
+    var i=h.indexOf('<h3>Props the app predicted</h3>');
+    return i>=0?h.slice(0,i)+sec+h.slice(i):h+sec;
+  }catch(e){return h}
 };
 try{render()}catch(e){}
 
