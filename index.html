@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v184, Nov 6';
+var BUILD='v185, Nov 6';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -12456,23 +12456,23 @@ function wxGameFor(lg,team){
   });
   return best;
 }
-function wxPropHtml(lg,team){
+function wxPropHtml(lg,team,cat){
   try{
     var g=wxGameFor(lg,team);if(!g)return '';
     var s=wxShort(g);if(!s)return '';
     s=s.replace(/<button[^>]*>.*?<\/button>/g,'').trim();if(!s)return '';
-    return '<div class="src" style="margin-top:4px">'+s+'</div>';
+    return '<div class="src" style="margin-top:4px">'+s+'</div>'+(cat?wxEffect(lg,team,cat):'');
   }catch(e){return ''}
 }
-function wxAdd135(h,lg,team){
-  var w=wxPropHtml(lg,team);if(!w)return h;
+function wxAdd135(h,lg,team,cat){
+  var w=wxPropHtml(lg,team,cat);if(!w)return h;
   var i=h.lastIndexOf('</div>');return i<0?h:h.slice(0,i)+w+h.slice(i);
 }
-var pbCard135=pbCard;pbCard=function(o){return wxAdd135(pbCard135.apply(this,arguments),o.r.lg,o.r.t)};
-var pkAngleCard135=pkAngleCard;pkAngleCard=function(a){return wxAdd135(pkAngleCard135.apply(this,arguments),a.o.r.lg,a.o.r.t)};
+var pbCard135=pbCard;pbCard=function(o){return wxAdd135(pbCard135.apply(this,arguments),o.r.lg,o.r.t,o.cat)};
+var pkAngleCard135=pkAngleCard;pkAngleCard=function(a){return wxAdd135(pkAngleCard135.apply(this,arguments),a.o.r.lg,a.o.r.t,a.o.cat)};
 var pbSheet135=pbSheet;pbSheet=function(s){
   var h=pbSheet135.apply(this,arguments);
-  try{var w=wxPropHtml(s.lg,s.team);if(w){var i=h.indexOf('<h3');if(i>=0)h=h.slice(0,i)+'<div class="card" style="margin-top:8px;padding:10px 12px">'+w.replace(' style="margin-top:4px"','')+'</div>'+h.slice(i)}}catch(e){}
+  try{var w=wxPropHtml(s.lg,s.team,s.cat);if(w){var i=h.indexOf('<h3');if(i>=0)h=h.slice(0,i)+'<div class="card" style="margin-top:8px;padding:10px 12px">'+w.replace(' style="margin-top:4px"','')+'</div>'+h.slice(i)}}catch(e){}
   return h;
 };
 try{render()}catch(e){}
@@ -12528,7 +12528,7 @@ function gradeProp(lg,cat,r,o,dir){
       });
     }
     try{var it=injIt108({lg:lg,n:r.n,t:r.t});if(it&&it.st&&!isOutInj({lg:lg,n:r.n,t:r.t}))add('Health',dir==='Over'?-12:0,'Listed '+it.st+(it.d?' ('+it.d+')':'')+(dir==='Over'?'. His workload could be cut':'. A smaller role would help the under'))}catch(e){}
-    if(/pass|rec|cpass|crec/.test(cat)||cat==='pass'||cat==='rec'){var w=grWind(lg,r.t);if(w&&w.wavg>=15)add('Weather',(w.wavg>=20?6:3)*-s,'Wind near '+Math.round(w.wavg)+' mph hurts the passing game')}
+    try{var wf=wxFx(lg,r.t,cat);if(wf)add('Weather',wf.over*s,wf.txt)}catch(e){}
     var sum=0;F.forEach(function(x){sum+=x.pts});
     return {sum:sum,letter:grLetter(sum),dir:dir,F:F};
   });
@@ -12801,6 +12801,33 @@ pbSheet=function(s){
   }catch(e){}
   return h;
 };
+try{render()}catch(e){}
+
+/* v185: rain, wind and cold change how football players are used, so say so on each prop and in the grade */
+function wxFx(lg,team,cat){
+  if(lg!=='nfl'&&lg!=='ncaafb')return null;
+  var w=grWind(lg,team);if(!w)return null;
+  var wind=w.wavg||0,rain=w.pp>=60,cold=w.t<=25,c=[];
+  if(rain)c.push('rain likely ('+Math.round(w.pp)+'%)');
+  if(wind>=15)c.push('wind near '+Math.round(wind)+' mph');
+  if(cold)c.push('freezing ('+Math.round(w.t)+'°F)');
+  if(!c.length)return null;
+  var air=/pass|rec/.test(cat),over;
+  if(air)over=-((wind>=20?6:wind>=15?3:0)+(rain?4:0)+(cold?1.5:0));
+  else if(/rush/.test(cat))over=((rain?2:0)+(wind>=15?2:0));
+  else return null;
+  over=Math.max(-9,Math.min(4,over));
+  var kind=/pass/.test(cat)?'passing':/rec/.test(cat)?'catching':'running';
+  var eff=air?'tends to cut '+(kind==='passing'?'passing yards and deep throws':'catches and receiving yards'):'tends to push teams toward the run';
+  return {over:over,txt:c.join(' and ')+' '+eff,cond:c.join(' · '),eff:eff,kind:kind};
+}
+function wxEffect(lg,team,cat){
+  try{
+    var f=wxFx(lg,team,cat);if(!f)return '';
+    var note=f.kind==='passing'?'A slick ball and swirling air make throws harder.':f.kind==='catching'?'Wet hands and shorter, safer targets are common.':'Offenses tend to lean on carries when passing is hard.';
+    return '<div class="src" style="margin-top:3px"><b>Playstyle:</b> '+esc(f.cond)+'. '+esc(note)+' '+(f.kind==='passing'?'Expect fewer passing yards and deep throws.':f.kind==='catching'?'Expect fewer catches and receiving yards.':'Expect more carries.')+'</div>';
+  }catch(e){return ''}
+}
 try{render()}catch(e){}
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
