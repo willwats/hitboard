@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v183, Nov 6';
+var BUILD='v184, Nov 6';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -12734,6 +12734,70 @@ vResults=function(){
       if(end<0)end=h.length;
       h=h.slice(0,k+4)+tbl+'<p class="src">Rows marked "past, rebuilt" were graded after the fact from what the app still had: the model’s chance, the price, the writers’ view, and each team’s or player’s results from before that game. Injuries and weather were not saved back then, so rebuilt grades use fewer factors than new ones.</p>'+h.slice(end);
     }
+  }catch(e){}
+  return h;
+};
+try{render()}catch(e){}
+
+/* v184: teammate impact shows position, health and the effect on the team, not just on the player */
+function pbPos(lg,k,team){
+  try{
+    var nm=pfPretty(k),I=S.inj[lg],tk=lg==='nfl'?nt(String(team||'').toUpperCase()):team;
+    if(I&&I.idx){var ks=nameKeys(nm);for(var q=0;q<ks.length;q++){var it=I.idx[tk+'|'+ks[q]];if(it&&it.pos)return it.pos}}
+    var p=(PROPS||[]).filter(function(x){return x.lg===lg&&normName(x.name)===k})[0];if(p&&p.pos)return p.pos;
+    var d=(DEEP||[]).filter(function(x){return normName(x.n)===k})[0];if(d&&d.pos)return d.pos;
+  }catch(e){}
+  return '';
+}
+var pbCalc139=pbCalc;
+pbCalc=function(lg,cat,name,line,opp,full){
+  var R=pbCalc139.apply(this,arguments);
+  try{
+    if(R&&R.tm&&R.all){
+      var i=R.i,tot=function(x){var s=0;Object.keys(x.ent.pres).forEach(function(k){var v=x.ent.pres[k][i];if(v!=null)s+=v});return s};
+      var avg=function(a){return a.length?a.reduce(function(s,x){return s+tot(x)},0)/a.length:null};
+      var rec=function(a){var g=a.filter(function(x){return x.w!=null});return {w:g.filter(function(x){return x.w}).length,n:g.length}};
+      R.tm.forEach(function(t){
+        var wo=R.all.filter(function(x){return x.ent.pres[t.k]===undefined}),wi=R.all.filter(function(x){return x.ent.pres[t.k]!==undefined});
+        t.ts={wo:avg(wo),wi:avg(wi)};t.win={wo:rec(wo),wi:rec(wi)};t.pos=pbPos(lg,t.k,R.team);
+      });
+    }
+  }catch(e){}
+  return R;
+};
+var pbSheet139=pbSheet;
+pbSheet=function(s){
+  var h=pbSheet139.apply(this,arguments);
+  try{
+    var lg=s.lg,c=pbCalc(lg,s.cat,s.n,s.line,s.opp,true),o=null;
+    try{pbRows(lg,s.cat).forEach(function(q){if(!o&&normName(q.r.n)===normName(s.n))o=q})}catch(e){}
+    var pos=o&&o.r.pos||pbPos(lg,normName(s.n),s.team)||'';
+    if(pos){var a=h.indexOf('</div><h2>');if(a>=0)h=h.slice(0,a)+' · '+esc(pos)+h.slice(a)}
+    var me=null;try{me=injIt108({lg:lg,n:s.n,t:s.team})}catch(e){}
+    var stat=(DL_LG[lg]&&DL_LG[lg].names[DL_LG[lg].ix[s.cat]]||'stat').toLowerCase();
+    var unk=lg==='ncaafb'||lg==='ncaamb';
+    var body='<h3>With and without teammates</h3>';
+    if(me&&me.st)body+='<div class="card" style="margin-top:6px;padding:10px 12px"><span class="tag warn" style="font-size:10px;padding:1px 6px">'+esc(me.st)+'</span> <b>'+esc(s.n)+'</b> is on the injury report'+(me.d?' ('+esc(me.d)+')':'')+'. Check his status before game time.</div>';
+    if(c&&c.tm&&c.tm.length){
+      var tmx=function(x){
+        var it=null;try{it=injIt108({lg:lg,n:x.n,t:s.team})}catch(e){}
+        var tag=x.out?'<span class="tag warn" style="font-size:10px;padding:1px 6px">Out</span>':it&&it.st?'<span class="tag warn" style="font-size:10px;padding:1px 6px">'+esc(it.st)+'</span>':unk?'<span class="tag" style="font-size:10px;padding:1px 6px">Status unknown</span>':'<span class="tag good" style="font-size:10px;padding:1px 6px">Available</span>';
+        var dd=x.wi.avg>0?x.wo.avg/x.wi.avg-1:0;
+        var l1='Without him <b>'+esc(s.n)+'</b> averages <b>'+fmt106(x.wo.avg)+'</b> ('+x.wo.n+' game'+(x.wo.n>1?'s':'')+') vs <b>'+fmt106(x.wi.avg)+'</b> with him ('+x.wi.n+'). '+(Math.abs(dd)<.08?'Little change.':dd>0?'He gets more of the load.':'He does worse.')+(x.wo.n<3?' Small sample.':'');
+        var l2=x.ts&&x.ts.wo!=null&&x.ts.wi!=null?'The team’s total '+stat+' is '+fmt106(x.ts.wo)+' without him vs '+fmt106(x.ts.wi)+' with him'+(x.win&&x.win.wo.n&&x.win.wi.n?'; the team won '+x.win.wo.w+' of '+x.win.wo.n+' without him and '+x.win.wi.w+' of '+x.win.wi.n+' with him':'')+'.':'';
+        var l3='Over '+fmt106(s.line)+': '+x.wo.h.o+' of '+x.wo.n+' without him, '+x.wi.h.o+' of '+x.wi.n+' with him.';
+        return '<div class="card" style="margin:0 0 6px;padding:10px 12px"><div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><span><b>'+esc(x.n)+'</b>'+(x.pos?' <span class="src">'+esc(x.pos)+'</span>':'')+'</span>'+tag+'</div><div style="margin-top:4px;font-size:13.5px">'+l1+'</div>'+(l2?'<div class="src" style="margin-top:3px">'+l2+'</div>':'')+'<div class="src" style="margin-top:3px">'+l3+'</div></div>'};
+      body+=c.tm.map(tmx).join('')+'<p class="src" style="margin:6px 0 0">A teammate counts as without when he does not appear in the box score. In football that can also mean he played with no stats. Samples are often small, so treat these as clues.'+(unk?' College injury lists are not published, so confirm who is playing.':'')+'</p>';
+    }else body='<h3>Health</h3>'+(me&&me.st?body.slice(body.indexOf('<div class="card"')):'<p class="src" style="margin:6px 0 0">'+esc(s.n)+' is not on the injury report'+(unk?' (college injury lists are not published, so confirm who is playing)':'')+'.</p>');
+    var a1=h.indexOf('<div class="card" style="margin-top:10px"><b>Key teammate out now</b>');
+    var s1=h.indexOf('<h3>With and without teammates</h3>');
+    var from=a1>=0?a1:s1;
+    if(from>=0){
+      var e1=h.indexOf('</p>',h.indexOf('A teammate counts as without',from));
+      if(e1<0)e1=h.indexOf('No teammate splits yet',from);
+      var end=e1>=0?h.indexOf('</p>',e1)+4:-1;
+      if(end>3)h=h.slice(0,from)+body+h.slice(end);
+    }else{var nt0=h.indexOf('No teammate splits yet');if(nt0>=0){var ps=h.lastIndexOf('<p',nt0);h=h.slice(0,ps)+body+h.slice(ps)}}
   }catch(e){}
   return h;
 };
