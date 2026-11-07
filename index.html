@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v181, Nov 6';
+var BUILD='v182, Nov 6';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -12484,6 +12484,191 @@ vBoard=function(){
   var h=vBoard136();
   try{
     h=h.replace(/<div style="margin:2px 0 10px"><button class="btn" data-act="bdrawer"[\s\S]*?<\/button><\/div>/,'<div class="chips" role="group" aria-label="Show">'+[['all','All'],['hot','Hot · over'],['cold','Cold · under']].map(function(c){return '<button class="chip" data-act="set" data-k="bf" data-v="'+c[0]+'" aria-pressed="'+((S.bf||'all')===c[0])+'">'+c[1]+'</button>'}).join('')+'</div>');
+  }catch(e){}
+  return h;
+};
+try{render()}catch(e){}
+
+/* v182: report-card grades (A+ to F) for game picks and props. Replaces the edge number. */
+function grClip(v,a,b){return Math.max(a,Math.min(b,v))}
+function grLetter(s){
+  var T=[[44,'A+'],[36,'A'],[29,'A-'],[22,'B+'],[15,'B'],[8,'B-'],[1,'C+'],[-6,'C'],[-14,'C-'],[-24,'D']];
+  for(var i=0;i<T.length;i++)if(s>=T[i][0])return T[i][1];return 'F';
+}
+function grCls(l){return l[0]==='A'||l[0]==='B'?'hi':l[0]==='C'?'mid':'lo'}
+function grPill(l,extra){return '<span class="hrpill '+grCls(l)+'" style="display:inline-block;font-weight:700">'+esc(l)+(extra?' '+esc(extra):'')+'</span>'}
+function grBand(l){return l[0]==='A'?'A':l[0]==='B'?'B':l[0]==='C'?'C':'D or F'}
+var _grC={},_grV='';
+function grCache(k,f){var v=S.dlV+'|'+Math.floor(Date.now()/120000);if(_grV!==v){_grC={};_grV=v}return k in _grC?_grC[k]:(_grC[k]=f())}
+function grWind(lg,team){
+  try{var g=wxGameFor(lg,team);if(!g)return null;var i=wxInfo(g);if(!i||i.roof!=='open')return null;var w=wxFor(i.key,g.start);return w&&w!=='load'?w:null}catch(e){return null}
+}
+/* prop grade for one direction ('Over' or 'Under') */
+function gradeProp(lg,cat,r,o,dir){
+  var key=[lg,cat,r.n,o.ln.v,dir].join('|');
+  return grCache(key,function(){
+    var c=o.c;if(!c||c.l10.n<5)return null;
+    var s=dir==='Over'?1:-1,F=[],add=function(k,pts,txt){F.push({k:k,pts:Math.round(pts*10)/10,txt:txt})};
+    var rate=function(w){return (dir==='Over'?w.h.o:w.h.u)/w.n};
+    var ln=o.ln.v,l10=c.l10,sn=c.s;
+    add('Line history',(rate(l10)-.5)*2*25*Math.min(1,l10.n/10),(dir==='Over'?'Cleared ':'Stayed under ')+ln+' in '+(dir==='Over'?l10.h.o:l10.h.u)+' of his last '+l10.n);
+    if(sn.n>=8)add('Season hit rate',(rate(sn)-.5)*2*10,(dir==='Over'?'Over ':'Under ')+ln+' in '+Math.round(rate(sn)*100)+'% of '+sn.n+' games this season');
+    if(c.l5.n>=3&&sn.avg>0){var tr=c.l5.avg/sn.avg-1;add('Recent form',grClip(tr/.3,-1,1)*s*15,'Last 5 games average '+fmt106(c.l5.avg)+' vs '+fmt106(sn.avg)+' for the season')}
+    if(typeof r.pct==='number')add('Opponent',grClip(r.pct/12,-1,1)*s*15,(r.def&&r.def.txt)||(r.pct>=0?'Soft matchup':'Tough matchup'));
+    var f=null;try{f=pbCalc(lg,cat,r.n,ln,o.opp,true)}catch(e){}
+    if(f&&f.tm){
+      var best=null;f.tm.forEach(function(t){if(!t.out||!t.wo||t.wo.n<2||!(t.wi.avg>0))return;var d=t.wo.avg/t.wi.avg-1;if(!best||Math.abs(d)>Math.abs(best.d))best={d:d,t:t}});
+      if(best)add('Teammates',grClip(best.d/.3,-1,1)*s*10,best.t.n+' is out. Without him he averages '+fmt106(best.t.wo.avg)+' vs '+fmt106(best.t.wi.avg)+' with him');
+    }
+    if(f&&f.sp){
+      var home=/^vs /.test(r.when||''),lab=home?'Home':'Away';
+      f.sp.forEach(function(p){
+        if(p.label===lab&&p.n>=3&&sn.avg>0)add('Home/away',grClip((p.avg/sn.avg-1)/.25,-1,1)*s*5,'Averages '+fmt106(p.avg)+' '+lab.toLowerCase()+' vs '+fmt106(sn.avg)+' overall');
+        if(/^Against /.test(p.label)&&sn.avg>0)add('Vs this team',grClip((p.avg/sn.avg-1)/.4,-1,1)*s*5,p.label+': '+fmt106(p.avg)+' in '+p.n+' game'+(p.n>1?'s':''));
+      });
+    }
+    try{var it=injIt108({lg:lg,n:r.n,t:r.t});if(it&&it.st&&!isOutInj({lg:lg,n:r.n,t:r.t}))add('Health',dir==='Over'?-12:0,'Listed '+it.st+(it.d?' ('+it.d+')':'')+(dir==='Over'?'. His workload could be cut':'. A smaller role would help the under'))}catch(e){}
+    if(/pass|rec|cpass|crec/.test(cat)||cat==='pass'||cat==='rec'){var w=grWind(lg,r.t);if(w&&w.wavg>=15)add('Weather',(w.wavg>=20?6:3)*-s,'Wind near '+Math.round(w.wavg)+' mph hurts the passing game')}
+    var sum=0;F.forEach(function(x){sum+=x.pts});
+    return {sum:sum,letter:grLetter(sum),dir:dir,F:F};
+  });
+}
+/* the better side of a prop */
+function gradeBest(lg,cat,r,o){
+  var a=gradeProp(lg,cat,r,o,'Over'),b=gradeProp(lg,cat,r,o,'Under');
+  if(!a||!b)return null;return a.sum>=b.sum?a:b;
+}
+function grWhy(g,n){
+  var pro=g.F.filter(function(x){return x.pts>=3}).sort(function(a,b){return b.pts-a.pts}).slice(0,n||3),con=g.F.filter(function(x){return x.pts<=-3}).sort(function(a,b){return a.pts-b.pts}).slice(0,2);
+  return {pro:pro,con:con};
+}
+/* game pick grade */
+function grOutW(lg,key){
+  var I=S.inj[lg];if(!I||!I.by)return {w:0,names:[]};
+  var L=I.by[key]||[],w=0,names=[];
+  L.forEach(function(x){if(!OUT_RE.test(x.st||''))return;var q=lg==='nfl'&&/^QB$/i.test(x.pos||'')?10:lg==='nfl'?2:3;w+=q;names.push(x.n+(x.pos?' ('+x.pos+')':''))});
+  return {w:w,names:names};
+}
+function grForm(lg,team){
+  try{var T=pbIdx(lg).T[dlAb(lg,team)]||[];var l=T.filter(function(e){return e.w!=null}).slice(-5);if(l.length<3)return null;return {w:l.filter(function(e){return e.w}).length,n:l.length}}catch(e){return null}
+}
+function gradeGame(i){
+  var key='g|'+i.g.id+'|'+i.x.t+'|'+(i.x.side||'')+'|'+(i.x.over==null?'':i.x.over)+'|'+Math.round(i.pr);
+  return grCache(key,function(){
+    var g=i.g,x=i.x,lg=g.lg,F=[],add=function(k,pts,txt){F.push({k:k,pts:Math.round(pts*10)/10,txt:txt})};
+    var be=amBe(i.pr);
+    add('Price',grClip(i.edge/.10,0,1.5)*22,'Model '+Math.round(x.p*100)+'% vs '+Math.round(be*100)+'% needed at DraftKings'+(i.assumed?' (no price listed, -110 assumed)':''));
+    add('Confidence',(x.p-.5)*60,'The model puts this pick at '+Math.round(x.p*100)+'%');
+    if(i.assumed)add('Price',-4,'No DraftKings price yet, so this uses -110');
+    var c=null;try{c=consAgree(g,x)}catch(e){}
+    if(c&&c[1]>=2)add('Outside writers',(c[0]/c[1]-.5)*2*8,c[0]+' of '+c[1]+' outside writers agree');
+    var kT=function(ab){return lg==='nfl'?nt(ab):ab};
+    if(x.t==='tot'){
+      if(lg==='nfl'){var oa=grOutW(lg,kT(g.a)),oh=grOutW(lg,kT(g.h)),qb=0,qn=[];[oa,oh].forEach(function(o){o.names.forEach(function(n){if(/\(QB\)/.test(n)){qb++;qn.push(n.replace(' (QB)',''))}})});if(qb)add('Injuries',(x.over?-6:6)*qb,'Quarterback out: '+qn.join(', '))}
+      var w=grWind(lg,g.h);if(w&&w.wavg>=15)add('Weather',(w.wavg>=20?6:3)*(x.over?-1:1),'Wind near '+Math.round(w.wavg)+' mph holds scoring down');
+    }else{
+      var mine=x.side==='h'?g.h:g.a,theirs=x.side==='h'?g.a:g.h;
+      var om=grOutW(lg,kT(mine)),ot=grOutW(lg,kT(theirs));
+      if(om.w||ot.w){var d=grClip(ot.w-om.w,-12,12);add('Injuries',d,(ot.names.length?theirs+' missing '+ot.names.slice(0,3).join(', '):'')+(om.names.length?(ot.names.length?'. ':'')+mine+' missing '+om.names.slice(0,3).join(', '):''))}
+      var fm=grForm(lg,mine),ft=grForm(lg,theirs);
+      if(fm&&ft)add('Recent form',(fm.w/fm.n-ft.w/ft.n)*8,mine+' won '+fm.w+' of its last '+fm.n+'; '+theirs+' won '+ft.w+' of '+ft.n);
+    }
+    var sum=0;F.forEach(function(q){sum+=q.pts});
+    return {sum:sum,letter:grLetter(sum),F:F};
+  });
+}
+/* game pick card with a grade instead of the edge */
+pkGameCard=function(i){
+  var x=i.x,G=gradeGame(i),W=grWhy(G,3);
+  return '<div class="card" data-act="bbgame" data-id="'+esc(i.g.id)+'" data-t="'+x.t+'" style="margin-bottom:8px;cursor:pointer"><div class="r" style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><div><b>'+esc(x.pick)+'</b> <span class="src">'+esc(lgName(i.g.lg))+' · '+esc(HB_T[x.t])+' · '+fmtAm(i.pr)+(i.assumed?' (assumed)':'')+'</span></div>'+grPill(G.letter)+'</div>'+
+    '<div class="src">'+esc(i.g.a+' @ '+i.g.h)+' · '+esc(gTime(i.g))+'</div>'+
+    '<ul class="pts" style="margin:6px 0 0">'+W.pro.map(function(f){return '<li>'+esc(f.txt)+'</li>'}).join('')+'</ul>'+
+    (W.con.length?'<div class="src" style="margin-top:4px">Against: '+esc(W.con.map(function(f){return f.txt}).join('; '))+'</div>':'')+
+    '<div class="src" style="margin-top:4px">Tap for the full matchup</div></div>';
+};
+/* sort game picks by grade */
+var pkGame137=pkGame;
+pkGame=function(lg){var o=pkGame137(lg);o.forEach(function(i){try{i.gs=gradeGame(i).sum}catch(e){i.gs=0}});return o.sort(function(a,b){return b.gs-a.gs})};
+/* angles: grade each, sort by grade, show the pill */
+var pkAngles137=pkAngles;
+pkAngles=function(lg){
+  var A=pkAngles137(lg);
+  A.forEach(function(a){try{a.gr=gradeProp(lg,a.o.cat,a.o.r,a.o,a.dir);if(a.gr)a.score=a.gr.sum}catch(e){}});
+  return A.sort(function(a,b){return b.score-a.score});
+};
+var pkAngleCard137=pkAngleCard;
+pkAngleCard=function(a){
+  var h=pkAngleCard137(a);
+  if(a.gr){var i=h.indexOf('<div class="src">projected ');if(i>=0)h=h.slice(0,i)+'<div style="margin-bottom:2px">'+grPill(a.gr.letter)+'</div>'+h.slice(i)}
+  return h;
+};
+/* props board: grade on each card */
+var pbCard137=pbCard;
+pbCard=function(o){
+  var h=pbCard137(o);
+  try{var G=o.tr!=null&&o.tr>=.12?gradeProp(o.r.lg,o.cat,o.r,o,'Over'):o.tr!=null&&o.tr<=-.12?gradeProp(o.r.lg,o.cat,o.r,o,'Under'):gradeBest(o.r.lg,o.cat,o.r,o);if(G){var i=h.indexOf('</b>');if(i>=0)h=h.slice(0,i+4)+' '+grPill(G.letter,G.dir)+h.slice(i+4)}}catch(e){}
+  return h;
+};
+/* player window: full report card */
+var pbSheet137=pbSheet;
+pbSheet=function(s){
+  var h=pbSheet137.apply(this,arguments);
+  try{
+    var lg=s.lg,r={n:s.n,t:s.team,lg:lg,when:s.when,pct:null,def:null};
+    var o=null;try{pbRows(lg,s.cat).forEach(function(q){if(!o&&normName(q.r.n)===normName(s.n))o=q})}catch(e){}
+    if(o){o={r:o.r,ln:{v:s.line,own:true},c:pbCalc(lg,s.cat,s.n,s.line,s.opp,false),opp:o.opp||s.opp,cat:s.cat};r=o.r}
+    var a=o&&gradeProp(lg,s.cat,r,o,'Over'),b=o&&gradeProp(lg,s.cat,r,o,'Under');
+    if(a&&b){
+      var best=a.sum>=b.sum?a:b,card='<h3>Report card</h3><div class="card" style="padding:12px"><div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap"><div>'+grPill(best.letter)+' <b>'+best.dir+' '+s.line+'</b></div><div class="src">Over '+esc(a.letter)+' · Under '+esc(b.letter)+'</div></div><ul class="pts" style="margin:8px 0 0">'+
+        best.F.filter(function(f){return Math.abs(f.pts)>=1}).sort(function(x,y){return Math.abs(y.pts)-Math.abs(x.pts)}).map(function(f){return '<li><b>'+(f.pts>=0?'For':'Against')+':</b> '+esc(f.txt)+'</li>'}).join('')+'</ul><p class="src" style="margin:8px 0 0">Grades rank how likely each side is to hit, from his past games, the opponent, teammates who are out, his health and the weather. Move the line and the grade moves with it.</p></div>';
+      var i=h.indexOf('<h3');h=i>=0?h.slice(0,i)+card+h.slice(i):h+card;
+    }
+  }catch(e){}
+  return h;
+};
+/* header text on the Picks tab */
+var vPicks2137=vPicks2;
+vPicks2=function(){
+  var h=vPicks2137();
+  try{
+    h=h.replace(/Spread, total and moneyline picks where the model[^<]*<\/p>/,'Spread, total and moneyline picks graded A+ to F. The grade is how likely the app thinks the pick is to hit, built from the price, injuries on both teams, recent form and the weather. Games in the next 8 days.</p>');
+    h=h.replace(/ESPN does not carry DraftKings’ player-prop prices[^<]*<\/p>/,'Players graded A+ to F on the side the app likes (over or under). The grade weighs how often he cleared the number, recent form, the opponent’s weakness, teammates who are out, his own health and the weather. ESPN has no DraftKings prop prices, so check your book’s line.</p>');
+  }catch(e){}
+  return h;
+};
+/* record grades so Results can check them */
+function grStamp(){
+  try{
+    var ch=false;
+    ['nfl','nba','ncaafb','nhl'].forEach(function(lg){pkGame(lg).forEach(function(i){
+      var e=S.log.filter(function(y){return y.gid===i.g.id&&y.t===i.x.t&&(y.side||null)===(i.x.side||null)})[0];
+      if(e&&!e.gr){var G=gradeGame(i);e.gr=G.letter;e.gs=G.sum;ch=true}})});
+    if(ch)saveLog();
+  }catch(e){}
+}
+var angRecord137=angRecord;
+angRecord=function(){
+  var n0=ANG.length;angRecord137.apply(this,arguments);
+  try{
+    var AC={};
+    ANG.forEach(function(x){if(x.gr||x.res)return;
+      var a=(AC[x.lg]||(AC[x.lg]=pkAngles(x.lg))).filter(function(q){return normName(q.o.r.n)===x.nk&&q.o.cat===x.cat})[0];
+      if(a&&a.gr){x.gr=a.gr.letter;x.gs=a.gr.sum}});
+    angSave();
+  }catch(e){}
+};
+setTimeout(function(){try{grStamp()}catch(e){}},26000);setInterval(function(){try{grStamp()}catch(e){}},10*60*1000);
+/* Results: by grade */
+var vResults137=vResults;
+vResults=function(){
+  var h=vResults137();
+  try{
+    var A=ANG.filter(function(x){return x.gr}),L=S.log.filter(function(x){return x.gr&&(x.res==='W'||x.res==='L')});
+    var t='<h3>Hit rate by grade</h3><p class="src" style="margin:0 0 8px">If the grades work, A picks should hit more often than B, and B more than C. Needs about 20 graded picks in a row to mean anything.</p>';
+    t+=grpTable('Player props',angRows(A,function(x){return grBand(x.gr)}).sort(function(a,b){return a.k<b.k?-1:1}),null,'Break-even');
+    t+=grpTable('Game picks',grpRows(L,function(x){return grBand(x.gr)},1,function(x){return .524}).sort(function(a,b){return a.k<b.k?-1:1}),null,'Break-even');
+    if(!A.length&&!L.length)t+='<div class="card empty">Grades are saved from now on. Results show up here after the games finish.</div>';
+    var i=h.indexOf('<h3>Player angles</h3>');h=i>=0?h.slice(0,i)+t+h.slice(i):h+t;
   }catch(e){}
   return h;
 };
