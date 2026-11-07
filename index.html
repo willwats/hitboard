@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v188, Nov 7';
+var BUILD='v189, Nov 7';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -12971,6 +12971,36 @@ feedSheet=function(g){
     var i=h.indexOf('<h3>Props the app predicted</h3>');
     return i>=0?h.slice(0,i)+sec+h.slice(i):h+sec;
   }catch(e){return h}
+};
+try{render()}catch(e){}
+
+/* v189: every upcoming game in the list shows who covers and a predicted score */
+var _gpC={};
+function gmPred(g){
+  var k=g.id+'|'+S.feedAt+'|'+(S.us[g.id]&&S.us[g.id].t||0)+'|'+Math.floor(Date.now()/60000);
+  if(k in _gpC)return _gpC[k];
+  var out='';
+  try{
+    if(kind(g)==='up'&&['nfl','ncaafb','nba','nhl'].indexOf(g.lg)>=0){
+      var m=pickModel(g),na=shortNm(g,'a'),nh=shortNm(g,'h');
+      if(m&&m.M!=null){
+        var L=m.ln&&m.ln.pts!=null?m.mk:null,ps=predScore(g,m,L==null?0:L,na,nh),sc=ps?(ps.h>=ps.a?nh+' '+hbF0(ps.h)+', '+na+' '+hbF0(ps.a):na+' '+hbF0(ps.a)+', '+nh+' '+hbF0(ps.h)):'';
+        if(L!=null){
+          var edge=m.M-L,homeCov=edge>=0,pk=homeCov?nh:na,lp=homeCov?-L:L,sc0=g.lg==='nhl'?.2:1,shr=.5*Math.abs(edge)/sc0,ex=null;
+          try{ex=expSig(g,homeCov?'h':'a',m.M>=0?'h':'a')}catch(e){}
+          out='<b>Covers: '+esc(pk)+' '+esc(sgnPts(lp))+'</b> · Grade '+esc(hbGradeOf(shr,ex))+(sc?' · Predicted score: '+esc(sc):'');
+        }else if(sc)out='Predicted score: '+esc(sc)+' <span class="src">(no spread posted yet)</span>';
+      }
+    }
+  }catch(e){out=''}
+  _gpC[k]=out;return out;
+}
+var schRow144=schRow;
+schRow=function(g){
+  var h=schRow144(g),p=gmPred(g);
+  if(!p)return h;
+  var i=h.lastIndexOf('</div>');
+  return i<0?h:h.slice(0,i)+'<div class="src" style="margin-top:4px;color:var(--ink)">'+p+'</div>'+h.slice(i);
 };
 try{render()}catch(e){}
 
