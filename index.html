@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v182, Nov 6';
+var BUILD='v183, Nov 6';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -12669,6 +12669,71 @@ vResults=function(){
     t+=grpTable('Game picks',grpRows(L,function(x){return grBand(x.gr)},1,function(x){return .524}).sort(function(a,b){return a.k<b.k?-1:1}),null,'Break-even');
     if(!A.length&&!L.length)t+='<div class="card empty">Grades are saved from now on. Results show up here after the games finish.</div>';
     var i=h.indexOf('<h3>Player angles</h3>');h=i>=0?h.slice(0,i)+t+h.slice(i):h+t;
+  }catch(e){}
+  return h;
+};
+try{render()}catch(e){}
+
+/* v183: grade past picks after the fact and log them under Results */
+var GB_STAT={nba:{pts:'npts',reb:'nreb',ast:'nast',tpm:'ntpm'},nfl:{pass:'pass',rush:'rush',rec:'rec'},ncaafb:{pass:'cpass',rush:'crush',rec:'crec'},ncaamb:{pts:'npts',reb:'nreb',ast:'nast',tpm:'ntpm'}};
+S.gbMsg='';
+function gbGame(x){
+  var F=0,be=breakEven(x),edge=(x.p0!=null?x.p0:x.p)-be;
+  F+=grClip(edge/.10,0,1.5)*22;
+  F+=((x.p0!=null?x.p0:x.p)-.5)*60;
+  if(x.oc&&x.oc[1]>=2)F+=(x.oc[0]/x.oc[1]-.5)*2*8;
+  if(x.t!=='tot'&&x.lg&&x.st){
+    var team=pickTeam(x),opp=pickOpp(x);
+    var form=function(t){try{var T=(pbIdx(x.lg).T[dlAb(x.lg,t)]||[]).filter(function(e){return e.w!=null&&e.at<x.st}).slice(-5);return T.length>=3?T.filter(function(e){return e.w}).length/T.length:null}catch(e){return null}};
+    var a=form(team),b=form(opp);if(a!=null&&b!=null)F+=(a-b)*8;
+  }
+  return F;
+}
+function gbProp(x){
+  var map=GB_STAT[x.lg];if(!map||!map[x.stat])return null;
+  var i=DL_LG[x.lg].ix[map[x.stat]];if(i==null)return null;
+  var cut=x.at,all=((pbIdx(x.lg).P[normName(x.name)])||[]).filter(function(e){return e.at<cut&&e.v[i]!=null});
+  if(all.length<5)return null;
+  var l10=all.slice(0,10),l5=all.slice(0,5),rate=function(a){return a.filter(function(e){return e.v[i]>x.thr}).length/a.length};
+  var avg=function(a){return a.reduce(function(s,e){return s+e.v[i]},0)/a.length};
+  var F=(rate(l10)-.5)*2*25*Math.min(1,l10.length/10);
+  if(all.length>=8)F+=(rate(all)-.5)*2*10;
+  var sa=avg(all);if(sa>0)F+=grClip((avg(l5)/sa-1)/.3,-1,1)*15;
+  return F;
+}
+function gbRun(){
+  var g=0,p=0,skip=0,pn=0;
+  S.log.forEach(function(x){
+    if(x.gr||!(x.res==='W'||x.res==='L'))return;
+    var s=null;try{s=gbGame(x)}catch(e){}
+    if(s==null){skip++;return}
+    x.gr=grLetter(s);x.gs=Math.round(s*10)/10;x.grb=1;g++;
+  });
+  S.auto.forEach(function(x){
+    if(x.gr||!(x.res==='W'||x.res==='L'))return;
+    var s=null;try{s=gbProp(x)}catch(e){}
+    if(s==null){skip++;return}
+    x.gr=grLetter(s);x.gs=Math.round(s*10)/10;x.grb=1;p++;
+  });
+  if(g)saveLog();if(p)saveAuto();
+  S.gbG=(S.gbG||0)+g;S.gbP=(S.gbP||0)+p;S.gbMsg=S.gbG+' past game picks and '+S.gbP+' past props graded'+(skip?'; '+skip+' skipped (no game history from before that game)':'')+'.';
+  return g+p;
+}
+var vResults138=vResults;
+vResults=function(){
+  try{gbRun()}catch(e){}
+  var h=vResults138();
+  try{
+    var i=h.indexOf('<h3>Hit rate by grade</h3>');
+    if(i>=0){
+      var j=h.indexOf('<p class="src"',i),k=h.indexOf('</p>',j);
+      var A=ANG.filter(function(x){return x.gr}).concat(S.auto.filter(function(x){return x.gr&&(x.res==='W'||x.res==='L')})),L=S.log.filter(function(x){return x.gr&&(x.res==='W'||x.res==='L')});
+      var key=function(x){return grBand(x.gr)+(x.grb?' (past, rebuilt)':'')};
+      var tbl=grpTable('Player props',angRows(A,key).sort(function(a,b){return a.k<b.k?-1:1}),null,'Break-even')+grpTable('Game picks',grpRows(L,key,1,function(){return .524}).sort(function(a,b){return a.k<b.k?-1:1}),null,'Break-even');
+      var end=h.indexOf('<h3>Player angles</h3>');
+      if(end<0)end=h.length;
+      h=h.slice(0,k+4)+tbl+'<p class="src">Rows marked "past, rebuilt" were graded after the fact from what the app still had: the model’s chance, the price, the writers’ view, and each team’s or player’s results from before that game. Injuries and weather were not saved back then, so rebuilt grades use fewer factors than new ones.</p>'+h.slice(end);
+    }
   }catch(e){}
   return h;
 };
