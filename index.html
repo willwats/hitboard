@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v193, Nov 8';
+var BUILD='v194, Nov 8';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -13388,6 +13388,130 @@ gradeGame=function(i){
     }catch(e){}
   }
   return G;
+};
+try{render()}catch(e){}
+
+/* v194: full game breakdown: team strengths/weaknesses, projection table, correlated parlays, uncertainty */
+function bkAb(lg,x){return lg==='nfl'?nt(String(x||'').toUpperCase()):dlAb(lg,x)}
+function bkCatLabel(lg,cat){var l='';try{pbCats(lg).forEach(function(c){if(c[0]===cat)l=c[1]})}catch(e){}return l||cat}
+function bkKind(lg,cat){
+  if(lg==='nfl'||lg==='ncaafb')return /rush/.test(cat)?'ground':'air';
+  return 'pace';
+}
+function bkSW(g){
+  var lg=g.lg,C=DL_LG[lg];if(!C)return '';
+  var out='';
+  [[g.a,'a'],[g.h,'h']].forEach(function(t){
+    var ab=bkAb(lg,t[0]),S1=[],W1=[];
+    C.names.forEach(function(nm,i){
+      if(/^(rec|crec)$/.test(Object.keys(C.ix).filter(function(k){return C.ix[k]===i})[0]||''))return;
+      var lgA=atdLeague(lg,i),mine=atdTeamAvg(lg,ab,i),b=cAllow(lg,i).by[ab];if(!lgA)return;
+      var n=String(nm).toLowerCase();
+      if(mine!=null){var f=mine/lgA;if(f>=1.1)S1.push('Offense: '+Math.round(mine)+' '+n+' a game (league '+Math.round(lgA)+')');else if(f<=.9)W1.push('Offense: only '+Math.round(mine)+' '+n+' a game (league '+Math.round(lgA)+')')}
+      if(b&&b.n>=3){var al=b.s/b.n,f2=al/lgA;if(f2<=.9)S1.push('Defense: allows '+Math.round(al)+' '+n+' (league '+Math.round(lgA)+')');else if(f2>=1.1)W1.push('Defense: allows '+Math.round(al)+' '+n+' (league '+Math.round(lgA)+')')}
+    });
+    var n=((pbIdx(lg).T[ab])||[]).length;
+    out+='<div class="card" style="padding:10px 12px;margin-bottom:8px"><b>'+esc(t[0])+'</b> <span class="src">'+n+' games read</span>'+
+      '<div class="src" style="margin-top:6px"><b>Strengths</b></div><ul class="pts" style="margin:2px 0">'+(S1.length?S1.slice(0,4).map(function(x){return '<li>'+esc(x)+'</li>'}).join(''):'<li>Nothing clearly above the league yet</li>')+'</ul>'+
+      '<div class="src"><b>Weaknesses</b></div><ul class="pts" style="margin:2px 0">'+(W1.length?W1.slice(0,4).map(function(x){return '<li>'+esc(x)+'</li>'}).join(''):'<li>Nothing clearly below the league yet</li>')+'</ul></div>';
+  });
+  return out;
+}
+function bkProps(g){
+  var R=[];try{R=gpRows(g)}catch(e){}
+  var seen={},L=[];R.forEach(function(o){var k=normName(o.r.n)+'|'+o.cat;if(seen[k])return;seen[k]=1;L.push(o)});
+  return L;
+}
+function bkTable(g,L){
+  var lg=g.lg,C=DL_LG[lg],ta=bkAb(lg,g.a);
+  var rows=L.slice().sort(function(a,b){var ea=bkAb(lg,a.r.t)===ta?0:1,eb=bkAb(lg,b.r.t)===ta?0:1;return ea-eb||b.gs-a.gs}).slice(0,12);
+  if(!rows.length)return '';
+  var h='<div style="overflow-x:auto"><table class="tbl" style="width:100%;font-size:12.5px;border-collapse:collapse"><tr><th align="left">Player</th><th align="left">Stat</th><th>Proj</th><th>Line</th><th>Season</th><th>Opp allows</th></tr>';
+  rows.forEach(function(o){
+    var i=C&&C.ix[o.cat],al='–';
+    try{if(i!=null){var b=cAllow(lg,i).by[bkAb(lg,o.opp)];if(b&&b.n>=3)al=Math.round(b.s/b.n)}}catch(e){}
+    h+='<tr><td>'+esc(shortNm108?o.r.n:o.r.n)+' <span class="src">'+esc(o.r.t)+'</span></td><td>'+esc(bkCatLabel(lg,o.cat))+'</td><td align="center">'+esc(o.r.projTxt||'–')+'</td><td align="center">'+(o.ln&&o.ln.v!=null?o.ln.v:'–')+'</td><td align="center">'+(o.c?fmt106(o.c.s.avg):'–')+'</td><td align="center">'+al+'</td></tr>';
+  });
+  return h+'</table></div><p class="src" style="margin:4px 0 0">Line is the projection rounded to the nearest half unless you entered your own. “Opp allows” is what the opponent gives up per game to all tracked players on that stat.</p>';
+}
+var shortNm108=true;
+/* correlated parlays */
+function bkLegs(g,L){
+  var lg=g.lg,bets=[];try{bets=picksFor(g)||[]}catch(e){}
+  var m=null;try{m=pickModel(g)}catch(e){}
+  var fav=m&&m.M!=null?(m.M>=0?'h':'a'):null;
+  var side=bets.filter(function(x){return x.t==='sp'||x.t==='ml'}).sort(function(a,b){return b.p-a.p})[0]||null;
+  var tot=bets.filter(function(x){return x.t==='tot'}).sort(function(a,b){return b.p-a.p})[0]||null;
+  var th=bkAb(lg,g.h);
+  var P=L.filter(function(o){return o.gr&&o.gr.sum>=8}).map(function(o){return {o:o,sd:bkAb(lg,o.r.t)===th?'h':'a',dir:o.gr.dir,k:bkKind(lg,o.cat),gs:o.gs}});
+  var anchors=[];
+  if(side)anchors.push({x:side,label:side.pick,p:side.p,sd:side.side,kind:'side'});
+  if(tot)anchors.push({x:tot,label:tot.pick,p:tot.p,over:tot.over,kind:'tot'});
+  var out=[];
+  anchors.forEach(function(A){
+    var comp=P.filter(function(q){
+      if(A.kind==='tot'){
+        if(lg==='nfl'||lg==='ncaafb'){return A.over?(q.k==='air'&&q.dir==='Over'):(q.k==='ground'&&q.dir==='Over')||(q.k==='air'&&q.dir==='Under')}
+        return A.over?q.dir==='Over':q.dir==='Under';
+      }
+      var mine=q.sd===A.sd,isFav=fav&&A.sd===fav;
+      if(lg==='nfl'||lg==='ncaafb'){
+        if(isFav)return (mine&&q.k==='ground'&&q.dir==='Over')||(!mine&&q.k==='air'&&q.dir==='Over');
+        return (mine&&q.k==='air'&&q.dir==='Over')||(!mine&&q.k==='ground'&&q.dir==='Under');
+      }
+      return (mine&&q.dir==='Over')||(!mine&&q.dir==='Under');
+    });
+    var why=function(q){
+      var tm=q.o.r.t,nm=q.o.r.n,cl=bkCatLabel(lg,q.o.cat).toLowerCase();
+      if(A.kind==='tot')return A.over?(lg==='nfl'||lg==='ncaafb'?'A high-scoring game needs passing: '+nm+' '+q.dir.toLowerCase()+' '+cl:'More points in the game lifts '+nm+' '+q.dir.toLowerCase()+' '+cl):(lg==='nfl'||lg==='ncaafb'?(q.k==='ground'?'A low-scoring game is a running game: ':'Fewer points usually means fewer passing yards: ')+nm+' '+q.dir.toLowerCase()+' '+cl:'Fewer points in the game pushes '+nm+' '+q.dir.toLowerCase()+' '+cl);
+      var mine=q.sd===A.sd,isFav=fav&&A.sd===fav;
+      if(lg==='nfl'||lg==='ncaafb')return isFav?(mine?'If '+tm+' leads it keeps running: '+nm+' '+q.dir.toLowerCase()+' '+cl:'If '+A.label.split(' ')[0]+' wins, '+tm+' has to throw to catch up: '+nm+' '+q.dir.toLowerCase()+' '+cl):(mine?'A cover as the underdog usually comes through the air: '+nm+' '+q.dir.toLowerCase()+' '+cl:nm+' '+q.dir.toLowerCase()+' '+cl+' if the favorite is held down');
+      return mine?'If '+tm+' covers, '+nm+' is likely driving it: '+q.dir.toLowerCase()+' '+cl:'If the other side covers, '+nm+' is more likely held down: '+q.dir.toLowerCase()+' '+cl;
+    };
+    out.push({A:A,comp:comp.sort(function(a,b){return b.gs-a.gs}),why:why});
+  });
+  return out;
+}
+function bkParlays(g,L){
+  var legs=bkLegs(g,L);if(!legs.length)return '';
+  var tiers=[['Conservative',2],['Standard',3],['Aggressive',4],['Long-shot',5]],used={},h='';
+  var best=legs.filter(function(l){return l.comp.length}).sort(function(a,b){return b.A.p-a.A.p});
+  tiers.forEach(function(t){
+    var A=null;for(var i=0;i<best.length;i++){if(best[i].comp.length>=t[1]-1){A=best[i];break}}
+    if(!A)return;
+    var picks=[],seen={};A.comp.forEach(function(q){var k=normName(q.o.r.n);if(seen[k]||picks.length>=t[1]-1)return;seen[k]=1;picks.push(q)});
+    if(picks.length<t[1]-1)return;
+    var px=null;try{var pr=A.A.x;var d=(g.dk&&g.dk.px)||{},ml=(g.dk&&g.dk.ml)||{};px=A.A.kind==='tot'?(A.A.over?d.to:d.tu):(A.A.x.t==='sp'?(A.A.sd==='h'?d.sh:d.sa):(A.A.sd==='h'?ml.h:ml.a))}catch(e){}
+    h+='<div class="card" style="padding:10px 12px;margin-bottom:8px"><b>'+t[0]+'</b> <span class="src">'+t[1]+' legs</span>'+
+      '<div style="margin-top:6px">1. <b>'+esc(A.A.label)+'</b> <span class="src">'+(px!=null&&isFinite(px)?fmtAm(px):'price not posted')+' · model '+Math.round(A.A.p*100)+'%</span></div>'+
+      picks.map(function(q,j){return '<div style="margin-top:4px">'+(j+2)+'. <b>'+esc(q.o.r.n)+' '+q.dir+' '+(q.o.ln&&q.o.ln.v!=null?q.o.ln.v:'')+' '+esc(bkCatLabel(g.lg,q.o.cat).toLowerCase())+'</b> <span class="src">grade '+esc(q.o.gr.letter)+' · no price here</span><div class="src">'+esc(A.why(q))+'</div></div>'}).join('')+'</div>';
+  });
+  if(!h)return '<p class="src" style="margin:0">Not enough graded props that line up with this game’s picks to build a correlated parlay yet.</p>';
+  return h+'<p class="src" style="margin:4px 0 0">Every leg after the first points the same way as the first one, so they tend to win or lose together. Many books limit or reprice same-game combinations, so check the price in your book. Longer parlays hit far less often.</p>';
+}
+function bkUncertain(g,L){
+  var lg=g.lg,ta=bkAb(lg,g.a),th=bkAb(lg,g.h),I=pbIdx(lg),na=(I.T[ta]||[]).length,nh=(I.T[th]||[]).length,s=[],v=[];
+  s.push(g.a+' '+na+' games and '+g.h+' '+nh+' games of box scores read this season.');
+  if(na<5||nh<5)v.push('Fewer than 5 games read for '+(na<5?g.a:g.h)+', so its averages can swing a lot.');
+  try{var kT=function(ab){return lg==='nfl'?nt(ab):ab};[[g.a,ta],[g.h,th]].forEach(function(t){var o=grOutW(lg,kT(t[1]));if(o.names.length)v.push(t[0]+' missing '+o.names.slice(0,4).join(', ')+'. Usage and the game plan may change.')})}catch(e){}
+  try{var w=grWind(lg,g.h);if(w&&w.wavg>=12)v.push('Wind near '+Math.round(w.wavg)+' mph can cut passing and kicking.')}catch(e){}
+  v.push('Prop results swing widely from game to game. Even a top-graded prop misses often.');
+  v.push('Prop prices are not available here, so the grade is about likelihood, not value.');
+  if(!g.dk)v.push('No posted game odds were found yet for this game.');
+  return '<div class="card" style="padding:10px 12px"><div class="src"><b>Solid</b></div><ul class="pts" style="margin:2px 0">'+s.map(function(x){return '<li>'+esc(x)+'</li>'}).join('')+'</ul><div class="src"><b>Volatile or unknown</b></div><ul class="pts" style="margin:2px 0">'+v.map(function(x){return '<li>'+esc(x)+'</li>'}).join('')+'</ul></div>';
+}
+var feedSheet149=feedSheet;
+feedSheet=function(g){
+  var h=feedSheet149.apply(this,arguments);
+  try{
+    if(kind(g)!=='up'||!DL_LG[g.lg])return h;
+    var L=bkProps(g),t='<h2 style="margin-top:22px">Full breakdown</h2>'+
+      '<h3>Strengths and weaknesses</h3>'+bkSW(g)+
+      (L.length?'<h3>Player projections</h3>'+bkTable(g,L)+'<h3>Correlated parlays</h3>'+bkParlays(g,L):'')+
+      '<h3>Data confidence</h3>'+bkUncertain(g,L);
+    var i=h.lastIndexOf('</div>');h=i>0?h.slice(0,i)+t+h.slice(i):h+t;
+  }catch(e){}
+  return h;
 };
 try{render()}catch(e){}
 
