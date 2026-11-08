@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v203, Nov 8';
+var BUILD='v204, Nov 8';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -11905,10 +11905,22 @@ function pbStreak(c){
   }catch(e){}
   return null;
 }
+function pbMatch(lg,o){
+  try{
+    var r=o.r,dt=r.def&&r.def.txt||'',tg=r.def&&r.def.tag&&String(r.def.tag[1]||'').toLowerCase()||'',m=/(\d+)(?:st|nd|rd|th) of (\d+)/.exec(dt),pts=null;
+    if(m&&+m[2]>=8)pts=((+m[1])/(+m[2])-.5)*40;
+    var lv=null;try{lv=pbLev(lg,o.cat,r,o,'Over')}catch(e){}
+    if(pts==null&&lv&&lv.cur)pts=lv.cur==='soft'?12:lv.cur==='tough'?-12:0;
+    if(pts==null)pts=tg==='soft'?12:tg==='tough'?-12:null;
+    if(pts==null)return null;
+    var dir=pts>=0?'Over':'Under',sg=pts>=0?1:-1,sum=Math.abs(pts)+(lv&&lv.over?lv.over*sg*2:0);
+    return {sum:sum,letter:grLetter(sum),dir:dir};
+  }catch(e){return null}
+}
 function pbCard(o){
   var r=o.r,c=o.c,ln=o.ln,pill='';
   if(o.st)pill='<span class="hrpill '+(o.st.k==='hot'||o.st.k==='up'?'hi':'lo')+'" style="display:inline-block;margin-left:6px">'+({hot:'Hot',up:'Trending up',cold:'Cold',down:'Trending down'})[o.st.k]+'</span>';
-  var d=r.def&&r.def.tag?'<span class="hrpill '+r.def.tag[0]+'" style="display:inline-block;margin-left:4px">'+r.def.tag[1]+'</span>':'';
+  var d=r.def&&r.def.tag?'<span class="hrpill '+r.def.tag[0]+'" style="display:inline-block;margin-left:4px">'+({soft:'Soft defense',tough:'Tough defense'}[String(r.def.tag[1]).toLowerCase()]||r.def.tag[1])+'</span>':'';
   var l2=c?'Last 5 <b>'+fmt106(c.l5.avg)+'</b> · Last 10 <b>'+fmt106(c.l10.avg)+'</b> · Season <b>'+fmt106(c.s.avg)+'</b> <span class="src">('+c.s.n+' games)</span>':esc(r.avgTxt||'');
   var l3=c?'Over '+ln.v+': '+c.l5.h.o+' of '+c.l5.n+' last 5 · '+c.l10.h.o+' of '+c.l10.n+' last 10'+(ln.own?'':' <span class="src">(reference line)</span>'):'<span class="src">No game log for this stat yet.</span>';
   var st='';try{var it=injIt108({lg:r.lg,t:r.t,n:r.n});if(it&&it.st)st=' <span class="tag warn" style="font-size:10px;padding:1px 6px">'+esc(it.st)+'</span>'}catch(e){}
@@ -13677,17 +13689,15 @@ vBoard=function(){
     if(S.bf==='match'){h=h.replace(/aria-pressed="true"([^>]*>(?:All|Hot · over|Cold · under)<)/g,'aria-pressed="false"$1');
       var lg=S.sport,rows=[];
       try{pbRows(lg,S.bc).forEach(function(o){
-        var G=null;try{G=gradeBest(lg,o.cat,o.r,o)}catch(x){}if(!G)return;
-        var lv=0;G.F.forEach(function(f){if(f.k==='Leverage')lv=f.pts});
-        var def=0;G.F.forEach(function(f){if(/opponent|defense|allow/i.test(f.k+' '+f.txt)&&f.pts>0)def+=f.pts});
-        rows.push({o:o,G:G,s:G.sum+lv*2+def*.5});
+        var M=pbMatch(lg,o);if(!M||M.sum<15)return;
+        rows.push({o:o,M:M,s:M.sum});
       })}catch(x){}
       rows.sort(function(a,b){return b.s-a.s});
-      var seen={},L=[];rows.forEach(function(r){var n=normName(r.o.r.n);if(seen[n]||L.length>=30)return;seen[n]=1;L.push(r.o)});
+      var seen={},L=[];rows.forEach(function(r){var n=normName(r.o.r.n);if(seen[n]||L.length>=40)return;seen[n]=1;L.push(r)});
       var a=h.indexOf('</details>',k),b=h.indexOf('<p class="foot">');
       if(a<0){var cs=h.indexOf('<div class="card"',k);a=cs>0?cs-10:-1}
       if(a>0&&b>a){
-        var body='<p class="src" style="margin:4px 0 8px">Players ranked by how well the matchup sets up the lean, using how the opponent defends that stat, how the player has done against similar defenses, his role, health and weather. Best first.</p>'+(L.length?L.map(pbCard).join(''):'<div class="card empty">No graded props for this stat yet.</div>');
+        var body='<p class="src" style="margin:4px 0 8px">Players whose matchup grades B or better. The matchup grade comes from how the opponent’s defense ranks against this stat and how the player has done in past games against similar defenses. Best first. “Soft defense” means that team gives up more of this stat than most teams do.</p>'+(L.length?L.map(function(r){var c=pbCard(r.o),i=c.indexOf('</b>');return i>=0?c.slice(0,i+4)+' <span class="src">Matchup</span> '+grPill(r.M.letter,r.M.dir)+c.slice(i+4):c}).join(''):'<div class="card empty">No matchups graded B or better on this stat right now.</div>');
         h=h.slice(0,a+10)+body+h.slice(b);
       }
     }
