@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v194, Nov 8';
+var BUILD='v195, Nov 8';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -13512,6 +13512,35 @@ feedSheet=function(g){
     var i=h.lastIndexOf('</div>');h=i>0?h.slice(0,i)+t+h.slice(i):h+t;
   }catch(e){}
   return h;
+};
+try{render()}catch(e){}
+
+/* v195: matchup wording in angle cards and anytime-TD reasons */
+var pkAngleCard149=pkAngleCard;
+pkAngleCard=function(a){
+  try{
+    var o=a.o,L=pbLev(o.r.lg,o.cat,o.r,o,a.dir);
+    if(L&&L.L.length&&!a._lv){a._lv=1;var m=L.L.filter(function(t){return !/^He accounts/.test(t)}).slice(0,2);a.why=m.concat(a.why).slice(0,5)}
+  }catch(e){}
+  return pkAngleCard149(a);
+};
+var atdRows150=atdRows;
+atdRows=function(g,pre){
+  var R=atdRows150.apply(this,arguments);
+  try{
+    var lg=g.lg,Y=ATD_Y[lg],C=DL_LG[lg],ab=function(x){return lg==='nfl'?nt(String(x||'').toUpperCase()):dlAb(lg,x)};
+    var cs=lg==='nfl'?{rush:'rush',rec:'rec'}:{rush:'crush',rec:'crec'};
+    R.forEach(function(r){
+      if(r._m)return;r._m=1;
+      var opp=ab(r.t)===ab(g.a)?ab(g.h):ab(g.a),oppName=ab(r.t)===ab(g.a)?g.h:g.a,add=[];
+      ['rush','rec'].forEach(function(k){
+        var i=C.ix[cs[k]],lgA=atdLeague(lg,i),b=cAllow(lg,i).by[opp];
+        if(lgA&&b&&b.n>=3){var al=b.s/b.n;if(al>=lgA*1.08)add.push(oppName+' allows about '+Math.round(al)+' '+(k==='rush'?'rushing':'receiving')+' yards a game, more than the typical '+Math.round(lgA)+', so '+r.n+' has room to score')}
+      });
+      r.why=add.slice(0,2).concat(r.why).slice(0,4);
+    });
+  }catch(e){}
+  return R;
 };
 try{render()}catch(e){}
 
