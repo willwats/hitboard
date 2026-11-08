@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v197, Nov 8';
+var BUILD='v198, Nov 8';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -4436,7 +4436,7 @@ function doRefresh(silent){
   var done=function(msg,k){
     S.busy=false;if(!silent||msg){S.msg=silent?'':msg;S.msgKind=k||''}
     var ae=document.activeElement;
-    if(!(silent&&ae&&ae.tagName==='INPUT'))render();
+    if(!(silent&&((ae&&ae.tagName==='INPUT')||Date.now()-HB_LAST_TOUCH<6000)))render();
   };
   var finish=function(out,srcName,failMsg){
     var ok=out.filter(function(o){return o.games}),bad=out.filter(function(o){return o.e});
@@ -12180,13 +12180,13 @@ document.addEventListener('click',function(e){
 S.dgMsg='';S.dgBusy=false;
 function dlRead(lg){
   if(window.claude||typeof fetch!=='function'||S.dgBusy||!DL_LG[lg])return;
-  S.dgBusy=true;S.dgMsg='Looking for finished '+lgName(lg)+' games…';render();
+  S.dgBusy=true;S.dgMsg='Looking for finished '+lgName(lg)+' games…';softRender();
   var want={};try{(S.feed[lg]||[]).forEach(function(g){want[dlAb(lg,g.a)]=1;want[dlAb(lg,g.h)]=1})}catch(e){}
   var C=DL_LG[lg],now=new Date(),fd=function(d){return d.getFullYear()+('0'+(d.getMonth()+1)).slice(-2)+('0'+d.getDate()).slice(-2)};
   var st=C.start,a=new Date(+st.slice(0,4),+st.slice(4,6)-1,+st.slice(6,8)),wins=[];
   while(a<=now&&wins.length<80){wins.push(fd(a));a=new Date(a.getFullYear(),a.getMonth(),a.getDate()+1)}
   var base='https://site.api.espn.com/apis/site/v2/sports/'+ESPN[lg],errs=[],listed=0,done=[],read=0,bad=0,fail=0,http='';
-  var say=function(t){S.dgMsg=t;try{var ae=document.activeElement;if(!(ae&&ae.tagName==='INPUT')&&!S.sheet)render()}catch(e){}};
+  var say=function(t){S.dgMsg=t;softRender()};
   var sbAll=function(){var out=[],i=0;var nx=function(){var part=wins.slice(i,i+8);i+=8;if(!part.length)return Promise.resolve(out);return Promise.all(part.map(sb1)).then(function(r){r.forEach(function(x){out.push(x)});say('Looking for finished games… '+Math.min(i,wins.length)+' of '+wins.length+' days');return nx()})};return nx()};
   var sb1=function(w){
     var vs=lg==='ncaafb'?['&groups=80&limit=300','&groups=80','']:lg==='ncaamb'?['&groups=50&limit=300','&groups=50','']:['&limit=100','','&limit=400'],k=0;
@@ -12215,7 +12215,7 @@ function dlRead(lg){
       if(read){try{dlSave()}catch(e){}S.dlV++;_dlE=null}
       say(read+' of '+todo.length+' box scores saved'+(bad?'; '+bad+' had no usable player stats':'')+(fail?'; '+fail+' could not be loaded'+(http?' ('+http+')':''):'')+(errs.length&&!read?'. '+errs[0]:'')+'.');
     });
-  }).catch(function(e){say('Stopped: '+String(e&&e.message||e).slice(0,80))}).then(function(){S.dgBusy=false;render();if(S['dgMore_'+lg]&&(S.dgRep=(S.dgRep||0)+1)<=10)setTimeout(function(){try{dlRead(lg)}catch(e){}},3000)});
+  }).catch(function(e){say('Stopped: '+String(e&&e.message||e).slice(0,80))}).then(function(){S.dgBusy=false;doneRender();if(S['dgMore_'+lg]&&(S.dgRep=(S.dgRep||0)+1)<=10)setTimeout(function(){try{dlRead(lg)}catch(e){}},3000)});
 }
 var vBoard129=vBoard;
 vBoard=function(){
@@ -12538,7 +12538,7 @@ function gradeBest(lg,cat,r,o){
   if(!a||!b)return null;return a.sum>=b.sum?a:b;
 }
 function grWhy(g,n){
-  var pro=g.F.filter(function(x){return x.pts>=3}).sort(function(a,b){return b.pts-a.pts}).slice(0,n||3),con=g.F.filter(function(x){return x.pts<=-3}).sort(function(a,b){return a.pts-b.pts}).slice(0,2);
+  var pro=g.F.filter(function(x){return x.pts>=3&&x.k!=='Price'&&x.k!=='Confidence'}).sort(function(a,b){return b.pts-a.pts}).slice(0,n||3),con=g.F.filter(function(x){return x.pts<=-3}).sort(function(a,b){return a.pts-b.pts}).slice(0,2);
   return {pro:pro,con:con};
 }
 /* game pick grade */
@@ -13020,7 +13020,7 @@ function dtRead(lg,only,done){
   if(!only)T=T.slice(0,24);
   if(!T.length){if(done)done();return}
   S.dtBusy=true;var read=0,fail=0,doneT=0,base='https://site.api.espn.com/apis/site/v2/sports/'+ESPN[lg]+'/summary?event=';
-  var say=function(){S.dtMsg='Season stats, '+lgName(lg)+': '+doneT+' of '+T.length+' teams read, '+read+' games added'+(fail?' ('+fail+' failed)':'')+'.';try{var ae=document.activeElement;if(!(ae&&ae.tagName==='INPUT')&&!S.sheet)render()}catch(e){}};
+  var say=function(){S.dtMsg='Season stats, '+lgName(lg)+': '+doneT+' of '+T.length+' teams read, '+read+' games added'+(fail?' ('+fail+' failed)':'')+'.';softRender()};
   var one=function(t){
     S.dtTried[lg+'|'+t.k]=Date.now();
     return tmIdFor(lg,t.ab,t.name).then(function(id){return tmSched(lg,id)}).then(function(v){
@@ -13041,7 +13041,7 @@ function dtRead(lg,only,done){
   Promise.all([worker(),worker(),worker()]).then(function(){
     if(read){try{dlSave()}catch(e){}S.dlV++}
     S.dtMsg='Season stats, '+lgName(lg)+': '+T.length+' teams read, '+read+' games added'+(fail?' ('+fail+' failed)':'')+'.';
-  }).catch(function(){}).then(function(){S.dtBusy=false;try{render();if(S.sheet&&S.sheet.type==='fgame'||S.sheet)renderSheet()}catch(e){}if(done)done()});
+  }).catch(function(){}).then(function(){S.dtBusy=false;doneRender();if(done)done()});
 }
 /* all leagues, one after another, then again as new games appear */
 function dtAll(){
@@ -13552,7 +13552,7 @@ function secCut(h,title){
 }
 function secOf(h,title){return secCut(h,title).s}
 function prFactors(G,n){
-  var F=G.F.filter(function(f){return f.k!=='Price'&&f.k!=='Outside writers'&&f.txt});
+  var F=G.F.filter(function(f){return f.k!=='Price'&&f.k!=='Confidence'&&f.k!=='Outside writers'&&f.txt});
   var pro=F.filter(function(f){return f.pts>=2}).sort(function(a,b){return b.pts-a.pts}).slice(0,n||4),con=F.filter(function(f){return f.pts<=-2}).sort(function(a,b){return a.pts-b.pts}).slice(0,2);
   return {pro:pro,con:con};
 }
@@ -13626,6 +13626,33 @@ pbSheet=function(s){
   return h;
 };
 try{render()}catch(e){}
+
+
+/* v198: background reading never redraws the page while you are touching it; list notes fold away */
+var HB_LAST_TOUCH=0;
+['touchstart','touchmove','pointerdown','wheel'].forEach(function(ev){window.addEventListener(ev,function(){HB_LAST_TOUCH=Date.now()},{passive:true,capture:true})});
+window.addEventListener('scroll',function(){HB_LAST_TOUCH=Date.now()},{passive:true,capture:true});
+function softRender(){
+  try{var e=document.querySelectorAll('[data-rdmsg]');for(var i=0;i<e.length;i++)e[i].innerHTML=esc(S.dgMsg||'')+(S.dtMsg?'<br>'+esc(S.dtMsg):'')}catch(x){}
+}
+var _drT=null,_drN=0;
+function doneRender(){
+  clearTimeout(_drT);
+  if(Date.now()-HB_LAST_TOUCH<6000&&_drN<10){_drN++;_drT=setTimeout(doneRender,3000);return}
+  _drN=0;try{render();if(S.sheet)renderSheet()}catch(e){}
+}
+var vBoard152=vBoard;
+vBoard=function(){
+  var h=vBoard152.apply(this,arguments);
+  try{
+    var k=h.indexOf('aria-label="Show"');if(k<0)return h;
+    var e=h.indexOf('</div>',k)+6,rest=h.slice(e),m=/^(\s*<p class="src"[^>]*>[\s\S]*?<\/p>)+/.exec(rest);
+    if(!m)return h;
+    var seg=m[0].replace('<b>Game-log reader:</b> ','<b>Game-log reader:</b> <span data-rdmsg>').replace(/(<span data-rdmsg>[\s\S]*?)<\/p>/,'$1</span></p>');
+    h=h.slice(0,e)+'<details class="more" style="margin:6px 0 10px"><summary>About this list</summary>'+seg+'</details>'+rest.slice(m[0].length);
+  }catch(x){}
+  return h;
+};
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
