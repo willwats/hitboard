@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v204, Nov 8';
+var BUILD='v205, Nov 8';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -13740,6 +13740,77 @@ vBoard=function(){
     if(!thin&&!busy)card='';
     h=h.slice(0,e)+card+h.slice(e);
   }catch(x){}
+  return h;
+};
+try{render()}catch(e){}
+
+/* v205: grades never contradict (covering grades at least as high as winning outright) and parlays by kickoff slot */
+function gmItem(g,x){
+  var px=(g.dk&&g.dk.px)||{},ml=(g.dk&&g.dk.ml)||{};
+  if(!x.t||x.p==null)return null;
+  var pr=x.t==='sp'?(x.side==='h'?px.sh:px.sa):x.t==='tot'?(x.over?px.to:px.tu):(x.side==='h'?ml.h:ml.a),assumed=false;
+  if(pr==null||!isFinite(pr)){if(x.t==='ml')return null;pr=-110;assumed=true}
+  return {g:g,x:x,pr:pr,assumed:assumed,edge:x.p-amBe(pr)};
+}
+var gradeGame154=gradeGame;
+gradeGame=function(i){
+  var G=gradeGame154(i);
+  try{
+    if(G&&!G.monoDone&&(i.x.t==='sp'||i.x.t==='ml')){
+      G.monoDone=true;
+      var b=picksFor(i.g)||[],sib=b.filter(function(y){return (y.t==='sp'||y.t==='ml')&&y.t!==i.x.t&&y.side===i.x.side})[0];
+      if(sib&&sib.p!=null&&sib.p<i.x.p){
+        var it=gmItem(i.g,sib),G2=it&&gradeGame154(it);
+        if(G2&&G2.sum>G.sum){G.F.push({k:'Consistency',pts:G2.sum-G.sum,txt:'Covering is the easier bet, so it grades at least as high as the other bet on the same team'});G.sum=G2.sum;G.letter=grLetter(G.sum)}
+      }
+    }
+  }catch(e){}
+  return G;
+};
+/* parlays by kickoff slot */
+function slParlays(lg){
+  var now=Date.now(),lim=now+(lg==='nfl'?8:3)*864e5,slots={},order=[];
+  (S.feed[lg]||[]).filter(function(g){return kind(g)==='up'&&g.start>now&&g.start<lim}).sort(function(a,b){return a.start-b.start}).forEach(function(g){
+    var k=gTime(g);if(!slots[k]){slots[k]=[];order.push(k)}slots[k].push(g)});
+  var out='';
+  order.forEach(function(k){
+    var gs=slots[k],legs=[];
+    gs.forEach(function(g){
+      var best=null,bets=[];try{bets=picksFor(g)||[]}catch(e){}
+      bets.forEach(function(x){var it=gmItem(g,x);if(!it)return;var G=null;try{G=gradeGame(it)}catch(e){}if(!G)return;
+        if(!best||G.sum>best.sum)best={sum:G.sum,letter:G.letter,g:g,label:x.pick,sub:(x.t==='sp'?'Spread':x.t==='tot'?'Total':'Moneyline'),pr:it.assumed?null:it.pr,p:x.p,game:true}});
+      try{gpRows(g).slice(0,3).forEach(function(o){var G=o.gr;if(!G)return;
+        if(!best||G.sum>best.sum+4)best={sum:G.sum,letter:G.letter,g:g,label:o.r.n+' '+G.dir+' '+(o.ln&&o.ln.v!=null?o.ln.v:'')+' '+bkCatLabel(lg,o.cat).toLowerCase(),sub:'Player prop',pr:null,p:null,game:false}})}catch(e){}
+      if(best&&best.sum>=8)legs.push(best);
+    });
+    legs.sort(function(a,b){return b.sum-a.sum});
+    var head='<h3 style="margin-top:14px">'+esc(lgName(lg))+' · '+esc(k)+' <span class="src">'+gs.length+' game'+(gs.length>1?'s':'')+'</span></h3>';
+    if(gs.length<2){out+=head+'<p class="src" style="margin:0 0 8px">Only one game in this slot. A same-game parlay is in that game’s window.</p>';return}
+    if(legs.length<2){out+=head+'<p class="src" style="margin:0 0 8px">No two legs grade B- or better in this slot, so no parlay is suggested.</p>';return}
+    var tiers=[['Safer',2],['Standard',3],['Reach',4]],h='',used={};
+    tiers.forEach(function(t){
+      if(legs.length<t[1]||used[t[1]])return;used[t[1]]=1;
+      var L=legs.slice(0,t[1]),dec=1,pp=1,all=true,allP=true;
+      L.forEach(function(l){if(l.pr!=null&&isFinite(l.pr))dec*=l.pr>0?1+l.pr/100:1+100/-l.pr;else all=false;if(l.p!=null)pp*=l.p;else allP=false});
+      h+='<div class="card" style="padding:10px 12px;margin-bottom:8px"><div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><b>'+t[0]+' · '+t[1]+' legs</b>'+(all?'<span><b>'+fmtAm(amFromDec(dec))+'</b> <span class="src">combined price</span></span>':'')+'</div>'+
+        L.map(function(l,j){return '<div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline;margin-top:6px"><span>'+(j+1)+'. <b>'+esc(l.label)+'</b> <span class="src">'+esc(l.sub)+' · '+esc(l.g.a+' @ '+l.g.h)+(l.pr!=null?' · '+fmtAm(l.pr):'')+'</span></span>'+grPill(l.letter)+'</div>'}).join('')+
+        (allP?'<div class="src" style="margin-top:6px">About '+Math.round(pp*100)+'% to hit all legs, treating the games as separate</div>':'<div class="src" style="margin-top:6px">Player legs have no price here. Check your book for the combined price.</div>')+'</div>';
+    });
+    out+=head+h;
+  });
+  if(!out)return '';
+  return '<h3>Parlays by kickoff</h3><p class="src" style="margin:0 0 8px">For each kickoff time, the best leg from each game in that slot, one leg per game so the legs do not depend on each other. Legs are graded the same way as the picks above. Longer parlays hit far less often.</p>'+out;
+}
+var vPicks154=vPicks2;
+vPicks2=function(){
+  var h=vPicks154.apply(this,arguments);
+  try{
+    var sel=S.pks==='all'?['nfl','ncaafb']:(S.pks==='nfl'||S.pks==='ncaafb')?[S.pks]:[];
+    if(!sel.length)return h;
+    var sec=grCache('slp|'+S.pks,function(){return sel.map(slParlays).join('')});
+    if(!sec)return h;
+    var i=h.indexOf('<h3>Player angles</h3>');h=i>=0?h.slice(0,i)+sec+h.slice(i):h+sec;
+  }catch(e){}
   return h;
 };
 try{render()}catch(e){}
