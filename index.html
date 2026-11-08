@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v208, Nov 8';
+var BUILD='v209, Nov 8';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -13292,11 +13292,12 @@ vBoard=function(){
     var i=h.indexOf('aria-label="Stat"');
     if(i>=0){
       var j=h.indexOf('</div>',i);
-      var chip='<button class="chip" data-act="set" data-k="bc" data-v="atd" aria-pressed="'+(S.bc==='atd')+'">Anytime TD</button>';
+      var chip='<button class="chip" data-act="set" data-k="bc" data-v="atd" aria-pressed="'+(S.bc==='atd')+'">Anytime TD</button><button class="chip" data-act="set" data-k="bc" data-v="parl" aria-pressed="'+(S.bc==='parl')+'">Parlays</button>';
       var grp=h.slice(i,j);
-      if(S.bc==='atd')grp=grp.replace(/aria-pressed="true"/g,'aria-pressed="false"');
+      if(S.bc==='atd'||S.bc==='parl')grp=grp.replace(/aria-pressed="true"/g,'aria-pressed="false"');
       var head=h.slice(0,i)+grp+chip+'</div>';
       if(S.bc==='atd')return head+vAtd(lg)+foot();
+      if(S.bc==='parl')return head+vParl(lg)+foot();
       return head+h.slice(j+6);
     }
   }catch(e){}
@@ -13855,8 +13856,20 @@ function slParlays(lg){
   if(!out)return '';
   return '<h3>Parlays by kickoff</h3><p class="src" style="margin:0 0 8px">For each kickoff time, the best leg from each game in that slot, one leg per game so the legs do not depend on each other. Legs are graded the same way as the game picks and props. Longer parlays hit far less often.</p>'+out;
 }
+function vParl(lg){
+  var now=Date.now(),lim=now+(lg==='nfl'?8:3)*864e5,slots={},order=[],out='';
+  (S.feed[lg]||[]).filter(function(g){return kind(g)==='up'&&g.start>now&&g.start<lim}).sort(function(a,b){return a.start-b.start}).forEach(function(g){var k=gTime(g);if(!slots[k]){slots[k]=[];order.push(k)}slots[k].push(g)});
+  order.forEach(function(k){
+    var gs=slots[k],p=grCache('slpp|'+lg+'|'+k,function(){return slPropParlay(lg,gs)});
+    out+='<h3 style="margin-top:14px">'+esc(k)+' <span class="src">'+gs.length+' game'+(gs.length>1?'s':'')+'</span></h3>'+(p||'<p class="src" style="margin:0 0 8px">Not enough graded player props in this slot yet.</p>');
+  });
+  return '<p class="src" style="margin:4px 0 10px">The best player props in each kickoff window, graded the same way as the props board. One prop per game first, so the legs do not depend on each other. Longer parlays hit far less often. The '+(lg==='nfl'?'next 8 days':'next 3 days')+' are shown.</p>'+(out||'<div class="card empty">No '+esc(lgName(lg))+' games with enough props in the window yet.</div>');
+}
 var vPicks154=vPicks2;
 vPicks2=function(){
+  return vPicks154.apply(this,arguments);
+};
+var vPicks154x=function(){
   var h=vPicks154.apply(this,arguments);
   try{
     var v=S.pkv==='parlays'?'parlays':'picks',tabs='<div class="chips" role="group" aria-label="View"><button class="chip" data-act="set" data-k="pkv" data-v="picks" aria-pressed="'+(v==='picks')+'">Picks</button><button class="chip" data-act="set" data-k="pkv" data-v="parlays" aria-pressed="'+(v==='parlays')+'">Parlays</button></div>';
