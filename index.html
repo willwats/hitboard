@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v191, Nov 7';
+var BUILD='v192, Nov 7';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -13091,15 +13091,15 @@ function atdLeague(lg,i){
   var n=0,s=0,T={};Object.keys(S.dlog).forEach(function(k){var g=S.dlog[k];if(g.lg!==lg||!g.s)return;g.s.forEach(function(sd){var t=0,ok=false;Object.keys(sd.p).forEach(function(nm){var v=sd.p[nm][i];if(v!=null){t+=v;ok=true}});if(ok){s+=t;n++}})});
   return n>=20?s/n:null;
 }
-function atdRows(g){
+function atdRows(g,pre){
   var lg=g.lg,Y=ATD_Y[lg];if(!Y)return [];
   var cats=lg==='nfl'?{rush:'rush',rec:'rec'}:{rush:'crush',rec:'crec'},C=DL_LG[lg];
   var ab=function(x){return lg==='nfl'?nt(String(x||'').toUpperCase()):dlAb(lg,x)},ta=ab(g.a),th=ab(g.h);
   var env={},m=null;try{m=pickModel(g);var L=m&&m.ln&&m.ln.pts!=null?m.mk:0,ps=m&&m.M!=null?predScore(g,m,L,'a','h'):null;if(ps){env[th]=Math.max(.8,Math.min(1.3,ps.h/Y.avg));env[ta]=Math.max(.8,Math.min(1.3,ps.a/Y.avg))}}catch(e){}
-  SP_ONLY={};SP_ONLY[ta]=1;SP_ONLY[th]=1;
+  if(!pre){SP_ONLY={};SP_ONLY[ta]=1;SP_ONLY[th]=1}
   var P={};
   try{['rush','rec'].forEach(function(k){
-    var cat=cats[k];pbRows(lg,cat).forEach(function(o){
+    var cat=cats[k];(pre?pre[k]:pbRows(lg,cat)).forEach(function(o){
       var t=ab(o.r.t);if(t!==ta&&t!==th)return;
       var nk=normName(o.r.n),e=P[nk]=P[nk]||{n:o.r.n,t:t,team:o.r.t,pos:o.r.pos||'',lam:0,why:[],opp:t===ta?th:ta,ys:{}};
       var lam=(o.r.proj||0)/Y[k];e.lam+=lam;e.ys[k]=o.r.proj||0;
@@ -13212,6 +13212,70 @@ vResults=function(){
       t+='<div class="tblwrap"><table><thead><tr><th>Predicted chance</th><th>Picks</th><th>Predicted</th><th>Scored</th></tr></thead><tbody>'+B.map(function(b){var E=D.filter(function(x){return b[1](x.p)});if(!E.length)return '';var w=E.filter(function(x){return x.res==='W'}).length,ap=E.reduce(function(s,x){return s+x.p},0)/E.length;return '<tr><td>'+b[0]+'</td><td>'+E.length+'</td><td>'+Math.round(ap*100)+'%</td><td>'+Math.round(100*w/E.length)+'%</td></tr>'}).join('')+'</tbody></table></div><p class="src">If the model is right, the “Scored” column should land near “Predicted”. It needs a few dozen picks per row to mean much.</p>';
     }
     var i=h.indexOf('<h3>Game picks</h3>');h=i>=0?h.slice(0,i)+t+h.slice(i):h+t;
+  }catch(e){}
+  return h;
+};
+try{render()}catch(e){}
+
+/* v192: Anytime TD chip on the Props board, grouped by matchup */
+function atdMatch(g){
+  try{
+    var lg=g.lg,C=DL_LG[lg],cats=lg==='nfl'?{rush:'rush',rec:'rec'}:{rush:'crush',rec:'crec'},ab=function(x){return lg==='nfl'?nt(String(x||'').toUpperCase()):dlAb(lg,x)};
+    var out=[];
+    [['rush','rushing'],['rec','receiving']].forEach(function(kk){
+      var i=C.ix[cats[kk[0]]],lgA=atdLeague(lg,i),AL=mbAllow(lg,i);if(!lgA)return;
+      [[g.a,g.h],[g.h,g.a]].forEach(function(s){
+        var t=ab(s[0]),o=ab(s[1]),ao=atdTeamAvg(lg,t,i),b=AL.by[o];if(ao==null||!b||b.n<3)return;
+        var al=b.s/b.n;
+        out.push(s[0]+' '+kk[1]+' '+Math.round(ao)+' yds a game ('+(ao>=lgA*1.08?'strong':ao<=lgA*.92?'weak':'average')+') vs '+s[1]+' allows '+Math.round(al)+' ('+(al>=lgA*1.05?'soft':al<=lgA*.95?'tough':'average')+')');
+      });
+    });
+    return out;
+  }catch(e){return []}
+}
+var _atdSlate={k:'',v:null};
+function atdSlate(lg){
+  var k=lg+'|'+S.dlV+'|'+Math.floor(Date.now()/120000)+'|'+(S.feed[lg]||[]).length;
+  if(_atdSlate.k===k)return _atdSlate.v;
+  var now=Date.now(),cats=lg==='nfl'?{rush:'rush',rec:'rec'}:{rush:'crush',rec:'crec'};
+  var G=(S.feed[lg]||[]).filter(function(g){return kind(g)==='up'&&g.start>now&&g.start<now+SLATE_MS}).sort(function(a,b){return a.start-b.start});
+  var pre={rush:[],rec:[]};try{pre.rush=pbRows(lg,cats.rush);pre.rec=pbRows(lg,cats.rec)}catch(e){}
+  var out=G.map(function(g){var R=[];try{R=atdRows(g,pre)}catch(e){}return {g:g,R:R,M:atdMatch(g)}});
+  _atdSlate={k:k,v:out};return out;
+}
+function vAtd(lg){
+  var S0=atdSlate(lg),n0=+(S.atdN||12),rec={};ATD.forEach(function(x){rec[x.k]=x});
+  var h='<p class="src" style="margin:4px 0 10px">Who is most likely to score in each matchup. The chance comes from the yards the app expects each player to gain against that defense, turned into a touchdown rate. “Fair price” is what that chance is worth in odds. ESPN has no sportsbook touchdown prices, so compare it with your book. Tap a game for the full window.</p>';
+  if(!S0.length)return h+'<div class="card empty">No '+esc(lgName(lg))+' games in the next 8 days.</div>';
+  var withP=S0.filter(function(x){return x.R.length}).length;
+  h+='<p class="src" style="margin:0 0 8px">Touchdown estimates for <b>'+withP+' of '+S0.length+'</b> games.'+(withP<S0.length?' The rest need more box scores, which the app keeps reading in the background.':'')+(S.dtMsg?' '+esc(S.dtMsg):'')+'</p>';
+  h+=S0.slice(0,n0).map(function(x){
+    var g=x.g;try{atdRecord(g)}catch(e){}
+    var body=x.R.length?x.R.slice(0,5).map(function(r){
+      var q=rec[r.k],st=q&&q.res?(q.res==='W'?'Scored':q.res==='L'?'No TD':'Did not play'):'',tone=st==='Scored'?'good':st==='No TD'?'warn':'';
+      return '<div style="padding:6px 0;border-top:1px solid var(--line)"><div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><span><b>'+esc(r.n)+'</b> <span class="src">'+esc(r.t)+(r.pos?' · '+esc(r.pos):'')+'</span></span><span><b>'+Math.round(r.p*100)+'%</b> <span class="src">fair '+atdOdds(r.p)+'</span>'+(st?' <span class="tag '+tone+'" style="font-size:10px;padding:1px 6px">'+st+'</span>':'')+'</span></div>'+(r.why.length?'<div class="src" style="margin-top:2px">'+esc(r.why[0])+'</div>':'')+'</div>'}).join(''):'<p class="src" style="margin:6px 0 0">No estimates yet. Reading these teams’ seasons…</p>';
+    return '<div class="card" style="margin-bottom:8px;padding:10px 12px"><div data-act="fgame" data-id="'+esc(g.id)+'" style="cursor:pointer"><b>'+esc(g.an||g.a)+' @ '+esc(g.hn||g.h)+'</b> <span class="src">'+esc(gTime(g))+'</span>'+
+      (x.M.length?'<div class="src" style="margin-top:3px">'+x.M.map(esc).join('<br>')+'</div>':'')+'</div>'+body+'</div>';
+  }).join('');
+  if(S0.length>n0)h+='<p style="text-align:center"><button class="btn" data-act="set" data-k="atdN" data-v="'+(n0+12)+'">Show more games ('+(S0.length-n0)+')</button></p>';
+  return h;
+}
+var vBoard147=vBoard;
+vBoard=function(){
+  var lg=S.sport,fb=lg==='nfl'||lg==='ncaafb';
+  var h=vBoard147();
+  if(!fb)return h;
+  try{
+    var i=h.indexOf('aria-label="Stat"');
+    if(i>=0){
+      var j=h.indexOf('</div>',i);
+      var chip='<button class="chip" data-act="set" data-k="bc" data-v="atd" aria-pressed="'+(S.bc==='atd')+'">Anytime TD</button>';
+      var grp=h.slice(i,j);
+      if(S.bc==='atd')grp=grp.replace(/aria-pressed="true"/g,'aria-pressed="false"');
+      var head=h.slice(0,i)+grp+chip+'</div>';
+      if(S.bc==='atd')return head+vAtd(lg)+foot();
+      return head+h.slice(j+6);
+    }
   }catch(e){}
   return h;
 };
