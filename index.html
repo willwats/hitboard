@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v195, Nov 8';
+var BUILD='v196, Nov 8';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -4929,7 +4929,7 @@ function snapLines(){
   if(ch)saveLines();
 }
 function homeSp(s){return s.pts==null?null:(s.pts===0?0:(s.fav==='h'?-s.pts:s.pts))}
-function lineMoveHtml(g){
+function lineMoveHtml0(g){
   var L=S.lines[g.id],h='<h3>Line movement</h3>';
   var cur=null;try{cur=lineFor(g)}catch(e){}
   if(!L||!L.first){return h+'<p class="note" style="margin-top:0">'+(cur?'Current: '+esc(cur.sp)+', total '+esc(cur.tot)+', moneyline '+esc(cur.ml)+'. '+esc(cur.srcTxt)+' The app saves each line the first time it sees it and updates it every time you open it, so movement shows from your next visit.':'No DraftKings or Kalshi line yet for this game.')+'</p>'}
@@ -5932,10 +5932,10 @@ function propSheetHtml(lg){
   var it=propItems(lg);S.hbProps=it;
   var h='<h3>Prop sheet, next 36 hours</h3>';
   if(!it.length)return h+'<p class="note" style="margin-top:0">No '+esc(lgName(lg))+' props to suggest right now. They appear once the day’s games and player data are loaded.</p>';
-  h+='<p class="src" style="margin-top:0">The app’s highest-chance props, ranked after weighting for sample size. The app does not see prop prices, so compare each with your DraftKings price: the fair price is shown. Bet it only if DraftKings pays at least that.</p>';
+  h+='<p class="src" style="margin-top:0">The app’s highest-chance props, ranked after weighting for sample size. The app does not see prop prices, so these are chances only.</p>';
   h+=it.map(function(o,i){var b=o.b,r=b.rec,done=S.mine.some(function(m){return m.type==='rprop'&&m.gid===r.gid&&normName(m.player)===normName(r.name)&&m.k===r.k&&m.thr===r.thr});
     return '<div class="card" data-act="prof" data-n="'+esc(r.name)+'" data-lg="'+esc(r.lg||o.g.lg)+'" data-team="'+esc(teamOfName(r.lg||o.g.lg,r.name))+'" style="margin-bottom:8px;cursor:pointer"><div class="r" style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><div><b>'+esc(b.title)+'</b></div>'+hbPill(Math.round(b.p*100)+'%','hi')+'</div>'+
-      '<div class="src">'+esc(b.sub)+' · '+esc(gTime(o.g))+'</div><div class="src">Fair price '+fmtAm(fairAm(b.p))+' · bet it if DraftKings pays '+fmtAm(fairAm(b.p))+' or better</div>'+
+      '<div class="src">'+esc(b.sub)+' · '+esc(gTime(o.g))+'</div>'+
       '</div>';
   }).join('');
   return h;
@@ -6397,7 +6397,7 @@ function gamesBest(lg){
   var pr=[];try{if(lg==='all'){TD_LG.forEach(function(L){pr=pr.concat(propItems(L))});pr.sort(function(a,b){return b.sc-a.sc});pr=pr.slice(0,5)}else pr=propItems(lg).slice(0,5);pr=pr.filter(function(o){return T.ok(o.g)})}catch(e){}
   h+='<div class="card" style="margin-top:8px"><div class="src" style="margin:0 0 6px"><b>Best player props</b>, after weighting for sample size. Tap a player for stats and splits.</div>';
   if(!pr.length)h+='<p class="src" style="margin:0">No props to suggest for '+when+' yet. They appear once those games and player data load.</p>';
-  else h+=pr.map(function(o){var b=o.b;var rr=b.rec||{};return '<div data-act="prof" data-n="'+esc(rr.name||'')+'" data-lg="'+esc(rr.lg||o.g.lg)+'" data-team="'+esc(teamOfName(rr.lg||o.g.lg,rr.name||''))+'" style="padding:8px 0;border-top:1px solid var(--line);cursor:pointer"><div class="r" style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><div><b>'+esc(b.title)+'</b></div>'+hbPill(Math.round(b.p*100)+'%','hi')+'</div><div class="src">'+esc(b.sub)+' · '+esc(gTime(o.g))+'</div><div class="src">Fair price '+fmtAm(fairAm(b.p))+'. Bet it only if DraftKings pays that or better.</div></div>'}).join('');
+  else h+=pr.map(function(o){var b=o.b;var rr=b.rec||{};return '<div data-act="prof" data-n="'+esc(rr.name||'')+'" data-lg="'+esc(rr.lg||o.g.lg)+'" data-team="'+esc(teamOfName(rr.lg||o.g.lg,rr.name||''))+'" style="padding:8px 0;border-top:1px solid var(--line);cursor:pointer"><div class="r" style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><div><b>'+esc(b.title)+'</b></div>'+hbPill(Math.round(b.p*100)+'%','hi')+'</div><div class="src">'+esc(b.sub)+' · '+esc(gTime(o.g))+'</div></div>'}).join('');
   h+='</div><div class="actions" style="margin-top:8px"><button class="btn" data-act="hbgo" data-lg="'+lg+'" data-m="sp">All '+esc(name)+' picks</button><button class="btn" data-act="hbgo" data-lg="'+lg+'" data-m="props">Prop sheet</button></div>';
   return h;
 }
@@ -6597,7 +6597,6 @@ var vToday0=vToday;
 vToday=function(){
   var h=vToday0(),g='<h3>What the words mean</h3><div class="card"><details><summary>Open the glossary</summary><ul class="pts" style="margin-top:8px">'+
     '<li><b>Edge:</b> the model’s chance minus the chance the price needs. +3% means the model thinks the bet wins 3 points more often than the price requires.</li>'+
-    '<li><b>Fair price:</b> the odds that match the model’s chance. If your book pays better, the prop has an edge on the model’s numbers.</li>'+
     '<li><b>Closing line:</b> the last number before kickoff. Beating it is the best sign of a real edge.</li>'+
     '<li><b>Hit rate:</b> how often a player cleared a line in recent games. Over 5 games it is noisy, so it is marked thin.</li>'+
     '<li><b>Splits:</b> the same stat for home or away, rested or back-to-back, and against this opponent.</li>'+
@@ -7935,7 +7934,7 @@ function pickBlock(g){
   var head=pk+' '+sgnPts(lineForPick)+' covers';
   var Mf=fav==='h'?m.M:-m.M,sub,ps0=predScore(g,m,L,na,nh);
   var scTxt=ps0?(ps0.h>=ps0.a?esc(nh)+' '+hbF0(ps0.h)+', '+esc(na)+' '+hbF0(ps0.a):esc(na)+' '+hbF0(ps0.a)+', '+esc(nh)+' '+hbF0(ps0.h)):'';
-  sub='<b>My predicted score, from the two teams alone: '+scTxt+'.</b> ';
+  sub='';
   if(pickSide===fav)sub+=esc(pk)+' wins by about '+hbF0(Math.abs(Mf))+', more than the '+big+' it needs, so it covers.';
   else if(Mf>0)sub+=esc(favN)+' wins by about '+hbF0(Mf)+', which is less than the '+big+' it has to win by, so '+esc(pk)+' covers.';
   else sub+=esc(pk)+' wins the game outright, so it covers.';
@@ -7955,7 +7954,7 @@ function pickBlock(g){
   }
   if(m.sa!=null){
     var Pn=m.T&&!m.T.missing?m.T:null,eA=m.sa,eH=m.sh;
-    why.push('From the teams alone I expect '+esc(na)+' to score about '+hbF0(eA)+' and '+esc(nh)+' about '+hbF0(eH)+'. '+(Rf&&Rd?esc(favN)+' averages '+hbF1(Rf.pf)+' and '+esc(dogN)+' allows '+hbF1(Rd.pa)+'; '+esc(dogN)+' averages '+hbF1(Rd.pf)+' and '+esc(favN)+' allows '+hbF1(Rf.pa)+'.':''));
+    if(Rf&&Rd)why.push((Rf&&Rd?esc(favN)+' averages '+hbF1(Rf.pf)+' and '+esc(dogN)+' allows '+hbF1(Rd.pa)+'; '+esc(dogN)+' averages '+hbF1(Rd.pf)+' and '+esc(favN)+' allows '+hbF1(Rf.pa)+'.':''));
     var ltm=US_BM[g.lg]?US_BM[g.lg].pts*2:null;
     if(ltm&&m.tot!=null&&m.tot<=ltm-8)why.push('My numbers point to a lower-scoring game than usual (about '+hbF0(m.tot)+' combined, a typical game is '+ltm+'). Fewer possessions means fewer points for either side to run away with.');
     if(ltm&&m.tot!=null&&m.tot>=ltm+8)why.push('My numbers point to a high-scoring game (about '+hbF0(m.tot)+' combined, a typical game is '+ltm+'). More possessions give the better team room to pull away.');
@@ -8022,7 +8021,7 @@ function pickBlock(g){
   h+='<h3>Total and winner</h3><ul class="pts" style="margin-top:2px">'+tl.join('')+'</ul>';
   var hTot=h;h='';
   var hTopOnly=hTop0;
-  h=hTopOnly+hbFold('Team strengths and weaknesses',hTeams)+hbFold('How I expect it to play out',hFlow,false,true)+hbFold('What analysts are saying',hAround.replace(/^<h3>.*?<\/h3>/,''),ex&&ex.rel==='split')+hbFold('Total, winner and risks',hTot+hRisk);
+  h=hTopOnly+hbFold('Team strengths and weaknesses',hTeams)+hbFold('How I expect it to play out',hFlow,false,true)+hbFold('What analysts are saying',hAround.replace(/^<h3>.*?<\/h3>/,''),ex&&ex.rel==='split');
   if(loading&&!m.ph)h+='<p class="src">Pulling each team’s recent games for the run and pass breakdown. This fills in on its own.</p>';
   return h;
 }
@@ -8266,7 +8265,7 @@ function atdWhy(o){
 }
 function atdRow(o,showGame){
   var g=o.g;
-  return '<div data-act="prof" data-n="'+esc(o.n)+'" data-lg="ncaafb" data-team="'+esc(o.t)+'" style="padding:8px 0;border-top:1px solid var(--line);cursor:pointer"><div class="r" style="display:flex;justify-content:space-between;gap:8px;align-items:center"><div><b>'+esc(o.n)+'</b> <span class="src">'+esc(o.t)+'</span><div class="src">'+esc(atdWhy(o))+(showGame?' · '+esc(g.a+' @ '+g.h)+' · '+esc(gTime(g)):'')+'</div><div class="src">Fair price '+fmtAm(fairAm(o.p))+' · worth it if your book pays that or better</div></div><span style="font-size:26px;font-weight:700;line-height:1">'+esc(o.gr)+'</span></div></div>';
+  return '<div data-act="prof" data-n="'+esc(o.n)+'" data-lg="ncaafb" data-team="'+esc(o.t)+'" style="padding:8px 0;border-top:1px solid var(--line);cursor:pointer"><div class="r" style="display:flex;justify-content:space-between;gap:8px;align-items:center"><div><b>'+esc(o.n)+'</b> <span class="src">'+esc(o.t)+'</span><div class="src">'+esc(atdWhy(o))+(showGame?' · '+esc(g.a+' @ '+g.h)+' · '+esc(gTime(g)):'')+'</div></div><span style="font-size:26px;font-weight:700;line-height:1">'+esc(o.gr)+'</span></div></div>';
 }
 function atdHtml(g){
   if(g.lg!=='ncaafb'||kind(g)!=='up')return '';
@@ -9025,7 +9024,7 @@ function pmSheet(s){
   bl.forEach(function(b){h+=pmBlockHtml(b)});
   if(s.lg==='ncaafb'&&g){
     try{var td=atdGame(g).filter(function(o){return normName(o.n)===normName(s.n)})[0];
-      if(td)h+='<h3>Anytime touchdown</h3><div class="card"><p style="margin:0">Grade <b>'+esc(td.gr)+'</b>. '+esc(atdWhy(td))+', adjusted for how many points his team is expected to score. Fair price '+fmtAm(fairAm(td.p))+'.</p></div>'}catch(e){}
+      if(td)h+='<h3>Anytime touchdown</h3><div class="card"><p style="margin:0">Grade <b>'+esc(td.gr)+'</b>. '+esc(atdWhy(td))+', adjusted for how many points his team is expected to score.</p></div>'}catch(e){}
   }
   h+='<div class="actions" style="margin-top:12px"><button class="btn" data-act="prof" data-full="1" data-n="'+esc(s.n)+'" data-lg="'+esc(s.lg)+'" data-team="'+esc(s.team)+'">Game log, splits and charts</button></div>';
   return h+'<p class="foot">Chances are estimates from his season numbers, the defense he faces and the game. They are not sportsbook lines.</p>';
@@ -9097,7 +9096,7 @@ function atdWhyLong(o){
 }
 function atdRow(o,showGame){
   var g=o.g;
-  return '<div data-act="prof" data-n="'+esc(o.n)+'" data-lg="ncaafb" data-team="'+esc(o.t)+'" style="padding:8px 0;border-top:1px solid var(--line);cursor:pointer"><div class="r" style="display:flex;justify-content:space-between;gap:8px;align-items:center"><div><b>'+esc(o.n)+'</b> <span class="src">'+esc(o.t)+'</span>'+(showGame?'<div class="src">'+esc(g.a+' @ '+g.h)+' · '+esc(gTime(g))+'</div>':'')+'<div class="src"><b>I predict he scores:</b> about a '+Math.round(o.p*100)+'% chance.</div><div class="src">'+esc(atdWhyLong(o))+'</div><div class="src">Fair price '+fmtAm(fairAm(o.p))+' · worth it if your book pays that or better</div></div><span style="font-size:26px;font-weight:700;line-height:1">'+esc(o.gr)+'</span></div></div>';
+  return '<div data-act="prof" data-n="'+esc(o.n)+'" data-lg="ncaafb" data-team="'+esc(o.t)+'" style="padding:8px 0;border-top:1px solid var(--line);cursor:pointer"><div class="r" style="display:flex;justify-content:space-between;gap:8px;align-items:center"><div><b>'+esc(o.n)+'</b> <span class="src">'+esc(o.t)+'</span>'+(showGame?'<div class="src">'+esc(g.a+' @ '+g.h)+' · '+esc(gTime(g))+'</div>':'')+'<div class="src"><b>I predict he scores:</b> about a '+Math.round(o.p*100)+'% chance.</div><div class="src">'+esc(atdWhyLong(o))+'</div></div><span style="font-size:26px;font-weight:700;line-height:1">'+esc(o.gr)+'</span></div></div>';
 }
 var pmSheet87=pmSheet;
 pmSheet=function(s){
@@ -9105,7 +9104,7 @@ pmSheet=function(s){
   try{
     var bl=pmBlocks(s.lg,s.n,s.team),g=bl[0]&&bl[0].p&&bl[0].p.g1;
     if(s.lg==='ncaafb'&&g){var td=atdGame(g).filter(function(o){return normName(o.n)===normName(s.n)})[0];
-      if(td){var i=h.indexOf('<h3>Anytime touchdown</h3>');if(i>=0){var j=h.indexOf('</div>',i)+6;h=h.slice(0,i)+'<h3>Anytime touchdown</h3><div class="card"><div class="label">My prediction</div><div class="teams" style="font-size:22px">About a '+Math.round(td.p*100)+'% chance to score · grade '+esc(td.gr)+'</div><p style="margin:4px 0 0;line-height:1.5">'+esc(atdWhyLong(td))+' Fair price '+fmtAm(fairAm(td.p))+'.</p></div>'+h.slice(j)}}}
+      if(td){var i=h.indexOf('<h3>Anytime touchdown</h3>');if(i>=0){var j=h.indexOf('</div>',i)+6;h=h.slice(0,i)+'<h3>Anytime touchdown</h3><div class="card"><div class="label">My prediction</div><div class="teams" style="font-size:22px">About a '+Math.round(td.p*100)+'% chance to score · grade '+esc(td.gr)+'</div><p style="margin:4px 0 0;line-height:1.5">'+esc(atdWhyLong(td))+'</p></div>'+h.slice(j)}}}
   }catch(e){}
   return h;
 };
@@ -9141,7 +9140,7 @@ function ntdInfo(r){
 }
 function tdRow(r,showGm){
   var o={};try{o=ntdInfo(r)}catch(e){}
-  var x=o.p!=null?'<div class="src" style="margin-top:4px;line-height:1.45"><b>I predict he scores:</b> about a '+Math.round(o.p*100)+'% chance · grade '+esc(o.gr)+'. '+esc(o.why)+' Fair price '+fmtAm(fairAm(o.p))+'.</div>':'';
+  var x=o.p!=null?'<div class="src" style="margin-top:4px;line-height:1.45"><b>I predict he scores:</b> about a '+Math.round(o.p*100)+'% chance · grade '+esc(o.gr)+'. '+esc(o.why)+'</div>':'';
   return '<tr><td><button class="pxname" data-act="prof" data-n="'+esc(r.n)+'" data-lg="nfl" data-team="'+esc(r.t)+'">'+esc(r.n)+'</button>'+badge(r.n,r.t)+' <span class="src">'+r.t+(showGm?' · '+r.gm:'')+'</span><br><span class="src">'+esc(matchTxt(r.t))+'</span>'+x+'</td><td><span class="hrpill '+(r.h>=6?'hi':r.h<=2?'lo':'mid')+'">'+r.h*10+'% ('+r.h+'/10)</span></td><td>'+(r.td==null?'—':r.td)+'</td></tr>';
 }
 
@@ -9247,8 +9246,8 @@ function kkSheet(s){
   if(nx)h+='<p class="src" style="margin:0 0 6px">'+esc(nx.txt)+'</p>';
   var fgG=k.fm/k.g*c.adj;
   h+='<div class="card"><div class="label">My prediction</div><div class="teams" style="font-size:22px">About '+fgG.toFixed(1)+' field goals · '+pr.pts.toFixed(1)+' points</div>';
-  h+='<div class="tblwrap" style="margin-top:8px"><table><thead><tr><th>Prop</th><th>Chance</th><th>Fair price</th></tr></thead><tbody>'+
-   [['1+ field goal',pr.p1],['2+ field goals',pr.p2],['3+ field goals',pr.p3],['7+ points',pr.p7],['9+ points',pr.p9]].map(function(r){return '<tr><td>'+r[0]+'</td><td><span class="hrpill '+(r[1]>=.7?'hi':r[1]<.4?'lo':'mid')+'" style="display:inline-block">'+Math.round(r[1]*100)+'%</span></td><td>'+fmtAm(fairAm(Math.min(.99,Math.max(.01,r[1]))))+'</td></tr>'}).join('')+'</tbody></table></div></div>';
+  h+='<div class="tblwrap" style="margin-top:8px"><table><thead><tr><th>Prop</th><th>Chance</th></tr></thead><tbody>'+
+   [['1+ field goal',pr.p1],['2+ field goals',pr.p2],['3+ field goals',pr.p3],['7+ points',pr.p7],['9+ points',pr.p9]].map(function(r){return '<tr><td>'+r[0]+'</td><td><span class="hrpill '+(r[1]>=.7?'hi':r[1]<.4?'lo':'mid')+'" style="display:inline-block">'+Math.round(r[1]*100)+'%</span></td></tr>'}).join('')+'</tbody></table></div></div>';
   var L=[];
   L.push('Starts from his season: '+k.fm+' of '+k.fa+' field goals ('+Math.round(k.fm/Math.max(k.fa,1)*100)+'%), long of '+k.lng+', over '+k.g+' games, so about '+(k.fm/k.g).toFixed(1)+' field goals and '+(k.xm/k.g).toFixed(1)+' extra points a game.');
   if(k.a50>0)L.push('From 50 or more he is '+k.m50+' of '+k.a50+', so long tries are '+(k.m50/k.a50>=.7?'not a worry.':'a real risk.'));
@@ -9347,9 +9346,9 @@ function rcBlock(d,b){
     var cv=covTxt(nx.opp);if(cv)ls.push(nx.opp+' plays '+cv+'.')}}catch(e){}
   (b.notes||[]).filter(function(t){return t.indexOf('Matchup:')!==0}).forEach(function(t){ls.push(t)});
   if(ls.length)h+='<ul class="pts" style="margin-top:6px">'+ls.map(function(x){return '<li>'+esc(x)+'</li>'}).join('')+'</ul>';
-  h+='<div class="tblwrap" style="margin-top:8px"><table><thead><tr><th>Number</th><th>This matchup</th><th>Average defense</th><th>Fair price</th></tr></thead><tbody>'+lines.map(function(l){
+  h+='<div class="tblwrap" style="margin-top:8px"><table><thead><tr><th>Number</th><th>This matchup</th><th>Average defense</th></tr></thead><tbody>'+lines.map(function(l){
     var c1=rcNb(mu,l),c0=rcNb(P.mu0,l);
-    return '<tr><td>Over '+l.toFixed(1)+'</td><td><span class="hrpill '+(c1>=.7?'hi':c1<.4?'lo':'mid')+'" style="display:inline-block">'+Math.round(c1*100)+'%</span></td><td>'+Math.round(c0*100)+'%</td><td>'+fmtAm(fairAm(Math.min(.99,Math.max(.01,c1))))+'</td></tr>'}).join('')+'</tbody></table></div>';
+    return '<tr><td>Over '+l.toFixed(1)+'</td><td><span class="hrpill '+(c1>=.7?'hi':c1<.4?'lo':'mid')+'" style="display:inline-block">'+Math.round(c1*100)+'%</span></td><td>'+Math.round(c0*100)+'%</td></tr>'}).join('')+'</tbody></table></div>';
   return h+'<p class="src" style="margin:6px 0 0">Catch counts swing a lot from game to game, so I spread the chances wider than a plain average would.</p></div>';
 }
 var pmSheet93=pmSheet;
@@ -13151,12 +13150,14 @@ function atdHtml(g){
   if(!R.length)return h+'<p class="src" style="margin-top:0">No touchdown estimates yet. They are built from each player’s rushing and receiving yards, so they appear once the app has read this season’s box scores for both teams.</p>';
   if(k==='up')try{atdRecord(g)}catch(e){}
   var rec={};ATD.forEach(function(x){if(x.gid===g.id)rec[x.nk]=x});
-  h+='<p class="src" style="margin:0 0 6px">The chance each player scores a touchdown, from how many yards the app expects him to gain against this opponent. “Fair price” is the odds that chance is worth. ESPN has no sportsbook touchdown prices, so compare it with your book.</p>';
+  h+='<p class="src" style="margin:0 0 6px">The chance each player scores a touchdown, from how many yards the app expects him to gain against this opponent. ESPN has no sportsbook touchdown prices.</p>';
+  var cnt={};R.forEach(function(r){r.why.forEach(function(w){cnt[w]=(cnt[w]||0)+1})});var shared=Object.keys(cnt).filter(function(w){return cnt[w]>1});
+  if(shared.length)h+='<div class="card" style="margin:0 0 6px;padding:10px 12px"><div class="src"><b>This matchup</b></div><ul class="pts" style="margin:4px 0 0">'+shared.map(function(w){return '<li>'+esc(w)+'</li>'}).join('')+'</ul></div>';
   h+=R.map(function(r){
     var x=rec[r.nk],st=x&&x.res?(x.res==='W'?'Scored':x.res==='L'?'No TD':'Did not play'):(k==='up'?'':'Waiting'),
         tone=st==='Scored'?'good':st==='No TD'?'warn':'';
-    return '<div class="card" style="margin:0 0 6px;padding:10px 12px"><div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><span><b>'+esc(r.n)+'</b> <span class="src">'+esc(r.t)+(r.pos?' · '+esc(r.pos):'')+'</span></span><span><b>'+Math.round(r.p*100)+'%</b> <span class="src">fair price '+atdOdds(r.p)+'</span>'+(st?' <span class="tag '+tone+'" style="font-size:10px;padding:1px 6px">'+st+'</span>':'')+'</span></div>'+
-      (r.why.length?'<ul class="pts" style="margin:6px 0 0">'+r.why.map(function(w){return '<li>'+esc(w)+'</li>'}).join('')+'</ul>':'')+
+    return '<div class="card" style="margin:0 0 6px;padding:10px 12px"><div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><span><b>'+esc(r.n)+'</b> <span class="src">'+esc(r.t)+(r.pos?' · '+esc(r.pos):'')+'</span></span><span><b>'+Math.round(r.p*100)+'%</b>'+(st?' <span class="tag '+tone+'" style="font-size:10px;padding:1px 6px">'+st+'</span>':'')+'</span></div>'+
+      (r.why.filter(function(w){return cnt[w]<2}).length?'<ul class="pts" style="margin:6px 0 0">'+r.why.filter(function(w){return cnt[w]<2}).map(function(w){return '<li>'+esc(w)+'</li>'}).join('')+'</ul>':'')+
       (r.envF&&Math.abs(r.envF-1)>=.12?'<div class="src" style="margin-top:3px">'+(r.envF>1?'The app expects this team to score more than usual in this game.':'The app expects this team to score less than usual in this game.')+'</div>':'')+'</div>'}).join('');
   return h;
 }
@@ -13245,7 +13246,7 @@ function atdSlate(lg){
 }
 function vAtd(lg){
   var S0=atdSlate(lg),n0=+(S.atdN||12),rec={};ATD.forEach(function(x){rec[x.k]=x});
-  var h='<p class="src" style="margin:4px 0 10px">Who is most likely to score in each matchup. The chance comes from the yards the app expects each player to gain against that defense, turned into a touchdown rate. “Fair price” is what that chance is worth in odds. ESPN has no sportsbook touchdown prices, so compare it with your book. Tap a game for the full window.</p>';
+  var h='<p class="src" style="margin:4px 0 10px">Who is most likely to score in each matchup. The chance comes from the yards the app expects each player to gain against that defense, turned into a touchdown rate. Tap a game for the full window.</p>';
   if(!S0.length)return h+'<div class="card empty">No '+esc(lgName(lg))+' games in the next 8 days.</div>';
   var withP=S0.filter(function(x){return x.R.length}).length;
   h+='<p class="src" style="margin:0 0 8px">Touchdown estimates for <b>'+withP+' of '+S0.length+'</b> games.'+(withP<S0.length?' The rest need more box scores, which the app keeps reading in the background.':'')+(S.dtMsg?' '+esc(S.dtMsg):'')+'</p>';
@@ -13253,7 +13254,7 @@ function vAtd(lg){
     var g=x.g;try{atdRecord(g)}catch(e){}
     var body=x.R.length?x.R.slice(0,5).map(function(r){
       var q=rec[r.k],st=q&&q.res?(q.res==='W'?'Scored':q.res==='L'?'No TD':'Did not play'):'',tone=st==='Scored'?'good':st==='No TD'?'warn':'';
-      return '<div style="padding:6px 0;border-top:1px solid var(--line)"><div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><span><b>'+esc(r.n)+'</b> <span class="src">'+esc(r.t)+(r.pos?' · '+esc(r.pos):'')+'</span></span><span><b>'+Math.round(r.p*100)+'%</b> <span class="src">fair '+atdOdds(r.p)+'</span>'+(st?' <span class="tag '+tone+'" style="font-size:10px;padding:1px 6px">'+st+'</span>':'')+'</span></div>'+(r.why.length?'<div class="src" style="margin-top:2px">'+esc(r.why[0])+'</div>':'')+'</div>'}).join(''):'<p class="src" style="margin:6px 0 0">No estimates yet. Reading these teams’ seasons…</p>';
+      return '<div style="padding:6px 0;border-top:1px solid var(--line)"><div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><span><b>'+esc(r.n)+'</b> <span class="src">'+esc(r.t)+(r.pos?' · '+esc(r.pos):'')+'</span></span><span><b>'+Math.round(r.p*100)+'%</b>'+(st?' <span class="tag '+tone+'" style="font-size:10px;padding:1px 6px">'+st+'</span>':'')+'</span></div>'+(r.why.length?'<div class="src" style="margin-top:2px">'+esc(r.why[0])+'</div>':'')+'</div>'}).join(''):'<p class="src" style="margin:6px 0 0">No estimates yet. Reading these teams’ seasons…</p>';
     return '<div class="card" style="margin-bottom:8px;padding:10px 12px"><div data-act="fgame" data-id="'+esc(g.id)+'" style="cursor:pointer"><b>'+esc(g.an||g.a)+' @ '+esc(g.hn||g.h)+'</b> <span class="src">'+esc(gTime(g))+'</span>'+
       (x.M.length?'<div class="src" style="margin-top:3px">'+x.M.map(esc).join('<br>')+'</div>':'')+'</div>'+body+'</div>';
   }).join('');
@@ -13392,6 +13393,7 @@ gradeGame=function(i){
 try{render()}catch(e){}
 
 /* v194: full game breakdown: team strengths/weaknesses, projection table, correlated parlays, uncertainty */
+function lineMoveHtml(g){return ''}
 function bkAb(lg,x){return lg==='nfl'?nt(String(x||'').toUpperCase()):dlAb(lg,x)}
 function bkCatLabel(lg,cat){var l='';try{pbCats(lg).forEach(function(c){if(c[0]===cat)l=c[1]})}catch(e){}return l||cat}
 function bkKind(lg,cat){
@@ -13506,9 +13508,7 @@ feedSheet=function(g){
   try{
     if(kind(g)!=='up'||!DL_LG[g.lg])return h;
     var L=bkProps(g),t='<h2 style="margin-top:22px">Full breakdown</h2>'+
-      '<h3>Strengths and weaknesses</h3>'+bkSW(g)+
-      (L.length?'<h3>Player projections</h3>'+bkTable(g,L)+'<h3>Correlated parlays</h3>'+bkParlays(g,L):'')+
-      '<h3>Data confidence</h3>'+bkUncertain(g,L);
+      (L.length?'<h3>Player projections</h3>'+bkTable(g,L)+'<h3>Correlated parlays</h3>'+bkParlays(g,L):'<p class="src">No graded props for this game yet.</p>');
     var i=h.lastIndexOf('</div>');h=i>0?h.slice(0,i)+t+h.slice(i):h+t;
   }catch(e){}
   return h;
@@ -13537,7 +13537,7 @@ atdRows=function(g,pre){
         var i=C.ix[cs[k]],lgA=atdLeague(lg,i),b=cAllow(lg,i).by[opp];
         if(lgA&&b&&b.n>=3){var al=b.s/b.n;if(al>=lgA*1.08)add.push(oppName+' allows about '+Math.round(al)+' '+(k==='rush'?'rushing':'receiving')+' yards a game, more than the typical '+Math.round(lgA)+', so '+r.n+' has room to score')}
       });
-      r.why=add.slice(0,2).concat(r.why).slice(0,4);
+      if(!r.why.some(function(w){return /allows/.test(w)}))r.why=add.slice(0,2).concat(r.why).slice(0,4);
     });
   }catch(e){}
   return R;
