@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v209, Nov 8';
+var BUILD='v210, Nov 8';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -13880,6 +13880,56 @@ var vPicks154x=function(){
     var top=h.slice(0,h.indexOf('<h3>'));
     return top+(S.pks!=='all'&&S.pks!=='nfl'&&S.pks!=='ncaafb'?'<p class="src" style="margin:0 0 8px">Parlays are built for NFL and college football.</p>':'')+(sec||'<div class="card empty">No NFL or college football slots with enough games in the next few days.</div>')+'<p class="src" style="margin:10px 0 0">Place bets yourself at your sportsbook. Parlays are research, not advice, and every extra leg lowers the chance they all hit.</p>'+foot();
   }catch(e){}
+  return h;
+};
+try{render()}catch(e){}
+
+/* v210: every prop gets a grade, even before game logs load, and a Top graded view lists the best first */
+function gradeNoLog(lg,cat,r,o,dir){
+  try{
+    var proj=+r.proj,m=/([\d.]+)/.exec(String(r.avgTxt||'')),avg=m?+m[1]:null;
+    if(!(proj>0)||!(avg>0))return null;
+    var s=dir==='Over'?1:-1,F=[],add=function(k,pts,txt){F.push({k:k,pts:Math.round(pts*10)/10,txt:txt})};
+    add('Projection',grClip((proj/avg-1)/.2,-1,1)*s*14,'Projected '+(r.projTxt||Math.round(proj))+' vs a season average of '+(m[1]));
+    var dt=r.def&&r.def.txt||'',tg=r.def&&r.def.tag&&String(r.def.tag[1]||'').toLowerCase()||'',rk=/(\d+)(?:st|nd|rd|th) of (\d+)/.exec(dt),op=null;
+    if(rk&&+rk[2]>=8)op=grClip(((+rk[1])/(+rk[2])-.5)*2,-1,1);else if(tg==='soft')op=.6;else if(tg==='tough')op=-.6;
+    if(op!=null)add('Opponent',op*s*18,dt||(tg==='soft'?'Soft defense':'Tough defense'));
+    var lv=null;try{lv=pbLev(lg,cat,r,o,dir)}catch(e){}
+    if(lv&&lv.over)add('Leverage',lv.over*s,(lv.L.filter(function(t){return /^Against/.test(t)})[0])||'Past results against similar defenses');
+    try{var it=injIt108({lg:lg,n:r.n,t:r.t});if(it&&it.st&&!isOutInj({lg:lg,n:r.n,t:r.t}))add('Health',dir==='Over'?-12:0,'Listed '+it.st+(it.d?' ('+it.d+')':''))}catch(e){}
+    try{var wf=wxFx(lg,r.t,cat);if(wf)add('Weather',wf.over*s,wf.txt)}catch(e){}
+    var sum=0;F.forEach(function(x){sum+=x.pts});
+    return {sum:sum,letter:grLetter(sum),dir:dir,F:F,noLog:true};
+  }catch(e){return null}
+}
+var gradeProp155=gradeProp;
+gradeProp=function(lg,cat,r,o,dir){
+  var G=gradeProp155.apply(this,arguments);
+  if(G)return G;
+  return grCache('nl|'+[lg,cat,r.n,dir].join('|'),function(){return gradeNoLog(lg,cat,r,o,dir)});
+};
+var vBoard155=vBoard;
+vBoard=function(){
+  var wasG=S.bf==='grade';if(wasG)S.bf='all';
+  var h;try{h=vBoard155.apply(this,arguments)}finally{if(wasG)S.bf='grade'}
+  try{
+    if(S.bc==='atd'||S.bc==='parl')return h;
+    var k=h.indexOf('aria-label="Show"');if(k<0)return h;
+    var e=h.indexOf('</div>',k);
+    h=h.slice(0,e)+'<button class="chip" data-act="set" data-k="bf" data-v="grade" aria-pressed="'+(S.bf==='grade')+'">Top graded</button>'+h.slice(e);
+    if(S.bf!=='grade')return h;
+    h=h.replace(/aria-pressed="true"([^>]*>(?:All|Hot · over|Cold · under|Best matchups)<)/g,'aria-pressed="false"$1');
+    var lg=S.sport,rows=[];
+    try{pbRows(lg,S.bc).forEach(function(o){var G=gradeBest(lg,o.cat,o.r,o);if(G)rows.push({o:o,G:G})})}catch(x){}
+    rows.sort(function(a,b){return b.G.sum-a.G.sum});
+    var seen={},L=[];rows.forEach(function(r){var n=normName(r.o.r.n);if(seen[n]||L.length>=40)return;seen[n]=1;L.push(r)});
+    var a=h.indexOf('</details>',k),b=h.indexOf('<p class="foot">');
+    if(a<0){var cs=h.indexOf('<div class="card"',k);a=cs>0?cs-10:-1}
+    if(a>0&&b>a){
+      var body='<p class="src" style="margin:4px 0 8px">Every player graded A+ to F on the side the app likes (Over or Under), best first. The grade weighs the projection, the opponent’s defense, past games when loaded, health and weather. Tap a player for the full breakdown.</p>'+(L.length?L.map(function(r){return pbCard(r.o)}).join(''):'<div class="card empty">No players to grade for this stat yet.</div>');
+      h=h.slice(0,a+10)+body+h.slice(b);
+    }
+  }catch(x){}
   return h;
 };
 try{render()}catch(e){}
