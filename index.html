@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v206, Nov 8';
+var BUILD='v207, Nov 8';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -13768,7 +13768,34 @@ gradeGame=function(i){
   return G;
 };
 /* parlays by kickoff slot */
+var _slPool=[];
+function slMixed(lg,legs){
+  try{
+    var C=[];
+    legs.forEach(function(l){C.push({sum:l.sum,letter:l.letter,label:l.label,sub:l.sub,g:l.g,pr:l.pr,p:l.p,prop:false})});
+    _slPool.forEach(function(p){C.push({sum:p.sum,letter:p.G.letter,label:p.o.r.n+' '+p.G.dir+' '+(p.o.ln&&p.o.ln.v!=null?p.o.ln.v:'')+' '+bkCatLabel(lg,p.o.cat).toLowerCase(),sub:'Player prop · '+p.o.r.t,g:p.g,pr:null,p:null,why:p.why,prop:true})});
+    C.sort(function(a,b){return b.sum-a.sum});
+    var out=[],gm={};
+    C.forEach(function(c){if(out.length>=4||gm[c.g.id])return;gm[c.g.id]=1;out.push(c)});
+    if(out.length>=2&&!out.some(function(c){return c.prop})){
+      var pr=C.filter(function(c){return c.prop&&!out.slice(0,out.length-1).some(function(o){return o.g.id===c.g.id})})[0];
+      if(pr)out[out.length-1]=pr;
+    }
+    if(out.length<2||!out.some(function(c){return c.prop}))return '';
+    var tiers=[['Safer',2],['Standard',3],['Reach',4]],h='';
+    tiers.forEach(function(t){
+      if(out.length<t[1])return;
+      var L=out.slice(0,t[1]);if(t[1]<out.length&&!L.some(function(c){return c.prop})){var pc=out.filter(function(c){return c.prop})[0];if(pc)L[L.length-1]=pc}
+      var dec=1,all=true;L.forEach(function(l){if(l.pr!=null&&isFinite(l.pr))dec*=l.pr>0?1+l.pr/100:1+100/-l.pr;else all=false});
+      h+='<div class="card" style="padding:10px 12px;margin-bottom:8px"><b>'+t[0]+' · '+t[1]+' legs</b>'+
+        L.map(function(l,j){return '<div style="margin-top:6px"><div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><span>'+(j+1)+'. <b>'+esc(l.label)+'</b> <span class="src">'+esc(l.sub)+' · '+esc(l.g.a+' @ '+l.g.h)+(l.pr!=null?' · '+fmtAm(l.pr):'')+'</span></span>'+grPill(l.letter)+'</div>'+(l.why?'<div class="src">'+esc(l.why)+'</div>':'')+'</div>'}).join('')+
+        '<div class="src" style="margin-top:6px">'+(all?'Combined price '+fmtAm(amFromDec(dec))+'.':'Prop legs have no price here, so check your book for the combined price.')+' One leg per game.</div></div>';
+    });
+    return '<p class="src" style="margin:4px 0 6px"><b>Best mix of game lines and props</b></p>'+h;
+  }catch(e){return ''}
+}
 function slPropParlay(lg,gs){
+  _slPool=[];
   try{
     var pool=[];
     gs.forEach(function(g){
@@ -13778,6 +13805,7 @@ function slPropParlay(lg,gs){
         pool.push({g:g,o:o,G:G,sum:G.sum,tm:bkAb(lg,o.r.t),why:F?F.txt:''})});
     });
     pool.sort(function(a,b){return b.sum-a.sum});
+    _slPool=pool.slice();
     var legs=[],perG={},used={};
     pool.forEach(function(p){if(legs.length>=4)return;var c=perG[p.g.id]=perG[p.g.id]||{};if(Object.keys(c).length>=1)return;c[p.tm]=1;legs.push(p);used[p.g.id+'|'+normName(p.o.r.n)]=1});
     pool.forEach(function(p){if(legs.length>=4)return;if(used[p.g.id+'|'+normName(p.o.r.n)])return;var c=perG[p.g.id]=perG[p.g.id]||{};if(Object.keys(c).length>=2||c[p.tm])return;c[p.tm]=1;legs.push(p);used[p.g.id+'|'+normName(p.o.r.n)]=1});
@@ -13809,9 +13837,10 @@ function slParlays(lg){
       if(best&&best.sum>=8)legs.push(best);
     });
     legs.sort(function(a,b){return b.sum-a.sum});
+    var mx=gs.length>=2?slMixed(lg,legs):'';
     var head='<h3 style="margin-top:14px">'+esc(lgName(lg))+' · '+esc(k)+' <span class="src">'+gs.length+' game'+(gs.length>1?'s':'')+'</span></h3>';
     if(gs.length<2){out+=head+'<p class="src" style="margin:0 0 8px">Only one game in this slot. A same-game parlay is in that game’s window.</p>'+ph;return}
-    if(legs.length<2){out+=head+'<p class="src" style="margin:0 0 8px">No two legs grade B- or better in this slot, so no game-line parlay is suggested.</p>'+ph;return}
+    if(legs.length<2){out+=head+'<p class="src" style="margin:0 0 8px">No two legs grade B- or better in this slot, so no game-line parlay is suggested.</p>'+mx+ph;return}
     var tiers=[['Safer',2],['Standard',3],['Reach',4]],h='',used={};
     tiers.forEach(function(t){
       if(legs.length<t[1]||used[t[1]])return;used[t[1]]=1;
@@ -13821,7 +13850,7 @@ function slParlays(lg){
         L.map(function(l,j){return '<div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline;margin-top:6px"><span>'+(j+1)+'. <b>'+esc(l.label)+'</b> <span class="src">'+esc(l.sub)+' · '+esc(l.g.a+' @ '+l.g.h)+(l.pr!=null?' · '+fmtAm(l.pr):'')+'</span></span>'+grPill(l.letter)+'</div>'}).join('')+
         (allP?'<div class="src" style="margin-top:6px">About '+Math.round(pp*100)+'% to hit all legs, treating the games as separate</div>':'<div class="src" style="margin-top:6px">Player legs have no price here. Check your book for the combined price.</div>')+'</div>';
     });
-    out+=head+h+ph;
+    out+=head+mx+h+ph;
   });
   if(!out)return '';
   return '<h3>Parlays by kickoff</h3><p class="src" style="margin:0 0 8px">For each kickoff time, the best leg from each game in that slot, one leg per game so the legs do not depend on each other. Legs are graded the same way as the picks above. Longer parlays hit far less often.</p>'+out;
