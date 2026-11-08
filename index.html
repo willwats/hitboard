@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v202, Nov 8';
+var BUILD='v203, Nov 8';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -11891,13 +11891,23 @@ function pbRows(lg,cat){
     try{opp=rowOpp106(lg,r)}catch(e){}
     try{c=pbCalc(lg,cat,r.n,ln.v,opp,false)}catch(e){}
     var tr=c&&c.l5.n>=3&&c.s.avg>0?c.l5.avg/c.s.avg-1:null,rate=c&&c.l10.n>=5?c.l10.h.o/c.l10.n:null;
-    return {r:r,ln:ln,c:c,tr:tr,rate:rate,opp:opp,cat:cat};
+    return {r:r,ln:ln,c:c,tr:tr,rate:rate,opp:opp,cat:cat,st:pbStreak(c)};
   });
+}
+function pbStreak(c){
+  try{
+    if(!c||!c.all||c.s.n<5||!(c.s.avg>0))return null;
+    var v=c.all.map(function(x){return x.v[c.i]}),a=c.s.avg,up=0,dn=0;
+    while(up<v.length&&v[up]>a)up++;
+    while(dn<v.length&&v[dn]<a)dn++;
+    if(up>=3)return {k:'hot',n:up};if(up===2)return {k:'up',n:2};
+    if(dn>=3)return {k:'cold',n:dn};if(dn===2)return {k:'down',n:2};
+  }catch(e){}
+  return null;
 }
 function pbCard(o){
   var r=o.r,c=o.c,ln=o.ln,pill='';
-  if(o.tr!=null&&o.tr>=.10)pill='<span class="hrpill hi" style="display:inline-block;margin-left:6px">Hot</span>';
-  else if(o.tr!=null&&o.tr<=-.10)pill='<span class="hrpill lo" style="display:inline-block;margin-left:6px">Cold</span>';
+  if(o.st)pill='<span class="hrpill '+(o.st.k==='hot'||o.st.k==='up'?'hi':'lo')+'" style="display:inline-block;margin-left:6px">'+({hot:'Hot',up:'Trending up',cold:'Cold',down:'Trending down'})[o.st.k]+'</span>';
   var d=r.def&&r.def.tag?'<span class="hrpill '+r.def.tag[0]+'" style="display:inline-block;margin-left:4px">'+r.def.tag[1]+'</span>':'';
   var l2=c?'Last 5 <b>'+fmt106(c.l5.avg)+'</b> · Last 10 <b>'+fmt106(c.l10.avg)+'</b> · Season <b>'+fmt106(c.s.avg)+'</b> <span class="src">('+c.s.n+' games)</span>':esc(r.avgTxt||'');
   var l3=c?'Over '+ln.v+': '+c.l5.h.o+' of '+c.l5.n+' last 5 · '+c.l10.h.o+' of '+c.l10.n+' last 10'+(ln.own?'':' <span class="src">(reference line)</span>'):'<span class="src">No game log for this stat yet.</span>';
@@ -11915,13 +11925,13 @@ function vBoard(){
   h+='<div class="chips" role="group" aria-label="Stat">'+cats.map(function(c){return '<button class="chip" data-act="set" data-k="bc" data-v="'+c[0]+'" aria-pressed="'+(cat===c[0])+'">'+esc(c[1])+'</button>'}).join('')+'</div>';
   h+='<div class="chips" role="group" aria-label="Filter">'+[['all','All'],['hot','Hot'],['cold','Cold'],['over','70%+ over']].map(function(c){return '<button class="chip" data-act="set" data-k="bf" data-v="'+c[0]+'" aria-pressed="'+(S.bf===c[0])+'">'+c[1]+'</button>'}).join('')+'<span class="src" style="align-self:center;margin:0 4px">Sort</span>'+[['trend','Trending'],['hit','Hit rate'],['proj','Projection']].map(function(c){return '<button class="chip" data-act="set" data-k="pbs" data-v="'+c[0]+'" aria-pressed="'+(S.pbs===c[0])+'">'+c[1]+'</button>'}).join('')+'</div>';
   var rows=pbRows(lg,cat),logs=rows.some(function(o){return o.c});
-  if(S.bf==='hot')rows=rows.filter(function(o){return o.tr!=null&&o.tr>=.10});
-  else if(S.bf==='cold')rows=rows.filter(function(o){return o.tr!=null&&o.tr<=-.10});
+  if(S.bf==='hot')rows=rows.filter(function(o){return o.st&&(o.st.k==='hot'||o.st.k==='up')});
+  else if(S.bf==='cold')rows=rows.filter(function(o){return o.st&&(o.st.k==='cold'||o.st.k==='down')});
   else if(S.bf==='over')rows=rows.filter(function(o){return o.rate!=null&&o.rate>=.7});
-  var key=S.pbs==='hit'?function(o){return o.rate==null?-1:o.rate+(o.c?o.c.l10.n/1000:0)}:S.pbs==='proj'?function(o){return o.r.sort||0}:function(o){return o.tr==null?-9:(S.bf==='cold'?-o.tr:o.tr)};
+  var key=S.pbs==='hit'?function(o){return o.rate==null?-1:o.rate+(o.c?o.c.l10.n/1000:0)}:S.pbs==='proj'?function(o){return o.r.sort||0}:function(o){return o.tr==null?-9:((o.st&&o.st.n>=3?5:0)+(S.bf==='cold'?-o.tr:o.tr))};
   rows.sort(function(a,b){return key(b)-key(a)});
   var n0=S.bn||40,more=rows.length>n0;
-  h+='<p class="src" style="margin:4px 0 10px">Tap a player for the full breakdown. Hot and Cold compare the last 5 games with the season. No sportsbook lines are available here, so the reference line is the projection rounded to the nearest half. Enter your book’s line inside a player to see the hit rate against it. Ruled-out players are hidden.</p>';
+  h+='<p class="src" style="margin:4px 0 10px">Tap a player for the full breakdown. Hot is 3 straight games above his season average, Cold is 3 straight below, and 2 in a row shows as Trending up or down. No sportsbook lines are available here, so the reference line is the projection rounded to the nearest half. Enter your book’s line inside a player to see the hit rate against it. Ruled-out players are hidden.</p>';
   if(S.sport==='nhl'||S.sport==='mlb')h+='<p class="note">Game logs for '+lgName(S.sport)+' are not read yet, so these rows show projections and season rates only. Hit rates and splits cover football and basketball.</p>';
   else if(!logs)h+='<p class="note">'+(S.dlBusy?'Reading finished games…':'No finished games are loaded yet.')+' Hit rates and trends appear once the app has read this season’s box scores. That can take a minute after opening.</p>';
   if(!rows.length)h+='<div class="card empty">No players match these filters. Teams without a game in the next 8 days are hidden.</div>';
@@ -12019,7 +12029,7 @@ vGames=function(){
 var foot125=foot;
 foot=function(){var h=foot125();try{if(S.tab==='props'||S.tab==='games'||S.tab==='players'||S.tab==='injuries')h=h.replace(/<br><span class="src">Display[\s\S]*?<\/span><br><span class="src">Rosters[\s\S]*?<\/span>/,'')}catch(e){}return h};
 TOUR.length=0;
-[{tab:'props',hl:'props',t:'Props',x:'Players ranked by recent form. Hot and Cold compare the last 5 games with the season. Tap a player for hit rates against a line you set, a game log, splits and how he does with or without a teammate.'},
+[{tab:'props',hl:'props',t:'Props',x:'Players ranked by recent form. Hot is 3 straight games above his season average, Cold is 3 straight below, and 2 in a row shows as Trending up or down. Tap a player for hit rates against a line you set, a game log, splits and how he does with or without a teammate.'},
  {tab:'games',hl:'games',t:'Games',x:'Every game with scores, lines and the model’s read. Tap a game for the matchup breakdown.'},
  {tab:'players',hl:'players',t:'Players',x:'Search any player in every sport and open the full profile.'},
  {tab:'injuries',hl:'injuries',t:'Injuries',x:'Who is out, by sport. Anyone ruled out is removed from the props and adjusts the game outlook.'},
@@ -12605,7 +12615,7 @@ pkAngleCard=function(a){
 var pbCard137=pbCard;
 pbCard=function(o){
   var h=pbCard137(o);
-  try{var G=o.tr!=null&&o.tr>=.12?gradeProp(o.r.lg,o.cat,o.r,o,'Over'):o.tr!=null&&o.tr<=-.12?gradeProp(o.r.lg,o.cat,o.r,o,'Under'):gradeBest(o.r.lg,o.cat,o.r,o);if(G){var i=h.indexOf('</b>');if(i>=0)h=h.slice(0,i+4)+' '+grPill(G.letter,G.dir)+h.slice(i+4)}}catch(e){}
+  try{var G=o.st&&(o.st.k==='hot'||o.st.k==='up')?gradeProp(o.r.lg,o.cat,o.r,o,'Over'):o.st?gradeProp(o.r.lg,o.cat,o.r,o,'Under'):gradeBest(o.r.lg,o.cat,o.r,o);if(G){var i=h.indexOf('</b>');if(i>=0)h=h.slice(0,i+4)+' '+grPill(G.letter,G.dir)+h.slice(i+4)}}catch(e){}
   return h;
 };
 /* player window: full report card */
@@ -13348,7 +13358,7 @@ var pbCard148=pbCard;
 pbCard=function(o){
   var h=pbCard148(o);
   try{
-    var G=o.tr!=null&&o.tr>=.12?gradeProp(o.r.lg,o.cat,o.r,o,'Over'):o.tr!=null&&o.tr<=-.12?gradeProp(o.r.lg,o.cat,o.r,o,'Under'):gradeBest(o.r.lg,o.cat,o.r,o);
+    var G=o.st&&(o.st.k==='hot'||o.st.k==='up')?gradeProp(o.r.lg,o.cat,o.r,o,'Over'):o.st?gradeProp(o.r.lg,o.cat,o.r,o,'Under'):gradeBest(o.r.lg,o.cat,o.r,o);
     var L=G&&(G.lev||pbLev(o.r.lg,o.cat,o.r,o,G.dir));
     if(L&&L.L.length){var i=h.lastIndexOf('</div>');if(i>=0)h=h.slice(0,i)+'<div class="src" style="margin-top:4px"><b>Matchup:</b> '+esc(L.L.filter(function(t){return !/^He accounts/.test(t)})[0]||L.L[0])+'</div>'+h.slice(i)}
   }catch(e){}
