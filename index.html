@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v198, Nov 8';
+var BUILD='v199, Nov 8';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -13571,7 +13571,7 @@ function gmCard(g){
   [best,tot].forEach(function(i){
     if(!i)return;var G=null;try{G=gradeGame(i)}catch(e){}
     rows+='<div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline;margin-top:8px"><span><b>'+esc(i.x.pick)+'</b> <span class="src">'+Math.round(i.x.p*100)+'% chance</span></span>'+(G?grPill(G.letter):'')+'</div>';
-    if(G&&i===best){var F=prFactors(G,4);story+=prList(F.pro,F.con)}
+    if(G&&i===best){var F=prFactors(G,4);F.pro=F.pro.filter(function(f){return f.k!=='Injuries'});F.con=F.con.filter(function(f){return f.k!=='Injuries'});story+=prList(F.pro,F.con)}
   });
   if(tot){try{var Gt=gradeGame(tot),Ft=prFactors(Gt,2);if(Ft.pro.length)story+='<div class="src" style="margin-top:8px"><b>The total</b></div>'+prList(Ft.pro,[])}catch(e){}}
   /* key players with their matchup edge */
@@ -13582,12 +13582,12 @@ function gmCard(g){
       var lv=pbLev(lg,o.cat,o.r,o,o.gr.dir),ln=lv&&lv.L.filter(function(x){return !/^He accounts/.test(x)})[0];
       pl+='<li><b>'+esc(o.r.n)+'</b> '+esc(o.r.t)+': projected '+esc(o.r.projTxt||'')+' '+esc(o.r.unit||'')+', '+o.gr.dir.toLowerCase()+' '+(o.ln&&o.ln.v!=null?o.ln.v:'')+' · grade '+esc(o.gr.letter)+(ln?'. '+esc(ln):'')+'</li>'});
   }catch(e){}
-  var inj='';try{var kT=function(x){return lg==='nfl'?nt(bkAb(lg,x)):bkAb(lg,x)};[[g.a],[g.h]].forEach(function(t){var o=grOutW(lg,kT(t[0]));if(o.names.length)inj+='<li>'+esc(t[0])+' without '+esc(o.names.slice(0,4).join(', '))+'</li>'})}catch(e){}
-  var wx='';try{var w=grWind(lg,g.h);if(w&&w.wavg>=12)wx='<li>Wind near '+Math.round(w.wavg)+' mph, which cuts passing and kicking</li>'}catch(e){}
+  var inj='';
+  var wx='';try{var wt=String(wxLong(g)||'').replace(/<[^>]*>/g,'').replace(/ ?\(Open-Meteo\)/,'').replace(/^Forecast for the start:/,'Forecast for the start:').trim();if(wt)wx='<li>'+esc(wt)+'</li>'}catch(e){}
   if(!head&&!rows&&!pl)return '';
   return '<h3>Prediction</h3><div class="card bcard" style="padding:12px"><div class="teams">'+esc(head||'Prediction building')+'</div>'+(sc?'<div class="facts" style="margin-top:4px"><span>'+esc(sc)+'</span></div>':'')+rows+story+
     (pl?'<div class="src" style="margin-top:10px"><b>How the key players fit</b></div><ul class="pts" style="margin:2px 0 0">'+pl+'</ul>':'')+
-    ((inj||wx)?'<div class="src" style="margin-top:8px"><b>Health and weather</b></div><ul class="pts" style="margin:2px 0 0">'+inj+wx+'</ul>':'')+
+    ((inj||wx)?'<div class="src" style="margin-top:8px"><b>Weather</b></div><ul class="pts" style="margin:2px 0 0">'+inj+wx+'</ul>':'')+
     '<p class="src" style="margin:8px 0 0">Built from this season’s team and player box scores, how each side matches up with the other, injuries and weather. Small samples early in the season can mislead.</p></div>';
 }
 var feedSheet151=feedSheet;
