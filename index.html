@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v200, Nov 8';
+var BUILD='v201, Nov 8';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -13657,7 +13657,8 @@ vBoard=function(){
 /* v200: Best matchups view on the props board */
 var vBoard200=vBoard;
 vBoard=function(){
-  var h=vBoard200.apply(this,arguments);
+  var wasM=S.bf==='match';if(wasM)S.bf='all';
+  var h;try{h=vBoard200.apply(this,arguments)}finally{if(wasM)S.bf='match'}
   try{
     if(S.bc==='atd')return h;
     var k=h.indexOf('aria-label="Show"');if(k<0)return h;
@@ -13674,6 +13675,7 @@ vBoard=function(){
       rows.sort(function(a,b){return b.s-a.s});
       var seen={},L=[];rows.forEach(function(r){var n=normName(r.o.r.n);if(seen[n]||L.length>=30)return;seen[n]=1;L.push(r.o)});
       var a=h.indexOf('</details>',k),b=h.indexOf('<p class="foot">');
+      if(a<0){var cs=h.indexOf('<div class="card"',k);a=cs>0?cs-10:-1}
       if(a>0&&b>a){
         var body='<p class="src" style="margin:4px 0 8px">Players ranked by how well the matchup sets up the lean, using how the opponent defends that stat, how the player has done against similar defenses, his role, health and weather. Best first.</p>'+(L.length?L.map(pbCard).join(''):'<div class="card empty">No graded props for this stat yet.</div>');
         h=h.slice(0,a+10)+body+h.slice(b);
