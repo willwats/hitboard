@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v207, Nov 8';
+var BUILD='v208, Nov 8';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -13853,17 +13853,19 @@ function slParlays(lg){
     out+=head+mx+h+ph;
   });
   if(!out)return '';
-  return '<h3>Parlays by kickoff</h3><p class="src" style="margin:0 0 8px">For each kickoff time, the best leg from each game in that slot, one leg per game so the legs do not depend on each other. Legs are graded the same way as the picks above. Longer parlays hit far less often.</p>'+out;
+  return '<h3>Parlays by kickoff</h3><p class="src" style="margin:0 0 8px">For each kickoff time, the best leg from each game in that slot, one leg per game so the legs do not depend on each other. Legs are graded the same way as the game picks and props. Longer parlays hit far less often.</p>'+out;
 }
 var vPicks154=vPicks2;
 vPicks2=function(){
   var h=vPicks154.apply(this,arguments);
   try{
-    var sel=S.pks==='all'?['nfl','ncaafb']:(S.pks==='nfl'||S.pks==='ncaafb')?[S.pks]:[];
-    if(!sel.length)return h;
-    var sec=grCache('slp|'+S.pks,function(){return sel.map(slParlays).join('')});
-    if(!sec)return h;
-    var i=h.indexOf('<h3>Player angles</h3>');h=i>=0?h.slice(0,i)+sec+h.slice(i):h+sec;
+    var v=S.pkv==='parlays'?'parlays':'picks',tabs='<div class="chips" role="group" aria-label="View"><button class="chip" data-act="set" data-k="pkv" data-v="picks" aria-pressed="'+(v==='picks')+'">Picks</button><button class="chip" data-act="set" data-k="pkv" data-v="parlays" aria-pressed="'+(v==='parlays')+'">Parlays</button></div>';
+    var t=h.indexOf('</h2>');if(t>=0)h=h.slice(0,t+5)+tabs+h.slice(t+5);
+    if(v==='picks')return h;
+    var sel=(S.pks==='nfl'||S.pks==='ncaafb')?[S.pks]:['nfl','ncaafb'];
+    var sec=grCache('slp|'+sel.join(),function(){return sel.map(slParlays).join('')});
+    var top=h.slice(0,h.indexOf('<h3>'));
+    return top+(S.pks!=='all'&&S.pks!=='nfl'&&S.pks!=='ncaafb'?'<p class="src" style="margin:0 0 8px">Parlays are built for NFL and college football.</p>':'')+(sec||'<div class="card empty">No NFL or college football slots with enough games in the next few days.</div>')+'<p class="src" style="margin:10px 0 0">Place bets yourself at your sportsbook. Parlays are research, not advice, and every extra leg lowers the chance they all hit.</p>'+foot();
   }catch(e){}
   return h;
 };
