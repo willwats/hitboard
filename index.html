@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v192, Nov 7';
+var BUILD='v193, Nov 8';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -13278,6 +13278,116 @@ vBoard=function(){
     }
   }catch(e){}
   return h;
+};
+try{render()}catch(e){}
+
+/* v193: matchup leverage. Past games decide how a player or team does against this kind of opponent, and every reason is framed as what they can exploit. */
+var cAllow=function(lg,i){return grCache('al|'+lg+'|'+i,function(){return mbAllow(lg,i)})};
+var atdTeamAvg148=atdTeamAvg;atdTeamAvg=function(lg,t,i){return grCache('ta|'+lg+'|'+t+'|'+i,function(){return atdTeamAvg148(lg,t,i)})};
+var atdLeague148=atdLeague;atdLeague=function(lg,i){return grCache('lg|'+lg+'|'+i,function(){return atdLeague148(lg,i)})};
+function levTier(f){return f==null?null:f>=1.05?'soft':f<=.95?'tough':'average'}
+function levAvg(a){return a.length?a.reduce(function(s,x){return s+x},0)/a.length:null}
+function pbLev(lg,cat,r,o,dir){
+  var key='lev|'+[lg,cat,r.n,o.opp,dir].join('|');
+  return grCache(key,function(){
+    try{
+      var C=DL_LG[lg],i=C&&C.ix[cat];if(i==null)return null;
+      var ab=function(x){return lg==='nfl'?nt(String(x||'').toUpperCase()):dlAb(lg,x)},opp=ab(o.opp),me=ab(r.t);
+      var AL=cAllow(lg,i),lgAvg=AL.avg;if(!lgAvg)return null;
+      var b=AL.by[opp],defF=b&&b.n>=3?(b.s/b.n)/lgAvg:null,cur=levTier(defF);
+      var P=(pbIdx(lg).P[normName(r.n)]||[]).filter(function(e){return e.v[i]!=null});if(P.length<3)return null;
+      var by={soft:[],tough:[],average:[]};
+      P.forEach(function(e){var bb=AL.by[e.o],f=bb&&bb.n>=3?(bb.s/bb.n)/lgAvg:null,t=levTier(f);if(t)by[t].push(e.v[i])});
+      var overall=levAvg(P.map(function(e){return e.v[i]})),same=cur&&by[cur].length>=2?levAvg(by[cur]):null;
+      var teamAvg=atdTeamAvg(lg,me,i),usage=teamAvg>0?overall/teamAvg:null;
+      var nm=(DL_LG[lg].names[i]||'').toLowerCase(),L=[],over=0,label={soft:'soft',tough:'tough',average:'average'}[cur]||'';
+      if(defF!=null&&cur!=='average')L.push(opp+' '+(cur==='soft'?'gives up':'holds players to')+' about '+Math.round(b.s/b.n)+' '+nm+' a game, '+(cur==='soft'?'more':'less')+' than the typical '+Math.round(lgAvg)+'.');
+      if(same!=null&&overall>0){L.push('Against '+cur+' defenses he averages '+fmt106(same)+' ('+by[cur].length+' game'+(by[cur].length>1?'s':'')+') vs '+fmt106(overall)+' overall.');over+=Math.max(-1,Math.min(1,(same/overall-1)/.3))*10}
+      if(usage!=null&&usage>=.2)L.push('He accounts for about '+Math.round(usage*100)+'% of '+me+'’s '+nm+' from its top players, so a good matchup runs through him.');
+      if(lg==='nfl'||lg==='ncaafb'){
+        var ip=C.ix[lg==='nfl'?'pass':'cpass'],ir=C.ix[lg==='nfl'?'rush':'crush'];
+        var tp=atdTeamAvg(lg,me,ip),tr=atdTeamAvg(lg,me,ir),lp=atdLeague(lg,ip),lr=atdLeague(lg,ir),bp=cAllow(lg,ip).by[opp],br=cAllow(lg,ir).by[opp];
+        if(tp&&tr&&lp&&lr&&bp&&br&&bp.n>=3&&br.n>=3){
+          var ps=tp/(tp+tr),lps=lp/(lp+lr),ap=bp.s/bp.n,ar=br.s/br.n,aps=ap/(ap+ar),laps=lp/(lp+lr);
+          if(Math.abs(ps-lps)>=.04||Math.abs(aps-laps)>=.04)L.push(r.t+' gets '+Math.round(ps*100)+'% of its yards through the air (typical '+Math.round(lps*100)+'%), and '+opp+' gives up '+Math.round(aps*100)+'% of its yardage that way. '+(aps>laps+.03?'Passing is the better way to attack it.':aps<laps-.03?'Running is the better way to attack it.':''));
+        }
+      }
+      return {L:L,over:over,cur:cur};
+    }catch(e){return null}
+  });
+}
+/* grades use the leverage history, and unders flip the sign */
+var gradeProp148=gradeProp;
+gradeProp=function(lg,cat,r,o,dir){
+  var G=gradeProp148.apply(this,arguments);
+  if(G&&!G.levDone){
+    G.levDone=true;
+    var L=null;try{L=pbLev(lg,cat,r,o,dir)}catch(e){}
+    if(L){var s=dir==='Over'?1:-1;G.lev=L;if(L.over){G.F.push({k:'Leverage',pts:Math.round(L.over*s*10)/10,txt:L.L.filter(function(t){return /^Against/.test(t)})[0]||'Past results against similar defenses'});G.sum+=L.over*s;G.letter=grLetter(G.sum)}}
+  }
+  return G;
+};
+/* player window: a matchup section that leads the report card */
+var pbSheet148=pbSheet;
+pbSheet=function(s){
+  var h=pbSheet148.apply(this,arguments);
+  try{
+    var lg=s.lg,o=null;pbRows(lg,s.cat).forEach(function(q){if(!o&&normName(q.r.n)===normName(s.n))o=q});
+    if(!o)return h;
+    var G=gradeBest(lg,s.cat,o.r,o),L=G&&(G.lev||pbLev(lg,s.cat,o.r,o,G.dir));
+    if(L&&L.L.length){
+      var t='<h3>The matchup</h3><div class="card" style="padding:10px 12px"><div class="src" style="margin-bottom:4px">'+(G.dir==='Over'?'How '+esc(s.n)+' can use it':'What could hold '+esc(s.n)+' down')+'</div><ul class="pts" style="margin:0">'+L.L.map(function(x){return '<li>'+esc(x)+'</li>'}).join('')+'</ul></div>';
+      var i=h.indexOf('<h3>Report card</h3>');if(i<0)i=h.indexOf('<h3');h=i>=0?h.slice(0,i)+t+h.slice(i):h+t;
+    }
+  }catch(e){}
+  return h;
+};
+/* prop cards on the board: the first matchup line */
+var pbCard148=pbCard;
+pbCard=function(o){
+  var h=pbCard148(o);
+  try{
+    var G=o.tr!=null&&o.tr>=.12?gradeProp(o.r.lg,o.cat,o.r,o,'Over'):o.tr!=null&&o.tr<=-.12?gradeProp(o.r.lg,o.cat,o.r,o,'Under'):gradeBest(o.r.lg,o.cat,o.r,o);
+    var L=G&&(G.lev||pbLev(o.r.lg,o.cat,o.r,o,G.dir));
+    if(L&&L.L.length){var i=h.lastIndexOf('</div>');if(i>=0)h=h.slice(0,i)+'<div class="src" style="margin-top:4px"><b>Matchup:</b> '+esc(L.L.filter(function(t){return !/^He accounts/.test(t)})[0]||L.L[0])+'</div>'+h.slice(i)}
+  }catch(e){}
+  return h;
+};
+/* game picks: how each offense lines up against the other defense */
+function gmLev(g,mineAb,theirAb){
+  var lg=g.lg;if(lg!=='nfl'&&lg!=='ncaafb')return null;
+  var C=DL_LG[lg],cats=lg==='nfl'?['rush','pass']:['crush','cpass'],ab=function(x){return lg==='nfl'?nt(String(x||'').toUpperCase()):dlAb(lg,x)};
+  var advs=function(off,def){
+    var out=[];cats.forEach(function(c,k){var i=C.ix[c],lgA=atdLeague(lg,i),ao=atdTeamAvg(lg,off,i),b=cAllow(lg,i).by[def];if(!lgA||ao==null||!b||b.n<3)return;
+      var al=b.s/b.n,a=(ao/lgA)*(al/lgA)-1;out.push({a:a,k:k?'passing':'rushing',ao:ao,al:al,lgA:lgA})});
+    return out;
+  };
+  return {mine:advs(ab(mineAb),ab(theirAb)),their:advs(ab(theirAb),ab(mineAb))};
+}
+var gradeGame148=gradeGame;
+gradeGame=function(i){
+  var G=gradeGame148(i);
+  if(G&&!G.levDone){
+    G.levDone=true;
+    try{
+      var g=i.g,x=i.x;
+      if(x.t==='tot'){var m=gmLev(g,g.h,g.a);if(m){var all=m.mine.concat(m.their);if(all.length){var avg=all.reduce(function(s,q){return s+q.a},0)/all.length,pts=Math.max(-1,Math.min(1,avg/.2))*5*(x.over?1:-1);G.F.push({k:'Matchup',pts:Math.round(pts*10)/10,txt:'Both offenses line up '+(avg>=0?'well':'poorly')+' against the other defense, which points to '+(avg>=0?'more':'fewer')+' points'});G.sum+=pts}}}
+      else{
+        var mine=x.side==='h'?g.h:g.a,theirs=x.side==='h'?g.a:g.h,m2=gmLev(g,mine,theirs);
+        if(m2&&(m2.mine.length||m2.their.length)){
+          var am=m2.mine.length?m2.mine.reduce(function(s,q){return s+q.a},0)/m2.mine.length:0,at=m2.their.length?m2.their.reduce(function(s,q){return s+q.a},0)/m2.their.length:0;
+          var pts2=Math.max(-1,Math.min(1,(am-at)/.25))*8;
+          var best=m2.mine.slice().sort(function(a,b){return b.a-a.a})[0],worst=m2.their.slice().sort(function(a,b){return b.a-a.a})[0];
+          var parts=[];
+          if(best&&best.a>=.05)parts.push(mine+' can attack through '+best.k+': it gets about '+Math.round(best.ao)+' yards a game there and '+theirs+' allows '+Math.round(best.al));
+          if(worst&&worst.a>=.05)parts.push(theirs+' can hurt '+mine+' through '+worst.k);
+          G.F.push({k:'Matchup',pts:Math.round(pts2*10)/10,txt:parts.length?parts.join('. '):'Offense and defense line up '+(pts2>=0?'in its favor':'against it')});G.sum+=pts2;
+        }
+      }
+      G.letter=grLetter(G.sum);
+    }catch(e){}
+  }
+  return G;
 };
 try{render()}catch(e){}
 
