@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v201, Nov 8';
+var BUILD='v202, Nov 8';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -13681,6 +13681,44 @@ vBoard=function(){
         h=h.slice(0,a+10)+body+h.slice(b);
       }
     }
+  }catch(x){}
+  return h;
+};
+try{render()}catch(e){}
+
+/* v202: Hot, Cold and Best matchups load previous games on their own and say so while they do */
+var _lpT={};
+function loadPrev(lg){
+  if(window.claude||!DL_LG[lg])return;
+  var now=Date.now();if(_lpT[lg]&&now-_lpT[lg]<5*60000)return;_lpT[lg]=now;
+  try{Object.keys(S.dtTried||{}).forEach(function(k){if(k.indexOf(lg+'|')===0)delete S.dtTried[k]})}catch(e){}
+  try{if(!S.dgBusy)dlRead(lg)}catch(e){}
+  var tries=0,iv=setInterval(function(){
+    tries++;if(tries>120){clearInterval(iv);return}
+    if(S.dgBusy)return;clearInterval(iv);
+    try{dtRead(lg,null,function(){})}catch(e){}
+  },2000);
+}
+var vBoard202=vBoard;
+vBoard=function(){
+  var h=vBoard202.apply(this,arguments);
+  try{
+    var lg=S.sport;
+    if(!(S.bf==='hot'||S.bf==='cold'||S.bf==='match')||S.bc==='atd'||!DL_LG[lg]||window.claude)return h;
+    var n=Object.keys(S.dlog).filter(function(k){return S.dlog[k].lg===lg}).length,rows=[];
+    try{rows=pbRows(lg,S.bc)}catch(e){}
+    var withLog=rows.filter(function(o){return o.c}).length;
+    var thin=n<12||!rows.length||withLog<rows.length*.6;
+    if(thin)loadPrev(lg);
+    var k=h.indexOf('aria-label="Show"');if(k<0)return h;
+    var e=h.indexOf('</div>',k)+6;
+    var busy=S.dgBusy||S.dtBusy;
+    var card='<div class="card" style="padding:10px 12px;margin:6px 0 10px"><b>Previous games</b> <span class="src">'+n+' games read for '+esc(lgName(lg))+' · '+withLog+' of '+rows.length+' players have a history</span>'+
+      '<div class="src" style="margin-top:4px">Hot, Cold and Best matchups are built from each player’s past games. '+(busy?'Reading more now…':thin?'Not enough yet, so the app is loading them.':'')+'</div>'+
+      '<div class="src" style="margin-top:4px" data-rdmsg>'+esc(S.dgMsg||'')+(S.dtMsg?'<br>'+esc(S.dtMsg):'')+'</div>'+
+      '<div style="margin-top:6px"><button class="btn" data-act="dlread" data-v="'+esc(lg)+'">Load previous games now</button></div></div>';
+    if(!thin&&!busy)card='';
+    h=h.slice(0,e)+card+h.slice(e);
   }catch(x){}
   return h;
 };
