@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v196, Nov 8';
+var BUILD='v197, Nov 8';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -13541,6 +13541,89 @@ atdRows=function(g,pre){
     });
   }catch(e){}
   return R;
+};
+try{render()}catch(e){}
+
+/* v197: one prediction card per game and per prop, built from all the data the app has */
+function secCut(h,title){
+  var a=h.indexOf('<h3>'+title+'</h3>');if(a<0)return {h:h,s:''};
+  var re=/<h3|<h2|<details|<\/details>/g;re.lastIndex=a+8;var m=re.exec(h),b=m?m.index:h.length;
+  return {h:h.slice(0,a)+h.slice(b),s:h.slice(a,b)};
+}
+function secOf(h,title){return secCut(h,title).s}
+function prFactors(G,n){
+  var F=G.F.filter(function(f){return f.k!=='Price'&&f.k!=='Outside writers'&&f.txt});
+  var pro=F.filter(function(f){return f.pts>=2}).sort(function(a,b){return b.pts-a.pts}).slice(0,n||4),con=F.filter(function(f){return f.pts<=-2}).sort(function(a,b){return a.pts-b.pts}).slice(0,2);
+  return {pro:pro,con:con};
+}
+function prList(pro,con){
+  var li=function(x){return '<li>'+esc(x.txt)+'</li>'};
+  return (pro.length?'<ul class="pts" style="margin:6px 0 0">'+pro.map(li).join('')+'</ul>':'')+(con.length?'<div class="src" style="margin-top:6px"><b>What could go wrong</b></div><ul class="pts" style="margin:2px 0 0">'+con.map(li).join('')+'</ul>':'');
+}
+function gmCard(g){
+  var lg=g.lg,m=null,ps=null,L=null;
+  try{m=pickModel(g);L=m&&m.ln&&m.ln.pts!=null?m.mk:0;if(m&&m.M!=null)ps=predScore(g,m,L,'a','h')}catch(e){}
+  var na=shortNm(g,'a'),nh=shortNm(g,'h'),head='',sc='';
+  if(ps){var hw=ps.h>=ps.a,mg=Math.abs(ps.h-ps.a);head=(hw?nh:na)+' by '+mg.toFixed(1);sc=(hw?nh+' '+hbF0(ps.h)+', '+na+' '+hbF0(ps.a):na+' '+hbF0(ps.a)+', '+nh+' '+hbF0(ps.h))+' · total '+hbF0(ps.h+ps.a)}
+  var picks=[];try{picks=pkGame(lg).filter(function(i){return i.g.id===g.id})}catch(e){}
+  var best=picks.filter(function(i){return i.x.t==='sp'||i.x.t==='ml'}).sort(function(a,b){return b.x.p-a.x.p})[0],tot=picks.filter(function(i){return i.x.t==='tot'}).sort(function(a,b){return b.x.p-a.x.p})[0];
+  var rows='',story='';
+  [best,tot].forEach(function(i){
+    if(!i)return;var G=null;try{G=gradeGame(i)}catch(e){}
+    rows+='<div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline;margin-top:8px"><span><b>'+esc(i.x.pick)+'</b> <span class="src">'+Math.round(i.x.p*100)+'% chance</span></span>'+(G?grPill(G.letter):'')+'</div>';
+    if(G&&i===best){var F=prFactors(G,4);story+=prList(F.pro,F.con)}
+  });
+  if(tot){try{var Gt=gradeGame(tot),Ft=prFactors(Gt,2);if(Ft.pro.length)story+='<div class="src" style="margin-top:8px"><b>The total</b></div>'+prList(Ft.pro,[])}catch(e){}}
+  /* key players with their matchup edge */
+  var pl='';
+  try{
+    var R=gpRows(g),seen={},T={};
+    R.forEach(function(o){var k=normName(o.r.n);if(seen[k]||!o.gr)return;seen[k]=1;var t=bkAb(lg,o.r.t);T[t]=(T[t]||0)+1;if(T[t]>2)return;
+      var lv=pbLev(lg,o.cat,o.r,o,o.gr.dir),ln=lv&&lv.L.filter(function(x){return !/^He accounts/.test(x)})[0];
+      pl+='<li><b>'+esc(o.r.n)+'</b> '+esc(o.r.t)+': projected '+esc(o.r.projTxt||'')+' '+esc(o.r.unit||'')+', '+o.gr.dir.toLowerCase()+' '+(o.ln&&o.ln.v!=null?o.ln.v:'')+' · grade '+esc(o.gr.letter)+(ln?'. '+esc(ln):'')+'</li>'});
+  }catch(e){}
+  var inj='';try{var kT=function(x){return lg==='nfl'?nt(bkAb(lg,x)):bkAb(lg,x)};[[g.a],[g.h]].forEach(function(t){var o=grOutW(lg,kT(t[0]));if(o.names.length)inj+='<li>'+esc(t[0])+' without '+esc(o.names.slice(0,4).join(', '))+'</li>'})}catch(e){}
+  var wx='';try{var w=grWind(lg,g.h);if(w&&w.wavg>=12)wx='<li>Wind near '+Math.round(w.wavg)+' mph, which cuts passing and kicking</li>'}catch(e){}
+  if(!head&&!rows&&!pl)return '';
+  return '<h3>Prediction</h3><div class="card bcard" style="padding:12px"><div class="teams">'+esc(head||'Prediction building')+'</div>'+(sc?'<div class="facts" style="margin-top:4px"><span>'+esc(sc)+'</span></div>':'')+rows+story+
+    (pl?'<div class="src" style="margin-top:10px"><b>How the key players fit</b></div><ul class="pts" style="margin:2px 0 0">'+pl+'</ul>':'')+
+    ((inj||wx)?'<div class="src" style="margin-top:8px"><b>Health and weather</b></div><ul class="pts" style="margin:2px 0 0">'+inj+wx+'</ul>':'')+
+    '<p class="src" style="margin:8px 0 0">Built from this season’s team and player box scores, how each side matches up with the other, injuries and weather. Small samples early in the season can mislead.</p></div>';
+}
+var feedSheet151=feedSheet;
+feedSheet=function(g){
+  var h=feedSheet151.apply(this,arguments);
+  try{
+    if(kind(g)!=='up'||!DL_LG[g.lg]||g.lg==='mlb')return h;
+    var head=h.slice(0,h.search(/<h3|<details|<h2 style/)),card=gmCard(g);
+    if(!card)return h;
+    var keep='';
+    ['Picks for this game','Player props for this game','Season stats for the key players','Props the app predicted'].forEach(function(t){keep+=secOf(h,t)});
+    var td='';try{td=atdHtml(g)}catch(e){}
+    var rest='';try{var L=bkProps(g);rest=(L.length?'<h3>Player projections</h3>'+bkTable(g,L)+'<h3>Correlated parlays</h3>'+bkParlays(g,L):'')}catch(e){}
+    var odds='';try{odds=dkLine(g)}catch(e){}
+    return head+card+td+keep+rest+odds+'</div>';
+  }catch(e){return h}
+};
+/* player window: one prediction card replaces the separate matchup and report card sections */
+var pbSheet151=pbSheet;
+pbSheet=function(s){
+  var h=pbSheet151.apply(this,arguments);
+  try{
+    var lg=s.lg,o=null;pbRows(lg,s.cat).forEach(function(q){if(!o&&normName(q.r.n)===normName(s.n))o=q});
+    if(!o)return h;
+    var G=gradeBest(lg,s.cat,o.r,o);if(!G)return h;
+    h=secCut(h,'The matchup').h;h=secCut(h,'Report card').h;
+    var F=prFactors(G,5),lv=G.lev||pbLev(lg,s.cat,o.r,o,G.dir),M=lv?lv.L.filter(function(x){return !/^He accounts/.test(x)}):[];
+    var pro=F.pro.filter(function(f){return f.k!=='Leverage'});
+    var card='<h3>Prediction</h3><div class="card bcard" style="padding:12px"><div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><div class="teams" style="font-size:22px">'+esc(o.r.projTxt||'')+' <span class="src">'+esc(o.r.unit||'projected')+'</span></div>'+grPill(G.letter)+'</div>'+
+      '<div class="src" style="margin-top:4px">'+G.dir+' '+(o.ln&&o.ln.v!=null?o.ln.v:s.line)+' is the lean · '+(o.c?'season '+fmt106(o.c.s.avg)+', last 5 '+fmt106(o.c.l5.avg):'no game log yet')+'</div>'+
+      (M.length?'<div class="src" style="margin-top:8px"><b>'+(G.dir==='Over'?'How '+esc(s.n)+' can use the matchup':'What could hold '+esc(s.n)+' down')+'</b></div><ul class="pts" style="margin:2px 0 0">'+M.slice(0,3).map(function(x){return '<li>'+esc(x)+'</li>'}).join('')+'</ul>':'')+
+      (pro.length?'<div class="src" style="margin-top:8px"><b>Also pointing this way</b></div><ul class="pts" style="margin:2px 0 0">'+pro.map(function(f){return '<li>'+esc(f.txt)+'</li>'}).join('')+'</ul>':'')+
+      (F.con.length?'<div class="src" style="margin-top:8px"><b>What could go wrong</b></div><ul class="pts" style="margin:2px 0 0">'+F.con.map(function(f){return '<li>'+esc(f.txt)+'</li>'}).join('')+'</ul>':'')+'</div>';
+    var i=h.indexOf('<h3');h=i>=0?h.slice(0,i)+card+h.slice(i):h+card;
+  }catch(e){}
+  return h;
 };
 try{render()}catch(e){}
 
