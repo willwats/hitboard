@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v211, Nov 8';
+var BUILD='v212, Nov 8';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -13946,6 +13946,93 @@ pbRows=function(lg,cat){
       return true;
     });
   }catch(e){return rows}
+};
+try{render()}catch(e){}
+
+/* v212: a cleaner look: grade first cards, labeled filters, tidier game window and pick cards */
+(function(){
+  var st=document.createElement('style');st.id='ui212';
+  st.textContent=[
+    '.card{border-radius:14px}',
+    '.chip{padding:7px 14px;font-size:14px}',
+    '.ctl-l{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:2px 0 4px;font-weight:600}',
+    '.pc{padding:12px 14px;margin:0 0 10px;cursor:pointer}',
+    '.pc-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}',
+    '.pc-name{font-weight:700;font-size:16px;line-height:1.25}',
+    '.pc-sub{color:var(--muted);font-size:12.5px;margin-top:2px}',
+    '.pc-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}',
+    '.pc-tag{font-size:11.5px;padding:2px 8px;border-radius:999px;background:var(--surface2);color:var(--ink)}',
+    '.pc-tag.hot{background:#1a8d5a22;color:#1a8d5a}.pc-tag.cold{background:#c0392b22;color:#c0392b}.pc-tag.warn{background:#d9a40022;color:#9a7500}',
+    '.pc-grade{flex:none;min-width:58px;text-align:center;border-radius:12px;padding:6px 8px;background:var(--surface2)}',
+    '.pc-grade b{display:block;font-size:24px;line-height:1.05;font-weight:800}',
+    '.pc-grade small{display:block;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em}',
+    '.pc-grade.hi{background:#1a8d5a22;color:#1a8d5a}.pc-grade.lo{background:#c0392b22;color:#c0392b}',
+    '.pc-proj{margin-top:8px;font-size:14px}.pc-proj b{font-size:20px}',
+    '.pc-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px}',
+    '.pc-stats div{background:var(--surface2);border-radius:10px;padding:5px 6px;text-align:center;font-size:11px;color:var(--muted)}',
+    '.pc-stats b{display:block;font-size:15px;color:var(--ink)}',
+    '.pc-why{margin-top:8px;font-size:13px;color:var(--muted);line-height:1.35}',
+    '.pc-why b{color:var(--ink)}',
+    '.pk-more{color:var(--muted);font-size:12.5px;margin-top:4px}'
+  ].join('\n');
+  document.head.appendChild(st);
+})();
+var pbCard157=pbCard;
+pbCard=function(o){
+  var old=pbCard157(o);
+  try{
+    var r=o.r,c=o.c,open=old.slice(0,old.indexOf('>')+1).replace(/ style="[^"]*"/,'').replace('class="card"','class="card pc"');
+    var pills=[],re=/<span class="(hrpill|tag)([^"]*)"[^>]*>([^<]*)<\/span>/g,m,grade=null,gdir='';
+    while((m=re.exec(old))){var t=m[3].trim(),gm=/^([A-F][+-]?) (Over|Under)$/.exec(t);if(gm&&!grade){grade=gm[1];gdir=gm[2]}else if(t)pills.push({k:m[2],t:t})}
+    var tags=pills.map(function(p){var cl=/Hot|up/i.test(p.t)?'hot':/Cold|down/i.test(p.t)?'cold':/warn/.test(p.k)?'warn':'';return '<span class="pc-tag '+cl+'">'+esc(p.t)+'</span>'}).join('');
+    var when=(r.when||'').replace(/^at |^vs /,'');
+    var sub=esc(r.t)+(r.pos?' · '+esc(r.pos):'')+' · '+esc(r.gl||'')+(when?' · '+esc(when):'');
+    var line=o.ln&&o.ln.v!=null?o.ln.v:null;
+    var stats='';
+    if(c&&c.l5&&c.l5.n){
+      var h5=gdir==='Under'?c.l5.h.u:c.l5.h.o;
+      stats='<div class="pc-stats"><div>Last 5<b>'+fmt106(c.l5.avg)+'</b></div><div>Last 10<b>'+fmt106(c.l10.avg)+'</b></div><div>Season<b>'+fmt106(c.s.avg)+'</b></div><div>'+(gdir||'Over')+' '+(line!=null?line:'')+'<b>'+h5+' of '+c.l5.n+'</b></div></div>';
+    }else stats='<div class="pc-why">'+esc(r.avgTxt||'')+'. No game log loaded yet.</div>';
+    var why='',ws=/<div class="src"[^>]*>(<b>(?:Matchup|Weather)[\s\S]*?)<\/div>/g,wm;
+    while((wm=ws.exec(old)))why+='<div>'+wm[1]+'</div>';
+    var wx=/Weather:[\s\S]*?(?=<\/div>)/.exec(old);
+    return open+'<div class="pc-top"><div style="min-width:0"><div class="pc-name">'+esc(r.n)+'</div><div class="pc-sub">'+sub+'</div>'+(tags?'<div class="pc-tags">'+tags+'</div>':'')+'</div>'+
+      (grade?'<div class="pc-grade '+grCls(grade)+'"><b>'+esc(grade)+'</b><small>'+gdir+'</small></div>':'')+'</div>'+
+      '<div class="pc-proj"><b>'+esc(r.projTxt||'')+'</b> '+esc(r.unit||'')+' projected'+(line!=null?' · line '+line:'')+'</div>'+stats+(why?'<div class="pc-why">'+why+'</div>':'')+'</div>';
+  }catch(e){return old}
+};
+var vBoard157=vBoard;
+vBoard=function(){
+  var h=vBoard157.apply(this,arguments);
+  try{
+    h=h.replace('Hot · over<','Hot<').replace('Cold · under<','Cold<');
+    var lab={Sport:'Sport',Stat:'Stat',Show:'View'};
+    h=h.replace(/<div class="chips" role="group" aria-label="(Sport|Stat|Show)">/g,function(m,k){return '<div class="ctl-l">'+lab[k]+'</div>'+m});
+  }catch(e){}
+  return h;
+};
+/* pick cards: drop the filler line, show a tap cue */
+var pkGameCard157=pkGameCard;
+pkGameCard=function(i){
+  var h=pkGameCard157(i);
+  h=h.replace('Tap for the full matchup','View matchup ›').replace('Tap for the reason and matchup','View matchup ›');
+  h=h.replace(/<span class="hrpill (hi|mid|lo)"[^>]*>([A-F][+-]?)<\/span>/,function(m,c,l){return '<span class="pc-grade '+c+'" style="min-width:46px;padding:4px 6px"><b style="font-size:19px">'+l+'</b></span>'});
+  return h;
+};
+/* game window: remove the empty "players and props" notice */
+function stripCard(h,phrase,must){
+  var a=h.indexOf(phrase);if(a<0)return h;
+  var s=h.lastIndexOf('<div class="card"',a);if(s<0)return h;
+  var re=/<div\b|<\/div>/g,d=0,m,end=-1;re.lastIndex=s;
+  while((m=re.exec(h))){if(m[0]==='</div>'){d--;if(d===0){end=m.index+6;break}}else d++}
+  if(end<0||(must&&h.slice(s,end).indexOf(must)<0))return h;
+  return h.slice(0,s)+h.slice(end);
+}
+var feedSheet157=feedSheet;
+feedSheet=function(g){
+  var h=feedSheet157.apply(this,arguments);
+  try{h=stripCard(h,'Players and props in this game','listed under')}catch(x){}
+  return h;
 };
 try{render()}catch(e){}
 
