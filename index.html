@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v212, Nov 8';
+var BUILD='v213, Nov 12';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -13014,6 +13014,7 @@ function gmPred(g){
       }
     }
   }catch(e){out=''}
+  try{if(out){var GS=gameScript(g);if(GS&&GS.short)out+='<div class="src" style="margin-top:3px">'+esc(GS.short)+'</div>'}}catch(e){}
   _gpC[k]=out;return out;
 }
 var schRow144=schRow;
@@ -13601,14 +13602,15 @@ function gmCard(g){
   var pl='';
   try{
     var R=gpRows(g),seen={},T={};
-    R.forEach(function(o){var k=normName(o.r.n);if(seen[k]||!o.gr)return;seen[k]=1;var t=bkAb(lg,o.r.t);T[t]=(T[t]||0)+1;if(T[t]>2)return;
+    R.forEach(function(o){var k=normName(o.r.n);if(seen[k]||!o.gr)return;var rl0=null;try{rl0=depRole(lg,o.r.t,o.r.n)}catch(e){}if(rl0&&!rl0.start)return;seen[k]=1;var t=bkAb(lg,o.r.t);T[t]=(T[t]||0)+1;if(T[t]>2)return;
       var lv=pbLev(lg,o.cat,o.r,o,o.gr.dir),ln=lv&&lv.L.filter(function(x){return !/^He accounts/.test(x)})[0];
       pl+='<li><b>'+esc(o.r.n)+'</b> '+esc(o.r.t)+': projected '+esc(o.r.projTxt||'')+' '+esc(o.r.unit||'')+', '+o.gr.dir.toLowerCase()+' '+(o.ln&&o.ln.v!=null?o.ln.v:'')+' · grade '+esc(o.gr.letter)+(ln?'. '+esc(ln):'')+'</li>'});
   }catch(e){}
   var inj='';
   var wx='';try{var wt=String(wxLong(g)||'').replace(/<[^>]*>/g,'').replace(/ ?\(Open-Meteo\)/,'').replace(/^Forecast for the start:/,'Forecast for the start:').trim();if(wt)wx='<li>'+esc(wt)+'</li>'}catch(e){}
+  var scr='';try{var GS=gameScript(g);if(GS)scr='<div class="src" style="margin-top:10px"><b>How I think it plays out</b></div><p style="margin:4px 0 0;font-size:14px;line-height:1.45">'+esc(GS.full.join(' '))+'</p>'+(GS.more.length?'<ul class="pts" style="margin:4px 0 0">'+GS.more.map(function(x){return '<li>'+esc(x)+'</li>'}).join('')+'</ul>':'')+'<p class="src" style="margin:4px 0 0">'+esc(GS.note)+'</p>'}catch(e){}
   if(!head&&!rows&&!pl)return '';
-  return '<h3>Prediction</h3><div class="card bcard" style="padding:12px"><div class="teams">'+esc(head||'Prediction building')+'</div>'+(sc?'<div class="facts" style="margin-top:4px"><span>'+esc(sc)+'</span></div>':'')+rows+story+
+  return '<h3>Prediction</h3><div class="card bcard" style="padding:12px"><div class="teams">'+esc(head||'Prediction building')+'</div>'+(sc?'<div class="facts" style="margin-top:4px"><span>'+esc(sc)+'</span></div>':'')+scr+rows+story+
     (pl?'<div class="src" style="margin-top:10px"><b>How the key players fit</b></div><ul class="pts" style="margin:2px 0 0">'+pl+'</ul>':'')+
     ((inj||wx)?'<div class="src" style="margin-top:8px"><b>Weather</b></div><ul class="pts" style="margin:2px 0 0">'+inj+wx+'</ul>':'')+
     '<p class="src" style="margin:8px 0 0">Built from this season’s team and player box scores, how each side matches up with the other, injuries and weather. Small samples early in the season can mislead.</p></div>';
@@ -14035,6 +14037,97 @@ feedSheet=function(g){
   return h;
 };
 try{render()}catch(e){}
+
+/* ---------- block158 (v213): depth charts for starters, and a plain-language game script ---------- */
+S.dep=S.dep||{};S.depAt=0;S.depBusy=false;S.depN=0;
+var DEP_START={qb:1,rb:1,wr:3,te:1};
+function depParse(j){
+  var out={};
+  var walk=function(o,key){
+    if(!o||typeof o!=='object')return;
+    if(Array.isArray(o)){o.forEach(function(c){walk(c,key)});return}
+    if(Array.isArray(o.athletes)&&o.athletes.length){
+      var pk=String(key||(o.position&&(o.position.abbreviation||o.position.name))||'').toLowerCase();
+      if(/^(qb|rb|wr|te)$/.test(pk)&&!out[pk]){
+        var L=[];o.athletes.forEach(function(a){var p=a&&(a.athlete||a);var n=p&&(p.displayName||p.fullName);if(n)L.push(n)});
+        if(L.length)out[pk]=L;
+      }
+    }
+    Object.keys(o).forEach(function(k){if(o[k]&&typeof o[k]==='object')walk(o[k],/^[a-z]{2,3}$/i.test(k)?k:key)});
+  };
+  walk(j.depthchart||j.depthCharts||j,null);
+  return out;
+}
+function loadDepth(){
+  if(window.claude||typeof fetch!=='function'||S.depBusy)return Promise.resolve();
+  var now=Date.now();if(now-S.depAt<3*3600000)return Promise.resolve();
+  var teams={};(S.feed.nfl||[]).forEach(function(g){if(kind(g)==='final')return;teams[nt(g.a)]={ab:g.a,nm:g.an};teams[nt(g.h)]={ab:g.h,nm:g.hn}});
+  var ks=Object.keys(teams);if(!ks.length)return Promise.resolve();
+  S.depBusy=true;
+  return Promise.all(ks.map(function(k){
+    return tmIdFor('nfl',teams[k].ab,teams[k].nm).then(function(id){
+      return getJson('https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/'+id+'/depthcharts');
+    }).then(function(j){var d=depParse(j);if(d.qb||d.rb||d.wr){S.dep[k]=d;S.depN++}}).catch(function(){});
+  })).then(function(){
+    S.depBusy=false;S.depAt=Date.now();
+    try{grCache={}}catch(e){}
+    try{if(!S.sheet)softRender()}catch(e){}
+  });
+}
+function depRole(lg,team,name){
+  if(lg!=='nfl')return null;var D=S.dep[nt(team)];if(!D)return null;
+  var n=normName(name),res=null;
+  ['qb','rb','wr','te'].forEach(function(p){(D[p]||[]).forEach(function(x,i){if(!res&&normName(x)===n)res={pos:p.toUpperCase(),rank:i+1,start:i<DEP_START[p]}})});
+  return res;
+}
+function depStarter(lg,team,pos){var D=S.dep[nt(team)];return D&&D[pos]&&D[pos][0]||null}
+setTimeout(loadDepth,2500);setInterval(loadDepth,30*60000);
+
+/* game script: what the numbers say about how the game flows */
+var _gsC={};
+function gameScript(g){
+  var k=g.id+'|'+S.feedAt+'|'+S.depAt+'|'+Math.floor(Date.now()/120000);if(k in _gsC)return _gsC[k];
+  var out=null;
+  try{
+    var lg=g.lg;if(kind(g)!=='up'||!DL_LG[lg]||lg==='mlb'){_gsC[k]=null;return null}
+    var m=pickModel(g);if(!m||m.M==null){_gsC[k]=null;return null}
+    var L=m.ln&&m.ln.pts!=null?m.mk:0,ps=predScore(g,m,L,'a','h');if(!ps){_gsC[k]=null;return null}
+    var na=shortNm(g,'a'),nh=shortNm(g,'h'),hw=ps.h>=ps.a,fav=hw?nh:na,dog=hw?na:nh,fs=hw?'h':'a',mg=Math.abs(ps.h-ps.a),tot=ps.h+ps.a;
+    var S1=[],S2=[];
+    var close=lg==='nhl'?mg<.5:lg==='nba'||lg==='ncaamb'?mg<4:mg<4;
+    S1.push(close?'This looks like a close game that '+fav+' edges.':fav+' should control it and win by about '+mg.toFixed(lg==='nhl'?1:0)+'.');
+    /* pace against this league's recent average */
+    var sum=0,n=0;(S.feed[lg]||[]).forEach(function(x){if(kind(x)==='final'&&x.sa!=null&&x.sh!=null){sum+=x.sa+x.sh;n++}});
+    if(n>=8){var av=sum/n,d=tot-av,tol=lg==='nhl'?.6:av*.04;S1.push(d>tol?'The projected total of '+hbF0(tot)+' is above the recent average of '+hbF0(av)+', so expect scoring and fast possessions.':d<-tol?'The projected total of '+hbF0(tot)+' is below the recent average of '+hbF0(av)+', so expect a slower, lower-scoring game.':'The projected total of '+hbF0(tot)+' is close to the recent average.')}
+    /* football: where each offense has the edge */
+    if(lg==='nfl'||lg==='ncaafb'){
+      var lv=gmLev(g,g.a,g.h);
+      if(lv){
+        [['a',na,lv.mine],['h',nh,lv.their]].forEach(function(t){
+          var z=t[2]||[];if(!z.length)return;var b=z.slice().sort(function(x,y){return Math.abs(y.a)-Math.abs(x.a)})[0];
+          if(Math.abs(b.a)<.06)return;
+          S2.push(t[1]+(b.a>0?' have the edge through the '+(b.k==='passing'?'air':'ground'):' will find the '+b.k+' game hard against this defense')+' ('+(b.a>0?'+':'')+Math.round(b.a*100)+'% vs a typical matchup).');
+        });
+      }
+      /* starters from the depth chart */
+      var qa=lg==='nfl'?depStarter(lg,g.a,'qb'):null,qh=lg==='nfl'?depStarter(lg,g.h,'qb'):null;
+      if(qa||qh)S2.push('Starting quarterbacks: '+(qa?qa+' ('+na+')':'')+(qa&&qh?', ':'')+(qh?qh+' ('+nh+')':'')+'.');
+    }
+    /* the players the model likes, starters first */
+    var R=gpRows(g),seen={},ft=[];
+    R.forEach(function(o){if(!o.gr||seen[normName(o.r.n)])return;seen[normName(o.r.n)]=1;
+      var rl=depRole(lg,o.r.t,o.r.n);if(rl&&!rl.start)return;
+      if(o.gr.sum>=8&&ft.length<3)ft.push(o.r.n+' ('+o.gr.dir.toLowerCase()+' '+(o.ln&&o.ln.v!=null?o.ln.v:'')+(rl?', '+rl.pos+rl.rank:'')+')')});
+    if(ft.length)S2.push('Best prop spots in this script: '+ft.join(', ')+'.');
+    /* weather */
+    try{var wt=String(wxLong(g)||'').replace(/<[^>]*>/g,''),mm=wt.match(/(\d+)\s*mph/);
+      if(!/not known|no forecast|loads in the phone|Check wind/i.test(wt)&&(/rain|snow|shower|storm/i.test(wt)||(mm&&+mm[1]>=15)))S2.push('Weather could slow the passing game and shorten the game: '+wt.replace(/ ?\(Open-Meteo\)/,'').replace(/^Forecast for the start:\s*/,'').slice(0,90)+'.');
+    }catch(e){}
+    var dn=lg==='nfl'?(S.depN?'Depth charts loaded for '+Object.keys(S.dep).length+' NFL teams; players who are out or off the roster are left out.':'Depth chart could not be loaded, so starters come from rosters and the injury report only.'):'Starters come from current rosters and the injury report (no depth chart for this league).';
+    out={short:S1.slice(0,2).join(' '),full:S1,more:S2,note:dn};
+  }catch(e){out=null}
+  _gsC[k]=out;return out;
+}
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
