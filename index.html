@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v214, Nov 13';
+var BUILD='v215, Nov 13';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -13014,7 +13014,7 @@ function gmPred(g){
       }
     }
   }catch(e){out=''}
-  try{if(out){var GS=gameScript(g);if(GS&&GS.short)out+='<div class="src" style="margin-top:3px">'+esc(GS.short)+'</div>'}}catch(e){}
+  try{if(out){var GS=gameScript(g,true);if(GS&&GS.short)out+='<div class="src" style="margin-top:3px">'+esc(GS.short)+'</div>'}}catch(e){}
   _gpC[k]=out;return out;
 }
 var schRow144=schRow;
@@ -14085,8 +14085,8 @@ setTimeout(loadDepth,2500);setInterval(loadDepth,30*60000);
 
 /* game script: what the numbers say about how the game flows */
 var _gsC={};
-function gameScript(g){
-  var k=g.id+'|'+S.feedAt+'|'+S.depAt+'|'+Math.floor(Date.now()/120000);if(k in _gsC)return _gsC[k];
+function gameScript(g,light){
+  var k=(light?'L':'F')+g.id+'|'+S.feedAt+'|'+S.depAt+'|'+Math.floor(Date.now()/120000);if(k in _gsC)return _gsC[k];
   var out=null;
   try{
     var lg=g.lg;if(kind(g)!=='up'||!DL_LG[lg]||lg==='mlb'){_gsC[k]=null;return null}
@@ -14114,7 +14114,7 @@ function gameScript(g){
       if(qa||qh)S2.push('Starting quarterbacks: '+(qa?qa+' ('+na+')':'')+(qa&&qh?', ':'')+(qh?qh+' ('+nh+')':'')+'.');
     }
     /* the players the model likes, starters first */
-    var R=gpRows(g),seen={},ft=[];
+    var R=light?[]:gpRows(g),seen={},ft=[];
     R.forEach(function(o){if(!o.gr||seen[normName(o.r.n)])return;seen[normName(o.r.n)]=1;
       var rl=depRole(lg,o.r.t,o.r.n);if(rl&&!rl.start)return;
       if(o.gr.sum>=8&&ft.length<3)ft.push(o.r.n+' ('+o.gr.dir.toLowerCase()+' '+(o.ln&&o.ln.v!=null?o.ln.v:'')+(rl?', '+rl.pos+rl.rank:'')+')')});
@@ -14212,6 +14212,55 @@ schRow=function(g){
     var i=h.lastIndexOf('</div>');if(i<0)return h;
     return h.slice(0,i)+'<div class="src" style="margin-top:3px">Experts: '+esc(e.ln)+' · '+esc(e.ag)+'</div>'+h.slice(i);
   }catch(x){return h}
+};
+
+/* ---------- block160 (v215): more expert insight, expert cover picks on the Picks tab ---------- */
+var EXP_X={
+ 'KC@ATL':['Kansas City bounced back from road losses at Seattle and Denver, and Atlanta is on a two-game skid.'],
+ 'MIN@GB':['Minnesota’s defense ranks first in points allowed (about 14.5 a game) and second in yards. Minnesota won Week 1 by 17 over Green Bay.','Kirk Cousins joins Minnesota and already knows the offense from his earlier time there.','One writer thinks 3.5 points is too many for Green Bay with Josh Jacobs out.'],
+ 'BUF@NYJ':['Buffalo swept the Jets in 2024 and 2025 and outscored them 128–52 over those four games.'],
+ 'SF@DAL':['San Francisco has won four straight against Dallas, including two playoff games. Dallas averaged about 16 points in that stretch.'],
+ 'HOU@CLE':['Houston started 0-4, has won three of four since, and is in the wild-card race.'],
+ 'CAR@NO':['The winner takes sole possession of first place in the NFC South. Carolina has lost three straight; New Orleans won a close overtime game.'],
+ 'LAR@ARI':['Arizona already beat the Rams earlier this season, so one writer does not treat this as a lock.'],
+ 'PIT@CIN':['Cincinnati’s offense is built around Burrow, Chase and Higgins, which several writers think is enough.'],
+ 'NE@DET':['Detroit has won four straight, mostly on defense, though its offense has cooled. New England has covered well as a road underdog.'],
+ 'LAC@BAL':['Baltimore traded for Jacoby Brissett and has a new playcaller, with Derrick Henry anchoring the run game. The Chargers are missing S Derwin James. One writer sees a first win possible for Los Angeles but has low confidence.'],
+ 'JAX@TEN':['Jacksonville made aggressive deadline trades to win now, including defensive help.']
+};
+var expFor159=expFor;
+expFor=function(g){
+  var e=expFor159(g);if(!e)return e;
+  if(e.lg==='nfl'){var x=EXP_X[e.a+'@'+e.h];if(x&&!e._x){var c={};Object.keys(e).forEach(function(k){c[k]=e[k]});c.why=(e.why||[]).concat(x);c._x=1;return c}}
+  return e;
+};
+/* picks tab: every game with an expert pick, grouped by sport, with who covers */
+function expPicksSec(lgs){
+  var out='',any=false,now=Date.now();
+  lgs.forEach(function(lg){
+    if(lg!=='nfl'&&lg!=='ncaafb')return;
+    var L=(S.feed[lg]||[]).filter(function(g){return kind(g)==='up'&&g.start<now+9*864e5}).sort(function(a,b){return a.start-b.start}),rows='';
+    L.forEach(function(g){
+      var e=expFor(g);if(!e)return;
+      var na=shortNm(g,'a'),nh=shortNm(g,'h'),nm=function(s){return s==='a'?na:nh};
+      var cov=e.cov?'To cover: <b>'+esc(nm(e.cov))+'</b>':'<b>Split</b> on the cover',appTx='';
+      try{var m=pickModel(g);if(m&&m.ln&&m.ln.pts!=null&&m.M!=null&&e.cov){var cs=m.M-m.mk>=0?'h':'a';appTx=cs===e.cov?'<span class="tag" style="font-size:10px;padding:1px 6px">App agrees</span>':'<span class="tag warn" style="font-size:10px;padding:1px 6px">App disagrees</span>'}}catch(x){}
+      var t=new Date(g.start).toLocaleDateString([],{weekday:'short'})+' '+new Date(g.start).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
+      rows+='<div data-act="fgame" data-id="'+esc(g.id)+'" style="padding:10px 0;border-top:1px solid var(--line);cursor:pointer"><div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><span><b>'+esc(na)+' @ '+esc(nh)+'</b></span><span class="src">'+esc(t)+'</span></div><div style="margin-top:3px">'+cov+' · '+esc(e.ln)+' '+appTx+'</div><div class="src" style="margin-top:2px">'+esc(e.ag)+'</div></div>';
+    });
+    if(rows){any=true;out+='<p class="src" style="margin:8px 0 0"><b>'+esc(lgName(lg))+'</b></p><div class="card" style="padding:4px 12px">'+rows.replace(/^<div([^>]*)border-top:1px solid var\(--line\);/,'<div$1')+'</div>'}
+  });
+  if(!any)return '<h3>Expert locks</h3><div class="card empty">No expert picks are entered for the games in this view. They cover the NFL and college football games this weekend.</div>';
+  return '<h3>Expert locks: who covers</h3><p class="src" style="margin:0 0 4px">Tap a game for the reasons and injuries. Entered by hand as of '+EXP_AT+'; it does not update live.</p>'+out;
+}
+var vPicks2_159=vPicks2;
+vPicks2=function(){
+  var h=vPicks2_159.apply(this,arguments);
+  try{
+    var lgs=S.pks==='all'||!S.pks?['nfl','ncaafb']:[S.pks],sec=expPicksSec(lgs),i=h.indexOf('<h3');
+    if(i<0)return h+sec;
+    return h.slice(0,i)+sec+h.slice(i);
+  }catch(e){return h}
 };
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
