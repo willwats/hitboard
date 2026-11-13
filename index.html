@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v213, Nov 12';
+var BUILD='v214, Nov 13';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -14128,6 +14128,91 @@ function gameScript(g){
   }catch(e){out=null}
   _gsC[k]=out;return out;
 }
+
+/* ---------- block159 (v214): expert locks, entered by hand from this week's expert picks and injury reports ---------- */
+var EXP_AT='Nov 13';
+var EXPERTS=[
+ /* NFL: a/h are team abbreviations; win = who most experts pick straight up; cov = side most take against the spread (null = split) */
+ {lg:'nfl',a:'NE',h:'DET',win:'h',cov:null,ln:'Lions -2.5',ag:'About 4 of 6 pick the Lions, but the cover is split',why:['Detroit’s offense is explosive and New England’s defense just gave up 45.','The other side: Detroit’s defense is banged up and Drake Maye can attack a weak secondary.'],watch:['Patriots: RBs Henderson and Stevenson out, CB Carlton Davis out, A.J. Brown limited.','Lions: Goff (chest) and St. Brown (ribs) limited, S Kerby Joseph out.','Played in Munich, so travel and the early start matter.']},
+ {lg:'nfl',a:'KC',h:'ATL',win:'a',cov:'a',ln:'Chiefs -3.5',ag:'Every expert picks the Chiefs, and nearly all cover too',why:['Kansas City’s run defense and pass rush match up well against an Atlanta defense that has slipped.','Atlanta traded two starters and is coming off the trip back from Spain.'],watch:['Mahomes practiced fully after the elbow scare.','Falcons: WR Zachariah Branch (hamstring) and DE James Pearce Jr. (back) did not practice.']},
+ {lg:'nfl',a:'BUF',h:'NYJ',win:'a',cov:null,ln:'Bills -8.5',ag:'Experts like the Bills to win; the cover is split about evenly',why:['Buffalo is 10-2 against the Jets since 2020 and has won recent meetings by wide margins.','Doubters say the Bills’ defense and a short week make a big number risky.'],watch:['Jets WR Garrett Wilson is in the concussion protocol.','Bills: OT Dawkins, TE Kincaid and G Anderson are all questionable.']},
+ {lg:'nfl',a:'MIA',h:'IND',win:'h',cov:null,ln:'Colts -3.5',ag:'Most lean Colts, but nobody is confident',why:['Miami starts rookie Kyle McCord after Malik Willis went to injured reserve.','One writer calls it a stay-away.'],watch:['Colts RB Jonathan Taylor limited for rest, TE Mo Alie-Cox (groin) questionable.','Dolphins: C Aaron Brewer (concussion), WR Chris Bell (knee).']},
+ {lg:'nfl',a:'MIN',h:'GB',win:'h',cov:null,ln:'Packers -3',ag:'Packers lean straight up, cover is split',why:['Green Bay’s passing game has been hot, and Minnesota’s quarterback situation is unsettled.','The other side: Minnesota’s defense has been strong and Green Bay has a long injury list.'],watch:['Vikings: Kyler Murray out (hamstring), Wentz (ankle) may start, Hockenson and Jennings did not practice.','Packers: RB Josh Jacobs out (finger), Kaleb Johnson may lead the backfield.']},
+ {lg:'nfl',a:'CAR',h:'NO',win:'a',cov:'a',ln:'Panthers -1.5 / Saints -2.5 (lines vary)',ag:'Most experts take Carolina',why:['New Orleans is reported as 0-5 against the spread at home.','Carolina’s running game and getting key defenders back.'],watch:['Saints: RB Alvin Kamara resting (back), RB Etienne on IR, C Erik McCoy (biceps) questionable.','Panthers: RB Chuba Hubbard resting, LB Bobby Okereke (foot) questionable.']},
+ {lg:'nfl',a:'JAX',h:'TEN',win:'a',cov:'a',ln:'Jaguars -10.5',ag:'5 of 6 take Jacksonville, most also cover',why:['Jacksonville is rated at or near the top of the league in efficiency on both sides of the ball.','Tennessee sold key players at the deadline.'],watch:['Jaguars: WR Jakobi Meyers, RB Bhayshul Tuten and DE Travon Walker did not practice.','Titans: WR Carnell Tate and RB Tyjae Spears did not practice.']},
+ {lg:'nfl',a:'HOU',h:'CLE',win:'a',cov:'a',ln:'Texans -4.5',ag:'Every expert picks the Texans',why:['Houston’s offense is top-10 and C.J. Stroud is playing well.','Cleveland gets Deshaun Watson back, so one writer expects it to stay close, possibly in bad weather.'],watch:['Texans: RB David Montgomery (groin) out since Week 5, WRs Tank Dell and Marvin Harrison Jr. limited.','Browns: WR Denzel Boston (toe) did not practice.']},
+ {lg:'nfl',a:'SEA',h:'LV',win:'a',cov:'a',ln:'Seahawks -3.5 to -6.5 (lines vary)',ag:'Every expert picks Seattle; one takes Las Vegas to cover',why:['Rookie Fernando Mendoza starts for Las Vegas, who rank last in scoring defense.','Counterpoint: Seattle’s offense ranks near the bottom and starts a hurt backup.'],watch:['Seahawks: Sam Darnold out, Drew Lock starts while limited (elbow, oblique). OT Charles Cross questionable.','Raiders: C Trey Zuhn III (concussion).']},
+ {lg:'nfl',a:'LAR',h:'ARI',win:'a',cov:'a',ln:'Rams -9.5',ag:'Most take the Rams, one takes Arizona and the points',why:['Arizona starts rookie Carson Beck and its offense has been weak.','Doubters: the Rams have only beaten losing teams and have no healthy top wide receiver. One writer sees a possible under.'],watch:['Rams: WR Puka Nacua out about a month, CB Trent McDuffie (back) questionable.','Cardinals: RB Bam Knight and C Hjalte Froholdt (concussions) questionable.']},
+ {lg:'nfl',a:'SF',h:'DAL',win:'a',cov:'a',ln:'49ers -4.5',ag:'Most take San Francisco, one takes Dallas to cover',why:['Dallas is 0-2 against winning teams, with kicking and discipline problems.','San Francisco is the top seed in the NFC. One writer expects a high-scoring game.'],watch:['Cowboys: TE Jake Ferguson and RB Tyler Goodson out, WR George Pickens limited.','49ers: WR Mike Evans (Achilles) out, Deebo Samuel returning from a hamstring issue.']},
+ {lg:'nfl',a:'PIT',h:'CIN',win:'h',cov:'h',ln:'Bengals -3.5',ag:'Most take Cincinnati, one takes Pittsburgh',why:['Cincinnati’s passing game is hot at home.','Doubters: the Bengals’ scoring run came against losing teams, and Pittsburgh won the earlier meeting.'],watch:['Steelers rested T.J. Watt, Cameron Heyward and Darnell Washington in practice.','Bengals: S Kyle Dugger (quad) questionable.']},
+ {lg:'nfl',a:'LAC',h:'BAL',win:'h',cov:null,ln:'Ravens -4.5 to -5.5 (lines vary)',ag:'Split on the cover; slight lean to Baltimore to win',why:['Baltimore has Jacoby Brissett at quarterback and a below-average defense, while the Chargers rank last in scoring.'],watch:['Lamar Jackson is on injured reserve.','Chargers: Justin Herbert’s finger scan was negative, so he should play. WR Ladd McConkey (back) day-to-day.']},
+ /* college football: nm = lowercase name/abbreviation keywords for each side */
+ {lg:'ncaafb',an:['northwestern','nw'],hn:['ohio state','buckeyes','osu'],win:'h',cov:'h',ln:'Ohio State -11.5',ag:'Experts like Ohio State, 80% to win',why:['Northwestern’s starting quarterback is out, which limits its offense.','Ohio State’s defense ranks sixth nationally in success rate.'],tr:['Lean: Under 45.5.']},
+ {lg:'ncaafb',an:['duke','blue devils'],hn:['hurricanes','miami fl'],win:'h',cov:'h',ln:'Miami -13.5',ag:'Experts like Miami, 83% to win',why:['Miami has the No. 2 rush defense in the country.','The writer doubts Duke’s quarterback against Miami’s offense.'],tr:['Lean: Over 54.5.']},
+ {lg:'ncaafb',an:['illinois','fighting illini','ill'],hn:['ucla','bruins'],win:'h',cov:'h',ln:'UCLA -9.5',ag:'Experts like UCLA, 77% to win',why:['UCLA’s defense is elite, and Illinois is in a travel letdown spot.'],tr:['UCLA is reported 9-0 against the spread this season.','Lean: Over 48.5.']},
+ {lg:'ncaafb',an:['wake forest','demon deacons','wake'],hn:['smu','mustangs'],win:'a',cov:'a',ln:'Wake Forest +1.5',ag:'Essentially a coin flip, slight lean to Wake Forest',why:['Wake Forest ranks No. 1 in points added per dropback, and SMU’s defense is weak on early downs.'],tr:['Lean: Under 60.5.']},
+ {lg:'ncaafb',an:['missouri','tigers'],hn:['georgia','bulldogs','uga'],win:'h',cov:'h',ln:'Georgia -14.5',ag:'Experts like Georgia, 86% to win',why:['Georgia has a top-25 defense and is 3-0 against the spread against ranked teams.'],tr:['Missouri is 1-3 against the spread against ranked teams.','Lean: Over 47.5.']},
+ {lg:'ncaafb',an:['lsu'],hn:['texas','longhorns'],win:'a',cov:'h',ln:'Texas +4.5',ag:'Straight-up lean is LSU (61%), but the pick is Texas to cover',why:['Texas’s defense ranks No. 1 in points added per play and has won three straight against the spread.'],tr:['LSU is 0-3 against the spread vs ranked teams.','Lean: Under 46.5.']},
+ {lg:'ncaafb',an:['usc','trojans'],hn:['indiana','hoosiers'],win:'h',cov:'h',ln:'Indiana -7.5',ag:'Experts like Indiana, 71% to win',why:['Indiana’s defense is top 10 in havoc and success rate; USC’s defense has struggled.'],tr:['Lean: Under 50.5.']},
+ {lg:'ncaafb',an:['alabama','crimson tide'],hn:['vanderbilt','commodores'],win:'a',cov:'a',ln:'Alabama -16.5',ag:'Experts like Alabama, 87% to win',why:['Alabama’s quarterback is playing at a high level and Vanderbilt’s defense ranks poorly in the SEC.'],tr:['Lean: Over 49.5.']},
+ {lg:'ncaafb',an:['tennessee','volunteers'],hn:['texas a&m','aggies'],win:'a',cov:'a',ln:'Tennessee -2.5',ag:'Experts like Tennessee, 56% to win',why:['Tennessee leads the country in sacks, and Texas A&M’s passing offense ranks near the bottom.'],tr:['Lean: Under 43.5.']},
+ {lg:'ncaafb',an:['south carolina','gamecocks'],hn:['arkansas','razorbacks'],win:'a',cov:'a',ln:'South Carolina -7.5',ag:'Experts like South Carolina, 74% to win',why:['South Carolina has covered four straight; Arkansas ranks outside the top 100 on offense and defense.'],tr:['Arkansas’s quarterback is questionable.']},
+ {lg:'ncaafb',an:['utah','utes'],hn:['arizona','wildcats'],win:'a',cov:'a',ln:'Utah -2.5',ag:'Slight lean to Utah, 56% to win',why:['Arizona’s run defense ranks 89th and Utah has a strong rushing attack.'],tr:['Utah is reported 8-1 against the spread.','Lean: Over 54.5.']},
+ {lg:'ncaafb',an:['red raiders','texas tech'],hn:['oklahoma state','cowboys'],win:'a',cov:'a',ln:'Texas Tech +3.5',ag:'Lean to Texas Tech',why:['Oklahoma State allows about 151 rushing yards a game, and Texas Tech’s offense has improved.'],tr:['Lean: Under 72.5.']},
+ {lg:'ncaafb',an:['florida','gators'],hn:['kentucky','wildcats'],win:'h',cov:'h',ln:'Kentucky -3.5',ag:'Experts like Kentucky, 61% to win',why:['Florida’s defense ranks 122nd in success rate.'],tr:['Lean: Over 52.5.']},
+ {lg:'ncaafb',an:['baylor','bears'],hn:['byu','cougars'],win:'h',cov:'a',ln:'Baylor +7.5',ag:'BYU wins (71%), but the pick is Baylor to cover',why:['Baylor’s defense ranks seventh in havoc rate.'],tr:['BYU is 0-3 against the spread since beating Notre Dame.','Lean: Over 48.5.']},
+ {lg:'ncaafb',an:['oregon state','beavers'],hn:['boise state','broncos'],win:'h',cov:'h',ln:'Boise State -11.5',ag:'Experts like Boise State, 82% to win',why:['Boise State has one of the most efficient offenses outside the power conferences.'],tr:['Oregon State is 0-3 against the spread since Week 7.','Lean: Under 65.5.']},
+ {lg:'ncaafb',an:['purdue','boilermakers'],hn:['iowa','hawkeyes'],win:'h',cov:'h',ln:'Iowa -17.5',ag:'Experts like Iowa, 87% to win',why:['Iowa is motivated by a possible first-ever playoff bid.'],tr:['Lean: Over 47.5.']},
+ {lg:'ncaafb',an:['michigan','wolverines'],hn:['oregon','ducks'],win:'h',cov:'a',ln:'Michigan +10.5',ag:'Oregon wins (78%), but the pick is Michigan to cover',why:['Michigan’s offense is weak, but the line is big for a low-scoring game.'],tr:['Michigan is 1-5 against the spread in Big Ten play.','Lean: Under 39.5.']},
+ {lg:'ncaafb',an:['ole miss','rebels'],hn:['oklahoma','sooners'],win:'a',cov:'a',ln:'Ole Miss -1.5',ag:'Coin flip, slight lean to Ole Miss',why:['Oklahoma’s offense ranks 109th in success rate with an interim coordinator.'],tr:['Both teams have significant injuries.','Lean: Under 49.5.']}
+];
+function expFor(g){
+  var lg=g.lg,hit=null,txt=function(s){return normName((s==='a'?g.an:g.hn)||'')+' '+String(s==='a'?g.a:g.h||'').toLowerCase()};
+  EXPERTS.forEach(function(e){
+    if(hit||e.lg!==lg)return;
+    if(lg==='nfl'){if(nt(String(g.a).toUpperCase())===e.a&&nt(String(g.h).toUpperCase())===e.h)hit=e;return}
+    var ok=function(side,ks){var t=' '+txt(side)+' ';return ks.some(function(k){return t.indexOf(' '+k+' ')>=0||normName(side==='a'?g.an:g.hn).indexOf(k)>=0&&k.length>3})};
+    if(ok('a',e.an)&&ok('h',e.hn))hit=e;
+    else if(ok('a',e.hn)&&ok('h',e.an)){var fl=function(s){return s==='a'?'h':s==='h'?'a':s};hit={};Object.keys(e).forEach(function(k){hit[k]=e[k]});hit.win=fl(e.win);hit.cov=fl(e.cov)}
+  });
+  return hit;
+}
+function expCard(g){
+  var e=expFor(g);if(!e||kind(g)!=='up')return '';
+  var na=shortNm(g,'a'),nh=shortNm(g,'h'),nm=function(s){return s==='a'?na:nh};
+  var app='',m=null,ps=null;
+  try{m=pickModel(g);var L=m&&m.ln&&m.ln.pts!=null?m.mk:0;if(m&&m.M!=null)ps=predScore(g,m,L,'a','h');
+    if(ps){var aw=ps.h>=ps.a?'h':'a';
+      app='<li>Winner: the app picks <b>'+esc(nm(aw))+'</b>, experts pick <b>'+esc(nm(e.win))+'</b> — '+(aw===e.win?'<b>they agree</b>.':'<b>they disagree</b>, so look closer.')+'</li>';
+      if(m.ln&&m.ln.pts!=null&&e.cov){var cs=m.M-L>=0?'h':'a';app+='<li>Against the spread: the app covers <b>'+esc(nm(cs))+'</b>, experts take <b>'+esc(nm(e.cov))+'</b> — '+(cs===e.cov?'<b>they agree</b>.':'<b>they disagree</b>.')+'</li>'}
+    }}catch(x){}
+  var li=function(a){return (a||[]).map(function(x){return '<li>'+esc(x)+'</li>'}).join('')};
+  return '<h3>Expert locks</h3><div class="card bcard" style="padding:12px"><div class="teams" style="font-size:18px">'+esc(e.ln)+'</div><div class="src" style="margin-top:2px">'+esc(e.ag)+'</div>'+
+    (app?'<ul class="pts" style="margin:8px 0 0">'+app+'</ul>':'')+
+    '<div class="src" style="margin-top:8px"><b>Why they like it</b></div><ul class="pts" style="margin:2px 0 0">'+li(e.why)+'</ul>'+
+    (e.tr&&e.tr.length?'<div class="src" style="margin-top:8px"><b>Trends</b></div><ul class="pts" style="margin:2px 0 0">'+li(e.tr)+'</ul>':'')+
+    (e.watch&&e.watch.length?'<div class="src" style="margin-top:8px"><b>Injuries to watch</b></div><ul class="pts" style="margin:2px 0 0">'+li(e.watch)+'</ul>':'')+
+    '<p class="src" style="margin:8px 0 0">Entered by hand from expert picks and injury reports as of '+EXP_AT+'. It does not update live, and injury statuses can change before kickoff. Experts mostly follow the betting line, so agreement is not an edge by itself.</p></div>';
+}
+var feedSheet158=feedSheet;
+feedSheet=function(g){
+  var h=feedSheet158.apply(this,arguments);
+  try{
+    var c=expCard(g);if(!c)return h;
+    var i=h.indexOf('<h3>Prediction</h3>'),j=i>=0?h.indexOf('<h3',i+10):-1;
+    if(j<0)j=h.search(/<h3/);
+    if(j<0)return h;
+    return h.slice(0,j)+c+h.slice(j);
+  }catch(e){return h}
+};
+var schRow158=schRow;
+schRow=function(g){
+  var h=schRow158.apply(this,arguments);
+  try{var e=expFor(g);if(!e||kind(g)!=='up')return h;
+    var i=h.lastIndexOf('</div>');if(i<0)return h;
+    return h.slice(0,i)+'<div class="src" style="margin-top:3px">Experts: '+esc(e.ln)+' · '+esc(e.ag)+'</div>'+h.slice(i);
+  }catch(x){return h}
+};
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
