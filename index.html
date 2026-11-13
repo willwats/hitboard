@@ -19,22 +19,22 @@
 <style>
 /* Layout: scrolling wordmark header, one content column (max 640px), fixed four-tab bar, bottom sheets for game deep dives and prop calculator */
 :root{
-  --bg:#F4F1EA; --surface:#FBF9F4; --surface2:#E9E4D8; --ink:#222831; --muted:#5E6670; --line:#D6D0C2;
-  --hit:#2F7D6B; --hit-bg:#D9EBE4; --miss:#B4533F; --miss-bg:#F3DDD6; --amber:#9A6B12; --amber-bg:#F3E6C6; --btn:#222831; --btn-ink:#F4F1EA;
+  --bg:#EDF1EE; --surface:#FFFFFF; --surface2:#E2E9E5; --ink:#13211C; --muted:#586861; --line:#CBD5CF;
+  --hit:#0A7D58; --hit-bg:#D3EEE2; --miss:#B93A2A; --miss-bg:#F6D9D3; --amber:#9A6700; --amber-bg:#F7E8C4; --btn:#13211C; --btn-ink:#EDF1EE;
   --font-display:'Barlow Condensed','Arial Narrow',sans-serif;
   --font-body:'IBM Plex Sans',system-ui,-apple-system,sans-serif;
   --font-data:'IBM Plex Mono',ui-monospace,Menlo,monospace;
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
-    --bg:#0F1720; --surface:#172230; --surface2:#1F2D3D; --ink:#E4E8EC; --muted:#93A1B0; --line:#2B3A4B;
-    --hit:#5CC4A8; --hit-bg:#173A33; --miss:#E58A78; --miss-bg:#3A2420; --amber:#E3B35A; --amber-bg:#3A2F17; --btn:#E4E8EC; --btn-ink:#0F1720;
+    --bg:#0D1512; --surface:#15211C; --surface2:#1E2D27; --ink:#E6EEE9; --muted:#92A59B; --line:#2A3C34;
+    --hit:#3DDC97; --hit-bg:#14392B; --miss:#FF7D69; --miss-bg:#3B1F1A; --amber:#F2B93B; --amber-bg:#3A2E10; --btn:#E6EEE9; --btn-ink:#0D1512;
     color-scheme:dark;
   }
 }
 :root[data-theme="dark"]{
-  --bg:#0F1720; --surface:#172230; --surface2:#1F2D3D; --ink:#E4E8EC; --muted:#93A1B0; --line:#2B3A4B;
-  --hit:#5CC4A8; --hit-bg:#173A33; --miss:#E58A78; --miss-bg:#3A2420; --amber:#E3B35A; --amber-bg:#3A2F17; --btn:#E4E8EC; --btn-ink:#0F1720;
+  --bg:#0D1512; --surface:#15211C; --surface2:#1E2D27; --ink:#E6EEE9; --muted:#92A59B; --line:#2A3C34;
+  --hit:#3DDC97; --hit-bg:#14392B; --miss:#FF7D69; --miss-bg:#3B1F1A; --amber:#F2B93B; --amber-bg:#3A2E10; --btn:#E6EEE9; --btn-ink:#0D1512;
   color-scheme:dark;
 }
 *{box-sizing:border-box}
@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v223, Nov 13';
+var BUILD='v224, Nov 13';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -14669,7 +14669,7 @@ function expPicksSec(lgs){
       var g=o.g,e=o.e,t=new Date(g.start).toLocaleDateString([],{weekday:'short'})+' '+new Date(g.start).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
       var cov=!e?'<span class="src">No expert pick found for this game</span>':e.cov?'To cover: <b>'+esc(o.nm(e.cov))+'</b> · '+esc(e.ln):'<b>Split</b> on the cover · '+esc(e.ln),ag=o.cs&&e&&e.cov?(o.cs===e.cov?'<span class="tag" style="font-size:10px;padding:1px 6px">App agrees</span>':'<span class="tag warn" style="font-size:10px;padding:1px 6px">App disagrees</span>'):'';
       var hp=['sp','ml','tot'].filter(function(k){return o.hv[k]}).map(function(k){var q=o.hv[k];return gPill(q.l,({sp:'Spread',ml:'Winner',tot:'Total'}[k])+(q.sg?' (season)':''))}).join('');
-      return '<div data-act="fgame" data-id="'+esc(g.id)+'" style="padding:10px 0;border-top:1px solid var(--line);cursor:pointer"><div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><span><b>'+esc(o.na)+' @ '+esc(o.nh)+'</b></span><span class="src">'+esc(t)+'</span></div><div style="margin-top:3px">'+cov+' '+ag+'</div>'+(e?'<div class="src" style="margin-top:2px">'+esc(e.ag)+'</div>':'')+'<div style="margin-top:5px">'+(o.el?gPill(o.el,'Expert'):'')+(hp?'<span class="src">Hitboard </span>'+hp:'<span class="src">Hitboard: grade loading…</span>')+'</div></div>';
+      return '<div data-act="fgame" data-id="'+esc(g.id)+'" style="padding:10px 0;border-top:1px solid var(--line);cursor:pointer"><div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><span><b>'+esc(o.na)+' @ '+esc(o.nh)+'</b></span><span class="src">'+esc(t)+'</span></div><div style="margin-top:3px">'+cov+' '+ag+'</div>'+(e?'<div class="src" style="margin-top:2px">'+esc(e.ag)+'</div>':'')+'<div style="margin-top:5px">'+(o.el?gPill(o.el,'Expert'):'')+(hp?'<span class="src">Hitboard </span>'+hp:'<span class="src">Hitboard: '+hbWait(g)+'</span>')+'</div></div>';
     };
     var body='';
     if(sort==='time')body=R.map(rowH).join('');
@@ -14723,6 +14723,22 @@ function bandHd(label,n){
   var c=/^Grade A/.test(label)?'var(--hit)':/^Grade [BC]/.test(label)?'var(--amber)':/^(D or F|Grade D|Grade F)/.test(label)?'var(--miss)':'var(--muted)';
   return '<div style="display:flex;justify-content:space-between;align-items:center;margin:18px 0 8px;padding:9px 12px;background:var(--surface2);border-left:5px solid '+c+';border-radius:8px"><b style="font-size:16px">'+esc(label)+'</b><span class="src" style="margin:0">'+n+(n===1?' game':' games')+'</span></div>';
 }
+
+/* ---------- block167 (v224): honest wording when a Hitboard grade is not available ---------- */
+function hbWait(g){
+  var d=S.seasX[expSeasonKey(g)];
+  if(d&&d.t)return 'no grade yet (not enough completed games found for these teams)';
+  return 'grade loading…';
+}
+
+/* ---- v224: background re-renders never replace the screen while a finger is down or scrolling ---- */
+var _usrAt=0,_rdT=null,render167=render;
+['click','pointerup','keydown','change','input'].forEach(function(ev){document.addEventListener(ev,function(){_usrAt=Date.now()},true)});
+render=function(){
+  var now=Date.now();
+  if(now-HB_LAST_TOUCH<1200&&now-_usrAt>400){clearTimeout(_rdT);_rdT=setTimeout(function(){try{render()}catch(e){}},1300);return}
+  return render167.apply(this,arguments);
+};
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
