@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v217, Nov 13';
+var BUILD='v218, Nov 13';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -14413,6 +14413,81 @@ document.addEventListener('click',function(e){
   try{renderSheet()}catch(x){}
 });
 EXPERTS.push(XC(['seminoles'],['panthers'],'h','h','Pittsburgh -3.5','Both writers take Pittsburgh and the points',['Pittsburgh is 5-1 at home, allows about 11 points a game there, and has the best run defense in the ACC (about 68 rushing yards a game).','Florida State is 1-3 on the road, allowed 43, 44 and 50 points in three of those games, and ranks 115th in EPA allowed per play.','Pitt is off a bye with 13 days of rest; Florida State has six days and travels about 730 miles.'],['Both teams are 1-3 over their last four, and Pittsburgh is 1-3 against the spread in that span.','Trends: Pitt’s last six November home games all went Under; the total is 52.5 to 54.5.','Florida State injuries: WR Duce Robinson out (reported ACL), C Bradyn Welch-Joiner hurt, DL Kevin Wynn and Deante McCray out.','Risk: FSU creates explosive plays at the eighth-highest rate nationally.']));
+
+/* ---------- block163 (v218): Results organized by game: the app's picks next to the expert picks ---------- */
+S.xlog=[];try{var xl=localStorage.getItem('hitboard.xlog.v1');if(xl){var ax=JSON.parse(xl);if(Array.isArray(ax))S.xlog=ax}}catch(e){}
+function saveXlog(){try{localStorage.setItem('hitboard.xlog.v1',JSON.stringify(S.xlog.slice(-800)))}catch(e){}}
+function expSnap(){
+  var ch=false,have={};S.xlog.forEach(function(x){have[x.gid]=1});
+  ['nfl','ncaafb'].forEach(function(lg){
+    (S.feed[lg]||[]).forEach(function(g){
+      try{
+        if(kind(g)==='up'&&!have[g.id]){
+          var e=expFor(g);if(!e||(!e.win&&!e.cov))return;
+          var mk=null;try{var m=pickModel(g);if(m&&m.ln&&m.ln.pts!=null)mk=m.mk}catch(x){}
+          S.xlog.push({gid:g.id,lg:lg,na:shortNm(g,'a'),nh:shortNm(g,'h'),st:g.start,win:e.win,cov:e.cov,ln:e.ln,mk:mk,res:null});have[g.id]=1;ch=true;
+        }
+        if(kind(g)==='final'&&g.sa!=null)S.xlog.forEach(function(x){
+          if(x.gid!==g.id||x.res)return;
+          var mh=g.sh-g.sa,r={};
+          if(x.win)r.w=mh===0?'P':((x.win==='h')===(mh>0)?'W':'L');
+          if(x.cov&&x.mk!=null){var v=mh-x.mk;r.c=v===0?'P':((x.cov==='h')===(v>0)?'W':'L')}
+          x.res=r;x.score=g.a+' '+g.sa+', '+g.h+' '+g.sh;x.mh=mh;ch=true;
+        });
+      }catch(e){}
+    });
+  });
+  if(ch)saveXlog();
+}
+setTimeout(expSnap,4000);setInterval(expSnap,5*60000);
+function rsBadge(r){
+  if(!r)return '<span class="src">waiting</span>';
+  var c=r==='W'?'#3ecf8e':r==='L'?'#ff7a7a':'#9aa';
+  return '<b style="color:'+c+'">'+(r==='W'?'Hit':r==='L'?'Miss':'Push')+'</b>';
+}
+function vResults213(){return vResults213src.apply(this,arguments)}
+var vResults213src=vResults;
+vResults=function(){
+  try{expSnap()}catch(e){}
+  var old=vResults213src.apply(this,arguments),j=old.lastIndexOf('<p class="foot">'),body=j>0?old:old,foot=j>0?old.slice(j):'';
+  body=j>0?old.slice(0,j):old;body=body.replace(/^\s*<h2>Results<\/h2>/,'');
+  var G={},TL={ml:'Winner',sp:'Spread',tot:'Total'};
+  var get=function(id,lg,st){return G[id]||(G[id]={gid:id,lg:lg,st:st||0,app:[],ex:null,score:'',game:''})};
+  S.log.forEach(function(x){if(!x.gid||(x.t!=='ml'&&x.t!=='sp'&&x.t!=='tot'))return;var o=get(x.gid,x.lg,x.st);o.app.push(x);if(x.score)o.score=x.score;if(!o.game)o.game=x.game||''});
+  S.xlog.forEach(function(x){var o=get(x.gid,x.lg,x.st);o.ex=x;if(x.score)o.score=x.score;o.game=x.na+' @ '+x.nh});
+  var L=Object.keys(G).map(function(k){return G[k]}),done=L.filter(function(o){return o.app.some(function(x){return x.res})||(o.ex&&o.ex.res)}),wait=L.length-done.length;
+  var sf=S.rsl||'all',lgs=['all'].concat(Object.keys(done.reduce(function(m,o){m[o.lg]=1;return m},{})));
+  var D=done.filter(function(o){return sf==='all'||o.lg===sf}).sort(function(a,b){return b.st-a.st});
+  /* summary */
+  var ap={W:0,L:0},ew={W:0,L:0},ec={W:0,L:0};
+  D.forEach(function(o){o.app.forEach(function(x){if(x.res==='W'||x.res==='L')ap[x.res]++});if(o.ex&&o.ex.res){var r=o.ex.res;if(r.w==='W'||r.w==='L')ew[r.w]++;if(r.c==='W'||r.c==='L')ec[r.c]++}});
+  var rt=function(c){var n=c.W+c.L;return c.W+'-'+c.L+(n?' ('+Math.round(c.W/n*100)+'%)':'')};
+  var h='<h2>Results</h2><p class="src" style="margin:0 0 8px">Each finished game with the app’s picks and the expert picks side by side. Picks are saved before the game and graded on the final score.</p>';
+  h+='<div class="facts"><span>App picks <b>'+rt(ap)+'</b></span><span>Experts: winner <b>'+rt(ew)+'</b></span><span>Experts: cover <b>'+rt(ec)+'</b></span></div>';
+  if(lgs.length>2)h+='<div class="chips" role="group" aria-label="Sport" style="margin:8px 0">'+lgs.map(function(l){return '<button class="chip'+(sf===l?' on':'')+'" data-act="set" data-k="rsl" data-v="'+l+'">'+(l==='all'?'All':esc(lgName(l)))+'</button>'}).join('')+'</div>';
+  h+='<h3>By game</h3>';
+  if(!D.length)h+='<div class="card empty">No finished games with saved picks yet. '+(wait?wait+' game'+(wait===1?' is':'s are')+' waiting to finish. ':'')+'Expert picks are saved from now on for NFL and college football, and graded when each game ends.</div>';
+  else{
+    var lastDay='';
+    D.slice(0,60).forEach(function(o){
+      var day=new Date(o.st).toLocaleDateString([],{weekday:'long',month:'short',day:'numeric'});
+      if(day!==lastDay){h+='<p class="src" style="margin:12px 0 4px"><b>'+esc(day)+'</b></p>';lastDay=day}
+      var apps=o.app.slice().sort(function(a,b){return ['ml','sp','tot'].indexOf(a.t)-['ml','sp','tot'].indexOf(b.t)}).map(function(x){return '<div style="display:flex;justify-content:space-between;gap:8px;margin-top:3px"><span class="src">'+TL[x.t]+': '+esc(x.pick||'')+'</span>'+rsBadge(x.res==='P'?'P':x.res)+'</div>'}).join('');
+      var ex='';
+      if(o.ex){var e=o.ex,nm=function(s){return s==='a'?e.na:e.nh};
+        ex='<div style="display:flex;justify-content:space-between;gap:8px;margin-top:3px"><span class="src">Winner: '+(e.win?esc(nm(e.win)):'no pick')+'</span>'+rsBadge(e.res&&e.res.w)+'</div>'+
+           '<div style="display:flex;justify-content:space-between;gap:8px;margin-top:3px"><span class="src">Cover: '+(e.cov?esc(nm(e.cov))+' ('+esc(e.ln)+')':'split')+'</span>'+(e.cov?rsBadge(e.res&&e.res.c):'<span class="src">no pick</span>')+'</div>';
+      }
+      h+='<div class="card" style="padding:10px 12px;margin:0 0 8px"><div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><b>'+esc(o.game)+'</b><span class="src">'+esc(lgName(o.lg))+'</span></div>'+
+        (o.score?'<div class="src" style="margin-top:2px">Final: '+esc(o.score)+'</div>':'')+
+        '<div style="margin-top:8px"><div class="src"><b>App’s picks</b></div>'+(apps||'<div class="src" style="margin-top:3px">No app pick was saved for this game.</div>')+'</div>'+
+        '<div style="margin-top:8px"><div class="src"><b>Expert picks</b></div>'+(ex||'<div class="src" style="margin-top:3px">No expert pick was saved for this game.</div>')+'</div></div>';
+    });
+    if(wait)h+='<p class="src">'+wait+' more game'+(wait===1?' is':'s are')+' waiting to finish.</p>';
+  }
+  h+='<details style="margin:14px 0"><summary><b>What kinds of picks have hit</b> (angles, bet types, by sport)</summary>'+body+'</details>';
+  return h+foot;
+};
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
