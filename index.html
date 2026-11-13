@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v218, Nov 13';
+var BUILD='v219, Nov 13';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -14425,7 +14425,7 @@ function expSnap(){
         if(kind(g)==='up'&&!have[g.id]){
           var e=expFor(g);if(!e||(!e.win&&!e.cov))return;
           var mk=null;try{var m=pickModel(g);if(m&&m.ln&&m.ln.pts!=null)mk=m.mk}catch(x){}
-          S.xlog.push({gid:g.id,lg:lg,na:shortNm(g,'a'),nh:shortNm(g,'h'),st:g.start,win:e.win,cov:e.cov,ln:e.ln,mk:mk,res:null});have[g.id]=1;ch=true;
+          S.xlog.push({gid:g.id,lg:lg,na:shortNm(g,'a'),nh:shortNm(g,'h'),st:g.start,win:e.win,cov:e.cov,ln:e.ln,mk:mk,eg:expLetter(expRatio(e)),res:null});have[g.id]=1;ch=true;
         }
         if(kind(g)==='final'&&g.sa!=null)S.xlog.forEach(function(x){
           if(x.gid!==g.id||x.res)return;
@@ -14440,6 +14440,7 @@ function expSnap(){
   if(ch)saveXlog();
 }
 setTimeout(expSnap,4000);setInterval(expSnap,5*60000);
+function gradeRank(l){var T=['F','D','C-','C','C+','B-','B','B+','A-','A','A+'];var i=T.indexOf(l);return i<0?-1:i}
 function rsBadge(r){
   if(!r)return '<span class="src">waiting</span>';
   var c=r==='W'?'#3ecf8e':r==='L'?'#ff7a7a':'#9aa';
@@ -14465,18 +14466,20 @@ vResults=function(){
   var h='<h2>Results</h2><p class="src" style="margin:0 0 8px">Each finished game with the app’s picks and the expert picks side by side. Picks are saved before the game and graded on the final score.</p>';
   h+='<div class="facts"><span>App picks <b>'+rt(ap)+'</b></span><span>Experts: winner <b>'+rt(ew)+'</b></span><span>Experts: cover <b>'+rt(ec)+'</b></span></div>';
   if(lgs.length>2)h+='<div class="chips" role="group" aria-label="Sport" style="margin:8px 0">'+lgs.map(function(l){return '<button class="chip'+(sf===l?' on':'')+'" data-act="set" data-k="rsl" data-v="'+l+'">'+(l==='all'?'All':esc(lgName(l)))+'</button>'}).join('')+'</div>';
-  h+='<h3>By game</h3>';
+  h+='<h3>By game</h3><div class="chips" role="group" aria-label="Group by" style="margin:4px 0 6px"><span class="src" style="align-self:center;margin-right:4px">Group by</span>'+[['day','Day'],['hb','Hitboard grade'],['ex','Expert grade']].map(function(c){return '<button class="chip'+((S.rgb||'day')===c[0]?' on':'')+'" data-act="set" data-k="rgb" data-v="'+c[0]+'">'+c[1]+'</button>'}).join('')+'</div>';
   if(!D.length)h+='<div class="card empty">No finished games with saved picks yet. '+(wait?wait+' game'+(wait===1?' is':'s are')+' waiting to finish. ':'')+'Expert picks are saved from now on for NFL and college football, and graded when each game ends.</div>';
   else{
-    var lastDay='';
-    D.slice(0,60).forEach(function(o){
-      var day=new Date(o.st).toLocaleDateString([],{weekday:'long',month:'short',day:'numeric'});
+    var lastDay='',rgb=S.rgb||'day',bestL=function(o){var b=null;['sp','ml','tot'].forEach(function(t){var l=S.glog[o.gid]&&S.glog[o.gid][t];if(l&&(!b||gradeRank(l)>gradeRank(b)))b=l});return b};
+    var DD=D.slice(0,60);
+    if(rgb!=='day')DD.sort(function(a,b){var la=rgb==='hb'?bestL(a):(a.ex&&a.ex.eg),lb=rgb==='hb'?bestL(b):(b.ex&&b.ex.eg);return (lb?gradeRank(lb):-99)-(la?gradeRank(la):-99)||b.st-a.st});
+    DD.forEach(function(o){
+      var day=rgb==='day'?new Date(o.st).toLocaleDateString([],{weekday:'long',month:'short',day:'numeric'}):(function(){var l=rgb==='hb'?bestL(o):(o.ex&&o.ex.eg);return l?'Grade '+bandOf(l):'No grade saved'})();
       if(day!==lastDay){h+='<p class="src" style="margin:12px 0 4px"><b>'+esc(day)+'</b></p>';lastDay=day}
-      var apps=o.app.slice().sort(function(a,b){return ['ml','sp','tot'].indexOf(a.t)-['ml','sp','tot'].indexOf(b.t)}).map(function(x){return '<div style="display:flex;justify-content:space-between;gap:8px;margin-top:3px"><span class="src">'+TL[x.t]+': '+esc(x.pick||'')+'</span>'+rsBadge(x.res==='P'?'P':x.res)+'</div>'}).join('');
+      var apps=o.app.slice().sort(function(a,b){return ['ml','sp','tot'].indexOf(a.t)-['ml','sp','tot'].indexOf(b.t)}).map(function(x){return '<div style="display:flex;justify-content:space-between;gap:8px;margin-top:3px"><span class="src">'+TL[x.t]+': '+esc(x.pick||'')+'</span><span>'+((S.glog[o.gid]&&S.glog[o.gid][x.t])?grPill(S.glog[o.gid][x.t])+' ':'')+rsBadge(x.res==='P'?'P':x.res)+'</span></div>'}).join('');
       var ex='';
       if(o.ex){var e=o.ex,nm=function(s){return s==='a'?e.na:e.nh};
         ex='<div style="display:flex;justify-content:space-between;gap:8px;margin-top:3px"><span class="src">Winner: '+(e.win?esc(nm(e.win)):'no pick')+'</span>'+rsBadge(e.res&&e.res.w)+'</div>'+
-           '<div style="display:flex;justify-content:space-between;gap:8px;margin-top:3px"><span class="src">Cover: '+(e.cov?esc(nm(e.cov))+' ('+esc(e.ln)+')':'split')+'</span>'+(e.cov?rsBadge(e.res&&e.res.c):'<span class="src">no pick</span>')+'</div>';
+           '<div style="display:flex;justify-content:space-between;gap:8px;margin-top:3px"><span class="src">Cover: '+(e.cov?esc(nm(e.cov))+' ('+esc(e.ln)+')':'split')+'</span>'+(e.cov?'<span>'+(e.eg?grPill(e.eg)+' ':'')+rsBadge(e.res&&e.res.c)+'</span>':'<span class="src">no pick</span>')+'</div>';
       }
       h+='<div class="card" style="padding:10px 12px;margin:0 0 8px"><div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><b>'+esc(o.game)+'</b><span class="src">'+esc(lgName(o.lg))+'</span></div>'+
         (o.score?'<div class="src" style="margin-top:2px">Final: '+esc(o.score)+'</div>':'')+
@@ -14488,6 +14491,94 @@ vResults=function(){
   h+='<details style="margin:14px 0"><summary><b>What kinds of picks have hit</b> (angles, bet types, by sport)</summary>'+body+'</details>';
   return h+foot;
 };
+
+/* ---------- block164 (v219): letter grades from the experts and from Hitboard, with sorting and grouping ---------- */
+function expRatio(e){
+  var t=String(e&&e.ag||''),m;
+  if(!e||(!e.cov&&!e.win))return null;
+  if((m=t.match(/(\d+)\s+of\s+(\d+)/)))return +m[1]/+m[2];
+  if(/split|coin flip|pick.?em|essentially/i.test(t))return .5;
+  if(/not enough/i.test(t))return null;
+  if(/^(every|both|all)|every expert|both writers/i.test(t)&&!/one (takes|likes|writer takes)/i.test(t))return .95;
+  if(/one (takes|likes|writer takes|writer likes)|one writer/i.test(t))return .75;
+  if(/most|mostly/i.test(t))return .78;
+  if(/slight|lean/i.test(t))return .6;
+  if(/writers? (favor|like)|experts like|writer favors/i.test(t))return .88;
+  if((m=t.match(/(\d+)%/)))return Math.max(.5,Math.min(.95,+m[1]/100));
+  return .65;
+}
+function expLetter(r){
+  if(r==null)return null;
+  var T=[[.95,'A'],[.85,'A-'],[.78,'B+'],[.7,'B'],[.62,'C+'],[.55,'C'],[.45,'C-']];
+  for(var i=0;i<T.length;i++)if(r>=T[i][0])return T[i][1];return 'D';
+}
+function hbGradesFor(g){
+  var k=g.id+'|'+S.dlV+'|'+Math.floor(Date.now()/120000);
+  S.hbg=S.hbg||{};if(S.hbg[g.id]&&S.hbg[g.id].k===k)return S.hbg[g.id].v;
+  var v={};
+  try{(picksFor(g)||[]).forEach(function(x){
+    if(x.t!=='ml'&&x.t!=='sp'&&x.t!=='tot')return;
+    var it=gmItem(g,x),G=it&&gradeGame(it);if(!G||G.sum==null)return;
+    if(!v[x.t]||G.sum>v[x.t].sum)v[x.t]={l:grLetter(G.sum),sum:G.sum,pick:x.pick||''};
+  })}catch(e){}
+  S.hbg[g.id]={k:k,v:v};return v;
+}
+function hbBest(v){var b=null;['sp','ml','tot'].forEach(function(t){if(v[t]&&(!b||v[t].sum>b.sum))b=v[t]});return b}
+function bandOf(l){return !l?'None':l[0]==='A'?'A':l[0]==='B'?'B':l[0]==='C'?'C':'D or F'}
+var BAND_ORDER=['A','B','C','D or F','None'];
+/* save Hitboard's grade before the game so Results can show it */
+S.glog={};try{var gl=localStorage.getItem('hitboard.glog.v1');if(gl)S.glog=JSON.parse(gl)||{}}catch(e){}
+function glogSave(){try{var ks=Object.keys(S.glog);if(ks.length>900)ks.sort(function(a,b){return (S.glog[a].st||0)-(S.glog[b].st||0)}).slice(0,ks.length-800).forEach(function(k){delete S.glog[k]});localStorage.setItem('hitboard.glog.v1',JSON.stringify(S.glog))}catch(e){}}
+function glogSnap(){
+  var now=Date.now(),n=0,ch=false;
+  LG.forEach(function(l){(S.feed[l[0]]||[]).forEach(function(g){
+    try{
+      if(n>=12||kind(g)!=='up'||g.start>now+40*36e5||S.glog[g.id])return;
+      var v=hbGradesFor(g),o={st:g.start};['ml','sp','tot'].forEach(function(t){if(v[t])o[t]=v[t].l});
+      n++;if(Object.keys(o).length>1){S.glog[g.id]=o;ch=true}
+    }catch(e){}
+  })});
+  if(ch)glogSave();
+}
+setTimeout(glogSnap,6000);setInterval(glogSnap,5*60000);
+function gPill(l,tag){return l?'<span style="margin-right:6px">'+(tag?'<span class="src">'+esc(tag)+' </span>':'')+grPill(l)+'</span>':''}
+/* Picks tab: expert locks with grades, sort and grouping */
+function expPicksSec(lgs){
+  var out='',any=false,now=Date.now(),sort=S.xsort||'time',pend=0,budget=8;
+  lgs.forEach(function(lg){
+    if(lg!=='nfl'&&lg!=='ncaafb')return;
+    var L=(S.feed[lg]||[]).filter(function(g){return kind(g)==='up'&&g.start<now+9*864e5}).sort(function(a,b){return a.start-b.start}),R=[],none=[];
+    L.forEach(function(g){
+      var e=expFor(g),na=shortNm(g,'a'),nh=shortNm(g,'h'),nm=function(s){return s==='a'?na:nh};
+      if(!e){none.push(na+' @ '+nh);return}
+      var er=expRatio(e),el=expLetter(er),hv={},fresh=S.hbg&&S.hbg[g.id]&&S.hbg[g.id].k===g.id+'|'+S.dlV+'|'+Math.floor(Date.now()/120000);
+      if(fresh||budget>0){if(!fresh)budget--;hv=hbGradesFor(g)}else pend++;
+      var hb=hbBest(hv),cs=null;
+      try{var m=pickModel(g);if(m&&m.ln&&m.ln.pts!=null&&m.M!=null&&e.cov)cs=m.M-m.mk>=0?'h':'a'}catch(x){}
+      R.push({g:g,e:e,na:na,nh:nh,nm:nm,er:er,el:el,hv:hv,hb:hb,cs:cs});
+    });
+    if(sort!=='time')R.sort(function(a,b){var x=sort==='hb'?(b.hb?b.hb.sum:-99)-(a.hb?a.hb.sum:-99):(b.er==null?-1:b.er)-(a.er==null?-1:a.er);return x||a.g.start-b.g.start});
+    var rowH=function(o){
+      var g=o.g,e=o.e,t=new Date(g.start).toLocaleDateString([],{weekday:'short'})+' '+new Date(g.start).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
+      var cov=e.cov?'To cover: <b>'+esc(o.nm(e.cov))+'</b>':'<b>Split</b> on the cover',ag=o.cs&&e.cov?(o.cs===e.cov?'<span class="tag" style="font-size:10px;padding:1px 6px">App agrees</span>':'<span class="tag warn" style="font-size:10px;padding:1px 6px">App disagrees</span>'):'';
+      var hp=['sp','ml','tot'].filter(function(k){return o.hv[k]}).map(function(k){return gPill(o.hv[k].l,{sp:'Spread',ml:'Winner',tot:'Total'}[k])}).join('');
+      return '<div data-act="fgame" data-id="'+esc(g.id)+'" style="padding:10px 0;border-top:1px solid var(--line);cursor:pointer"><div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><span><b>'+esc(o.na)+' @ '+esc(o.nh)+'</b></span><span class="src">'+esc(t)+'</span></div><div style="margin-top:3px">'+cov+' · '+esc(e.ln)+' '+ag+'</div><div class="src" style="margin-top:2px">'+esc(e.ag)+'</div><div style="margin-top:5px">'+gPill(o.el,'Expert')+(hp?'<span class="src">Hitboard </span>'+hp:'<span class="src">Hitboard: no grade yet</span>')+'</div></div>';
+    };
+    var body='';
+    if(sort==='time')body=R.map(rowH).join('');
+    else{
+      var Bd={};R.forEach(function(o){var l=sort==='hb'?(o.hb&&o.hb.l):o.el,b=bandOf(l);(Bd[b]=Bd[b]||[]).push(o)});
+      BAND_ORDER.forEach(function(b){if(Bd[b])body+='<p class="src" style="margin:8px 0 0"><b>'+(b==='None'?'No grade':b==='D or F'?'D or F':'Grade '+b)+'</b> · '+Bd[b].length+'</p>'+Bd[b].map(rowH).join('')});
+    }
+    if(R.length||none.length){any=true;out+='<p class="src" style="margin:10px 0 0"><b>'+esc(lgName(lg))+'</b> · '+R.length+' of '+L.length+' games have an expert pick</p>'+(body?'<div class="card" style="padding:4px 12px">'+body.replace(/^(<p[^>]*>.*?<\/p>)?<div([^>]*)border-top:1px solid var\(--line\);/,'$1<div$2')+'</div>':'')+(none.length?'<details style="margin:6px 0"><summary class="src">No expert pick yet ('+none.length+')</summary><p class="src" style="margin:4px 0">'+none.map(esc).join(' · ')+'</p></details>':'')}
+  });
+  if(pend){clearTimeout(S._xgT);S._xgT=setTimeout(function(){try{if(!HB_LAST_TOUCH||Date.now()-HB_LAST_TOUCH>800)render();else S._xgT=setTimeout(function(){render()},1500)}catch(e){}},400)}
+  if(!any)return '<h3>Expert locks</h3><div class="card empty">No NFL or college football games are in view right now.</div>';
+  var chips=[['time','Kickoff'],['hb','Hitboard grade'],['ex','Expert grade']].map(function(c){return '<button class="chip'+(sort===c[0]?' on':'')+'" data-act="set" data-k="xsort" data-v="'+c[0]+'">'+c[1]+'</button>'}).join('');
+  return '<h3>Expert locks: who covers</h3><p class="src" style="margin:0 0 4px">Tap a game for the reasons, injuries and each team’s season. Entered by hand as of '+EXP_AT+'; it does not update live.</p>'+
+    '<div class="chips" role="group" aria-label="Sort by" style="margin:6px 0"><span class="src" style="align-self:center;margin-right:4px">Sort by</span>'+chips+'</div>'+
+    '<p class="src" style="margin:0 0 4px">The expert grade shows how strongly the writers agree (A means nearly all take the same side, D means a split). The Hitboard grade is the app’s own pick grade for that game.</p>'+out;
+}
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
