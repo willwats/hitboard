@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v221, Nov 13';
+var BUILD='v222, Nov 13';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -4491,7 +4491,7 @@ document.addEventListener('click',function(e){
   else if(act==='ckretry'){S.ck.err='';render()}
   else if(act==='gpk'){S.gpk=el.dataset.v;renderSheet()}
   else if(act==='trk'){S.trk=el.dataset.v;renderSheet()}
-  else if(act==='set'){S[el.dataset.k]=el.dataset.v;render()}
+  else if(act==='set'){if(S[el.dataset.k]===el.dataset.v&&Date.now()-(S._pu||0)<900)return;S[el.dataset.k]=el.dataset.v;render()}
   else if(act==='hblog'){hbLog(el.dataset.gid,el.dataset.t)}
   else if(act==='hbcopy'){hbCopy(el.dataset.lg,el.dataset.t)}
   else if(act==='hbprop'){hbProp(el.dataset.i)}
@@ -14473,9 +14473,10 @@ vResults=function(){
     var lastDay='',rgb=S.rgb||'day',bestL=function(o){var b=null;['sp','ml','tot'].forEach(function(t){var l=S.glog[o.gid]&&S.glog[o.gid][t];if(l&&(!b||gradeRank(l)>gradeRank(b)))b=l});return b};
     var DD=D.slice(0,60);
     if(rgb!=='day')DD.sort(function(a,b){var la=rgb==='hb'?bestL(a):(a.ex&&a.ex.eg),lb=rgb==='hb'?bestL(b):(b.ex&&b.ex.eg);return (lb?gradeRank(lb):-99)-(la?gradeRank(la):-99)||b.st-a.st});
+    var _labf=function(o){return rgb==='day'?new Date(o.st).toLocaleDateString([],{weekday:'long',month:'short',day:'numeric'}):(function(){var l=rgb==='hb'?bestL(o):(o.ex&&o.ex.eg);return l?'Grade '+bandOf(l):'No grade saved'})()},_cnt={};DD.forEach(function(o){var d=_labf(o);_cnt[d]=(_cnt[d]||0)+1});
     DD.forEach(function(o){
-      var day=rgb==='day'?new Date(o.st).toLocaleDateString([],{weekday:'long',month:'short',day:'numeric'}):(function(){var l=rgb==='hb'?bestL(o):(o.ex&&o.ex.eg);return l?'Grade '+bandOf(l):'No grade saved'})();
-      if(day!==lastDay){h+='<p class="src" style="margin:12px 0 4px"><b>'+esc(day)+'</b></p>';lastDay=day}
+      var day=_labf(o);
+      if(day!==lastDay){h+=bandHd(day,_cnt[day]);lastDay=day}
       var apps=o.app.slice().sort(function(a,b){return ['ml','sp','tot'].indexOf(a.t)-['ml','sp','tot'].indexOf(b.t)}).map(function(x){return '<div style="display:flex;justify-content:space-between;gap:8px;margin-top:3px"><span class="src">'+TL[x.t]+': '+esc(x.pick||'')+'</span><span>'+((S.glog[o.gid]&&S.glog[o.gid][x.t])?grPill(S.glog[o.gid][x.t])+' ':'')+rsBadge(x.res==='P'?'P':x.res)+'</span></div>'}).join('');
       var ex='';
       if(o.ex){var e=o.ex,nm=function(s){return s==='a'?e.na:e.nh};
@@ -14569,7 +14570,7 @@ function expPicksSec(lgs){
     if(sort==='time')body=R.map(rowH).join('');
     else{
       var Bd={};R.forEach(function(o){var l=sort==='hb'?(o.hb&&o.hb.l):o.el,b=bandOf(l);(Bd[b]=Bd[b]||[]).push(o)});
-      BAND_ORDER.forEach(function(b){if(Bd[b])body+='<p class="src" style="margin:8px 0 0"><b>'+(b==='None'?'No grade':b==='D or F'?'D or F':'Grade '+b)+'</b> · '+Bd[b].length+(Bd[b].length===1?' game':' games')+'</p>'+Bd[b].map(rowH).join('')});
+      BAND_ORDER.forEach(function(b){if(Bd[b])body+=bandHd((b==='None'?'No grade':b==='D or F'?'D or F':'Grade '+b),Bd[b].length)+Bd[b].map(rowH).join('')});
     }
     if(R.length||none.length){any=true;out+='<p class="src" style="margin:10px 0 0"><b>'+esc(lgName(lg))+'</b> · '+R.length+' of '+L.length+' games have an expert pick</p>'+(body?'<div class="card" style="padding:4px 12px">'+body.replace(/^(<p[^>]*>.*?<\/p>)?<div([^>]*)border-top:1px solid var\(--line\);/,'$1<div$2')+'</div>':'')+(none.length?'<details style="margin:6px 0"><summary class="src">No expert pick yet ('+none.length+')</summary><p class="src" style="margin:4px 0">'+none.map(esc).join(' · ')+'</p></details>':'')}
   });
@@ -14674,7 +14675,7 @@ function expPicksSec(lgs){
     if(sort==='time')body=R.map(rowH).join('');
     else{
       var Bd={};R.forEach(function(o){var l=sort==='hb'?(o.hb&&o.hb.l):o.el,b=bandOf(l);(Bd[b]=Bd[b]||[]).push(o)});
-      BAND_ORDER.forEach(function(b){if(Bd[b])body+='<p class="src" style="margin:8px 0 0"><b>'+(b==='None'?'No grade':b==='D or F'?'D or F':'Grade '+b)+'</b> · '+Bd[b].length+(Bd[b].length===1?' game':' games')+'</p>'+Bd[b].map(rowH).join('')});
+      BAND_ORDER.forEach(function(b){if(Bd[b])body+=bandHd((b==='None'?'No grade':b==='D or F'?'D or F':'Grade '+b),Bd[b].length)+Bd[b].map(rowH).join('')});
     }
     if(R.length){any=true;out+='<p class="src" style="margin:10px 0 0"><b>'+esc(lgName(lg))+'</b> · '+nex+' of '+R.length+' games have an expert pick'+(lg==='ncaamb'&&(S.feed[lg]||[]).length>cap?' (showing '+cap+' games)':'')+'</p><div class="card" style="padding:4px 12px">'+body.replace(/^(<p[^>]*>.*?<\/p>)?<div([^>]*)border-top:1px solid var\(--line\);/,'$1<div$2')+'</div>'}
   });
@@ -14684,6 +14685,43 @@ function expPicksSec(lgs){
   return '<h3>Expert locks: who covers</h3><p class="src" style="margin:0 0 4px">Tap a game for the reasons, injuries and each team’s season. Expert picks are entered by hand as of '+EXP_AT+' and do not update live. Many games, especially in basketball, have no expert coverage.</p>'+
     '<div class="chips" role="group" aria-label="Group by grade" style="margin:6px 0"><span class="src" style="align-self:center;margin-right:4px">Group by grade</span>'+chips+'</div>'+
     '<p class="src" style="margin:0 0 4px">Expert grade: how strongly the writers agree. Hitboard grade: the app’s own pick grade. Where the app has no pick for a game, “(season)” grades it from every game each team has played this season, with the last five weighted more; it does not adjust for opponent strength, so it never grades above B+.</p>'+out;
+}
+
+/* ---------- block166 (v222): real expert picks for NBA + college basketball (no computer picks), taps never lost, bolder grade headers ---------- */
+function XB(lg,an,hn,win,cov,ln,ag,why,tr){return {lg:lg,an:an,hn:hn,win:win,cov:cov,ln:ln,ag:ag,why:why||[],tr:tr||[]}}
+EXPERTS=EXPERTS.filter(function(e){return e.lg!=='nba'&&e.lg!=='ncaamb'}).concat([
+ XB('nba',['knicks'],['pacers'],'a','a','Knicks -6.5','One writer takes the Knicks and the points',['New York has the stronger defense. Indiana ranks 19th in offensive rating and is 1-5 at home.'],[]),
+ XB('nba',['bucks'],['magic'],'h','h','Magic -8.5','One writer takes the Magic and the points',['Milwaukee has lost eight straight and failed to cover four in a row.','Orlando has won back-to-back and could get Jalen Suggs back.'],[]),
+ XB('nba',['cavaliers'],['heat'],null,'a','Cavaliers +2.5','One writer takes Cleveland and the points',['Miami allows about 120 points a game, fifth most in the league.','Cleveland is without Evan Mobley but has the steadier offense and beat the Knicks recently.'],[]),
+ XB('nba',['hawks'],['bulls'],'a','a','Hawks -7.5','One writer takes the Hawks and the points',['Chicago allows the most points per game in the league (about 128.8) and has not won at home.','Atlanta’s fast pace should hurt them in transition.'],['Fast pace points to a high-scoring game.']),
+ XB('nba',['grizzlies'],['pelicans'],'a','a','Grizzlies -3.5','One writer takes Memphis and the points',['Memphis is 5-0 on the road. New Orleans has lost four straight and ranks 26th in defensive rating.'],[]),
+ XB('nba',['jazz'],['rockets'],'h','a','Jazz +17.5','One writer takes Utah and the points',['The writer expects Houston to win but not by 18, because the Rockets play slowly (27th in pace).'],[]),
+ XB('nba',['warriors'],['spurs'],'h','h','Spurs -12.5','One writer takes San Antonio and the points',['Golden State is missing several key players, including Stephen Curry. San Antonio is relatively healthy.','Golden State is third in home defensive rating but 24th on the road.'],[]),
+ XB('nba',['trail blazers','blazers'],['kings'],'a','a','Trail Blazers -10.5','One writer takes Portland and the points',['Portland has beaten Oklahoma City twice in a row and is 5-1 on the road.','Sacramento allows about 121 points a game, ranks 28th in defensive rating and is 0-6 at home.'],[]),
+ XB('nba',['thunder'],['clippers'],null,'h','Clippers +7.5','One writer takes the Clippers and the points',['Oklahoma City’s rotation is thinned by injuries and the team has lost two straight.','The writer sees value in Los Angeles getting more than seven at home.'],[])
+]).concat([
+ XB('ncaamb',['pittsburgh'],['butler'],'h','h','Butler -3.5','One writer sides with the market and takes Butler',['The ratings model projects a one-point Pitt win, but the writer trusts the line.','Butler has covered well in non-conference games and Pitt has little returning minutes.'],[]),
+ XB('ncaamb',['georgia'],['north carolina'],null,'a','Georgia +4.5','One writer takes Georgia and the points',['North Carolina is in its first season under a new coach. Georgia has better turnover and rebounding rates on both ends.'],[]),
+ XB('ncaamb',['ohio state'],['uconn','connecticut'],'h','h','UConn -11.5','One writer takes UConn and the points',['UConn has covered often in non-conference games since 2019-20 with large average margins.'],[]),
+ XB('ncaamb',['virginia'],['maryland'],'a','a','Virginia -5.5','One writer takes Virginia and the points',['Virginia has won all four games by 19 or more. Maryland ranks poorly in assist rate and defensive efficiency.'],['Source headings were inconsistent on the sign; the pick text says Virginia -5.5.']),
+ XB('ncaamb',['mississippi state'],['xavier'],'h','h','Xavier -3.5','One writer takes Xavier and the points',['Xavier’s size and shot profile (more close two-point attempts) should give it an edge.'],[]),
+ XB('ncaamb',['arizona'],['auburn'],'a','a','Arizona -2.5','One writer takes Arizona and the points',['The writer is down on Auburn after its coaching change and missed NCAA Tournament. Arizona won by 29 last December.'],['Source headings were inconsistent on the sign; the pick text says Arizona -2.5.']),
+ XB('ncaamb',['seton hall'],['alabama'],null,'a','Seton Hall +17.5','One writer takes Seton Hall and the points',['Seton Hall’s defense and experience should keep it inside the number. Alabama ranks low in experience.'],[])
+]);
+EXP_AT='Nov 13';
+/* a tap on a chip should never be lost to a re-render between press and release */
+var _pdSet=null;
+document.addEventListener('pointerdown',function(e){var b=e.target&&e.target.closest&&e.target.closest('[data-act="set"]');_pdSet=b?{k:b.dataset.k,v:b.dataset.v,x:e.clientX,y:e.clientY,t:Date.now()}:null},true);
+document.addEventListener('pointerup',function(e){
+  var p=_pdSet;_pdSet=null;
+  if(!p||Date.now()-p.t>900||Math.abs(e.clientX-p.x)>12||Math.abs(e.clientY-p.y)>12)return;
+  var b=e.target&&e.target.closest&&e.target.closest('[data-act="set"]');
+  if(!b||b.dataset.k!==p.k)return;
+  if(S[p.k]!==p.v){S[p.k]=p.v;S._pu=Date.now();render()}
+},true);
+function bandHd(label,n){
+  var c=/^Grade A/.test(label)?'var(--hit)':/^Grade [BC]/.test(label)?'var(--amber)':/^(D or F|Grade D|Grade F)/.test(label)?'var(--miss)':'var(--muted)';
+  return '<div style="display:flex;justify-content:space-between;align-items:center;margin:18px 0 8px;padding:9px 12px;background:var(--surface2);border-left:5px solid '+c+';border-radius:8px"><b style="font-size:16px">'+esc(label)+'</b><span class="src" style="margin:0">'+n+(n===1?' game':' games')+'</span></div>';
 }
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
