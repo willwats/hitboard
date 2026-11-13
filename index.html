@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v216, Nov 13';
+var BUILD='v217, Nov 13';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -14359,6 +14359,60 @@ function expPicksSec(lgs){
   if(!any)return '<h3>Expert locks</h3><div class="card empty">No NFL or college football games are in view right now.</div>';
   return '<h3>Expert locks: who covers</h3><p class="src" style="margin:0 0 4px">Tap a game for the reasons, injuries and each team’s season. Entered by hand as of '+EXP_AT+'; it does not update live.</p>'+out;
 }
+
+/* ---------- block162 (v217): tolerant season-schedule reader with visible diagnostics, Pitt-FSU expert entry ---------- */
+S.tmDbg=S.tmDbg||{};
+function tmSched(lg,id){
+  var k=lg+'|'+id,c=S.tmS[k];if(c&&Date.now()-c.t<20*60000)return Promise.resolve(c.v);
+  var base='https://site.api.espn.com/apis/site/v2/sports/'+ESPN[lg]+'/teams/'+id+'/schedule',d=new Date(),yr=d.getMonth()<2?d.getFullYear()-1:d.getFullYear();
+  var dbg=S.tmDbg[k]={codes:[],ev:0,done:0,sc:0};
+  var gj=function(u){return fetch(u).then(function(r){dbg.codes.push(r.status);return r.ok?r.json():null}).catch(function(e){dbg.codes.push('net');return null})};
+  return Promise.all([gj(base),gj(base+'?seasontype=2'),gj(base+'?season='+yr)]).then(function(js){
+    var ev={},sc=function(c){var s=c&&c.score;if(s==null)return null;if(typeof s==='object')s=s.value!=null?s.value:s.displayValue;s=parseFloat(s);return isNaN(s)?null:s};
+    js.filter(Boolean).forEach(function(j){(j.events||[]).forEach(function(e){
+      dbg.ev++;
+      var c=(e.competitions||[])[0]||{},st=(c.status&&c.status.type)||(e.status&&e.status.type)||{};
+      var done=st.completed===true||st.state==='post';if(!e.id||ev[e.id])return;
+      var me=null,op=null;(c.competitors||[]).forEach(function(x){if(String(x.team&&x.team.id)===String(id))me=x;else op=x});
+      if(!me||!op)return;var pf=sc(me),pa=sc(op);
+      if(pf==null||pa==null)return;
+      if(!done&&!(pf+pa>0&&Date.parse(e.date)<Date.now()-4*36e5))return;
+      dbg.done++;
+      ev[e.id]={id:e.id,date:e.date,home:me.homeAway==='home',pf:pf,pa:pa,opp:op.team||{}};
+    })});
+    var v=Object.keys(ev).map(function(x){return ev[x]}).sort(function(a,b){return Date.parse(a.date)-Date.parse(b.date)});
+    dbg.sc=v.length;
+    S.tmS[k]={t:v.length?Date.now():Date.now()-19*60000,v:v};return v;
+  });
+}
+function seasonLoad(g){
+  var k=expSeasonKey(g),cur=S.seasX[k];if(cur&&(cur.busy||cur.t))return;S.seasX[k]={busy:true};
+  var side=function(ab,nm){var o={L:null,why:''};
+    return tmIdFor(g.lg,ab,nm).then(function(id){o.id=id;return tmSched(g.lg,id)},function(){o.why='team not found in the team list';return null}).then(function(v){
+      if(v){o.L=v;if(!v.length){var b=S.tmDbg[g.lg+'|'+o.id]||{};o.why='the schedule loaded with '+(b.ev||0)+' games, none completed (codes '+(b.codes||[]).join('/')+')'}}else if(!o.why)o.why='the schedule did not load';
+      return o}).catch(function(){o.why='the schedule did not load';return o})};
+  Promise.all([side(g.a,g.an),side(g.h,g.hn)]).then(function(v){
+    S.seasX[k]={a:v[0],h:v[1],t:Date.now()};
+    try{if(S.sheet&&S.sheet.type==='fgame'&&S.sheet.id===g.id)renderSheet()}catch(e){}
+  });
+}
+function seasonCard(g){
+  if(!DL_LG[g.lg]||kind(g)!=='up')return '';
+  seasonLoad(g);var d=S.seasX[expSeasonKey(g)];
+  if(!d||d.busy)return '<h3>Season so far</h3><div class="card" style="padding:12px"><p class="src" style="margin:0">Loading each team’s full season…</p></div>';
+  var blk=function(nm,o){
+    if(o&&o.L&&o.L.length)return seasonBlock(nm,o.L);
+    return '<p class="src" style="margin:6px 0 0"><b>'+esc(nm)+'</b>: season results did not load'+(o&&o.why?' ('+esc(o.why)+')':'')+'.</p>';
+  },bad=!(d.a&&d.a.L&&d.a.L.length)||!(d.h&&d.h.L&&d.h.L.length);
+  return '<h3>Season so far</h3><div class="card" style="padding:12px">'+blk(shortNm(g,'a'),d.a)+blk(shortNm(g,'h'),d.h)+(bad?'<div class="actions" style="margin-top:8px"><button class="btn" data-act="seasretry" data-k="'+esc(expSeasonKey(g))+'">Try again</button></div>':'')+'<p class="src" style="margin:8px 0 0">Every completed game this season, from the schedule. Against-the-spread records are not in this data, so any ATS trend above is a reported figure.</p></div>';
+}
+document.addEventListener('click',function(e){
+  var el=e.target.closest&&e.target.closest('[data-act="seasretry"]');if(!el)return;
+  var k=el.dataset.k;delete S.seasX[k];
+  Object.keys(S.tmS).forEach(function(x){if(!(S.tmS[x].v||[]).length)delete S.tmS[x]});
+  try{renderSheet()}catch(x){}
+});
+EXPERTS.push(XC(['seminoles'],['panthers'],'h','h','Pittsburgh -3.5','Both writers take Pittsburgh and the points',['Pittsburgh is 5-1 at home, allows about 11 points a game there, and has the best run defense in the ACC (about 68 rushing yards a game).','Florida State is 1-3 on the road, allowed 43, 44 and 50 points in three of those games, and ranks 115th in EPA allowed per play.','Pitt is off a bye with 13 days of rest; Florida State has six days and travels about 730 miles.'],['Both teams are 1-3 over their last four, and Pittsburgh is 1-3 against the spread in that span.','Trends: Pitt’s last six November home games all went Under; the total is 52.5 to 54.5.','Florida State injuries: WR Duce Robinson out (reported ACL), C Bradyn Welch-Joiner hurt, DL Kevin Wynn and Deante McCray out.','Risk: FSU creates explosive plays at the eighth-highest rate nationally.']));
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
