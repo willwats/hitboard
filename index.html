@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v219, Nov 13';
+var BUILD='v220, Nov 13';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -14171,6 +14171,7 @@ function expFor(g){
   EXPERTS.forEach(function(e){
     if(hit||e.lg!==lg)return;
     if(lg==='nfl'){if(nt(String(g.a).toUpperCase())===e.a&&nt(String(g.h).toUpperCase())===e.h)hit=e;return}
+    if(!e.an||!e.hn)return;
     var ok=function(side,ks){var t=' '+txt(side)+' ';return ks.some(function(k){return t.indexOf(' '+k+' ')>=0||normName(side==='a'?g.an:g.hn).indexOf(k)>=0&&k.length>3})};
     if(ok('a',e.an)&&ok('h',e.hn))hit=e;
     else if(ok('a',e.hn)&&ok('h',e.an)){var fl=function(s){return s==='a'?'h':s==='h'?'a':s};hit={};Object.keys(e).forEach(function(k){hit[k]=e[k]});hit.win=fl(e.win);hit.cov=fl(e.cov)}
@@ -14257,7 +14258,7 @@ var vPicks2_159=vPicks2;
 vPicks2=function(){
   var h=vPicks2_159.apply(this,arguments);
   try{
-    var lgs=S.pks==='all'||!S.pks?['nfl','ncaafb']:[S.pks],sec=expPicksSec(lgs),i=h.indexOf('<h3');
+    var lgs=S.pks==='all'||!S.pks?['nfl','ncaafb','nba','nhl','ncaamb']:[S.pks],sec=expPicksSec(lgs),i=h.indexOf('<h3');
     if(i<0)return h+sec;
     return h.slice(0,i)+sec+h.slice(i);
   }catch(e){return h}
@@ -14466,7 +14467,7 @@ vResults=function(){
   var h='<h2>Results</h2><p class="src" style="margin:0 0 8px">Each finished game with the app’s picks and the expert picks side by side. Picks are saved before the game and graded on the final score.</p>';
   h+='<div class="facts"><span>App picks <b>'+rt(ap)+'</b></span><span>Experts: winner <b>'+rt(ew)+'</b></span><span>Experts: cover <b>'+rt(ec)+'</b></span></div>';
   if(lgs.length>2)h+='<div class="chips" role="group" aria-label="Sport" style="margin:8px 0">'+lgs.map(function(l){return '<button class="chip'+(sf===l?' on':'')+'" data-act="set" data-k="rsl" data-v="'+l+'">'+(l==='all'?'All':esc(lgName(l)))+'</button>'}).join('')+'</div>';
-  h+='<h3>By game</h3><div class="chips" role="group" aria-label="Group by" style="margin:4px 0 6px"><span class="src" style="align-self:center;margin-right:4px">Group by</span>'+[['day','Day'],['hb','Hitboard grade'],['ex','Expert grade']].map(function(c){return '<button class="chip'+((S.rgb||'day')===c[0]?' on':'')+'" data-act="set" data-k="rgb" data-v="'+c[0]+'">'+c[1]+'</button>'}).join('')+'</div>';
+  h+='<h3>By game</h3><div class="chips" role="group" aria-label="Group by grade" style="margin:4px 0 6px"><span class="src" style="align-self:center;margin-right:4px">Group by grade</span>'+[['day','None'],['ex','Expert'],['hb','Hitboard']].map(function(c){return '<button class="chip'+((S.rgb||'day')===c[0]?' on':'')+'" data-act="set" data-k="rgb" data-v="'+c[0]+'">'+c[1]+'</button>'}).join('')+'</div>';
   if(!D.length)h+='<div class="card empty">No finished games with saved picks yet. '+(wait?wait+' game'+(wait===1?' is':'s are')+' waiting to finish. ':'')+'Expert picks are saved from now on for NFL and college football, and graded when each game ends.</div>';
   else{
     var lastDay='',rgb=S.rgb||'day',bestL=function(o){var b=null;['sp','ml','tot'].forEach(function(t){var l=S.glog[o.gid]&&S.glog[o.gid][t];if(l&&(!b||gradeRank(l)>gradeRank(b)))b=l});return b};
@@ -14578,6 +14579,111 @@ function expPicksSec(lgs){
   return '<h3>Expert locks: who covers</h3><p class="src" style="margin:0 0 4px">Tap a game for the reasons, injuries and each team’s season. Entered by hand as of '+EXP_AT+'; it does not update live.</p>'+
     '<div class="chips" role="group" aria-label="Sort by" style="margin:6px 0"><span class="src" style="align-self:center;margin-right:4px">Sort by</span>'+chips+'</div>'+
     '<p class="src" style="margin:0 0 4px">The expert grade shows how strongly the writers agree (A means nearly all take the same side, D means a split). The Hitboard grade is the app’s own pick grade for that game.</p>'+out;
+}
+
+/* ---------- block165 (v220): all sports in the expert list, season-based grades when no Hitboard grade, None/Expert/Hitboard filter ---------- */
+function XN(a,h,win,cov,ln,ag,why,tr){return {lg:'nba',a:a,h:h,win:win,cov:cov,ln:ln,ag:ag,why:why||[],tr:tr||[]}}
+EXPERTS=EXPERTS.filter(function(e){return e.lg!=='nba'}).concat([
+ XN('MIL','ORL','h',null,'Magic by about 9 (computer projection)','Computer projection only: leans Orlando',['Projected 116–108. Orlando’s rotation is thin, but Milwaukee’s defense is struggling.','Props pick: Franz Wagner Over 24.5 points (30-plus in three straight).'],[]),
+ XN('NYK','IND','a',null,'Knicks by about 7 (computer projection)','Computer projection only: leans New York',['Projected 114–107.','Props pick: Karl-Anthony Towns 20-plus points; Andrew Nembhard Over 7.5 assists.'],[]),
+ XN('MEM','NOP','a',null,'Grizzlies by about 5 (computer projection)','Computer projection only: leans Memphis',['Projected 120–114. Trey Murphy III is doubtful for New Orleans.','Memphis is missing Zach Edey and Quinten Post.'],[]),
+ XN('ATL','CHI','a',null,'Hawks by about 5 (computer projection)','Computer projection only: leans Atlanta',['Projected 125–119. Chicago plays at the league’s highest pace and ranks 23rd at limiting rebounds to Okongwu’s position.','Norm Powell is dealing with a back issue.'],['Fast pace points to a high-scoring game.']),
+ XN('CLE','MIA','h',null,'Heat by about 2 (computer projection)','Computer projection only: a narrow lean to Miami',['Projected 117–115.'],[]),
+ XN('UTA','HOU','h','h','Rockets by about 15 (computer projection)','Computer projection only: strong lean to Houston',['Projected 117–102. Utah’s lineup is depleted.'],[]),
+ XN('GSW','SAS','h','h','Spurs -12.5 (best price -13.5)','The one expert side pick: San Antonio to cover',['Golden State is third in home defensive rating but 24th on the road, and has lost Curry’s scoring and spacing.','Devin Vassell is out; Vassell and De’Aaron Fox are listed questionable.'],[]),
+ XN('POR','SAC','a','a','Trail Blazers -8.5 (computer projection about 9)','Computer projection leans Portland to cover',['Projected 120–111. Portland’s Deni Avdija is shooting well; Sacramento’s Dylan Acuff averages 26 points.','Portland allows 31 points a game to opposing point guards.'],[]),
+ XN('OKC','LAC','a','a','Thunder -6.5 (computer projection about 9)','Computer projection leans Oklahoma City to cover',['Projected 115–107.'],[])
+]);
+var expFor165=expFor;
+expFor=function(g){
+  var e=expFor165(g);if(e)return e;
+  if(g.lg==='nba'||g.lg==='nhl'||g.lg==='ncaamb'){
+    var A=String(g.a).toUpperCase(),H=String(g.h).toUpperCase(),hit=null;
+    EXPERTS.forEach(function(x){if(!hit&&x.lg===g.lg&&x.a===A&&x.h===H)hit=x});
+    return hit;
+  }
+  return e;
+};
+/* ---- season-based grade: every completed game this season, no opponent adjustment ---- */
+var SG_HFA={nfl:2.2,ncaafb:2.5,nba:2.5,ncaamb:3.5,nhl:.15,mlb:.15},SG_SD={nfl:13,ncaafb:16,nba:12,ncaamb:11,nhl:2.4,mlb:3.2};
+function phi(z){var t=1/(1+.2316419*Math.abs(z)),d=.3989423*Math.exp(-z*z/2),p=d*t*(.3193815+t*(-.3565638+t*(1.781478+t*(-1.821256+t*1.330274))));return z>0?1-p:p}
+function sgRate(L){
+  if(!L||L.length<2)return null;
+  var m=function(a){return a.reduce(function(s,x){return s+x.pf-x.pa},0)};
+  var all=m(L)/(L.length+3),l5=L.slice(-5),rec=m(l5)/(l5.length+2);
+  return .75*all+.25*rec;
+}
+S.sq=[];S.sqN=0;S.sqT=null;
+function seasonQueue(g){
+  var k=expSeasonKey(g),c=S.seasX[k];if(c&&(c.busy||c.t))return;
+  if(S.sq.indexOf(g)<0)S.sq.push(g);seasonPump();
+}
+function seasonPump(){
+  while(S.sqN<3&&S.sq.length){
+    var g=S.sq.shift(),k=expSeasonKey(g),c=S.seasX[k];if(c&&(c.busy||c.t))continue;
+    S.sqN++;seasonLoad(g);
+    (function(k){var iv=setInterval(function(){var d=S.seasX[k];if(d&&d.t){clearInterval(iv);S.sqN--;seasonPump();clearTimeout(S.sqT);S.sqT=setTimeout(function(){try{if((S.tab==='picks2'||S.tab==='results')&&(!HB_LAST_TOUCH||Date.now()-HB_LAST_TOUCH>1200)&&!S.sheet)render()}catch(e){}},700)}},400)})(k);
+  }
+}
+function seasonGrade(g){
+  var d=S.seasX[expSeasonKey(g)];
+  if(!d||!d.t){seasonQueue(g);return null}
+  var ra=sgRate(d.a&&d.a.L),rh=sgRate(d.h&&d.h.L);if(ra==null||rh==null)return {none:true};
+  var lg=g.lg,M=rh-ra+(SG_HFA[lg]||0),sd=SG_SD[lg]||12,ph=phi(M/sd),side=ph>=.5?'h':'a',p=Math.max(ph,1-ph);
+  var sum=Math.min(22,(p-.5)*100),out={side:side,M:M,sd:sd,ml:{l:grLetter(sum),sum:sum,pick:(side==='h'?shortNm(g,'h'):shortNm(g,'a'))+' to win',sg:1}};
+  try{var m=pickModel(g);if(m&&m.ln&&m.ln.pts!=null&&m.mk!=null){var pc=phi((M-m.mk)/(sd*.95)),cs=pc>=.5?'h':'a',pp=Math.max(pc,1-pc),su=Math.min(22,(pp-.5)*100*.9);out.sp={l:grLetter(su),sum:su,pick:(cs==='h'?shortNm(g,'h'):shortNm(g,'a'))+' covers',sg:1,side:cs}}}catch(e){}
+  return out;
+}
+var hbGradesFor165=hbGradesFor;
+hbGradesFor=function(g){
+  var v=hbGradesFor165(g);
+  if(!v.ml&&!v.sp){
+    var s=seasonGrade(g);
+    if(s&&!s.none){v=Object.assign({},v);v.ml=s.ml;if(s.sp)v.sp=s.sp}
+  }
+  return v;
+};
+function hbBest(v){var b=null;['sp','ml','tot'].forEach(function(t){if(v[t]&&(!b||v[t].sum>b.sum))b=v[t]});return b}
+/* picks list across all sports */
+var XLGS=['nfl','ncaafb','nba','nhl','ncaamb'];
+function expPicksSec(lgs){
+  var out='',any=false,now=Date.now(),sort=S.xsort||'time',pend=0,budget=6;
+  lgs.forEach(function(lg){
+    if(XLGS.indexOf(lg)<0)return;
+    var span=(lg==='nfl'||lg==='ncaafb')?9*864e5:2*864e5,cap=(lg==='ncaamb')?40:80;
+    var L=(S.feed[lg]||[]).filter(function(g){return kind(g)==='up'&&g.start<now+span}).sort(function(a,b){return a.start-b.start});
+    if(lg==='ncaamb'){var ex0=L.filter(function(g){return expFor(g)}),rest=L.filter(function(g){return !expFor(g)});L=ex0.concat(rest).slice(0,cap).sort(function(a,b){return a.start-b.start})}
+    var R=[],nex=0;
+    L.forEach(function(g){
+      var e=expFor(g),na=shortNm(g,'a'),nh=shortNm(g,'h'),nm=function(s){return s==='a'?na:nh};
+      if(e)nex++;
+      var er=e?expRatio(e):null,el=expLetter(er),hv={},fresh=S.hbg&&S.hbg[g.id]&&S.hbg[g.id].k===g.id+'|'+S.dlV+'|'+Math.floor(Date.now()/120000);
+      if(fresh||budget>0){if(!fresh)budget--;hv=hbGradesFor(g)}else pend++;
+      var hb=hbBest(hv),cs=null;
+      try{var m=pickModel(g);if(m&&m.ln&&m.ln.pts!=null&&m.M!=null&&e&&e.cov)cs=m.M-m.mk>=0?'h':'a'}catch(x){}
+      R.push({g:g,e:e,na:na,nh:nh,nm:nm,er:er,el:el,hv:hv,hb:hb,cs:cs});
+    });
+    if(sort!=='time')R.sort(function(a,b){var x=sort==='hb'?(b.hb?b.hb.sum:-99)-(a.hb?a.hb.sum:-99):(b.er==null?-1:b.er)-(a.er==null?-1:a.er);return x||a.g.start-b.g.start});
+    var rowH=function(o){
+      var g=o.g,e=o.e,t=new Date(g.start).toLocaleDateString([],{weekday:'short'})+' '+new Date(g.start).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
+      var cov=!e?'<span class="src">No expert pick found for this game</span>':e.cov?'To cover: <b>'+esc(o.nm(e.cov))+'</b> · '+esc(e.ln):'<b>Split</b> on the cover · '+esc(e.ln),ag=o.cs&&e&&e.cov?(o.cs===e.cov?'<span class="tag" style="font-size:10px;padding:1px 6px">App agrees</span>':'<span class="tag warn" style="font-size:10px;padding:1px 6px">App disagrees</span>'):'';
+      var hp=['sp','ml','tot'].filter(function(k){return o.hv[k]}).map(function(k){var q=o.hv[k];return gPill(q.l,({sp:'Spread',ml:'Winner',tot:'Total'}[k])+(q.sg?' (season)':''))}).join('');
+      return '<div data-act="fgame" data-id="'+esc(g.id)+'" style="padding:10px 0;border-top:1px solid var(--line);cursor:pointer"><div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><span><b>'+esc(o.na)+' @ '+esc(o.nh)+'</b></span><span class="src">'+esc(t)+'</span></div><div style="margin-top:3px">'+cov+' '+ag+'</div>'+(e?'<div class="src" style="margin-top:2px">'+esc(e.ag)+'</div>':'')+'<div style="margin-top:5px">'+(o.el?gPill(o.el,'Expert'):'')+(hp?'<span class="src">Hitboard </span>'+hp:'<span class="src">Hitboard: grade loading…</span>')+'</div></div>';
+    };
+    var body='';
+    if(sort==='time')body=R.map(rowH).join('');
+    else{
+      var Bd={};R.forEach(function(o){var l=sort==='hb'?(o.hb&&o.hb.l):o.el,b=bandOf(l);(Bd[b]=Bd[b]||[]).push(o)});
+      BAND_ORDER.forEach(function(b){if(Bd[b])body+='<p class="src" style="margin:8px 0 0"><b>'+(b==='None'?'No grade':b==='D or F'?'D or F':'Grade '+b)+'</b> · '+Bd[b].length+'</p>'+Bd[b].map(rowH).join('')});
+    }
+    if(R.length){any=true;out+='<p class="src" style="margin:10px 0 0"><b>'+esc(lgName(lg))+'</b> · '+nex+' of '+R.length+' games have an expert pick'+(lg==='ncaamb'&&(S.feed[lg]||[]).length>cap?' (showing '+cap+' games)':'')+'</p><div class="card" style="padding:4px 12px">'+body.replace(/^(<p[^>]*>.*?<\/p>)?<div([^>]*)border-top:1px solid var\(--line\);/,'$1<div$2')+'</div>'}
+  });
+  if(pend){clearTimeout(S._xgT);S._xgT=setTimeout(function(){try{if(!HB_LAST_TOUCH||Date.now()-HB_LAST_TOUCH>800)render();else S._xgT=setTimeout(function(){render()},1500)}catch(e){}},400)}
+  if(!any)return '<h3>Expert locks</h3><div class="card empty">No games are in view right now.</div>';
+  var chips=[['time','None'],['ex','Expert'],['hb','Hitboard']].map(function(c){return '<button class="chip'+(sort===c[0]?' on':'')+'" data-act="set" data-k="xsort" data-v="'+c[0]+'">'+c[1]+'</button>'}).join('');
+  return '<h3>Expert locks: who covers</h3><p class="src" style="margin:0 0 4px">Tap a game for the reasons, injuries and each team’s season. Expert picks are entered by hand as of '+EXP_AT+' and do not update live. Many games, especially in basketball, have no expert coverage.</p>'+
+    '<div class="chips" role="group" aria-label="Group by grade" style="margin:6px 0"><span class="src" style="align-self:center;margin-right:4px">Group by grade</span>'+chips+'</div>'+
+    '<p class="src" style="margin:0 0 4px">Expert grade: how strongly the writers agree. Hitboard grade: the app’s own pick grade. Where the app has no pick for a game, “(season)” grades it from every game each team has played this season, with the last five weighted more; it does not adjust for opponent strength, so it never grades above B+.</p>'+out;
 }
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
