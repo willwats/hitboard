@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v215, Nov 13';
+var BUILD='v216, Nov 13';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -14262,6 +14262,103 @@ vPicks2=function(){
     return h.slice(0,i)+sec+h.slice(i);
   }catch(e){return h}
 };
+
+/* ---------- block161 (v216): full college football expert slate, season-so-far card, all games listed ---------- */
+function XC(an,hn,win,cov,ln,ag,why,tr){return {lg:'ncaafb',an:an,hn:hn,win:win,cov:cov,ln:ln,ag:ag,why:why||[],tr:tr||[]}}
+EXPERTS=EXPERTS.filter(function(e){return e.lg!=='ncaafb'}).concat([
+ XC(['blue devils'],['hurricanes'],'h',  'a','Duke +13.5','Miami wins, but two of three writers take Duke and the points',['Duke has the top pass defense in the ACC, which can blunt Miami’s offense.','Miami is missing receiver Malachi Toney.','Duke is the defending conference champ and is motivated.'],['One writer leans Over 54.5.']),
+ XC(['wildcats'],['buckeyes'],'h',null,'Ohio State -11.5 to -13.5','Ohio State wins; writers split on the cover',['Northwestern QB Aidan Chiles is out.','Ohio State’s offense stalled for most of last week and its defense has slipped, so one writer takes Northwestern and the points.'],['Two writers lean Under 44.5 to 45.5; another likes the Over.']),
+ XC(['demon deacons'],['mustangs'],'a','a','Wake Forest +1.5','Both writers lean Wake Forest',['Wake Forest has been strong on both sides of the ball in the ACC.','SMU may struggle without a big home edge.'],['Lean: Under 60.5.']),
+ XC(['crimson tide'],['commodores'],'a',null,'Alabama -15.5 to -17','Alabama wins; one writer takes Vanderbilt and the points',['Alabama has the SEC’s second-best scoring offense; Vanderbilt allows the most points in the conference.','Doubters think the line is inflated by Alabama’s name.'],['Lean: Under 50.5; Alabama team total Over 33.5.']),
+ XC(['volunteers'],['aggies'],null,null,'Tennessee -2.5; Texas A&M moneyline +116','Split between Tennessee and Texas A&M',['Texas A&M has been held without touchdowns in several Power 4 games, but one writer sees value on the Aggies’ moneyline.','Tennessee leads the country in sacks.'],['Lean: Under 43.5.']),
+ XC(['wolverines'],['ducks'],'h','a','Michigan +10.5','Oregon wins, but writers like Michigan and the points',['Rain and wind are forecast, which favors Michigan’s defense and a low-scoring game.','Oregon’s scoring has been low recently.'],['Lean: Under 38.5 to 39.5.']),
+ XC(['missouri'],['georgia'],'h','h','Georgia -15.5','Writers favor Georgia',['Georgia has the SEC’s best scoring offense and defense.','Missouri’s defense has allowed 30-plus points in recent games.'],['Lean: Over 47.5.']),
+ XC(['trojans'],['hoosiers'],'h',null,'Indiana -7.5','Indiana wins; writers split on the cover',['Indiana QB Josh Hoover has an arm injury that may limit deep passing, which USC defends poorly.','USC has struggled on eastern-time road trips, and Indiana is coming off a bye.'],['Lean: Under 50.5; first-half Under 24.5.']),
+ XC(['eagles'],['fighting irish'],'h','a','Boston College +29.5','Notre Dame wins; writer takes Boston College and the points',['Notre Dame is missing several defensive starters.'],['Notre Dame QB CJ Carr Over 235.5 passing yards is also a lean.']),
+ XC(['rebels'],['sooners'],null,null,'Pick’em (lines differ by outlet)','Split; lines disagree on the favorite',['Oklahoma’s pressure should stall Ole Miss, which is reeling after recent losses.','Ole Miss QB Trinidad Chambliss has struggled against top competition.'],['Lean: Under 49.5.']),
+ XC(['gators'],['wildcats'],'h','h','Kentucky -3.5','Writers favor Kentucky',['Florida has allowed about 32 points per game in SEC play.','Kentucky is at home and scores often.'],['Lean: Over 52.5.']),
+ XC(['cardinals'],['tar heels'],null,null,'Louisville at North Carolina','No side picked; passing props lean over',['North Carolina creates little pressure, so Louisville has time to throw.','UNC QB Billy Edwards Jr. has topped 255 passing yards in three straight games.'],['Louisville allows the most passing yards in the ACC.']),
+ XC(['longhorns'],['lsu'],'h',null,'LSU -3.5 to -4.5','LSU favored, but writers split on the cover',['LSU has one of the best pass rushes against a Texas line that struggles in protection.','Texas’s defense is strong and LSU has struggled against ranked teams.'],['Lean: Under 46.5.']),
+ XC(['utes'],['wildcats'],'a',null,'Utah -2.5','Utah favored; writers split on the cover',['Utah has a strong rushing attack and Arizona’s run defense has been poor.','Arizona’s defense should bounce back at home after a narrow win.'],['Lean: Under 54.5.']),
+ XC(['gamecocks'],['razorbacks'],'a','a','South Carolina -7.5','Writers favor South Carolina',['Arkansas ranks poorly on offense and defense, and its quarterback is questionable.','South Carolina’s Jabree Coleman averages 5.6 yards a carry; Arkansas allows 4.6.'],[]),
+ XC(['red raiders'],['cowboys'],'h',null,'Oklahoma State -3.5','Oklahoma State favored; cover is split',['Texas Tech QB Drew Mestemaker has topped 300 yards in eight straight games, and Texas Tech allows the third-most passing yards in the country.','Oklahoma State’s offense is high-powered.'],['Lean: Over 72.5 to 73.5.']),
+ XC(['bearcats'],['cyclones'],'h','h','Iowa State -3','Writers favor Iowa State',['Cincinnati is weak against the run and has lost all three conference road games.'],[]),
+ XC(['wolfpack'],['orange'],null,null,'NC State at Syracuse','No side picked; leaning Over',['NC State’s offense should score on a Syracuse defense that ranks poorly in EPA.'],['Lean: Over 53.5.']),
+ XC(['badgers'],['terrapins'],null,'h','Maryland +8.5','One writer takes Maryland and the points',['Wisconsin’s defense has gone Under five straight games, but Maryland has momentum after a conference win.'],[]),
+ XC(['dukes'],['huskies'],'a','a','James Madison -4.5','Writers favor JMU',['UConn is struggling as an underdog; JMU’s defense ranks near the top in success rate.'],['Another writer likes the Over 57.5.']),
+ XC(['auburn'],['mississippi state'],'h','h','Mississippi State moneyline (+133)','One writer likes Mississippi State at home',['Auburn is just 1-2 on the road, and Mississippi State has plenty to play for.'],[]),
+ XC(['yellow jackets'],['tigers'],null,null,'Georgia Tech at Clemson','No side picked',['Georgia Tech’s offense has scored just 28 points over its last two games, and quarterback changes hurt it.'],['Lean: Georgia Tech team total Under 17.5.']),
+ XC(['cornhuskers'],['scarlet knights'],null,null,'Nebraska at Rutgers','No side picked; leaning Under',['Rutgers’ offense is limited.'],['Lean: Under 52.5.']),
+ XC(['pirates'],['charlotte'],'a','a','East Carolina -11.5','Writers favor East Carolina',['Charlotte’s defense is among the worst in the country.'],[]),
+ XC(['green wave'],['owls'],'h','h','Rice -2.5','One writer leans Rice',['Tulane is in turmoil and Rice has the better yards-per-play margin.'],['Rice -2.5.']),
+ XC(['blue raiders'],['flames'],'h','h','Liberty -21.5','Writers favor Liberty',['Liberty has allowed about 11 points per game recently, and Middle Tennessee’s defense is weak.'],[]),
+ XC(['beavers'],['broncos'],'h','h','Boise State -11.5','Writers favor Boise State',['Boise State averages nearly 40 points a game.','Oregon State is 0-3 against the spread since Week 7.'],['Lean: Over 64.5 from one writer.']),
+ XC(['lobos'],['rebels'],'a','a','New Mexico -14.5','Writer favors New Mexico',['UNLV’s QB struggles under pressure, and New Mexico leads the country in havoc rate.'],[]),
+ XC(['mean green'],['roadrunners'],'a',null,'North Texas moneyline','Lean North Texas',['North Texas ranks among the top Group of Five offenses.'],[]),
+ XC(['bears'],['cougars'],'h','a','Baylor +7.5','BYU wins, but writers like Baylor and the points',['Baylor’s defense ranks seventh in havoc rate. A power rating projects BYU by 7, short of the number.','Rain is expected, which favors fewer points.'],['Lean: Under 48.5. BYU is reported 0-3 against the spread since beating Notre Dame.']),
+ XC(['sun devils'],['knights'],'h','h','UCF -3','A power rating favors UCF',['UCF projected to win by about 7 at home.'],[]),
+ XC(['jayhawks'],['mountaineers'],'h','h','West Virginia -2.5','A power rating favors West Virginia',['Projected 34–29, a high-scoring game.'],['Total 68.5, projected under it.']),
+ XC(['wildcats'],['horned frogs'],'h','h','TCU -10.5','A power rating favors TCU',['Projected win by 13 in a lower-scoring game.'],['Total 44.5.']),
+ XC(['cougars'],['buffaloes'],'a','a','Houston -8.5','A power rating favors Houston by about 17',['Projected 33–16; Houston is the heavy moneyline favorite.'],[]),
+ XC(['fighting illini'],['bruins'],'h','h','UCLA -9.5','Experts like UCLA, 77% to win',['UCLA’s defense is elite, and Illinois is in a travel letdown spot.'],['UCLA is reported 9-0 against the spread this season.','Lean: Over 48.5.']),
+ XC(['boilermakers'],['hawkeyes'],'h','h','Iowa -17.5','Experts like Iowa, 87% to win',['Iowa is motivated by a possible first-ever playoff bid.'],['Lean: Over 47.5.']),
+ XC(['panthers'],['seminoles'],null,null,'Pittsburgh vs Florida State','Not enough expert coverage',[],[])
+].filter(function(e){return e.win||e.cov||e.why.length}));
+function expSeasonKey(g){return g.lg+'|'+g.id}
+S.seasX=S.seasX||{};
+function seasonLoad(g){
+  var k=expSeasonKey(g);if(S.seasX[k])return;S.seasX[k]={busy:true};
+  var side=function(ab,nm){return tmIdFor(g.lg,ab,nm).then(function(id){return tmSched(g.lg,id)}).catch(function(){return null})};
+  Promise.all([side(g.a,g.an),side(g.h,g.hn)]).then(function(v){
+    S.seasX[k]={a:v[0],h:v[1],t:Date.now()};
+    try{if(S.sheet&&S.sheet.type==='fgame'&&S.sheet.id===g.id)renderSheet()}catch(e){}
+  });
+}
+function seasonBlock(nm,L){
+  if(!L||!L.length)return '<p class="src" style="margin:6px 0 0"><b>'+esc(nm)+'</b>: season results are not available yet.</p>';
+  var w=0,l=0,t=0,pf=0,pa=0,hw=0,hl=0,aw=0,al=0,streak='',sn=0;
+  L.forEach(function(x){pf+=x.pf;pa+=x.pa;var win=x.pf>x.pa,tie=x.pf===x.pa;if(tie)t++;else if(win){w++;x.home?hw++:aw++}else{l++;x.home?hl++:al++}});
+  for(var i=L.length-1;i>=0;i--){var r=L[i].pf>L[i].pa?'W':L[i].pf<L[i].pa?'L':'T';if(!streak)streak=r;if(r===streak)sn++;else break}
+  var n=L.length,last=L.slice(-5).reverse().map(function(x){var r=x.pf>x.pa?'W':x.pf<x.pa?'L':'T',o=(x.opp&&(x.opp.abbreviation||x.opp.shortDisplayName||x.opp.displayName))||'';return '<span class="tag" style="margin:2px 4px 0 0">'+r+' '+x.pf+'–'+x.pa+' '+(x.home?'vs':'@')+' '+esc(o)+'</span>'}).join('');
+  return '<p style="margin:8px 0 0"><b>'+esc(nm)+'</b> '+w+'-'+l+(t?'-'+t:'')+' · home '+hw+'-'+hl+', away '+aw+'-'+al+' · streak '+streak+sn+'</p>'+
+    '<div class="src">'+(pf/n).toFixed(1)+' points for, '+(pa/n).toFixed(1)+' against per game (margin '+((pf-pa)/n>=0?'+':'')+((pf-pa)/n).toFixed(1)+') over '+n+' games</div><div>'+last+'</div>';
+}
+function seasonCard(g){
+  if(!DL_LG[g.lg]||kind(g)!=='up')return '';
+  seasonLoad(g);var d=S.seasX[expSeasonKey(g)];
+  if(!d||d.busy)return '<h3>Season so far</h3><div class="card" style="padding:12px"><p class="src" style="margin:0">Loading each team’s full season…</p></div>';
+  return '<h3>Season so far</h3><div class="card" style="padding:12px">'+seasonBlock(shortNm(g,'a'),d.a)+seasonBlock(shortNm(g,'h'),d.h)+'<p class="src" style="margin:8px 0 0">Every completed game this season, from the schedule. Against-the-spread records are not in this data, so any ATS trend above is a reported figure.</p></div>';
+}
+var feedSheet160=feedSheet;
+feedSheet=function(g){
+  var h=feedSheet160.apply(this,arguments);
+  try{
+    var c=seasonCard(g);if(!c)return h;
+    var i=h.indexOf('<h3>Expert locks</h3>');
+    if(i<0)i=h.indexOf('<h3>Prediction</h3>');
+    var j=i>=0?h.indexOf('<h3',i+10):-1;if(j<0)return h;
+    return h.slice(0,j)+c+h.slice(j);
+  }catch(e){return h}
+};
+/* picks tab: all upcoming games for the sport, those without an expert pick listed underneath */
+function expPicksSec(lgs){
+  var out='',any=false,now=Date.now();
+  lgs.forEach(function(lg){
+    if(lg!=='nfl'&&lg!=='ncaafb')return;
+    var L=(S.feed[lg]||[]).filter(function(g){return kind(g)==='up'&&g.start<now+9*864e5}).sort(function(a,b){return a.start-b.start}),rows='',none=[];
+    L.forEach(function(g){
+      var e=expFor(g),na=shortNm(g,'a'),nh=shortNm(g,'h'),nm=function(s){return s==='a'?na:nh};
+      if(!e){none.push(na+' @ '+nh);return}
+      var cov=e.cov?'To cover: <b>'+esc(nm(e.cov))+'</b>':'<b>Split</b> on the cover',appTx='';
+      try{var m=pickModel(g);if(m&&m.ln&&m.ln.pts!=null&&m.M!=null&&e.cov){var cs=m.M-m.mk>=0?'h':'a';appTx=cs===e.cov?'<span class="tag" style="font-size:10px;padding:1px 6px">App agrees</span>':'<span class="tag warn" style="font-size:10px;padding:1px 6px">App disagrees</span>'}}catch(x){}
+      var t=new Date(g.start).toLocaleDateString([],{weekday:'short'})+' '+new Date(g.start).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
+      rows+='<div data-act="fgame" data-id="'+esc(g.id)+'" style="padding:10px 0;border-top:1px solid var(--line);cursor:pointer"><div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><span><b>'+esc(na)+' @ '+esc(nh)+'</b></span><span class="src">'+esc(t)+'</span></div><div style="margin-top:3px">'+cov+' · '+esc(e.ln)+' '+appTx+'</div><div class="src" style="margin-top:2px">'+esc(e.ag)+'</div></div>';
+    });
+    if(rows||none.length){any=true;out+='<p class="src" style="margin:8px 0 0"><b>'+esc(lgName(lg))+'</b> · '+(L.length-none.length)+' of '+L.length+' games have an expert pick</p>'+(rows?'<div class="card" style="padding:4px 12px">'+rows+'</div>':'')+(none.length?'<details style="margin:6px 0"><summary class="src">No expert pick yet ('+none.length+')</summary><p class="src" style="margin:4px 0">'+none.map(esc).join(' · ')+'</p></details>':'')}
+  });
+  if(!any)return '<h3>Expert locks</h3><div class="card empty">No NFL or college football games are in view right now.</div>';
+  return '<h3>Expert locks: who covers</h3><p class="src" style="margin:0 0 4px">Tap a game for the reasons, injuries and each team’s season. Entered by hand as of '+EXP_AT+'; it does not update live.</p>'+out;
+}
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
