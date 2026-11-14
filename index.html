@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v229, Nov 13';
+var BUILD='v230, Nov 13';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -15037,6 +15037,96 @@ vResults=function(){
     var other=['nba','nhl','ncaamb','mlb'].reduce(function(s,lg){return s+Object.keys(S.lrn).filter(function(k){return S.lrn[k].lg===lg}).length},0);
     var card='<h3>Learning model</h3><div class="card" style="padding:12px"><p class="src" style="margin:0 0 6px">Before each game the app saves its margin, the market line, both teams’ injury burden and the expert lean. After the final it records the result and re-fits how much weight each one deserves.</p><ul class="pts" style="margin:0">'+rows+'<li><b>Other sports:</b> '+other+' games recorded quietly for later; not shown yet.</li></ul></div>';
     var k=h.indexOf('<details style="margin:14px 0">');return k>=0?h.slice(0,k)+card+h.slice(k):h+card;
+  }catch(e){return h}
+};
+
+/* ---------- block172 (v230): reported absences for this week's games, with what each change means ---------- */
+var KEY_AT='Nov 13';
+/* entries: 'POS Name:o|d|q' (out, doubtful, questionable) */
+var KEYOUT={
+ nfl:{
+  SEA:{items:['QB Sam Darnold:o','OT Charles Cross:o','G Quenton Nelson:o','DT Leonard Williams:o'],
+       chg:['Sam Darnold (ribs) is out and Drew Lock starts. Lock was 19 of 28 for 175 yards, 1 touchdown and no interceptions last week. Seattle throws about 25 passes a game with Lock and about 39.5 with Darnold, so expect a more run-leaning, lower-volume offense.','Three more starters are out up front on offense and defense (Cross, Nelson, Williams), which hurts both pass protection and the run game.'],qb:{n:'Sam Darnold',lv:'out',bk:'Drew Lock'}},
+  LV:{items:['WR Dont\'e Thornton Jr.:q','DT Thomas Booker:q'],chg:['Quarterback Kirk Cousins was traded to Minnesota last week, so the Raiders’ passing game is different from earlier this season. Covers lists rookie Fernando Mendoza at quarterback for this game.']},
+  MIN:{items:['QB Kyler Murray:o','TE T.J. Hockenson:o','WR Jauan Jennings:o','LB Blake Cashman:o','WR Jordan Addison:q','OLB Kyle Van Noy:q'],
+       chg:['Kyler Murray (hamstring) is out. Kirk Cousins starts; he was acquired by trade from Las Vegas last Tuesday and played for Minnesota from 2018 to 2023. A new starter with a few days to learn the plan is a real risk.','The Vikings are also without their top tight end and a main receiver (Hockenson, Jennings), and Addison is questionable.'],qb:{n:'Kyler Murray',lv:'out',bk:'Kirk Cousins'}},
+  GB:{items:['EDGE Micah Parsons:o','RB Josh Jacobs:o','C Sean Rhyan:o','TE Josh Whyle:o','LB Zaire Franklin:d','S Xavier McKinney:q','EDGE Lukas Van Ness:q','S Javon Bullard:q','G Kevin Zeitler:q','G Travis Glover:q','WR Skyy Moore:q'],
+       chg:['Micah Parsons has missed nine games and is out again, and Lukas Van Ness (team-high 13 quarterback hits and 4.5 sacks) is questionable, so the pass rush is thin.','Josh Jacobs is out at running back and two linemen are out or questionable, which makes the run game and protection less reliable.']},
+  KC:{items:['OL Jaylon Moore:o','DL Peter Woods:o','DT Omarr Norman-Lott:o','RB Kenneth Walker III:q','RB Jaydn Ott:q','CB Mansoor Delane:q'],chg:['Kansas City’s defensive line is short two players; Kenneth Walker III’s status decides the backfield.']},
+  ATL:{items:['WR Zachariah Branch:o','LB Divine Deablo:d','DE James Pearce Jr.:q','DT Gervon Dexter:q'],chg:[]},
+  HOU:{items:['WR Marvin Harrison Jr.:o','DE Danielle Hunter:o','TE Brevin Jordan:o','LB Azeez Al-Shaair:o','DE Will Anderson Jr.:q','RB David Montgomery:q','G Wyatt Teller:q'],chg:['Houston loses its top receiver (Harrison) and its best edge rusher (Hunter), with Will Anderson Jr. questionable too. That hurts both sides of the ball in a game the weather may slow down.']},
+  CLE:{items:['S Ronnie Hickman Jr.:o','WR Denzel Boston:q'],chg:[]},
+  NE:{items:['RB TreVeyon Henderson:o','OL Ben Brown:o','CB Carlton Davis:o','RB Rhamondre Stevenson:q','WR A.J. Brown:q'],chg:['New England’s backfield is thin (Henderson out, Stevenson questionable) and A.J. Brown is questionable.']},
+  DET:{items:['S Kerby Joseph:o','C Cade Mays:o','CB D.J. Reed:o','WR Amon-Ra St. Brown:q'],chg:['Detroit’s secondary is down two starters and its center is out; Amon-Ra St. Brown is questionable.']},
+  SF:{items:['WR Mike Evans:o','OT Trent Williams:q','DT CJ West:q','LB Dre Greenlaw:q','CB Nate Hobbs:q'],chg:['Trent Williams is questionable; San Francisco’s offense is much weaker if its left tackle is out.']},
+  DAL:{items:['RB Tyler Goodson:o','WR Jonathan Mingo:o','TE Jake Ferguson:o','S P.J. Locke:o','S Juanyeh Thomas:d','CB Joey Porter Jr.:q','CB DaRon Bland:q'],chg:['Dallas is missing its tight end and has a banged-up secondary (two corners questionable, a safety doubtful).']},
+  PIT:{items:['DT Derrick Harmon:q'],chg:[]},
+  CIN:{items:['S Kyle Dugger:o','WR Andrei Iosivas:d','G Brian Parker II:d','CB Jalen Davis:d'],chg:[]},
+  LAR:{items:['TE Terrance Ferguson:o','OL Steve Avila:o','OLB Myles Garrett:q','CB Trent McDuffie:q'],chg:['Myles Garrett and Trent McDuffie are both questionable. Their status moves the Rams’ defense a lot.']},
+  ARI:{items:['OL Hjalte Froholdt:o','OL Jon Gaines II:o','DL Zach Carter:o','TE Hunter Long:q','CB Max Melton:q'],chg:['Two offensive linemen are out for Arizona, a problem against the Rams’ pass rush.']},
+  BUF:{items:['OT Spencer Brown:d','CB Christian Benford:q','WR Tyrell Shavers:q'],chg:[]},
+  NYJ:{items:['LB Trevin Wallace:o','WR Garrett Wilson:q','WR Adonai Mitchell:q','EDGE Joseph Ossai:q'],chg:['Both Jets starting receivers are questionable.']},
+  JAX:{items:['DE BJ Green II:o','DT Jordan Davis:o','S Jessie Bates:o','OL Robert Hainsey:q'],chg:['Jacksonville is missing three defensive starters.']},
+  TEN:{items:['WR Carnell Tate:o','G Peter Skoronski:o','LB Cody Barton:o','LB Anthony Hill Jr.:o','P Tommy Townsend:o','RB Tyjae Spears:q'],chg:['Tennessee is down a top receiver, a starting guard and two linebackers.']},
+  CAR:{items:['LB Bobby Okereke:o','RB Jonathon Brooks:d','CB Mike Jackson:d','WR Xavier Legette:q','OLB Jaelan Phillips:q'],chg:[]},
+  NO:{items:['RB CJ Donaldson:o','OT Taliese Fuaga:o','C Erik McCoy:o','DL Christen Miller:o','RB Travis Etienne:q'],chg:['New Orleans is missing its left tackle and center, a real problem for protection and the run game.']},
+  MIA:{items:['WR Jared Wayne:o','C Aaron Brewer:o','WR Chris Bell:d','CB Darrell Baker Jr.:q'],chg:[]},
+  IND:{items:['TE Mo Alie-Cox:o','OT Jalen Travis:o','DT Jerry Tillery:o','TE Will Mallory:q','DE Arden Key:q'],chg:[]}
+ },
+ ncaafb:{
+  indiana:{items:['RB Turbo Richard:o'],chg:['Indiana’s leading rusher Turbo Richard is out. Quarterback Josh Hoover is off the injury report.'],kw:['indiana']}
+ }
+};
+function keyoutFor(g,s){
+  var T=KEYOUT[g.lg];if(!T)return null;
+  if(g.lg==='nfl')return T[nt(s==='a'?g.a:g.h)]||null;
+  var nm=normName((s==='a'?g.an:g.hn)||''),hit=null;
+  Object.keys(T).forEach(function(k){if(!hit&&(T[k].kw||[k]).some(function(w){return (' '+nm+' ').indexOf(' '+w+' ')>=0}))hit=T[k]});
+  return hit;
+}
+function keyItems(K){
+  return (K&&K.items||[]).map(function(t){var m=/^(\S+)\s+(.+):([odq])$/.exec(t);return m?{pos:m[1],n:m[2],lv:m[3]==='o'?'out':m[3]==='d'?'doubtful':'questionable'}:null}).filter(Boolean);
+}
+function keyCard(g){
+  if(kind(g)!=='up')return '';
+  var Ka=keyoutFor(g,'a'),Kh=keyoutFor(g,'h');if(!Ka&&!Kh)return '';
+  var blk=function(s,K){
+    if(!K)return '';
+    var it=keyItems(K),w=function(x){return (POSW[x.pos]!=null?POSW[x.pos]:1.5)*(x.lv==='out'?1:x.lv==='doubtful'?.8:.4)},tot=it.reduce(function(a,x){return a+w(x)},0);
+    var by=function(l){return it.filter(function(x){return x.lv===l}).map(function(x){return x.pos+' '+x.n}).join(', ')};
+    var ln=['out','doubtful','questionable'].map(function(l){var t=by(l);return t?'<li><span class="tag warn" style="font-size:10px">'+l.toUpperCase()+'</span> '+esc(t)+'</li>':''}).join('');
+    return '<p style="margin:8px 0 2px"><b>'+esc(shortNm(g,s))+'</b> <span class="src">impact '+tot.toFixed(1)+'</span></p><ul class="pts" style="margin:0">'+ln+'</ul>'+(K.chg&&K.chg.length?'<p class="src" style="margin:6px 0 0"><b>What it changes:</b></p><ul class="pts" style="margin:0">'+K.chg.map(function(x){return '<li>'+esc(x)+'</li>'}).join('')+'</ul>':'');
+  };
+  return '<h3>Reported absences</h3><div class="card" style="padding:12px"><p class="src" style="margin:0">As of '+KEY_AT+', from the league injury report and team reports. Entered by hand and not live, so check status before kickoff. Impact weights position, with the starting quarterback counting most.</p>'+blk('a',Ka)+blk('h',Kh)+'</div>';
+}
+/* a quarterback listed here counts for the quarterback check even when the live injury feed has not caught up */
+var qbSide172=qbSide;
+qbSide=function(g,s){
+  var r=qbSide172(g,s),K=keyoutFor(g,s);
+  if(K&&K.qb&&r.lvl==='ok'){r.starter=K.qb.n;r.lvl=K.qb.lv;r.backup=K.qb.bk||r.backup;r.known=true;r.st=K.qb.lv}
+  return r;
+};
+/* the grade also counts absences entered here that the live feed does not list */
+var grOutW172=grOutW;
+grOutW=function(lg,key){
+  var r=grOutW172(lg,key),T=KEYOUT[lg];
+  if(!T||lg!=='nfl')return r;
+  try{var K=T[key];if(!K)return r;var have=(r.names||[]).join('|').toLowerCase(),add=0,names=[];
+    keyItems(K).forEach(function(x){if(have.indexOf(x.n.toLowerCase())>=0)return;
+      var w=x.lv==='out'?(x.pos==='QB'?10:2):x.lv==='doubtful'?(x.pos==='QB'?6:1.2):(x.pos==='QB'?3:.5);add+=w;if(x.lv!=='questionable')names.push(x.n+' ('+x.pos+')')});
+    if(add)r={w:r.w+add,names:r.names.concat(names)};
+  }catch(e){}
+  return r;
+};
+var feedSheet172=feedSheet;
+feedSheet=function(g){
+  var h=feedSheet172.apply(this,arguments);
+  try{
+    var c=keyCard(g);if(!c)return h;
+    var i=h.indexOf('<h3>Who is missing</h3>');if(i<0)i=h.indexOf('<h3>Quarterback check</h3>');
+    if(i<0){var p=h.indexOf('<h3>Prediction</h3>'),j=p>=0?h.indexOf('<h3',p+10):-1;i=j>=0?j:h.search(/<h3/)}
+    if(i<0)return h;
+    return h.slice(0,i)+c+h.slice(i);
   }catch(e){return h}
 };
 
