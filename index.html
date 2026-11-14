@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v235, Nov 14';
+var BUILD='v236, Nov 14';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -14670,7 +14670,7 @@ function expPicksSec(lgs){
     var rowH=function(o){
       var g=o.g,e=o.e,t=new Date(g.start).toLocaleDateString([],{weekday:'short'})+' '+new Date(g.start).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
       var cov=!e?'<span class="src">No expert pick found for this game</span>':e.cov?'To cover: <b>'+esc(o.nm(e.cov))+'</b> · '+esc(e.ln):'<b>Split</b> on the cover · '+esc(e.ln),ag=o.cs&&e&&e.cov?(o.cs===e.cov?'<span class="tag" style="font-size:10px;padding:1px 6px">App agrees</span>':'<span class="tag warn" style="font-size:10px;padding:1px 6px">App disagrees</span>'):'';
-      var hp=['sp','ml','tot'].filter(function(k){return o.hv[k]}).map(function(k){var q=o.hv[k];return gPill(q.l,({sp:'Spread',ml:'Winner',tot:'Total'}[k])+(q.sg?' (season)':''))}).join('');
+      var hp=['sp','ml','tot'].filter(function(k){return o.hv[k]}).map(function(k){var q=o.hv[k];return gPill(q.l,({sp:'Spread',ml:'Winner',tot:'Total'}[k])+(q.sg?' (season)':''),q.sum)}).join('');
       return '<div data-act="fgame" data-id="'+esc(g.id)+'" style="padding:10px 0;border-top:1px solid var(--line);cursor:pointer"><div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><span><b>'+esc(o.na)+' @ '+esc(o.nh)+'</b></span><span class="src">'+esc(t)+'</span></div><div style="margin-top:3px">'+cov+' '+ag+'</div>'+(e?'<div class="src" style="margin-top:2px">'+esc(e.ag)+'</div>':'')+'<div style="margin-top:5px">'+(o.el?gPill(o.el,'Expert'):'')+(hp?'<span class="src">Hitboard </span>'+hp:'<span class="src">Hitboard: '+hbWait(g)+'</span>')+'</div></div>';
     };
     var body='';
@@ -15229,6 +15229,62 @@ render=function(){
   }
   return render176.apply(this,arguments);
 };
+
+/* ---------- block177 (v236): 0-100 score, season track record, calibration ---------- */
+function hbScore(sum){return sum==null?null:Math.round(Math.max(1,Math.min(99,50+sum)))}
+function trkPct(a){var n=a.length;if(!n)return '–';var w=a.filter(function(x){return x.res==='W'}).length;return w+'-'+(n-w)+' ('+Math.round(w/n*100)+'%)'}
+function trkBar(p,c){return '<div style="height:6px;background:var(--surface2);border-radius:3px;margin:3px 0 0"><div style="height:6px;width:'+Math.max(2,Math.min(100,p))+'%;background:'+(c||'var(--hit)')+';border-radius:3px"></div></div>'}
+function trkRow(label,a,note){
+  var n=a.length,w=a.filter(function(x){return x.res==='W'}).length,p=n?Math.round(w/n*100):0;
+  return '<div style="padding:6px 0;border-top:1px solid var(--line)"><div style="display:flex;justify-content:space-between;gap:8px"><span>'+esc(label)+(note?' <span class="src">'+esc(note)+'</span>':'')+'</span><b>'+(n?trkPct(a):'no graded picks yet')+'</b></div>'+(n?trkBar(p,p>=52.4?'var(--hit)':'var(--amber)'):'')+'</div>';
+}
+function trkCard(sf){
+  var E=S.log.filter(function(x){return (x.res==='W'||x.res==='L')&&(sf==='all'||x.lg===sf)});
+  var nmL={nfl:'NFL',ncaafb:'College football',nba:'NBA',ncaamb:'College basketball',nhl:'NHL',mlb:'MLB'};
+  var h='<h3>Track record</h3><div class="card" style="padding:12px"><p class="src" style="margin:0 0 6px">Every pick the app saved before kickoff and graded on the final score'+(sf==='all'?'':', '+esc(nmL[sf]||sf)+' only')+'. A green bar means the hit rate is above about 52.4%, the break-even at standard -110 prices; amber means below it.</p>';
+  if(!E.length)return h+'<p class="src" style="margin:0">No graded picks yet for this view.</p></div>';
+  h+=trkRow('All graded picks',E);
+  if(sf==='all')Object.keys(nmL).forEach(function(l){var a=E.filter(function(x){return x.lg===l});if(a.length)h+=trkRow(nmL[l],a)});
+  h+='<p style="margin:10px 0 2px"><b>By market</b></p>';
+  [['ml','Winner'],['sp','Spread'],['tot','Total']].forEach(function(m){h+=trkRow(m[1],E.filter(function(x){return x.t===m[0]}))});
+  /* by Hitboard grade at the time the game was saved */
+  var tier={A:[],B:[],C:[],'D or F':[]},any=0;
+  E.forEach(function(x){var gl=S.glog[x.gid],l=gl&&gl[x.t];if(l){tier[bandOf(l)].push(x);any++}});
+  h+='<p style="margin:10px 0 2px"><b>By Hitboard grade</b></p>';
+  if(!any)h+='<p class="src" style="margin:0">Grades are saved before each game, so this fills in as graded games come in.</p>';
+  else{['A','B','C','D or F'].forEach(function(b){if(tier[b].length)h+=trkRow(b==='D or F'?'D or F':'Grade '+b,tier[b])});
+    var A=tier.A,B=tier.B;
+    if(A.length>=10&&B.length>=10){var pa=A.filter(function(x){return x.res==='W'}).length/A.length,pb=B.filter(function(x){return x.res==='W'}).length/B.length;
+      h+='<p class="src" style="margin:6px 0 0">'+(pa>pb+.03?'So far A picks are hitting more often than B picks, which is what a grade should do.':pa<pb-.03?'So far A picks are not beating B picks, so treat the grade with caution.':'So far A and B picks hit at about the same rate, so the grade is not separating them yet.')+'</p>'}
+    else h+='<p class="src" style="margin:6px 0 0">Needs 10 graded picks in both A and B before this says whether the grade separates winners.</p>'}
+  return h+'</div>';
+}
+function calCard(sf){
+  var E=S.log.filter(function(x){return (x.res==='W'||x.res==='L')&&x.p!=null&&(sf==='all'||x.lg===sf)});
+  var P=function(x){return x.p>1?x.p/100:x.p};
+  var h='<h3>Calibration</h3><div class="card" style="padding:12px"><p class="src" style="margin:0 0 6px">When the app says a pick is 60% likely, does it win about 60% of the time? Each row groups picks by the probability the app gave them.</p>';
+  if(E.length<10)return h+'<p class="src" style="margin:0">'+E.length+' of 10 graded picks needed to start.</p></div>';
+  var B=[[0,.52,'Under 52%'],[.52,.56,'52–56%'],[.56,.60,'56–60%'],[.60,.65,'60–65%'],[.65,1.01,'65% and up']];
+  B.forEach(function(b){
+    var a=E.filter(function(x){var p=P(x);return p>=b[0]&&p<b[1]});if(!a.length)return;
+    var pr=a.reduce(function(s,x){return s+P(x)},0)/a.length,w=a.filter(function(x){return x.res==='W'}).length/a.length;
+    h+='<div style="padding:6px 0;border-top:1px solid var(--line)"><div style="display:flex;justify-content:space-between;gap:8px"><span>'+b[2]+' <span class="src">n='+a.length+'</span></span><span>said <b>'+Math.round(pr*100)+'%</b> · won <b>'+Math.round(w*100)+'%</b></span></div>'+trkBar(w*100,Math.abs(w-pr)<=.05?'var(--hit)':'var(--amber)')+'</div>';
+  });
+  var pm=E.reduce(function(s,x){return s+P(x)},0)/E.length,hw=E.filter(function(x){return x.res==='W'}).length/E.length,d=Math.round((pm-hw)*100);
+  h+='<p style="margin:8px 0 0">'+(E.length<30?'<span class="src">Needs 30 graded picks for a verdict ('+E.length+' so far).</span>':Math.abs(d)<=3?'Overall the app’s confidence is about right ('+Math.round(pm*100)+'% said, '+Math.round(hw*100)+'% won).':d>0?'Overall the app is overconfident by about '+d+' points ('+Math.round(pm*100)+'% said, '+Math.round(hw*100)+'% won).':'Overall the app is underconfident by about '+(-d)+' points ('+Math.round(pm*100)+'% said, '+Math.round(hw*100)+'% won).')+'</p></div>';
+  return h;
+}
+var vResults177=vResults;
+vResults=function(){
+  var h=vResults177.apply(this,arguments);
+  try{
+    var sf=S.rsl||'all',c=trkCard(sf)+calCard(sf);
+    var k=h.indexOf('<h3>Learning model</h3>');if(k<0)k=h.indexOf('<details style="margin:14px 0">');
+    return k>=0?h.slice(0,k)+c+h.slice(k):h+c;
+  }catch(e){return h}
+};
+/* the grade pill now carries the 0-100 score */
+function gPill(l,tag,sum){var sc=hbScore(sum);return l?'<span style="margin-right:6px">'+(tag?'<span class="src">'+esc(tag)+' </span>':'')+grPill(l,sc!=null?String(sc):'')+'</span>':''}
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
