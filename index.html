@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v224, Nov 13';
+var BUILD='v225, Nov 13';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -14709,16 +14709,6 @@ EXPERTS=EXPERTS.filter(function(e){return e.lg!=='nba'&&e.lg!=='ncaamb'}).concat
  XB('ncaamb',['seton hall'],['alabama'],null,'a','Seton Hall +17.5','One writer takes Seton Hall and the points',['Seton Hall’s defense and experience should keep it inside the number. Alabama ranks low in experience.'],[])
 ]);
 EXP_AT='Nov 13';
-/* a tap on a chip should never be lost to a re-render between press and release */
-var _pdSet=null;
-document.addEventListener('pointerdown',function(e){var b=e.target&&e.target.closest&&e.target.closest('[data-act="set"]');_pdSet=b?{k:b.dataset.k,v:b.dataset.v,x:e.clientX,y:e.clientY,t:Date.now()}:null},true);
-document.addEventListener('pointerup',function(e){
-  var p=_pdSet;_pdSet=null;
-  if(!p||Date.now()-p.t>900||Math.abs(e.clientX-p.x)>12||Math.abs(e.clientY-p.y)>12)return;
-  var b=e.target&&e.target.closest&&e.target.closest('[data-act="set"]');
-  if(!b||b.dataset.k!==p.k)return;
-  if(S[p.k]!==p.v){S[p.k]=p.v;S._pu=Date.now();render()}
-},true);
 function bandHd(label,n){
   var c=/^Grade A/.test(label)?'var(--hit)':/^Grade [BC]/.test(label)?'var(--amber)':/^(D or F|Grade D|Grade F)/.test(label)?'var(--miss)':'var(--muted)';
   return '<div style="display:flex;justify-content:space-between;align-items:center;margin:18px 0 8px;padding:9px 12px;background:var(--surface2);border-left:5px solid '+c+';border-radius:8px"><b style="font-size:16px">'+esc(label)+'</b><span class="src" style="margin:0">'+n+(n===1?' game':' games')+'</span></div>';
@@ -14738,6 +14728,101 @@ render=function(){
   var now=Date.now();
   if(now-HB_LAST_TOUCH<1200&&now-_usrAt>400){clearTimeout(_rdT);_rdT=setTimeout(function(){try{render()}catch(e){}},1300);return}
   return render167.apply(this,arguments);
+};
+
+/* ---------- block168 (v225): rebuilt tap handling, no page jumps, error-safe render, phone CSS, expert prop picks ---------- */
+/* 1. every [data-act] control activates on finger-up, even if the screen redrew while the finger was down */
+(function(){
+  var pg=null,ignoreUntil=0;
+  var sig=function(el){var d=el.dataset,o=[];for(var k in d)o.push(k+'='+d[k]);return o.sort().join('&')+'|'+(el.textContent||'').trim().slice(0,40)};
+  document.addEventListener('pointerdown',function(e){
+    if(e.pointerType==='mouse'&&e.button!==0){pg=null;return}
+    var el=e.target&&e.target.closest&&e.target.closest('[data-act]');
+    pg=el?{s:sig(el),x:e.clientX,y:e.clientY,t:Date.now()}:null;
+  },true);
+  document.addEventListener('pointerup',function(e){
+    var p=pg;pg=null;_usrAt=Date.now();
+    if(!p||Date.now()-p.t>900||Math.abs(e.clientX-p.x)>10||Math.abs(e.clientY-p.y)>10)return;
+    var t=document.elementFromPoint(e.clientX,e.clientY),el=t&&t.closest&&t.closest('[data-act]');
+    if(!el||sig(el)!==p.s)return;
+    ignoreUntil=Date.now()+700;
+    el.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window}));
+  },true);
+  document.addEventListener('click',function(e){
+    if(e.isTrusted&&Date.now()<ignoreUntil&&e.target&&e.target.closest&&e.target.closest('[data-act]')){e.stopImmediatePropagation();e.preventDefault()}
+  },true);
+})();
+/* 2. background redraws keep whatever was at the top of the screen where it was */
+var render168=render;
+render=function(){
+  var now=Date.now(),v=document.getElementById('view');
+  if(now-_usrAt<=400||!v)return render168.apply(this,arguments);
+  var key=null,nth=0,top=0;
+  try{
+    var els=v.querySelectorAll('h2,h3,.card,[data-act],summary'),ks={};
+    for(var i=0;i<els.length;i++){
+      var el=els[i],r=el.getBoundingClientRect(),k=el.tagName+'|'+(el.getAttribute('data-id')||'')+'|'+(el.textContent||'').trim().slice(0,50);
+      if(r.top>=0&&r.top<window.innerHeight&&key===null){key=k;nth=ks[k]||0;top=r.top}
+      ks[k]=(ks[k]||0)+1;
+    }
+  }catch(e){key=null}
+  var out=render168.apply(this,arguments);
+  try{
+    if(key!==null){
+      var els2=v.querySelectorAll('h2,h3,.card,[data-act],summary'),c=0;
+      for(var j=0;j<els2.length;j++){
+        var e2=els2[j],k2=e2.tagName+'|'+(e2.getAttribute('data-id')||'')+'|'+(e2.textContent||'').trim().slice(0,50);
+        if(k2===key){if(c===nth){var d=e2.getBoundingClientRect().top-top;if(Math.abs(d)>2)window.scrollBy(0,d);break}c++}
+      }
+    }
+  }catch(e){}
+  return out;
+};
+/* 3. a screen that fails to build never leaves the app stuck */
+var render168b=render;
+render=function(){
+  try{return render168b.apply(this,arguments)}
+  catch(err){
+    try{var v=document.getElementById('view');S.lastErr=String(err&&err.message||err);
+      v.__h=null;v.innerHTML='<h2>Something went wrong on this screen</h2><div class="card" style="padding:12px"><p class="src" style="margin:0 0 8px">'+esc(S.lastErr)+'</p><div class="actions"><button class="btn primary" data-act="tab" data-t="games">Go to Games</button><button class="btn" data-act="tab" data-t="props">Go to Props</button></div></div>';
+      renderNav()}catch(e2){}
+  }
+};
+/* 4. phone friendly */
+(function(){var st=document.createElement('style');st.textContent=
+ 'button,[data-act],summary,select{touch-action:manipulation;-webkit-tap-highlight-color:transparent}'+
+ 'input,select,textarea{font-size:16px}'+
+ '.chip{min-height:40px;display:inline-flex;align-items:center;justify-content:center}'+
+ 'nav button{min-height:52px}'+
+ 'html{-webkit-text-size-adjust:100%;text-size-adjust:100%}'+
+ 'body{overflow-x:hidden;-webkit-overflow-scrolling:touch}'+
+ '.chips{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}.chips::-webkit-scrollbar{display:none}'+
+ '#view{overflow-anchor:none}';
+ document.head.appendChild(st)})();
+/* 5. expert prop picks at the top of Props */
+var PROP_X=[
+ {lg:'nba',until:Date.UTC(2026,10,14,10),game:'Knicks at Pacers',p:'Andrew Nembhard',m:'assists',s:'Over',l:'7.5',why:'Averaging 7.8 assists, with 8, 12 and 10 in his last three on about 33 minutes. The Knicks’ slow pace is the hurdle.'},
+ {lg:'nba',until:Date.UTC(2026,10,14,10),game:'Bucks at Magic',p:'Franz Wagner',m:'points',s:'Over',l:'24.5',why:'Three straight 30-point games on 22-plus shots, 30% usage and seven straight games of 37-plus minutes. Milwaukee allows 121.3 points a game.'},
+ {lg:'nba',until:Date.UTC(2026,10,14,10),game:'Cavaliers at Heat',p:'Bam Adebayo',m:'steals',s:'Over',l:'1.5',why:'Averaging 2.2 steals, with two or more in 8 of his first 11 games. Does not depend on a turnover-prone opponent.'},
+ {lg:'nba',until:Date.UTC(2026,10,14,10),game:'Hawks at Bulls',p:'Josh Giddey',m:'made threes',s:'Over',l:'1.5',why:'Takes about five more shots per 36 minutes when rookie Caleb Wilson is off the floor, nearly two of them from three. Wilson is sidelined.'},
+ {lg:'nba',until:Date.UTC(2026,10,14,10),game:'Grizzlies at Pelicans',p:'Herbert Jones',m:'points',s:'Over',l:'9.5',why:'Trey Murphy III is out and Dejounte Murray is doubtful, opening shots. Memphis is missing its top two centers.'},
+ {lg:'nba',until:Date.UTC(2026,10,14,10),game:'Jazz at Rockets',p:'Reed Sheppard',m:'made threes',s:'Over',l:'2.5',why:'Last five games: 6.2 three-point attempts and 2.4 makes. Marcus Smart’s suspension may add minutes. Utah defends guards well from deep, which is the counterpoint.'},
+ {lg:'nba',until:Date.UTC(2026,10,14,10),game:'Warriors at Spurs',p:'Julian Champagnie',m:'points',s:'Over',l:'9.5',why:'Double figures in three straight, averaging 12.3 points on 43.6% three-point shooting. Fox and Vassell are questionable, which could open more shots.'},
+ {lg:'nba',until:Date.UTC(2026,10,14,10),game:'Trail Blazers at Kings',p:'Darius Acuff Jr.',m:'points',s:'Over',l:'24.5',why:'Averaging 26.2 points on 32% usage, with 32 and 29 in his last two and 33 in the first meeting. Portland allows 31.1 a game to opposing point guards.'},
+ {lg:'nfl',until:Date.UTC(2026,10,16,11),game:'Dolphins at Colts',p:'Kyle McCord',m:'passing yards',s:'Over',l:'150',why:'Indianapolis allows a high yards per attempt and many more touchdown passes than interceptions. The pick assumes about 25 attempts.'},
+ {lg:'nfl',until:Date.UTC(2026,10,16,11),game:'Raiders at Seahawks',p:'Fernando Mendoza',m:'rushing yards',s:'Over',l:'15',why:'Ran heavily in college and Seattle allows a high yards per play. Relies on him escaping pressure if passing windows close.'},
+ {lg:'nfl',until:Date.UTC(2026,10,16,11),game:'Cardinals at Rams',p:'Carson Beck',m:'passing yards',s:'Under',l:'175',why:'The Rams hold passers to a low yards per attempt and completion rate. The writer expects a hard debut.'}
+];
+var vProps168=vProps;
+vProps=function(){
+  var h=vProps168.apply(this,arguments),lg=S.sport,now=Date.now();
+  var L=PROP_X.filter(function(x){return x.lg===lg&&now<x.until});
+  if(!L.length)return h;
+  var sec='<h3>Expert prop picks</h3><div class="card" style="padding:10px 12px"><p class="src" style="margin:0 0 6px">One writer’s pick per player, entered by hand as of '+EXP_AT+'. Lines move and injuries change, so check the line at your book. Not a guarantee.</p>'+
+    L.map(function(x){return '<details style="border-top:1px solid var(--line);padding:8px 0"><summary style="cursor:pointer"><b>'+esc(x.p)+'</b> · '+esc(x.s)+' '+esc(x.l)+' '+esc(x.m)+' <span class="src">('+esc(x.game)+')</span></summary><p class="src" style="margin:6px 0 0">'+esc(x.why)+'</p></details>'}).join('')+'</div>';
+  var pos=h.indexOf('</h2>');if(pos<0)return sec+h;pos+=5;
+  while(h.slice(pos).replace(/^\s+/,'').indexOf('<div class="chips"')===0){var s0=h.indexOf('<div class="chips"',pos);pos=h.indexOf('</div>',s0)+6}
+  return h.slice(0,pos)+sec+h.slice(pos);
 };
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
