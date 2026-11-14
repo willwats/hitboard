@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v226, Nov 13';
+var BUILD='v227, Nov 13';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -14823,6 +14823,26 @@ vProps=function(){
   var pos=h.indexOf('</h2>');if(pos<0)return sec+h;pos+=5;
   while(h.slice(pos).replace(/^\s+/,'').indexOf('<div class="chips"')===0){var s0=h.indexOf('<div class="chips"',pos);pos=h.indexOf('</div>',s0)+6}
   return h.slice(0,pos)+sec+h.slice(pos);
+};
+
+/* ---------- block169 (v227): key absences (QB and other starters) shown with the expert picks ---------- */
+EXPERTS.forEach(function(e){
+  if(e.lg==='ncaafb'&&e.an&&e.an[0]==='seminoles'&&e.hn&&e.hn[0]==='panthers'){
+    e.ag='Split: one writer takes Pittsburgh -3.5, another takes Florida State +3.5 because of Pitt’s quarterback situation';
+    e.why=['Pitt’s starting quarterback, Mason Heintschel, is out for the season (torn ACL). Backup Holden Geriner was listed questionable, so true freshman Corey Dailey could start.'].concat(e.why||[]);
+    e.out=[
+     {t:'Pittsburgh',x:'QB Mason Heintschel (starter): out for the season, torn ACL. QB Holden Geriner (backup): questionable. Freshman QB Corey Dailey: could start.'},
+     {t:'Pittsburgh',x:'Also out: TEs Elijah Lagg and Max Hunt, WRs Tyreek Robinson and Rodney Dunbar, LB Cameron Lindsey, DBs Allen Bryant and Isaac Patterson.'},
+     {t:'Florida State',x:'Out: starting center Bradyn Welch-Joiner, RB Tre Wisner, DL Kevin Wynn and Deante McCray, plus several defensive backs and linebackers (13 listed).'}];
+  }
+});
+var expCard169=expCard;
+expCard=function(g){
+  var h=expCard169(g);if(!h)return h;
+  try{var e=expFor(g);
+    if(e&&e.out&&e.out.length)h+='<h3>Key absences</h3><div class="card" style="padding:12px"><p class="src" style="margin:0 0 6px">Starters reported out or doubtful. The app’s model does not adjust its numbers for these by itself, and the betting line already reflects most of them, so treat a quarterback change as a reason for extra caution, not a pick by itself.</p><ul class="pts" style="margin:0">'+e.out.map(function(o){return '<li><b>'+esc(o.t)+':</b> '+esc(o.x)+'</li>'}).join('')+'</ul></div>';
+  }catch(x){}
+  return h;
 };
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
