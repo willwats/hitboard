@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v227, Nov 13';
+var BUILD='v228, Nov 13';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -14843,6 +14843,71 @@ expCard=function(g){
     if(e&&e.out&&e.out.length)h+='<h3>Key absences</h3><div class="card" style="padding:12px"><p class="src" style="margin:0 0 6px">Starters reported out or doubtful. The app’s model does not adjust its numbers for these by itself, and the betting line already reflects most of them, so treat a quarterback change as a reason for extra caution, not a pick by itself.</p><ul class="pts" style="margin:0">'+e.out.map(function(o){return '<li><b>'+esc(o.t)+':</b> '+esc(o.x)+'</li>'}).join('')+'</ul></div>';
   }catch(x){}
   return h;
+};
+
+/* ---------- block170 (v228): quarterback check for NFL + "does the pick hold up" summary ---------- */
+function qbSide(g,s){
+  var ab=s==='a'?g.a:g.h,key=nt(ab),D=S.dep[key],I=S.inj.nfl,list=(I&&I.by&&I.by[key])||[];
+  var q=(D&&D.qb)||[],starter=q[0]||null,backup=q[1]||null,st='',lvl='ok';
+  var hit=null;
+  if(starter)list.forEach(function(x){if(!hit&&normName(x.n)===normName(starter))hit=x});
+  if(!hit){var qs=list.filter(function(x){return /^QB$/i.test(x.pos||'')});if(qs.length&&!starter){hit=qs[0];starter=hit.n}}
+  if(hit){st=hit.st||'';lvl=OUT_RE.test(st)?'out':/doubtful/i.test(st)?'doubtful':/question|day-to-day|probable/i.test(st)?(/probable/i.test(st)?'ok':'questionable'):'ok'}
+  return {s:s,team:shortNm(g,s),starter:starter,backup:backup,st:st,lvl:lvl,known:!!(D&&D.qb)||!!hit,d:hit&&hit.d||''};
+}
+function qbCheck(g){return g.lg==='nfl'?[qbSide(g,'a'),qbSide(g,'h')]:[]}
+function qbCard(g){
+  var Q=qbCheck(g);if(!Q.length||!Q.some(function(x){return x.known}))return '';
+  var li=Q.map(function(x){
+    if(!x.starter)return '<li><b>'+esc(x.team)+':</b> starter not listed yet.</li>';
+    var tag=x.lvl==='out'?' <span class="tag warn">OUT</span>':x.lvl==='doubtful'?' <span class="tag warn">DOUBTFUL</span>':x.lvl==='questionable'?' <span class="tag warn">QUESTIONABLE</span>':' <span class="src">healthy on the injury report</span>';
+    return '<li><b>'+esc(x.team)+':</b> '+esc(x.starter)+tag+(x.d&&x.lvl!=='ok'?' <span class="src">('+esc(x.d)+')</span>':'')+(x.lvl!=='ok'&&x.backup?'<br><span class="src">Next on the depth chart: '+esc(x.backup)+'</span>':'')+'</li>';
+  }).join('');
+  return '<h3>Quarterback check</h3><div class="card" style="padding:12px"><ul class="pts" style="margin:0">'+li+'</ul><p class="src" style="margin:8px 0 0">From the depth chart and the injury report. The injury report can lag a change announced that day.</p></div>';
+}
+function pickCheck(g){
+  if(kind(g)!=='up')return '';
+  var items=[],score=0,m=null,win=null,cov=null,e=null;
+  try{m=pickModel(g);if(m&&m.M!=null){win=m.M>=0?'h':'a';var L=m.ln&&m.ln.pts!=null?m.mk:null;if(L!=null)cov=m.M-L>=0?'h':'a'}}catch(x){}
+  if(win==null)return '';
+  try{e=expFor(g)}catch(x){}
+  var nm=function(s){return shortNm(g,s)};
+  if(e&&e.win){if(e.win===win){score+=2;items.push(['+','The expert pick for the winner matches the app ('+nm(win)+').'])}else{score-=2;items.push(['-','The experts take '+nm(e.win)+' to win, the app takes '+nm(win)+'.'])}}
+  if(e&&e.cov&&cov){if(e.cov===cov){score+=2;items.push(['+','On the spread both sides take '+nm(cov)+'.'])}else{score-=2;items.push(['-','On the spread the experts take '+nm(e.cov)+', the app takes '+nm(cov)+'.'])}}
+  if(e&&e.ag&&/split/i.test(e.ag)){score-=1;items.push(['-','The experts are split on this game.'])}
+  qbCheck(g).forEach(function(q){
+    if(q.lvl==='ok'||!q.starter)return;
+    var mine=win===q.s,w=q.lvl==='questionable'?1:2;
+    if(mine){score-=w;items.push(['-',q.team+' (the pick) '+(q.lvl==='out'?'is without':'may be without')+' starting QB '+q.starter+'.'])}
+    else{score+=w-1;items.push(['+',q.team+' (the opponent) '+(q.lvl==='out'?'is without':'may be without')+' starting QB '+q.starter+'.'])}
+  });
+  if(e&&e.out&&e.out.length){score-=1;items.push(['-','Key absences are on file for this game (see below).'])}
+  if(!items.length)return '';
+  var v=score>=3?['Well supported','var(--hit)']:score>=0?['Mixed','var(--amber)']:['Handle with care','var(--miss)'];
+  return '<h3>Does the pick hold up?</h3><div class="card" style="padding:12px;border-left:5px solid '+v[1]+'"><div style="font-weight:700;margin-bottom:4px">'+v[0]+'</div><ul class="pts" style="margin:0">'+items.map(function(i){return '<li>'+(i[0]==='+'?'✓ ':'⚠ ')+esc(i[1])+'</li>'}).join('')+'</ul><p class="src" style="margin:8px 0 0">A checklist, not a probability. Experts mostly follow the betting line, so agreement is not an edge by itself.</p></div>';
+}
+var feedSheet170=feedSheet;
+feedSheet=function(g){
+  var h=feedSheet170.apply(this,arguments);
+  try{
+    var c=pickCheck(g)+qbCard(g);if(!c)return h;
+    var i=h.indexOf('<h3>Prediction</h3>'),j=i>=0?h.indexOf('<h3',i+10):-1;
+    if(j<0)j=h.search(/<h3/);
+    if(j<0)return h;
+    return h.slice(0,j)+c+h.slice(j);
+  }catch(e){return h}
+};
+/* the grade also counts a doubtful or questionable starting quarterback (smaller weight than out) */
+var grOutW170=grOutW;
+grOutW=function(lg,key){
+  var r=grOutW170(lg,key);
+  if(lg!=='nfl')return r;
+  try{var I=S.inj.nfl,L=(I&&I.by&&I.by[key])||[];
+    L.forEach(function(x){if(!/^QB$/i.test(x.pos||'')||OUT_RE.test(x.st||''))return;
+      var w=/doubtful/i.test(x.st||'')?6:/question|day-to-day/i.test(x.st||'')?3:0;
+      if(w){r={w:r.w+w,names:r.names.concat([x.n+' (QB, '+String(x.st).toLowerCase()+')'])}}});
+  }catch(e){}
+  return r;
 };
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
