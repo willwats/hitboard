@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v234, Nov 14';
+var BUILD='v235, Nov 14';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -15197,6 +15197,38 @@ shortNm=function(g,side){
   return shortNm175.apply(this,arguments);
 };
 (function(){var st=document.createElement('style');st.textContent='header{padding-block:calc(24px + env(safe-area-inset-top,0px)) 14px}';document.head.appendChild(st)})();
+
+/* ---------- block176 (v235): a grade, once shown, stays until something real changes ---------- */
+S.glock={};try{var _gk=localStorage.getItem('hitboard.glock.v1');if(_gk)S.glock=JSON.parse(_gk)||{}}catch(e){}
+function glockSave(){try{var ks=Object.keys(S.glock);if(ks.length>700)ks.sort(function(a,b){return (S.glock[a].st||0)-(S.glock[b].st||0)}).slice(0,ks.length-600).forEach(function(k){delete S.glock[k]});localStorage.setItem('hitboard.glock.v1',JSON.stringify(S.glock))}catch(e){}}
+function pickSide(p){return String(p||'').replace(/[+\-−]?\d+(\.\d+)?/g,'').replace(/\s+/g,' ').trim().toLowerCase()}
+var hbGradesFor176=hbGradesFor;
+hbGradesFor=function(g){
+  var fresh=hbGradesFor176(g),L=S.glock[g.id],out={},ch=false;
+  if(!L){
+    if(Object.keys(fresh).length){L=S.glock[g.id]={st:g.start};['ml','sp','tot'].forEach(function(t){if(fresh[t])L[t]=fresh[t]});glockSave()}
+    return fresh;
+  }
+  ['ml','sp','tot'].forEach(function(t){
+    var f=fresh[t],l=L[t];
+    if(!f){if(l)out[t]=l;return}
+    if(!l){out[t]=f;L[t]=f;ch=true;return}
+    var same=pickSide(l.pick)===pickSide(f.pick),moved=Math.abs((f.sum||0)-(l.sum||0));
+    if(same&&moved<10)out[t]=l;else{out[t]=f;L[t]=f;ch=true}
+  });
+  if(ch)glockSave();
+  return out;
+};
+/* background redraws happen at most every few seconds */
+var render176=render,_lastBg=0,_bgT=null;
+render=function(){
+  var now=Date.now();
+  if(now-_usrAt>400){
+    if(now-_lastBg<3000){clearTimeout(_bgT);_bgT=setTimeout(function(){render()},3050-(now-_lastBg));return}
+    _lastBg=now;
+  }
+  return render176.apply(this,arguments);
+};
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
