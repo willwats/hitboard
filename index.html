@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v233, Nov 13';
+var BUILD='v234, Nov 14';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -14459,7 +14459,7 @@ vResults=function(){
   S.log.forEach(function(x){if(!x.gid||(x.t!=='ml'&&x.t!=='sp'&&x.t!=='tot'))return;var o=get(x.gid,x.lg,x.st);o.app.push(x);if(x.score)o.score=x.score;if(!o.game)o.game=x.game||''});
   S.xlog.forEach(function(x){var o=get(x.gid,x.lg,x.st);o.ex=x;if(x.score)o.score=x.score;o.game=x.na+' @ '+x.nh});
   var L=Object.keys(G).map(function(k){return G[k]}),done=L.filter(function(o){return o.app.some(function(x){return x.res})||(o.ex&&o.ex.res)}),wait=L.length-done.length;
-  var sf=S.rsl||'all',lgs=['all'].concat(Object.keys(done.reduce(function(m,o){m[o.lg]=1;return m},{})));
+  var sf=S.rsl||'all',lgs=['all','nfl','ncaafb','nba','ncaamb','nhl','mlb'];
   var D=done.filter(function(o){return sf==='all'||o.lg===sf}).sort(function(a,b){return b.st-a.st});
   /* summary */
   var ap={W:0,L:0},ew={W:0,L:0},ec={W:0,L:0};
@@ -14467,7 +14467,8 @@ vResults=function(){
   var rt=function(c){var n=c.W+c.L;return c.W+'-'+c.L+(n?' ('+Math.round(c.W/n*100)+'%)':'')};
   var h='<h2>Results</h2><p class="src" style="margin:0 0 8px">Each finished game with the app’s picks and the expert picks side by side. Picks are saved before the game and graded on the final score.</p>';
   h+='<div class="facts"><span>App picks <b>'+rt(ap)+'</b></span><span>Experts: winner <b>'+rt(ew)+'</b></span><span>Experts: cover <b>'+rt(ec)+'</b></span></div>';
-  if(lgs.length>2)h+='<div class="chips" role="group" aria-label="Sport" style="margin:8px 0">'+lgs.map(function(l){return '<button class="chip'+(sf===l?' on':'')+'" data-act="set" data-k="rsl" data-v="'+l+'">'+(l==='all'?'All':esc(lgName(l)))+'</button>'}).join('')+'</div>';
+  if(lgs.length>2)h+='<div class="chips" role="group" aria-label="Sport" style="margin:8px 0">'+lgs.map(function(l){return '<button class="chip" data-act="set" data-k="rsl" data-v="'+l+'" aria-pressed="'+(sf===l)+'">'+(l==='all'?'All':esc(lgName(l)))+'</button>'}).join('')+'</div>';
+  if(!D.length)h+='<p class="src" style="margin:0 0 6px">No finished '+(sf==='all'?'':esc(lgName(sf))+' ')+'games with saved picks yet. The app saves its picks before a game starts and grades them on the final score, so this fills in as games finish.</p>';
   h+='<h3>By game</h3><div class="chips" role="group" aria-label="Group by grade" style="margin:4px 0 6px"><span class="src" style="align-self:center;margin-right:4px">Group by grade</span>'+[['day','None'],['ex','Expert'],['hb','Hitboard']].map(function(c){return '<button class="chip" data-act="set" data-k="rgb" data-v="'+c[0]+'" aria-pressed="'+((S.rgb||'day')===c[0])+'">'+c[1]+'</button>'}).join('')+'</div>';
   if(!D.length)h+='<div class="card empty">No finished games with saved picks yet. '+(wait?wait+' game'+(wait===1?' is':'s are')+' waiting to finish. ':'')+'Expert picks are saved from now on for NFL and college football, and graded when each game ends.</div>';
   else{
