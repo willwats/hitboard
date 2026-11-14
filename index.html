@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v231, Nov 13';
+var BUILD='v232, Nov 13';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -4389,6 +4389,7 @@ function espnNorm(lg,events){
     var clk=state==='in'?(st.shortDetail&&/half|end/i.test(st.shortDetail)?st.shortDetail:(e.status.displayClock||null)):null;
     if(lg==='mlb')clk=state==='in'?(st.shortDetail||null):null;
     var rr=(row(lg,status,e.date,aw.team.abbreviation,hm.team.abbreviation,aw.team.displayName||aw.team.abbreviation,hm.team.displayName||hm.team.abbreviation,sc(aw),sc(hm),null,null,clk,state==='in'?e.status.period:null,title,e.id));
+    try{rr.aid=aw.team.id;rr.hid=hm.team.id;S.tmIdMap=S.tmIdMap||{};S.tmIdMap[lg+'|'+rr.a]=aw.team.id;S.tmIdMap[lg+'|'+rr.h]=hm.team.id}catch(e3){}
     try{var dk=parseDK(c.odds,rawA,rawH);if(dk)rr.dk=dk}catch(e2){}
     var vn=c.venue;if(vn)rr.ven={n:vn.fullName||'',c:(vn.address&&vn.address.city)||'',s:(vn.address&&vn.address.state)||'',i:!!vn.indoor};
     if(lg==='mlb'){var pp=function(x){var q=x&&x.probables&&x.probables[0];return q&&q.athlete&&(q.athlete.displayName||q.athlete.fullName)||null};rr.pit={a:pp(aw),h:pp(hm)}}
@@ -15160,6 +15161,31 @@ renderSheet=function(){
     }
   }catch(e){}
   return out;
+};
+
+/* ---------- block174 (v232): season results use the team ids that come with the scoreboard, so no team is "not found" ---------- */
+var tmIdFor174=tmIdFor;
+tmIdFor=function(lg,ab,name){
+  var id=S.tmIdMap&&S.tmIdMap[lg+'|'+ab];
+  if(id)return Promise.resolve(id);
+  return tmIdFor174(lg,ab,name).catch(function(){
+    /* last resort: any other game in the feed that carries this team's id */
+    var f=null;(S.feed[lg]||[]).forEach(function(g){if(f)return;if(g.aid&&sameTm(g.a,ab))f=g.aid;else if(g.hid&&sameTm(g.h,ab))f=g.hid});
+    if(f)return f;throw 0;
+  });
+};
+/* head to head this season, when the two teams have already met */
+var seasonCard174=seasonCard;
+seasonCard=function(g){
+  var h=seasonCard174.apply(this,arguments);
+  try{
+    var d=S.seasX[expSeasonKey(g)];if(!d||!d.a||!d.a.L||!d.a.id&&!g.hid)return h;
+    var hid=String(g.hid||(d.h&&d.h.id)||''),m=null;
+    if(hid)d.a.L.forEach(function(x){if(x.opp&&String(x.opp.id)===hid)m=x});
+    if(!m)return h;
+    var line='<p style="margin:10px 0 0"><b>Earlier this season</b>: '+esc(shortNm(g,'a'))+' '+(m.pf>m.pa?'won':'lost')+' '+m.pf+'–'+m.pa+' '+(m.home?'at home':'on the road')+' against '+esc(shortNm(g,'h'))+'.</p>';
+    var k=h.lastIndexOf('<p class="src"');return k>=0?h.slice(0,k)+line+h.slice(k):h+line;
+  }catch(e){return h}
 };
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
