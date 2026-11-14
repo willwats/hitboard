@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v228, Nov 13';
+var BUILD='v229, Nov 13';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -14846,13 +14846,14 @@ expCard=function(g){
 };
 
 /* ---------- block170 (v228): quarterback check for NFL + "does the pick hold up" summary ---------- */
+var OUTX=/^(out|injured reserve|ir\b|suspended|pup|non-football|reserve|physically unable|inactive|season)/i;
 function qbSide(g,s){
   var ab=s==='a'?g.a:g.h,key=nt(ab),D=S.dep[key],I=S.inj.nfl,list=(I&&I.by&&I.by[key])||[];
   var q=(D&&D.qb)||[],starter=q[0]||null,backup=q[1]||null,st='',lvl='ok';
   var hit=null;
   if(starter)list.forEach(function(x){if(!hit&&normName(x.n)===normName(starter))hit=x});
   if(!hit){var qs=list.filter(function(x){return /^QB$/i.test(x.pos||'')});if(qs.length&&!starter){hit=qs[0];starter=hit.n}}
-  if(hit){st=hit.st||'';lvl=OUT_RE.test(st)?'out':/doubtful/i.test(st)?'doubtful':/question|day-to-day|probable/i.test(st)?(/probable/i.test(st)?'ok':'questionable'):'ok'}
+  if(hit){st=hit.st||'';lvl=OUTX.test(st)?'out':/doubtful/i.test(st)?'doubtful':/question|day-to-day|probable/i.test(st)?(/probable/i.test(st)?'ok':'questionable'):'ok'}
   return {s:s,team:shortNm(g,s),starter:starter,backup:backup,st:st,lvl:lvl,known:!!(D&&D.qb)||!!hit,d:hit&&hit.d||''};
 }
 function qbCheck(g){return g.lg==='nfl'?[qbSide(g,'a'),qbSide(g,'h')]:[]}
@@ -14908,6 +14909,135 @@ grOutW=function(lg,key){
       if(w){r={w:r.w+w,names:r.names.concat([x.n+' (QB, '+String(x.st).toLowerCase()+')'])}}});
   }catch(e){}
   return r;
+};
+
+/* ---------- block171 (v229): who is missing (all positions), matchup edges, and a learning log that trains on results ---------- */
+var POSW={QB:10,RB:3,WR:3,TE:2,OL:3,OT:3,OG:3,C:3,T:3,G:3,DL:3,DE:3,DT:3,EDGE:3,LB:2,CB:3,S:2,FS:2,SS:2,DB:2,K:1,P:.5};
+function injTeam(g,s){
+  var lg=g.lg,key=lg==='nfl'?nt(s==='a'?g.a:g.h):(s==='a'?g.a:g.h),I=S.inj[lg],L=(I&&I.by&&I.by[key])||[],o=[];
+  L.forEach(function(x){
+    var st=x.st||'',lv=OUTX.test(st)?'out':/doubtful/i.test(st)?'doubtful':/question|day-to-day/i.test(st)?'questionable':null;
+    if(!lv)return;
+    var pos=String(x.pos||'').toUpperCase(),w=(POSW[pos]!=null?POSW[pos]:1.5)*(lv==='out'?1:lv==='doubtful'?.8:.4);
+    var dr=null;try{dr=lg==='nfl'?depRole(lg,s==='a'?g.a:g.h,x.n):null}catch(e){}
+    if(dr&&dr.start)w*=1.5;
+    o.push({n:x.n,pos:pos,lv:lv,w:w,start:!!(dr&&dr.start),d:x.d||''});
+  });
+  o.sort(function(a,b){return b.w-a.w});return o;
+}
+function injCard(g){
+  if(g.lg!=='nfl')return '';
+  var A=injTeam(g,'a'),H=injTeam(g,'h'),I=S.inj.nfl;if(!I)return '';
+  var tot=function(L){return L.reduce(function(s,x){return s+x.w},0)};
+  var row=function(s,L){
+    var top=L.slice(0,6).map(function(x){return '<li>'+esc(x.n)+' <span class="src">'+esc(x.pos)+(x.start?', starter':'')+'</span> <span class="tag warn" style="font-size:10px">'+x.lv.toUpperCase()+'</span>'+(x.d?' <span class="src">'+esc(x.d)+'</span>':'')+'</li>'}).join('');
+    return '<p style="margin:8px 0 2px"><b>'+esc(shortNm(g,s))+'</b> <span class="src">'+(L.length?'impact '+tot(L).toFixed(1)+' · '+L.length+' listed':'nobody listed')+'</span></p>'+(top?'<ul class="pts" style="margin:0">'+top+(L.length>6?'<li class="src">+ '+(L.length-6)+' more</li>':'')+'</ul>':'');
+  };
+  var ta=tot(A),th=tot(H),edge=Math.abs(ta-th)<2?'The injury burden is about even.':(ta>th?shortNm(g,'h'):shortNm(g,'a'))+' is the healthier side ('+Math.abs(ta-th).toFixed(1)+' points of impact).';
+  return '<h3>Who is missing</h3><div class="card" style="padding:12px"><p class="src" style="margin:0">'+esc(edge)+' Impact weights position (quarterback most) and whether he starts on the depth chart; questionable counts a little, doubtful more, out fully.</p>'+row('a',A)+row('h',H)+'<p class="src" style="margin:8px 0 0">From the league injury report, which can lag same-day news.</p></div>';
+}
+function lgAvgPts(lg){return lg==='nfl'?22.5:lg==='ncaafb'?27.5:null}
+function tmProf(L){
+  if(!L||L.length<3)return null;
+  var n=L.length,pf=0,pa=0,close=0,cw=0,hp=0,hn=0,ap=0,an=0;
+  L.forEach(function(x){pf+=x.pf;pa+=x.pa;if(Math.abs(x.pf-x.pa)<=7){close++;if(x.pf>x.pa)cw++}if(x.home){hp+=x.pf-x.pa;hn++}else{ap+=x.pf-x.pa;an++}});
+  var l3=L.slice(-3),f3=l3.reduce(function(s,x){return s+x.pf},0)/l3.length,a3=l3.reduce(function(s,x){return s+x.pa},0)/l3.length;
+  return {n:n,pf:pf/n,pa:pa/n,f3:f3,a3:a3,close:close,cw:cw,hm:hn?hp/hn:null,am:an?ap/an:null};
+}
+function matchCard(g){
+  if(g.lg!=='nfl'&&g.lg!=='ncaafb')return '';
+  var d=S.seasX[expSeasonKey(g)];if(!d||!d.t)return '';
+  var A=tmProf(d.a&&d.a.L),H=tmProf(d.h&&d.h.L);if(!A||!H)return '';
+  var avg=lgAvgPts(g.lg),na=shortNm(g,'a'),nh=shortNm(g,'h'),pts=[];
+  var f1=function(x){return x.toFixed(1)};
+  /* offense against defense */
+  var ao=A.pf-H.pa,ho=H.pf-A.pa;
+  pts.push(na+' score '+f1(A.pf)+' a game; '+nh+' allow '+f1(H.pa)+'. '+(ao>3?'Edge to the '+na+' offense.':ao<-3?'The '+nh+' defense has the edge.':'Fairly even.'));
+  pts.push(nh+' score '+f1(H.pf)+' a game; '+na+' allow '+f1(A.pa)+'. '+(ho>3?'Edge to the '+nh+' offense.':ho<-3?'The '+na+' defense has the edge.':'Fairly even.'));
+  /* trends */
+  [[na,A],[nh,H]].forEach(function(p){var t=p[1],dO=t.f3-t.pf,dD=t.a3-t.pa;
+    if(Math.abs(dO)>=4||Math.abs(dD)>=4)pts.push(p[0]+' last three games: '+f1(t.f3)+' scored, '+f1(t.a3)+' allowed ('+(dO>=4?'offense is heating up':dO<=-4?'offense has cooled':'')+(Math.abs(dO)>=4&&Math.abs(dD)>=4?'; ':'')+(dD>=4?'defense is slipping':dD<=-4?'defense is tightening':'')+').')});
+  /* venue splits */
+  if(A.am!=null)pts.push(na+' average margin on the road: '+(A.am>=0?'+':'')+f1(A.am)+'.');
+  if(H.hm!=null)pts.push(nh+' average margin at home: '+(H.hm>=0?'+':'')+f1(H.hm)+'.');
+  /* close games */
+  [[na,A],[nh,H]].forEach(function(p){if(p[1].close>=3)pts.push(p[0]+' have played '+p[1].close+' games decided by a touchdown or less and won '+p[1].cw+'.')});
+  /* total pace */
+  var proj=(A.pf+H.pa)/2+(H.pf+A.pa)/2;
+  pts.push('Scoring both ways points to about '+Math.round(proj)+' total points'+(avg?' (a typical game is about '+Math.round(avg*2)+')':'')+'.');
+  return '<h3>Matchup edges</h3><div class="card" style="padding:12px"><ul class="pts" style="margin:0">'+pts.map(function(x){return '<li>'+esc(x)+'</li>'}).join('')+'</ul><p class="src" style="margin:8px 0 0">Built from each team’s full season results so far. It does not adjust for strength of schedule, and these are points, not yards or play-by-play.</p></div>';
+}
+/* ---- learning log: every sport is recorded; football is shown ---- */
+S.lrn={};try{var _l=localStorage.getItem('hitboard.lrn.v1');if(_l)S.lrn=JSON.parse(_l)||{}}catch(e){}
+function lrnSave(){try{var ks=Object.keys(S.lrn);if(ks.length>1500)ks.sort(function(a,b){return (S.lrn[a].st||0)-(S.lrn[b].st||0)}).slice(0,ks.length-1300).forEach(function(k){delete S.lrn[k]});localStorage.setItem('hitboard.lrn.v1',JSON.stringify(S.lrn))}catch(e){}}
+function lrnAbs(g,s){try{var key=g.lg==='nfl'?nt(s==='a'?g.a:g.h):(s==='a'?g.a:g.h);return grOutW(g.lg,key).w}catch(e){return 0}}
+function lrnSnap(){
+  var now=Date.now(),ch=false,n=0;
+  LG.forEach(function(l){(S.feed[l[0]]||[]).forEach(function(g){
+    try{
+      var r=S.lrn[g.id],k=kind(g);
+      if(!r&&k==='up'&&g.start<now+40*36e5&&n<15){
+        var m=pickModel(g);if(!m||m.M==null)return;
+        var e=null;try{e=expFor(g)}catch(x){}
+        var d=S.seasX[expSeasonKey(g)],fa=d&&d.a&&d.a.L?sgRate(d.a.L):null,fh=d&&d.h&&d.h.L?sgRate(d.h.L):null;
+        S.lrn[g.id]={lg:g.lg,st:g.start,M:m.M,mk:(m.ln&&m.ln.pts!=null)?m.mk:null,aa:lrnAbs(g,'a'),ah:lrnAbs(g,'h'),ew:e&&e.win||null,ec:e&&e.cov||null,fd:(fa!=null&&fh!=null)?fh-fa:null,na:g.an||g.a,nh:g.hn||g.h};n++;ch=true;
+      }else if(r&&!r.o&&k==='final'&&g.sa!=null&&g.sh!=null){r.o=g.sh-g.sa;ch=true}
+    }catch(e){}
+  })});
+  if(ch)lrnSave();
+}
+setTimeout(lrnSnap,7000);setInterval(lrnSnap,5*60000);
+function lrnRows(lg){return Object.keys(S.lrn).map(function(k){return S.lrn[k]}).filter(function(r){return r.lg===lg&&r.o!=null&&r.o!==0&&r.M!=null})}
+function lrnX(r,lg){var sd=SG_SD[lg]||12;return [r.M/sd,((r.aa||0)-(r.ah||0))/10,r.ew==='h'?1:r.ew==='a'?-1:0,r.fd!=null?r.fd/sd:0]}
+function lrnFit(lg){
+  var R=lrnRows(lg);if(R.length<8)return {n:R.length};
+  var b0=[0,1.7,0,0,0],b=b0.slice(),lam=.6,lr=.08,sig=function(z){return 1/(1+Math.exp(-z))};
+  for(var it=0;it<500;it++){
+    var g=[0,0,0,0,0];
+    R.forEach(function(r){var x=[1].concat(lrnX(r,lg)),y=r.o>0?1:0,z=0;for(var j=0;j<5;j++)z+=b[j]*x[j];var e=sig(z)-y;for(var j=0;j<5;j++)g[j]+=e*x[j]});
+    for(var j=0;j<5;j++)b[j]-=lr*(g[j]/R.length+lam*(b[j]-b0[j])/R.length)
+  }
+  var br=function(cf){var s=0;R.forEach(function(r){var x=[1].concat(lrnX(r,lg)),z=0;for(var j=0;j<5;j++)z+=cf[j]*x[j];var p=sig(z),y=r.o>0?1:0;s+=(p-y)*(p-y)});return s/R.length};
+  var hit=function(cf){var c=0;R.forEach(function(r){var x=[1].concat(lrnX(r,lg)),z=0;for(var j=0;j<5;j++)z+=cf[j]*x[j];if((z>0)===(r.o>0))c++});return c/R.length};
+  return {n:R.length,b:b,brier0:br(b0),brier1:br(b),acc0:hit(b0),acc1:hit(b),ok:R.length>=30};
+}
+function lrnLean(g){
+  if(g.lg!=='nfl'&&g.lg!=='ncaafb')return null;
+  var f=lrnFit(g.lg);if(!f.ok)return {n:f.n||0};
+  var m=pickModel(g);if(!m||m.M==null)return {n:f.n};
+  var e=null;try{e=expFor(g)}catch(x){}
+  var r={M:m.M,aa:lrnAbs(g,'a'),ah:lrnAbs(g,'h'),ew:e&&e.win||null,fd:null},x=[1].concat(lrnX(r,g.lg)),z=0;for(var j=0;j<5;j++)z+=f.b[j]*x[j];
+  return {n:f.n,p:1/(1+Math.exp(-z))};
+}
+function lrnCard(g){
+  var L=lrnLean(g);if(!L)return '';
+  if(L.p==null)return '<h3>Learning model</h3><div class="card" style="padding:12px"><p class="src" style="margin:0">Still collecting. '+(L.n||0)+' of 30 finished '+(g.lg==='nfl'?'NFL':'college football')+' games recorded; the model learns from how its pre-game numbers compared with the final score, and starts showing a lean at 30.</p></div>';
+  var s=L.p>=.5?'h':'a',pp=Math.max(L.p,1-L.p);
+  return '<h3>Learning model</h3><div class="card" style="padding:12px"><p style="margin:0"><b>'+esc(shortNm(g,s))+'</b> '+Math.round(pp*100)+'%</p><p class="src" style="margin:4px 0 0">Re-weighted from '+L.n+' finished games using the app’s margin, injury burden and expert lean. It is trained on the same games it is scored on, so expect it to look better than it will be going forward.</p></div>';
+}
+var feedSheet171=feedSheet;
+feedSheet=function(g){
+  var h=feedSheet171.apply(this,arguments);
+  try{
+    var c=matchCard(g)+injCard(g)+lrnCard(g);if(!c)return h;
+    var i=h.indexOf('<h3>Prediction</h3>'),j=i>=0?h.indexOf('<h3',i+10):-1;
+    if(j<0)j=h.search(/<h3/);
+    if(j<0)return h;
+    return h.slice(0,j)+c+h.slice(j);
+  }catch(e){return h}
+};
+var vResults171=vResults;
+vResults=function(){
+  var h=vResults171.apply(this,arguments);
+  try{
+    var rows=['nfl','ncaafb'].map(function(lg){var f=lrnFit(lg),all=Object.keys(S.lrn).filter(function(k){return S.lrn[k].lg===lg}).length;
+      var nm=lg==='nfl'?'NFL':'College football';
+      if(f.n<8)return '<li><b>'+nm+':</b> '+all+' games recorded, '+f.n+' finished. Needs 8 to start fitting and 30 to show a lean.</li>';
+      return '<li><b>'+nm+':</b> '+f.n+' finished games. Winner hit rate: app numbers '+Math.round(f.acc0*100)+'%, re-weighted '+Math.round(f.acc1*100)+'% (in-sample). '+(f.ok?'Lean is shown in game windows.':'Lean shows at 30 games.')+'</li>'}).join('');
+    var other=['nba','nhl','ncaamb','mlb'].reduce(function(s,lg){return s+Object.keys(S.lrn).filter(function(k){return S.lrn[k].lg===lg}).length},0);
+    var card='<h3>Learning model</h3><div class="card" style="padding:12px"><p class="src" style="margin:0 0 6px">Before each game the app saves its margin, the market line, both teams’ injury burden and the expert lean. After the final it records the result and re-fits how much weight each one deserves.</p><ul class="pts" style="margin:0">'+rows+'<li><b>Other sports:</b> '+other+' games recorded quietly for later; not shown yet.</li></ul></div>';
+    var k=h.indexOf('<details style="margin:14px 0">');return k>=0?h.slice(0,k)+card+h.slice(k):h+card;
+  }catch(e){return h}
 };
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
