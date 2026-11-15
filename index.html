@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v240, Nov 15';
+var BUILD='v241, Nov 15';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -11963,7 +11963,7 @@ function pbSheet(s){
   var win=function(lb,w){return '<div style="flex:1;min-width:0"><div class="src">'+lb+'</div><div style="font-size:18px;font-weight:700">'+(w.n?fmt106(w.avg):'–')+'</div><div class="src">Over '+w.h.o+' of '+w.n+(w.n?' ('+pbPct(w.h.o,w.n)+')':'')+'</div></div>'};
   h+='<h3>Hit rate against '+s.line+'</h3><div class="card" style="display:flex;gap:10px">'+win('Last 5',c.l5)+win('Last 10',c.l10)+win('Season',c.s)+'</div>';
   if(c.mn5!=null)h+='<p class="src" style="margin:6px 0 0">Minutes, last 5 games: '+fmt106(c.mn5)+' a game.</p>';
-  h+='<h3>Game log</h3><div class="card" style="padding:4px 12px">'+c.all.slice(0,10).map(function(x,k){
+  h+='<h3>Game log</h3><div class="card" style="padding:4px 12px">'+c.all.map(function(x,k){
     var v=x.v[c.i],o=v>s.line?'O':v<s.line?'U':'P',cl=o==='O'?'hi':o==='U'?'lo':'mid';
     return '<div style="display:flex;justify-content:space-between;gap:8px;padding:7px 0;'+(k?'border-top:1px solid var(--line)':'')+'"><span>'+esc(new Date(x.at).toLocaleDateString('en-US',{month:'short',day:'numeric'}))+' · '+(x.h===0?'@ ':'vs ')+esc(String(x.o||'').toUpperCase())+(x.w!=null?' · '+(x.w?'W':'L'):'')+(x.mn!=null?' · '+Math.round(x.mn)+' min':'')+'</span><span><b>'+fmt106(v)+'</b> <span class="hrpill '+cl+'" style="display:inline-block;margin-left:4px">'+o+'</span></span></div>';
   }).join('')+'</div>';
@@ -15691,6 +15691,60 @@ gradeBest=function(lg,cat,r,o){
     }
   }catch(e){}
   return gradeBest182.apply(this,arguments);
+};
+
+/* v241: every player's whole season. Saved box scores are capped per sport so college games can no longer push out
+   early NFL games, the app reads every finished NFL and NBA game this season on its own, and the player window shows all of them */
+var DLCAP183={nfl:400,nba:700,ncaafb:350,ncaamb:350};
+dlSave=function(){
+  var by={};Object.keys(S.dlog).forEach(function(k){var g=S.dlog[k];(by[g.lg]=by[g.lg]||[]).push(k)});
+  Object.keys(by).forEach(function(lg){var ks=by[lg],cap=DLCAP183[lg]||300;if(ks.length>cap){ks.sort(function(a,b){return S.dlog[a].at-S.dlog[b].at}).slice(0,ks.length-cap).forEach(function(k){delete S.dlog[k]})}});
+  var order=['ncaamb','ncaafb','nba'];
+  for(var t=0;t<8;t++){
+    try{localStorage.setItem('hitboard.dlog.v1',JSON.stringify(S.dlog));return}catch(e){
+      /* out of room: drop the oldest college games first, then the oldest NBA games; NFL games are kept */
+      var lg=order[Math.min(t,order.length-1)],ks=Object.keys(S.dlog).filter(function(k){return S.dlog[k].lg===lg}).sort(function(a,b){return S.dlog[a].at-S.dlog[b].at});
+      if(!ks.length&&t<order.length)continue;
+      ks.slice(0,Math.max(1,Math.ceil(ks.length/3))).forEach(function(k){delete S.dlog[k]});
+    }
+  }
+};
+function dlCount183(lg){var n=0;Object.keys(S.dlog).forEach(function(k){if(S.dlog[k].lg===lg)n++});return n}
+/* how many games a player has saved versus how many he has played (season totals) */
+function dlGap183(){
+  var I;try{I=pbIdx('nfl')}catch(e){return 99}
+  var miss=0;DEEP.forEach(function(d){var g=d.d0?d.d0.g:d.g;if(g<4)return;var n=(I.P[normName(d.n)]||[]).length;if(n<g-1)miss++});
+  return miss;
+}
+var _full183={};
+function dlFull183(force){
+  if(window.claude||typeof fetch!=='function')return;
+  if(S.dgBusy){setTimeout(function(){dlFull183(force)},20000);return}
+  var lg=null;
+  if(dlCount183('nfl')<130||dlGap183()>5)lg='nfl';
+  else if(dlCount183('nba')<150&&!_full183.nba)lg='nba';
+  if(!lg)return;
+  if(!force&&_full183[lg]&&Date.now()-_full183[lg]<20*60000)return;
+  _full183[lg]=Date.now();S.dgRep=0;
+  try{dlRead(lg)}catch(e){}
+}
+setTimeout(function(){try{dlFull183()}catch(e){}},8000);
+setInterval(function(){try{dlFull183()}catch(e){}},25*60000);
+/* player window: say when the saved games do not cover his whole season, and keep reading */
+var pbSheet183=pbSheet;
+pbSheet=function(s){
+  var h=pbSheet183.apply(this,arguments);
+  try{
+    var C=DL_LG[s.lg];if(!C||C.ix[s.cat]==null)return h;
+    var n=(pbIdx(s.lg).P[normName(s.n)]||[]).filter(function(x){return x.v[C.ix[s.cat]]!=null}).length,tot=null,txt='';
+    if(s.lg==='nfl'){var d=DEEP.filter(function(x){return x.kind===s.cat&&normName(x.n)===normName(s.n)})[0];if(d){var o=d.d0||d;tot=o.g;txt=' His season totals: '+Math.round(o.avg*o.g)+' '+(s.cat==='pass'?'passing':s.cat==='rush'?'rushing':'receiving')+' yards in '+o.g+' games ('+fmt106(o.avg)+' a game), and the projection uses those totals until the game log catches up.'}}
+    if(tot!=null&&n<tot-1){
+      if(!S.dgBusy)setTimeout(function(){try{dlFull183(true)}catch(e){}},300);
+      var note='<div class="card" style="margin-top:8px;border-color:var(--warn,#b8860b)"><p class="src" style="margin:0"><b>'+n+' of his '+tot+' games are loaded so far.</b> The app is reading the rest of this season’s box scores now'+(S.dgMsg?' ('+esc(S.dgMsg)+')':'')+'.'+esc(txt)+'</p></div>';
+      var i=h.indexOf('<h3>Hit rate against');return i>=0?h.slice(0,i)+note+h.slice(i):h+note;
+    }
+  }catch(e){}
+  return h;
 };
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
