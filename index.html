@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v239, Nov 15';
+var BUILD='v240, Nov 15';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -12627,7 +12627,7 @@ pkAngleCard=function(a){
 var pbCard137=pbCard;
 pbCard=function(o){
   var h=pbCard137(o);
-  try{var G=o.st&&(o.st.k==='hot'||o.st.k==='up')?gradeProp(o.r.lg,o.cat,o.r,o,'Over'):o.st?gradeProp(o.r.lg,o.cat,o.r,o,'Under'):gradeBest(o.r.lg,o.cat,o.r,o);if(G){var i=h.indexOf('</b>');if(i>=0)h=h.slice(0,i+4)+' '+grPill(G.letter,G.dir)+h.slice(i+4)}}catch(e){}
+  try{var G=gradeBest(o.r.lg,o.cat,o.r,o);if(G){var i=h.indexOf('</b>');if(i>=0)h=h.slice(0,i+4)+' '+grPill(G.letter,G.dir)+h.slice(i+4)}}catch(e){}
   return h;
 };
 /* player window: full report card */
@@ -13372,7 +13372,7 @@ var pbCard148=pbCard;
 pbCard=function(o){
   var h=pbCard148(o);
   try{
-    var G=o.st&&(o.st.k==='hot'||o.st.k==='up')?gradeProp(o.r.lg,o.cat,o.r,o,'Over'):o.st?gradeProp(o.r.lg,o.cat,o.r,o,'Under'):gradeBest(o.r.lg,o.cat,o.r,o);
+    var G=gradeBest(o.r.lg,o.cat,o.r,o);
     var L=G&&(G.lev||pbLev(o.r.lg,o.cat,o.r,o,G.dir));
     if(L&&L.L.length){var i=h.lastIndexOf('</div>');if(i>=0)h=h.slice(0,i)+'<div class="src" style="margin-top:4px"><b>Matchup:</b> '+esc(L.L.filter(function(t){return !/^He accounts/.test(t)})[0]||L.L[0])+'</div>'+h.slice(i)}
   }catch(e){}
@@ -13604,7 +13604,7 @@ function gmCard(g){
     var R=gpRows(g),seen={},T={};
     R.forEach(function(o){var k=normName(o.r.n);if(seen[k]||!o.gr)return;var rl0=null;try{rl0=depRole(lg,o.r.t,o.r.n)}catch(e){}if(rl0&&!rl0.start)return;seen[k]=1;var t=bkAb(lg,o.r.t);T[t]=(T[t]||0)+1;if(T[t]>2)return;
       var lv=pbLev(lg,o.cat,o.r,o,o.gr.dir),ln=lv&&lv.L.filter(function(x){return !/^He accounts/.test(x)})[0];
-      pl+='<li><b>'+esc(o.r.n)+'</b> '+esc(o.r.t)+': projected '+esc(o.r.projTxt||'')+' '+esc(o.r.unit||'')+', '+o.gr.dir.toLowerCase()+' '+(o.ln&&o.ln.v!=null?o.ln.v:'')+' · grade '+esc(o.gr.letter)+(ln?'. '+esc(ln):'')+'</li>'});
+      pl+='<li><b>'+esc(o.r.n)+'</b> '+esc(o.r.t)+': projected '+esc(o.r.projTxt||'')+' '+esc(o.r.unit||'')+' vs '+(o.ln&&o.ln.base==='season'?'his season average of ':'a line of ')+(o.ln&&o.ln.v!=null?o.ln.v:'')+', so lean '+o.gr.dir.toLowerCase()+' · grade '+esc(o.gr.letter)+(ln?'. '+esc(ln):'')+'</li>'});
   }catch(e){}
   var inj='';
   var wx='';try{var wt=String(wxLong(g)||'').replace(/<[^>]*>/g,'').replace(/ ?\(Open-Meteo\)/,'').replace(/^Forecast for the start:/,'Forecast for the start:').trim();if(wt)wx='<li>'+esc(wt)+'</li>'}catch(e){}
@@ -15654,6 +15654,44 @@ function tradeCard181(g){
 }
 var keyCard181=keyCard;
 keyCard=function(g){var h='';try{h=keyCard181.apply(this,arguments)||''}catch(e){}var t='';try{t=tradeCard181(g)}catch(e){}return h+t};
+
+/* v240: prop lines and leans stop moving and always agree with the projection.
+   The comparison line is the player's season level (his average this season), fixed for the game.
+   The lean is Over when the projection is above that line and Under when below; when they are within 4% there is no lean. */
+var PBL182={};try{PBL182=JSON.parse(localStorage.getItem('hb.pbl182')||'{}')||{}}catch(e){PBL182={}}
+function pbl182Save(){try{var now=Date.now();Object.keys(PBL182).forEach(function(k){if(PBL182[k].exp<now)delete PBL182[k]});localStorage.setItem('hb.pbl182',JSON.stringify(PBL182))}catch(e){}}
+function seasonMean182(lg,cat,n){
+  var C=DL_LG[lg];
+  if(C&&C.ix[cat]!=null){try{var L=(pbIdx(lg).P[normName(n)]||[]).filter(function(x){return x.v[C.ix[cat]]!=null});if(L.length>=3)return L.reduce(function(s,x){return s+x.v[C.ix[cat]]},0)/L.length}catch(e){}}
+  if(lg==='nfl'){var d=DEEP.filter(function(x){return x.kind===cat&&normName(x.n)===normName(n)})[0];if(d)return d.d0?d.d0.avg:d.avg}
+  return null;
+}
+var pbLine182=pbLine;
+pbLine=function(lg,cat,n,proj){
+  var own=PB_L[pbLKey(lg,cat,n)];if(own!=null)return {v:own,own:true};
+  var k=pbLKey(lg,cat,n),L=PBL182[k],now=Date.now();
+  if(L&&L.exp>now)return {v:L.v,own:false,base:L.b};
+  var m=seasonMean182(lg,cat,n),v,b;
+  if(m!=null&&m>0){v=m>=10?Math.floor(m)+.5:Math.round(m*2)/2;if(v===Math.round(v))v+=.5;b='season'}
+  else{var r=pbLine182(lg,cat,n,proj);v=r.v;b='proj';if(v===Math.round(v)&&v>=1)v-=.5}
+  if(!(v>0))return {v:.5,own:false};
+  PBL182[k]={v:v,b:b,exp:now+36*3600e3};pbl182Save();
+  return {v:v,own:false,base:b};
+};
+/* lean follows the projection; a lean, once shown, holds unless the projection clearly crosses the line */
+var gradeBest182=gradeBest;
+gradeBest=function(lg,cat,r,o){
+  try{
+    var proj=r&&typeof r.proj==='number'?r.proj:parseFloat(r&&r.proj),ln=o&&o.ln&&o.ln.v;
+    if(isFinite(proj)&&ln>0&&cat!=='td'){
+      var gap=(proj-ln)/ln,k=pbLKey(lg,cat,r.n)+'|dir',L=PBL182[k],dir=null;
+      if(L&&L.exp>Date.now()&&L.ln===ln){dir=L.d;if((dir==='Over'&&gap<-.04)||(dir==='Under'&&gap>.04))dir=null}
+      if(!dir){if(Math.abs(gap)<.04)return null;dir=gap>0?'Over':'Under';PBL182[k]={d:dir,ln:ln,exp:Date.now()+36*3600e3};pbl182Save()}
+      return gradeProp(lg,cat,r,o,dir);
+    }
+  }catch(e){}
+  return gradeBest182.apply(this,arguments);
+};
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
