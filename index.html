@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v241, Nov 15';
+var BUILD='v242, Nov 15';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -14815,15 +14815,17 @@ var PROP_X=[
  {lg:'nfl',until:Date.UTC(2026,10,16,11),game:'Cardinals at Rams',p:'Carson Beck',m:'passing yards',s:'Under',l:'175',why:'The Rams hold passers to a low yards per attempt and completion rate. The writer expects a hard debut.'}
 ];
 var vProps168=vProps;
-vProps=function(){
-  var h=vProps168.apply(this,arguments),lg=S.sport,now=Date.now();
-  var L=PROP_X.filter(function(x){return x.lg===lg&&now<x.until});
-  if(!L.length)return h;
+function xpSec241(lg){
+  var now=Date.now(),L=PROP_X.filter(function(x){return x.lg===lg&&now<x.until});
+  if(!L.length)return '';
   var sec='<h3>Expert prop picks</h3><div class="card" style="padding:10px 12px"><p class="src" style="margin:0 0 6px">One writer’s pick per player, entered by hand as of '+EXP_AT+'. Lines move and injuries change, so check the line at your book. Not a guarantee.</p>'+
     L.map(function(x){return '<details style="border-top:1px solid var(--line);padding:8px 0"><summary style="cursor:pointer"><b>'+esc(x.p)+'</b> · '+esc(x.s)+' '+esc(x.l)+' '+esc(x.m)+' <span class="src">('+esc(x.game)+')</span></summary><p class="src" style="margin:6px 0 0">'+esc(x.why)+'</p></details>'}).join('')+'</div>';
-  var pos=h.indexOf('</h2>');if(pos<0)return sec+h;pos+=5;
-  while(h.slice(pos).replace(/^\s+/,'').indexOf('<div class="chips"')===0){var s0=h.indexOf('<div class="chips"',pos);pos=h.indexOf('</div>',s0)+6}
-  return h.slice(0,pos)+sec+h.slice(pos);
+  return sec;
+}
+var vParlay241=vParlay;
+vParlay=function(){
+  var h=vParlay241.apply(this,arguments);
+  try{if(S.mtop||S.betTab!=='parlays')return h;var sec=xpSec241(S.sport);if(!sec)return h;var i=h.indexOf('<p class="lede"');if(i<0)i=h.indexOf('<div class="card');return i<0?h+sec:h.slice(0,i)+sec+h.slice(i)}catch(e){return h}
 };
 
 /* ---------- block169 (v227): key absences (QB and other starters) shown with the expert picks ---------- */
@@ -15746,6 +15748,9 @@ pbSheet=function(s){
   }catch(e){}
   return h;
 };
+
+var vParl241=vParl;
+vParl=function(lg){var h=vParl241.apply(this,arguments);try{var sec=xpSec241(lg||S.sport);if(sec)h=sec+h}catch(e){}return h};
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
