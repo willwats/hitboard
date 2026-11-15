@@ -787,19 +787,19 @@ function tdParse(){
   DATA.tds.g.forEach(function(g){g[2].split(';').forEach(function(x){var p=x.split('|');if(avail(p[1],p[0]).show)out.push({gm:g[0],t:p[0],n:p[1],h:+p[2],td:p[3]?+p[3]:null})})});
   return out;
 }
-function tdRow(r,showGm){return '<tr><td><button class="pxname" data-act="prof" data-n="'+esc(r.n)+'" data-lg="nfl" data-team="'+esc(r.t)+'">'+esc(r.n)+'</button>'+badge(r.n,r.t)+' <span class="src">'+r.t+(showGm?' · '+r.gm:'')+'</span><br><span class="src">'+esc(matchTxt(r.t))+'</span></td><td><span class="hrpill '+(r.h>=6?'hi':r.h<=2?'lo':'mid')+'">'+r.h*10+'% ('+r.h+'/10)</span></td><td>'+(r.td==null?'—':r.td)+'</td></tr>'}
+function tdRow(r,showGm){return '<tr><td><button class="pxname" data-act="prof" data-n="'+esc(r.n)+'" data-lg="nfl" data-team="'+esc(r.t)+'">'+esc(r.n)+'</button>'+badge(r.n,r.t)+' <span class="src">'+r.t+(showGm?' · '+r.gm:'')+'</span><br><span class="src">'+esc(matchTxt(r.t))+'</span></td><td><span class="hrpill '+(r.h>=6?'hi':r.h<=2?'lo':'mid')+'">'+(r.cur?Math.round(r.h*10)+'%':r.h*10+'% ('+r.h+'/10)')+'</span></td><td>'+(r.td==null?'—':r.td)+'</td></tr>'}
 function nflTD(){
   var d=DATA.tds,all=tdParse();
   var top=all.slice().sort(function(a,b){return b.h-a.h||(b.td||0)-(a.td||0)}).slice(0,30);
-  var head='<thead><tr><th>Player</th><th>TD in L10</th><th>TDs</th></tr></thead>';
+  var head='<thead><tr><th>Player</th><th>Chance</th><th>TDs</th></tr></thead>';
   var h='<p class="lede">'+esc(d.asOf)+' Compare a player’s rate with the price your book shows: +100 needs 50%, +200 needs 33%, +300 needs 25%.</p>';
   h+='<h3>Top 30 anytime TD rates</h3><div class="tblwrap"><table>'+head+'<tbody>'+top.map(function(r){return tdRow(r,true)}).join('')+'</tbody></table></div>';
-  h+='<h3>Market prices, Bills at Raiders</h3><p class="src">'+esc(d.kal.src)+'</p><div class="tblwrap"><table><thead><tr><th>Player</th><th>Anytime TD</th><th>Last 10</th></tr></thead><tbody>'+
-   d.kal.rows.filter(function(r){return avail(r[0],r[1]).show}).map(function(r){var m=all.filter(function(a){return a.n===r[0]})[0];return '<tr><td>'+esc(r[0])+' <span class="src">'+r[1]+'</span></td><td><span class="hrpill mid">'+r[2]+'%</span></td><td>'+(m?m.h*10+'%':'—')+'</td></tr>'}).join('')+'</tbody></table></div>';
+  h+='<h3>Market prices, Week 10</h3><p class="src">'+esc(d.kal.src)+'</p><div class="tblwrap"><table><thead><tr><th>Player</th><th>Market</th><th>Hitboard</th></tr></thead><tbody>'+
+   d.kal.rows.filter(function(r){return avail(r[0],r[1]).show}).map(function(r){var m=all.filter(function(a){return a.n===r[0]})[0];return '<tr><td>'+esc(r[0])+' <span class="src">'+r[1]+'</span></td><td><span class="hrpill mid">'+r[2]+'%</span></td><td>'+(m?Math.round(m.h*10)+'%':'—')+'</td></tr>'}).join('')+'</tbody></table></div>';
   h+='<h3>By game</h3>'+d.g.map(function(g){var rows=all.filter(function(a){return a.gm===g[0]});
     return '<details class="card bcard"><summary><b>'+g[0]+'</b> <span class="src">'+g[1]+' ET</span></summary><div class="tblwrap" style="margin-top:8px"><table>'+head+'<tbody>'+rows.map(function(r){return tdRow(r,false)}).join('')+'</tbody></table></div></details>';
   }).join('');
-  return h+'<p class="note" style="margin-top:12px">Last-10 rates ignore opponent and role changes. Check injuries before using them. Anytime TD prices from sportsbooks were not readable.</p>';
+  return h+'<p class="note" style="margin-top:12px">Season rates do not capture every role change. Check injuries before using them. Anytime TD prices from sportsbooks were not readable.</p>';
 }
 function vPropsLg(){
   var lg=S.sport,name=LG.filter(function(l){return l[0]===lg})[0][1],cat=curCat();
@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v238, Nov 15';
+var BUILD='v239, Nov 15';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -9113,8 +9113,8 @@ pmSheet=function(s){
 function ntdInfo(r){
   var o={p:null,why:'',gr:''};
   var n=nextOpp(nt(r.t));
-  var base=(r.h+0.5)/12,lam=-Math.log(1-base),f=1,txt=[];
-  txt.push('Scored in '+r.h+' of his last 10 games'+(r.td!=null?', '+r.td+' touchdowns this season':'')+'.');
+  var base=r.cur?Math.max(.02,Math.min(.9,r.h/10)):(r.h+0.5)/12,lam=-Math.log(1-base),f=1,txt=[];
+  txt.push(r.cur?(r.td!=null?r.td+' touchdowns in '+r.g+' games this season ('+r.rt+' rushing, '+r.ct+' receiving)':'No season touchdown line in the data')+(r.mk!=null?'. The prediction market prices him at '+r.mk+'%':'')+'.':'Scored in '+r.h+' of his last 10 games'+(r.td!=null?', '+r.td+' touchdowns this season':'')+'.');
   var d=null;try{var k=normName(r.n);d=DEEP.filter(function(x){return nt(x.t)===nt(r.t)&&normName(x.n)===k}).sort(function(a,b){return b.g-a.g})[0]}catch(e){}
   if(d){var q=String(d.note||'');
     if(d.kind==='rush')txt.push('He is a '+d.pos+' with '+q.split(' carries')[0]+' carries in '+d.g+' games, so he gets the ball near the goal line.');
@@ -9141,7 +9141,7 @@ function ntdInfo(r){
 function tdRow(r,showGm){
   var o={};try{o=ntdInfo(r)}catch(e){}
   var x=o.p!=null?'<div class="src" style="margin-top:4px;line-height:1.45"><b>I predict he scores:</b> about a '+Math.round(o.p*100)+'% chance · grade '+esc(o.gr)+'. '+esc(o.why)+'</div>':'';
-  return '<tr><td><button class="pxname" data-act="prof" data-n="'+esc(r.n)+'" data-lg="nfl" data-team="'+esc(r.t)+'">'+esc(r.n)+'</button>'+badge(r.n,r.t)+' <span class="src">'+r.t+(showGm?' · '+r.gm:'')+'</span><br><span class="src">'+esc(matchTxt(r.t))+'</span>'+x+'</td><td><span class="hrpill '+(r.h>=6?'hi':r.h<=2?'lo':'mid')+'">'+r.h*10+'% ('+r.h+'/10)</span></td><td>'+(r.td==null?'—':r.td)+'</td></tr>';
+  return '<tr><td><button class="pxname" data-act="prof" data-n="'+esc(r.n)+'" data-lg="nfl" data-team="'+esc(r.t)+'">'+esc(r.n)+'</button>'+badge(r.n,r.t)+' <span class="src">'+r.t+(showGm?' · '+r.gm:'')+'</span><br><span class="src">'+esc(matchTxt(r.t))+'</span>'+x+'</td><td><span class="hrpill '+(r.h>=6?'hi':r.h<=2?'lo':'mid')+'">'+(r.cur?Math.round(r.h*10)+'%':r.h*10+'% ('+r.h+'/10)')+'</span></td><td>'+(r.td==null?'—':r.td)+'</td></tr>';
 }
 
 /* v131: anytime TD rows use the live schedule for the opponent and grouping; wording fixes */
@@ -9162,7 +9162,7 @@ nflTD=function(){
     all.forEach(function(r){var n=nextOpp(nt(r.t));if(!n)return;var k=n.key||(r.t+'@'+n.opp);if(!groups[k]){groups[k]={n:n,rows:[],teams:{}};order.push(k)}groups[k].rows.push(r);groups[k].teams[r.t]=1});
     if(!order.length)return h;
     order.sort(function(a,b){return (groups[a].n.start||9e15)-(groups[b].n.start||9e15)});
-    var head='<thead><tr><th>Player</th><th>TD in L10</th><th>TDs</th></tr></thead>';
+    var head='<thead><tr><th>Player</th><th>Chance</th><th>TDs</th></tr></thead>';
     var by='<h3>By game</h3>'+order.map(function(k){var G=groups[k],pr=k.split('@');var title=pr.length===2?pr[0]+' @ '+pr[1]:k;
       var rows=G.rows.sort(function(a,b){return b.h-a.h||(b.td||0)-(a.td||0)});
       return '<details class="card bcard"><summary><b>'+esc(title)+'</b> <span class="src">'+(G.n.start?esc(fmtTime(G.n.start)):'')+'</span></summary><div class="tblwrap" style="margin-top:8px"><table>'+head+'<tbody>'+rows.map(function(r){return tdRow(r,false)}).join('')+'</tbody></table></div></details>'}).join('');
@@ -9477,7 +9477,7 @@ function spRows(lg,cat){
       tdParse().forEach(function(r){
         var nx=nextOpp(nt(r.t));if(!nx)return;var o=ntdInfo(r);if(o.p==null)return;
         var d=DEEP.filter(function(x){return nt(x.t)===nt(r.t)&&normName(x.n)===normName(r.n)}).sort(function(a,b){return b.g-a.g})[0];
-        out.push({n:r.n,t:r.t,pos:d?d.pos:'',lg:'nfl',when:nx.txt.split(' · ')[0],gk:nx.key,gl:nx.key.replace('@',' @ '),def:spDefNfl(d&&d.pos==='RB'?'rush':'pass',nx.opp),proj:o.p,projTxt:Math.round(o.p*100)+'%',unit:'chance to score · grade '+o.gr,avgTxt:'TD in '+r.h+' of last 10',sort:o.p,badge:badge(r.n,r.t)})
+        out.push({n:r.n,t:r.t,pos:d?d.pos:'',lg:'nfl',when:nx.txt.split(' · ')[0],gk:nx.key,gl:nx.key.replace('@',' @ '),def:spDefNfl(d&&d.pos==='RB'?'rush':'pass',nx.opp),proj:o.p,projTxt:Math.round(o.p*100)+'%',unit:'chance to score · grade '+o.gr,avgTxt:r.cur?(r.td!=null?r.td+' TD in '+r.g+' games':'market '+r.mk+'%'):'TD in '+r.h+' of last 10',sort:o.p,badge:badge(r.n,r.t)})
       });
     }else if(cat==='kick'){
       KICKERS.forEach(function(k){
@@ -11865,8 +11865,8 @@ function pbCalc(lg,cat,name,line,opp,full){
   Object.keys(cands).forEach(function(k){
     var wo=all.filter(function(x){return x.ent.pres[k]===undefined}),wi=all.filter(function(x){return x.ent.pres[k]!==undefined});
     if(wo.length<1||wi.length<2)return;
-    var nm=pfPretty(k),outNow=false;try{outNow=isOutInj({lg:lg,t:R.team,n:nm})}catch(e){}
-    out.push({k:k,n:nm,wo:{n:wo.length,avg:pbMean(wo,i),h:pbHit(wo,i,line)},wi:{n:wi.length,avg:pbMean(wi,i),h:pbHit(wi,i,line)},out:outNow});
+    var nm=pfPretty(k),outNow=false,gone=false;try{gone=gone180(lg,R.team,nm);outNow=isOutInj({lg:lg,t:R.team,n:nm})||gone}catch(e){}
+    out.push({k:k,n:nm,wo:{n:wo.length,avg:pbMean(wo,i),h:pbHit(wo,i,line)},wi:{n:wi.length,avg:pbMean(wi,i),h:pbHit(wi,i,line)},out:outNow,gone:gone});
   });
   out.sort(function(a,b){return (b.out-a.out)||(b.wo.n-a.wo.n)});
   R.tm=out.slice(0,6);
@@ -12539,7 +12539,7 @@ function gradeProp(lg,cat,r,o,dir){
     var f=null;try{f=pbCalc(lg,cat,r.n,ln,o.opp,true)}catch(e){}
     if(f&&f.tm){
       var best=null;f.tm.forEach(function(t){if(!t.out||!t.wo||t.wo.n<2||!(t.wi.avg>0))return;var d=t.wo.avg/t.wi.avg-1;if(!best||Math.abs(d)>Math.abs(best.d))best={d:d,t:t}});
-      if(best)add('Teammates',grClip(best.d/.3,-1,1)*s*10,best.t.n+' is out. Without him he averages '+fmt106(best.t.wo.avg)+' vs '+fmt106(best.t.wi.avg)+' with him');
+      if(best)add('Teammates',grClip(best.d/.3,-1,1)*s*10,best.t.n+(best.t.gone?' was traded away':' is out')+'. Without him he averages '+fmt106(best.t.wo.avg)+' vs '+fmt106(best.t.wi.avg)+' with him');
     }
     if(f&&f.sp){
       var home=/^vs /.test(r.when||''),lab=home?'Home':'Away';
@@ -15413,7 +15413,7 @@ function deepSync179(){
       var base=.45*ms+.35*mw+.2*md,sd=Math.sqrt(vs.reduce(function(t,v){return t+(v-ms)*(v-ms)},0)/Math.max(1,n-1)),cvE=ms>0?Math.max(.25,Math.min(.85,sd/ms)):CV[d.kind];
       var w0=n>=6?.75:1.5;
       d.avg=ms;d.g=Math.max(n,o.g);d.avgS=((n*base+w0*pr)/(n+w0))*B[d.kind];d.cv=(n*cvE+4*CV[d.kind])/(n+4);d.src0='log';d.l3=vs.slice(0,3).reduce(function(t,v){return t+v},0)/Math.min(3,n);d.nlog=n;
-      if(L[0].t&&nt(L[0].t)!==nt(d.t))d.t=nt(L[0].t);
+      var rt=teamNow180(d.n);if(rt)d.t=rt;else if(L[0].t&&nt(L[0].t)!==nt(d.t))d.t=nt(L[0].t);var nIn=L.filter(function(z){return nt(z.t)===nt(d.t)}).length;d.newTm=nIn<2&&n>=3;if(d.newTm){d.cv=Math.min(.95,(d.cv||CV[d.kind])*1.2)}
     }else{d.avg=o.avg;d.g=o.g;d.avgS=o.avgS*B[d.kind];d.cv=null;d.src0='season';d.nlog=n}
   });
   /* store this week's pre-game projections so results can grade them */
@@ -15534,6 +15534,126 @@ gradeProp=function(lg,cat,r,o,dir){
     ['CB Charles Woods:q','S Kevin Byard:q'].forEach(function(t){if(NE.items.indexOf(t)<0)NE.items.push(t)});
     NE.chg=['New England is expected to be without its top two running backs (TreVeyon Henderson and Rhamondre Stevenson), so Corey Kiner leads the backfield. Three offensive line starters are questionable and CB Carlton Davis is out.']}catch(e){}
 })();
+
+/* v239: current anytime-TD data (season touchdowns plus market prices), and trades applied to every team */
+var TRADES180={'Kirk Cousins':['LV','MIN'],'Jacoby Brissett':['ARI','BAL'],'J.J. McCarthy':['MIN','NYG'],'Keenan Allen':['IND','SF'],'Josh Downs':['IND','KC'],'Marvin Harrison Jr.':['ARI','HOU'],'Quenton Nelson':['IND','SEA'],'DeForest Buckner':['IND','SF'],'Jeffery Simmons':['TEN','CHI'],'Jessie Bates':['ATL','JAX'],'Jessie Bates III':['ATL','JAX'],'Jordan Davis':['PHI','JAX'],'Davon Godchaux':['NO','JAX'],'Andre Cisco':['NYJ','DET'],'Amani Hooker':['TEN','BUF'],'Joey Porter Jr.':['PIT','DAL'],'Cam Jurgens':['PHI','BAL'],'Ryan Neuzil':['ATL','BAL']};
+var _tr180={};Object.keys(TRADES180).forEach(function(n){_tr180[normName(n)]=TRADES180[n]});
+function teamNow180(n){
+  try{var k=nameKeys(n),t=S.rosWho&&(S.rosWho['nfl|'+k[0]]||S.rosWho['nfl|'+k[1]]);if(t)return nt(t)}catch(e){}
+  var x=_tr180[normName(n)];return x?x[1]:null;
+}
+function gone180(lg,team,n){
+  if(lg!=='nfl')return false;
+  var now=teamNow180(n);return !!(now&&nt(now)!==nt(team));
+}
+DEEP.forEach(function(d){var t=teamNow180(d.n);if(t&&t!==nt(d.t)){d.t=t;if(d.d0)d.d0.t=t}});
+var TD180="Bijan Robinson|ATL|9|5|0;Kenneth Walker III|KC|8|7|0;Jahmyr Gibbs|DET|8|9|2;Bucky Irving|TB|9|7|0;James Cook III|BUF|8|8|0;Jaylen Warren|PIT|8|2|1;Derrick Henry|BAL|9|8|0;Jonathan Taylor|IND|9|8|0;Javonte Williams|DAL|9|9|0;Chuba Hubbard|CAR|8|5|0;Braelon Allen|NYJ|9|3|0;Tony Pollard|TEN|8|6|0;Kyren Williams|LAR|9|6|1;D'Andre Swift|CHI|9|10|0;Bhayshul Tuten|JAX|8|4|0;Cam Skattebo|NYG|8|4|0;Aaron Jones Sr.|MIN|8|2|0;Ollie Gordon II|MIA|8|4|0;Christian McCaffrey|SF|8|9|1;Blake Corum|LAR|9|4|0;Emanuel Wilson|SEA|8|3|0;Rhamondre Stevenson|NE|9|2|2;Chase Brown|CIN|8|1|0;Quinshon Judkins|CLE|8|3|0;Tyler Allgeier|ARI|9|2|0;Omarion Hampton|LAC|8|3|0;Ashton Jeanty|LV|9|1|3;Woody Marks|HOU|8|2|0;J.K. Dobbins|DEN|9|3|0;Kyle Monangai|CHI|4|3|0;Kaelon Black|SF|8|1|0;Saquon Barkley|PHI|7|3|0;Josh Allen|BUF|8|9|0;Jayden Daniels|WAS|7|2|0;Rachaad White|WAS|8|1|0;Mike Washington Jr.|LV|9|1|0;Jeremiyah Love|ARI|6|1|0;Corey Kiner|NE|9|1|0;Justice Hill|BAL|9|1|0;Jacory Croskey-Merritt|WAS|5|2|0;Malik Willis|MIA|8|3|0;Chris Rodriguez Jr.|JAX|8|4|0;Breece Hall|NYJ|4|1|0;Drake Maye|NE|9|3|0;Deshaun Watson|CLE|8|1|0;Brian Robinson Jr.|ATL|6|4|0;Seth McGowan|IND|9|1|0;TreVeyon Henderson|NE|6|1|0;Brock Purdy|SF|8|2|0;Jonah Coleman|DEN|5|3|0;Jordan Mason|MIN|4|1|0;Samaje Perine|CIN|8|1|0;Rico Dowdle|PIT|5|1|0;Kaleb Johnson|GB|7|1|0;Tyler Shough|NO|8|2|0;Kimani Vidal|LAC|8|1|0;Kendre Miller|NO|6|2|0;Alvin Kamara|NO|7|2|0;MarShawn Lloyd|GB|8|2|0;Caleb Williams|CHI|6|2|0;Lamar Jackson|BAL|5|1|0;David Montgomery|HOU|5|2|0;George Holani|SEA|9|1|0;Bo Nix|DEN|9|2|0;Jaxon Smith-Njigba|SEA|9|0|9;CeeDee Lamb|DAL|9|0|7;Christian Watson|GB|9|0|7;Matthew Golden|GB|9|0|5;Tee Higgins|CIN|8|0|6;Chris Olave|NO|8|0|2;Puka Nacua|LAR|7|0|4;Drake London|ATL|9|0|1;Malik Nabers|NYG|9|0|2;Brock Bowers|LV|7|0|6;Amon-Ra St. Brown|DET|8|0|5;Ja'Marr Chase|CIN|8|0|7;Luther Burden III|CHI|9|0|4;Tetairoa McMillan|CAR|8|0|3;Zay Flowers|BAL|8|0|3;Trey McBride|ARI|9|0|5;Isaiah Likely|NYG|9|0|7;Michael Wilson|ARI|9|0|2;George Pickens|DAL|8|0|2;Tre Tucker|LV|9|0|4;Rome Odunze|CHI|9|0|1;Garrett Wilson|NYJ|8|0|3;Denzel Boston|CLE|9|0|3;Parker Washington|JAX|8|0|5;George Kittle|SF|8|0|5;Travis Kelce|KC|8|0|2;Davante Adams|LAR|6|0|4;Jameson Williams|DET|8|0|5;Harold Fannin Jr.|CLE|9|0|4;KC Concepcion Jr.|CLE|9|0|1;DeMario Douglas|NE|9|0|4;Dalton Kincaid|BUF|8|0|2;Mike Evans|SF|6|0|3;Carnell Tate|TEN|7|0|1;Khalil Shakir|BUF|8|0|1;Sam LaPorta|DET|8|0|3;Ryan Flournoy|DAL|9|0|2;Justin Jefferson|MIN|7|0|4;Jalen Coker|CAR|7|0|3;Michael Mayer|LV|9|0|1;Stefon Diggs|WAS|8|0|6;Nico Collins|HOU|6|0|4;DK Metcalf|PIT|8|0|1;Jakobi Meyers|JAX|8|0|2;Devaughn Vele|NO|8|0|3;Colston Loveland|CHI|9|0|2;Hunter Henry|NE|9|0|2;Brenton Strange|JAX|8|0|1;Josh Downs|KC|9|0|1;Jahan Dotson|ATL|9|0|2;Keenan Allen|SF|8|0|1;Tucker Kraft|GB|9|0|3;Malik Washington|MIA|8|0|1;Malachi Fields|NYG|9|0|1;Jaylen Waddle|DEN|9|0|2;Jaylin Noel|HOU|7|0|2;T.J. Hockenson|MIN|8|0|3;Antonio Williams|WAS|9|0|2;Kayshon Boutte|HOU|8|0|2;Makai Lemon|PHI|9|0|1;DeVonta Smith|PHI|4|0|2;Dallas Goedert|PHI|7|0|2;Omar Cooper Jr.|NYJ|5|0|2;Keon Coleman|BUF|8|0|3;Darren Waller|CAR|8|0|4;Caleb Douglas|MIA|5|0|2;Rashod Bateman|BAL|9|0|1;Rashee Rice|KC|6|0|2;Kalif Raymond|CHI|9|0|1;Juwan Johnson|NO|8|0|4;Tyler Higbee|LAR|9|0|1;Xavier Hutchinson|HOU|8|0|2;Ladd McConkey|LAC|6|0|1;DJ Moore|BUF|6|0|2;Dontayvion Wicks|PHI|6|0|1;Germie Bernard|PIT|8|0|1;Xavier Worthy|KC|8|0|1;Emeka Egbuka|TB|7|0|2;Jordan Addison|MIN|7|0|1;Tyler Warren|IND|7|0|2;Courtland Sutton|DEN|9|0|2;Adonai Mitchell|NYJ|5|0|1;Wan'Dale Robinson|TEN|8|0|3;Romeo Doubs|NE|6|0|3;Treylon Burks|WAS|7|0|2;Quentin Johnston|LAC|7|0|1;Darnell Washington|PIT|8|0|3;Tez Johnson|TB|9|0|1";
+var KAL180={'ashton jeanty':34,'emanuel wilson':9,'james cook iii':60,'mike washington jr':22,'kaelon black':24,'omarion hampton':13,'christian mccaffrey':70,'kyle juszczyk':12,'corey kiner':45,'aj barner':26,'braelon allen':33,'audric estime':35,'ty johnson':15,'quinshon judkins':33,'jordan watkins':23,'kyren williams':56,'ollie gordon ii':41,'alvin kamara':32,'george kittle':47,'ray davis':7,'demarcus robinson':20,'keenan allen':20,'chris rodriguez jr':35,'derrick henry':49,'jonathan taylor':54};
+var KALN180={'ashton jeanty':['Ashton Jeanty','LV'],'emanuel wilson':['Emanuel Wilson','SEA'],'james cook iii':['James Cook III','BUF'],'mike washington jr':['Mike Washington Jr.','LV'],'kaelon black':['Kaelon Black','SF'],'omarion hampton':['Omarion Hampton','LAC'],'christian mccaffrey':['Christian McCaffrey','SF'],'kyle juszczyk':['Kyle Juszczyk','SF'],'corey kiner':['Corey Kiner','NE'],'aj barner':['AJ Barner','SEA'],'braelon allen':['Braelon Allen','NYJ'],'audric estime':['Audric Estime','NO'],'ty johnson':['Ty Johnson','BUF'],'quinshon judkins':['Quinshon Judkins','CLE'],'jordan watkins':['Jordan Watkins','SF'],'kyren williams':['Kyren Williams','LAR'],'ollie gordon ii':['Ollie Gordon II','MIA'],'alvin kamara':['Alvin Kamara','NO'],'george kittle':['George Kittle','SF'],'ray davis':['Ray Davis','BUF'],'demarcus robinson':['Demarcus Robinson','SF'],'keenan allen':['Keenan Allen','SF'],'chris rodriguez jr':['Chris Rodriguez Jr.','JAX'],'derrick henry':['Derrick Henry','BAL'],'jonathan taylor':['Jonathan Taylor','IND']};
+try{
+  DATA.tds.asOf='Season touchdowns through Week 9 (read Nov 15), blended with prediction-market prices from Nov 12 where a price exists.';
+  DATA.tds.kal={src:'Prediction-market anytime TD prices for Week 10, as of Nov 12. Prices move, so check yours.',rows:Object.keys(KALN180).map(function(k){return [KALN180[k][0],KALN180[k][1],KAL180[k]]})};
+}catch(e){}
+var _td180=null,_td180K='';
+tdParse=function(){
+  var key=(S.feedAt||0)+'|'+((S.feed.nfl||[]).length)+'|'+(S.rosLAt||0);if(_td180&&_td180K===key)return _td180;
+  var out=[],seen={};
+  TD180.split(';').forEach(function(x){
+    var p=x.split('|');if(p.length<5)return;var n=p[0],t=teamNow180(n)||p[1],g=+p[2],tds=+p[3]+(+p[4]),k=normName(n);
+    if(seen[k])return;seen[k]=1;
+    try{if(!avail(n,t).show)return}catch(e){}
+    var nx=nextOpp(nt(t));if(!nx)return;
+    var lam=(tds+.3)/(g+1),pm=1-Math.exp(-lam),m=KAL180[k],pr=m!=null?.5*pm+.5*m/100:pm;
+    out.push({gm:nx.key||'',t:nt(t),n:n,h:pr*10,td:tds,g:g,cur:1,mk:m==null?null:m,rt:+p[3],ct:+p[4]});
+  });
+  Object.keys(KAL180).forEach(function(k){if(seen[k])return;var q=KALN180[k],nx=nextOpp(nt(q[1]));if(!nx)return;try{if(!avail(q[0],q[1]).show)return}catch(e){}
+    out.push({gm:nx.key||'',t:nt(q[1]),n:q[0],h:KAL180[k]/10,td:null,g:null,cur:1,mk:KAL180[k]})});
+  _td180=out;_td180K=key;return out;
+};
+var legList180=legList;
+legList=function(lg){
+  var L=legList180(lg);
+  if(lg!=='nfl')return L;
+  try{
+    var N=[];tdParse().forEach(function(r){var nx=nextOpp(nt(r.t));if(!nx||!nx.key)return;var o={p:null};try{o=ntdInfo(r)}catch(e){}var p=o.p!=null?o.p:r.h/10;
+      N.push({name:r.n,team:r.t,mk:'Anytime TD',p:p,src:(r.td!=null?r.td+' TD in '+r.g+' games this season':'No season line in the data')+(r.mk!=null?', market '+r.mk+'%':''),nx:{txt:nx.txt,opp:nx.opp,id:nx.key},kind:'td'})});
+    if(N.length)L=L.filter(function(l){return l.kind!=='td'}).concat(dropOut178('nfl',N,function(l){return l.name||''}));
+  }catch(e){}
+  return L;
+};
+
+/* v239 (part 2): market prices matched by full name, and what each trade does to both teams */
+var KALM181={};Object.keys(KALN180).forEach(function(k){KALM181[normName(KALN180[k][0])]=KAL180[k]});
+var _td181=null,_td181K='';
+tdParse=function(){
+  var key=(S.feedAt||0)+'|'+((S.feed.nfl||[]).length)+'|'+(S.rosLAt||0);if(_td181&&_td181K===key)return _td181;
+  var out=[],seen={};
+  TD180.split(';').forEach(function(x){
+    var p=x.split('|');if(p.length<5)return;var n=p[0],t=teamNow180(n)||p[1],g=+p[2],tds=+p[3]+(+p[4]),k=normName(n);
+    if(seen[k])return;seen[k]=1;
+    try{if(!avail(n,t).show)return}catch(e){}
+    var nx=nextOpp(nt(t));if(!nx)return;
+    var lam=(tds+.3)/(g+1),pm=1-Math.exp(-lam),m=KALM181[k],pr=m!=null?.5*pm+.5*m/100:pm;
+    out.push({gm:nx.key||'',t:nt(t),n:n,h:pr*10,td:tds,g:g,cur:1,mk:m==null?null:m,rt:+p[3],ct:+p[4]});
+  });
+  Object.keys(KALN180).forEach(function(k0){var q=KALN180[k0],k=normName(q[0]);if(seen[k])return;seen[k]=1;var t=teamNow180(q[0])||q[1],nx=nextOpp(nt(t));if(!nx)return;try{if(!avail(q[0],t).show)return}catch(e){}
+    out.push({gm:nx.key||'',t:nt(t),n:q[0],h:KAL180[k0]/10,td:null,g:null,cur:1,mk:KAL180[k0]})});
+  _td181=out;_td181K=key;return out;
+};
+
+/* every trade since the season started (positions and dates as reported) */
+var TRL181=[
+ ['J.J. McCarthy','QB','MIN','NYG','Sep 28'],['Joey Porter Jr.','CB','PIT','DAL','Oct 1'],['Cam Jurgens','C','PHI','BAL','Oct 7'],
+ ['Marvin Harrison Jr.','WR','ARI','HOU','Oct 12'],['DeForest Buckner','DL','IND','SF','Oct 27'],['Quenton Nelson','G','IND','SEA','Oct 27'],
+ ['Jeffery Simmons','DT','TEN','CHI','Oct 29'],['Jacoby Brissett','QB','ARI','BAL','Nov 6'],['Andre Cisco','S','NYJ','DET','Nov 9'],
+ ['Jessie Bates','S','ATL','JAX','Nov 9'],['Jordan Davis','DT','PHI','JAX','Nov 9'],['Davon Godchaux','DT','NO','JAX','Nov 9'],
+ ['Ryan Neuzil','C','ATL','BAL','Nov 10'],['Andrew Vorhees','OL','BAL','ATL','Nov 10'],['Josh Downs','WR','IND','KC','Nov 10'],
+ ['Kirk Cousins','QB','LV','MIN','Nov 10'],['Amani Hooker','S','TEN','BUF','Nov 10'],['Keenan Allen','WR','IND','SF','Nov 10']
+];
+TRL181.forEach(function(r){if(!_tr180[normName(r[0])])_tr180[normName(r[0])]=[r[2],r[3]]});
+function trAt181(r){return Date.parse(r[4]+' 2026 12:00')||0}
+/* games a player has played for his new team, from the box scores */
+function trGames181(name,team){
+  try{var L=pbIdx('nfl').P[normName(name)]||[];return L.filter(function(x){return nt(x.t)===nt(team)}).length}catch(e){return 0}
+}
+var TRKIND181={WR:'rec',TE:'rec',RB:'rush'};
+/* after the baselines are rebuilt: keep traded players on their new team, discount a new arrival until he has played there,
+   and give the departed player's share to the teammates left behind */
+var _t181K=null,deepSync181=deepSync179;
+deepSync179=function(){
+  deepSync181.apply(this,arguments);
+  if(_t181K===_s179K)return;_t181K=_s179K;
+  try{
+    DEEP.forEach(function(d){var t=teamNow180(d.n);if(t&&t!==nt(d.t))d.t=t;d.tr=null});
+    TRL181.forEach(function(r){
+      var ng=trGames181(r[0],r[3]);if(ng>=2)return;
+      DEEP.forEach(function(d){if(normName(d.n)!==normName(r[0]))return;d.avgS*=r[1]==='QB'?.95:.92;d.cv=(d.cv||CV[d.kind])*1.15;d.tr={from:r[2],to:r[3],at:r[4],ng:ng}});
+      var kd=TRKIND181[r[1]];if(!kd)return;
+      var gone=DEEP.filter(function(d){return d.kind===kd&&normName(d.n)===normName(r[0])})[0];if(!gone)return;
+      var left=DEEP.filter(function(d){return d.kind===kd&&nt(d.t)===nt(r[2])&&normName(d.n)!==normName(r[0])&&d.g>=3});
+      var tot=Math.max(120,left.reduce(function(s,d){return s+d.avgS},0));
+      var share=(gone.d0?gone.d0.avg:gone.avg)*.5;
+      left.forEach(function(d){var add=Math.min(share*d.avgS/tot,.25*d.avgS);d.avgS+=add;d.trUp=(d.trUp||0)+add;d.trWhy=r[0]+' was traded to '+r[3]})
+    });
+  }catch(e){}
+};
+/* game window: what the trades mean for each team */
+function tradeCard181(g){
+  if(g.lg!=='nfl')return '';
+  var A=nt(g.a),H=nt(g.h),rows=[];
+  [[A,shortNm(g,'a')],[H,shortNm(g,'h')]].forEach(function(s){
+    var inn=TRL181.filter(function(r){return r[3]===s[0]}),out=TRL181.filter(function(r){return r[2]===s[0]});
+    if(!inn.length&&!out.length)return;
+    var lines=[];
+    inn.forEach(function(r){var ng=trGames181(r[0],r[3]);lines.push('<li><b>Added</b> '+esc(r[1]+' '+r[0])+' from '+esc(r[2])+' ('+esc(r[4])+'). '+(ng>=2?'He has played '+ng+' games for them, so his numbers already reflect the new team.':r[1]==='QB'?'A new quarterback with little time to learn the offense. The passing game can be uneven at first, so receivers are less predictable.':/^(WR|TE|RB)$/.test(r[1])?'He has '+(ng?'one game':'no games')+' with them yet, so the app trims his projection until he settles in.':'Helps the '+(/^(DT|DL|DE|EDGE|LB)$/.test(r[1])?'run defense and pass rush':/^(CB|S)$/.test(r[1])?'secondary':'offensive line')+'.')+'</li>')});
+    out.forEach(function(r){var ng=trGames181(r[0],r[3]);lines.push('<li><b>Lost</b> '+esc(r[1]+' '+r[0])+' to '+esc(r[3])+' ('+esc(r[4])+'). '+(/^(WR|TE|RB)$/.test(r[1])?(ng>=2?'Their numbers since already show his absence.':'His share of the offense moves to the players left, and the app raises their projections.'):r[1]==='QB'?'The quarterback room changed.':'A thinner '+(/^(DT|DL|DE|EDGE|LB)$/.test(r[1])?'defensive front':/^(CB|S)$/.test(r[1])?'secondary':'offensive line')+'.')+'</li>')});
+    rows.push('<p style="margin:6px 0 2px"><b>'+esc(s[1])+'</b></p><ul class="pts" style="margin:0">'+lines.join('')+'</ul>');
+  });
+  if(!rows.length)return '';
+  return '<h3>Trades this season</h3><div class="card" style="padding:10px 12px">'+rows.join('')+'<p class="src" style="margin:6px 0 0">Rosters refresh from the live team lists every few hours, so later moves and signings show up there.</p></div>';
+}
+var keyCard181=keyCard;
+keyCard=function(g){var h='';try{h=keyCard181.apply(this,arguments)||''}catch(e){}var t='';try{t=tradeCard181(g)}catch(e){}return h+t};
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
