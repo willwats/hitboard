@@ -451,7 +451,7 @@ PROPS.forEach(function(p){p.avg=p.total/p.g;p.gm=gameById(p.game)});
 function calc(p,line,oo,uo,adj){
   var mu=p.avg*(1+adj/100),sd,pu;
   if(PXPOIS[p.kind]){sd=Math.sqrt(mu);pu=0;var top=Math.floor(line+1e-9);for(var k=0;k<=top;k++)pu+=pois(mu,k);pu=Math.min(1,pu)}
-  else{var cv=CV[p.kind]*(p.g<3?1.3:1);sd=Math.max(cv*mu,.8);pu=Phi((line-mu)/sd)}
+  else{var cv=(p.cv||CV[p.kind])*(p.g<3?1.3:1);sd=Math.max(cv*mu,.8);pu=Phi((line-mu)/sd)}
   var po=1-pu,nvo=nov(oo,uo);
   return {mu:mu,sd:sd,po:po,pu:pu,nvo:nvo,eo:po-nvo,eu:pu-(1-nvo)};
 }
@@ -1621,8 +1621,8 @@ function analyzeBet(b){
     if(!d)return {p:null,note:'This player and stat are not on the 2026 yardage board (passing, rushing and receiving yards), so there is no model chance. You can still save the bet to track it.'};
     if(!isFinite(line))return {p:null,note:'Enter the line.'};
     var nx=nextOpp(nt(d.t)),pct=0;
-    if(nx&&TS[nx.opp]){var dm=d.kind==='rush'?'drush':'dpass',la=leagueAvg(dm),f=mv(nx.opp,dm)/la;pct=Math.max(-12,Math.min(12,(f-1)*50))}
-    var c=calc({avg:d.avgS,kind:d.kind,g:d.g},line,-110,-110,pct);
+    if(nx&&(TS[nx.opp]||defOk179(nx.opp))){pct=defPctNfl(nx.opp,d.kind)}
+    var c=calc({avg:d.avgS,kind:d.kind,g:d.g,cv:d.cv},line,-110,-110,pct);
     return {p:b.side==='over'?c.po:c.pu,note:d.n+' projects '+c.mu.toFixed(1)+' '+d.stat.toLowerCase()+(nx?' against '+nx.opp:'')+'. Normal-curve estimate from his 2026 average.',game:nx?nx.key:d.t,lg:'nfl',proj:c.mu};
   }
   var g=find(b.gid);if(!g)return {p:null,note:'Pick the game.'};
@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v237, Nov 15';
+var BUILD='v238, Nov 15';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -2616,15 +2616,15 @@ function injHtml(lg,teams){
 var COV={CLE:[44.4,51.9],CHI:[31.5,64.9],IND:[29.2,63.6],NE:[28.3,65],NYG:[28.1,67.5],CIN:[28,62.5],DEN:[23.5,70.5],NYJ:[22.1,68.8],JAX:[21.8,72.8],DAL:[21.3,70.3],LAR:[21.1,71.1],KC:[20.8,76.9],LV:[19.8,74],ATL:[19.3,72.5],TB:[19.1,76.3],MIA:[18.3,73.7],BAL:[17.4,76.5],DET:[16.4,77.7],PHI:[15.4,75.3],WAS:[14.6,76],GB:[14.6,76.8],BUF:[13.7,77.7],HOU:[13.4,83.4],TEN:[13.2,79.5],LAC:[13.2,75.2],SF:[11.9,84.3],PIT:[11.1,83.2],ARI:[10.5,79.6],CAR:[9.7,85.1],NO:[9.2,80.4],MIN:[5,85.4],SEA:[5,89.8]};
 var COV_SRC='Coverage rates: Sharp Football Analysis, 2026 season to date (the page gives no as-of date; read Oct 18).';
 var TM={GNB:'GB',KAN:'KC',LVR:'LV',NOR:'NO',NWE:'NE',SFO:'SF',TAM:'TB'};
-var DEEPSRC={asOf:'Pro Football Reference 2026 season totals, read Oct 18',rec:"Jaxon Smith-Njigba|SEA|WR|6|66|49|717|7;Trey McBride|ARI|TE|5|56|42|308|3;CeeDee Lamb|DAL|WR|5|51|39|507|4;Chris Olave|NOR|WR|5|54|39|537|1;Amon-Ra St. Brown|DET|WR|5|57|37|372|5;Isaiah Likely|NYG|TE|5|48|33|284|4;Puka Nacua|LAR|WR|3|45|31|337|1;Garrett Wilson|NYJ|WR|5|42|31|374|3;Tyler Warren|IND|TE|5|36|30|213|2;Malik Nabers|NYG|WR|5|46|29|329|2;Michael Wilson|ARI|WR|5|51|29|288|1;Davante Adams|LAR|WR|5|45|27|441|4;Ja'Marr Chase|CIN|WR|5|38|27|289|4;Jahmyr Gibbs|DET|RB|5|34|27|243|2;Tee Higgins|CIN|WR|5|43|27|423|1;Sam LaPorta|DET|TE|5|37|27|316|3;Drake London|ATL|WR|5|37|27|488|0;George Pickens|DAL|WR|5|41|27|355|1;Kyren Williams|LAR|RB|5|33|27|200|1;Zay Flowers|BAL|WR|4|31|26|405|2;Tetairoa McMillan|CAR|WR|4|39|26|385|2;Christian Watson|GNB|WR|5|40|26|474|6;Juwan Johnson|NOR|TE|5|32|25|248|3;Devaughn Vele|NOR|WR|5|37|25|252|2;Brock Bowers|LVR|TE|3|35|24|312|3;Chase Brown|CIN|RB|5|28|24|124|0;Mike Evans|SFO|WR|5|34|24|326|3;Matthew Golden|GNB|WR|5|44|24|397|2;Kalif Raymond|CHI|WR|5|27|24|226|1;Dalton Schultz|HOU|TE|5|31|24|244|0;Luther Burden|CHI|WR|5|35|23|266|1;RJ Harvey|DEN|RB|5|26|23|163|0;T.J. Hockenson|MIN|TE|5|27|23|202|1;Carnell Tate|TEN|WR|5|37|23|274|0;Malik Washington|MIA|WR|5|36|23|262|0;Mark Andrews|BAL|TE|5|30|22|177|1;Ashton Jeanty|LVR|RB|5|30|22|215|2;Wan'Dale Robinson|TEN|WR|5|30|22|176|2;Jaylen Waddle|DEN|WR|6|38|22|228|1;Parker Washington|JAX|WR|5|35|22|352|4;Emeka Egbuka|TAM|WR|5|33|21|192|1;George Kittle|SFO|TE|5|28|21|268|4;Michael Mayer|LVR|TE|5|25|21|171|1;Brenton Strange|JAX|TE|5|26|21|235|1;Josh Downs|IND|WR|5|34|20|249|0;Tyler Higbee|LAR|TE|5|25|20|224|1;Tucker Kraft|GNB|TE|5|29|20|212|1;Nico Collins|HOU|WR|3|25|19|249|3;Pat Freiermuth|PIT|TE|5|26|19|169|4;Chris Godwin|TAM|WR|5|21|19|179|0;Justin Jefferson|MIN|WR|4|24|19|258|3;Christian McCaffrey|SFO|RB|5|25|19|137|0;D.K. Metcalf|PIT|WR|5|37|19|225|1;DeVonta Smith|PHI|WR|3|27|19|235|1;Tre Tucker|LVR|WR|5|28|19|274|1;Jaylen Warren|PIT|RB|5|26|19|230|1;Keenan Allen|IND|WR|4|29|18|145|1;Jalen Coker|CAR|WR|3|22|18|222|2;KC Concepcion|CLE|WR|5|29|18|149|0;Stefon Diggs|WAS|WR|4|31|18|170|3;Harold Fannin|CLE|TE|5|27|18|157|3;Quinshon Judkins|CLE|RB|5|20|18|102|0;Cade Otton|TAM|TE|5|27|18|182|0;Bijan Robinson|ATL|RB|5|25|18|152|1;Khalil Shakir|BUF|WR|5|26|18|256|0;Jameson Williams|DET|WR|5|29|18|276|2;Kendrick Bourne|ARI|WR|5|22|17|178|0;Rome Odunze|CHI|WR|5|29|17|273|0;Dontayvion Wicks|PHI|WR|5|28|17|260|1;Javonte Williams|DAL|RB|5|20|17|94|1;Rashod Bateman|BAL|WR|5|21|16|233|1;Denzel Boston|CLE|WR|5|29|16|330|3;Ryan Flournoy|DAL|WR|5|27|16|194|0;Xavier Hutchinson|HOU|WR|5|31|16|231|0;Travis Kelce|KAN|TE|4|22|16|246|2;Dalton Kincaid|BUF|TE|5|27|16|277|1;Cooper Kupp|SEA|WR|6|25|16|179|1;Deebo Samuel|SFO|WR|5|20|16|206|3;AJ Barner|SEA|TE|6|24|15|138|0;Keon Coleman|BUF|WR|5|18|15|224|2;Jake Ferguson|DAL|TE|5|21|15|102|3;Tre Harris|LAC|WR|5|25|15|225|0;Hunter Henry|NWE|TE|5|19|15|177|1;Mack Hollins|NWE|WR|4|20|15|209|0;Bucky Irving|TAM|RB|5|18|15|71|1;Makai Lemon|PHI|WR|5|22|15|108|0;Jakobi Meyers|JAX|WR|5|18|15|202|2;Rhamondre Stevenson|NWE|RB|5|19|15|111|0;Antonio Williams|WAS|WR|5|22|15|155|1;Terry McLaurin|WAS|WR|4|26|14|203|1;Kenyon Sadiq|NYJ|TE|5|21|14|146|1;Rashid Shaheed|SEA|WR|6|27|14|162|0;Tyjae Spears|TEN|RB|5|16|14|68|0;D'Andre Swift|CHI|RB|5|17|14|114|0;Roman Wilson|PIT|WR|5|25|14|188|2;Xavier Worthy|KAN|WR|4|22|14|133|1;Germie Bernard|PIT|WR|5|20|13|140|0;Romeo Doubs|NWE|WR|5|23|13|219|2;DeMario Douglas|NWE|WR|5|22|13|147|2;Greg Dulcich|MIA|TE|5|17|13|127|0;Alvin Kamara|NOR|RB|4|16|13|41|0;Colston Loveland|CHI|TE|5|23|13|110|0;Dohnte Meyers|CIN|WR|5|18|13|141|0;Jaylin Noel|HOU|WR|5|17|13|227|1;Rashee Rice|KAN|WR|4|17|13|190|1;Courtland Sutton|DEN|WR|6|28|13|123|1;Jonathan Taylor|IND|RB|5|19|13|106|0;Darren Waller|CAR|TE|4|19|13|148|2;Kayshon Boutte|HOU|WR|5|18|12|153|0;Evan Engram|DEN|TE|6|19|12|134|1;Mike Gesicki|CIN|TE|5|17|12|159|4;Aaron Jones|MIN|RB|5|18|12|72|0;Ladd McConkey|LAC|WR|4|17|12|183|1;D.J. Moore|BUF|WR|4|20|12|178|1;Kenneth Walker III|KAN|RB|4|19|12|84|2;Jordan Addison|MIN|WR|4|22|11|163|1;Dallas Goedert|PHI|TE|3|17|11|119|2;Tyquan Thornton|KAN|WR|4|15|11|219|2;Laquon Treadwell|IND|WR|5|19|11|157|0;Darnell Washington|PIT|TE|5|16|11|131|1;Isaiah Williams|NYJ|WR|5|14|11|151|1;Malachi Fields|NYG|WR|5|17|10|146|1;Kyle Pitts|ATL|TE|5|15|10|109|1;Pat Bryant|DEN|WR|4|12|9|133|1;Noah Fant|NOR|TE|4|13|9|73|3;Oronde Gadsden II|LAC|TE|5|16|9|86|1;Isaac TeSlaa|DET|WR|5|19|9|187|0;Brian Thomas|JAX|WR|5|18|9|105|1",rush:"Derrick Henry|BAL|RB|5|113|476|7;Jahmyr Gibbs|DET|RB|5|105|504|7;Bijan Robinson|ATL|RB|5|102|580|4;Jonathan Taylor|IND|RB|5|101|398|6;Aaron Jones|MIN|RB|5|97|410|2;James Cook|BUF|RB|5|95|532|5;Ashton Jeanty|LVR|RB|5|88|291|0;Kenneth Walker III|KAN|RB|4|87|537|4;Emanuel Wilson|SEA|RB|6|87|303|2;Bhayshul Tuten|JAX|RB|5|82|349|2;J.K. Dobbins|DEN|RB|6|81|270|2;Cam Skattebo|NYG|RB|5|81|294|1;D'Andre Swift|CHI|RB|5|78|354|4;Bucky Irving|TAM|RB|5|77|406|2;Javonte Williams|DAL|RB|5|74|276|6;Omarion Hampton|LAC|RB|5|73|271|3;Quinshon Judkins|CLE|RB|5|73|221|1;Chase Brown|CIN|RB|5|71|246|1;Jaylen Warren|PIT|RB|5|70|410|1;Kyren Williams|LAR|RB|5|70|343|4;Tony Pollard|TEN|RB|5|68|273|1;Jacory Croskey-Merritt|WAS|RB|5|67|239|2;Jeremiyah Love|ARI|RB|5|67|245|1;Chuba Hubbard|CAR|RB|4|61|306|3;Christian McCaffrey|SFO|RB|5|61|286|5;Kyle Monangai|CHI|RB|4|60|324|3;Braelon Allen|NYJ|RB|5|57|236|2;Rhamondre Stevenson|NWE|RB|5|57|227|2;David Montgomery|HOU|RB|5|52|138|2;Breece Hall|NYJ|RB|3|51|163|1;Brian Robinson Jr.|ATL|RB|5|51|210|4;Ollie Gordon|MIA|RB|5|47|236|3;Josh Allen|BUF|QB|5|43|239|8;Woody Marks|HOU|RB|5|43|149|2;TreVeyon Henderson|NWE|RB|4|42|163|1;MarShawn Lloyd|GNB|RB|5|40|112|2;Blake Corum|LAR|RB|5|38|181|1;Kaelon Black|SFO|RB|5|37|136|0;Deshaun Watson|CLE|QB|5|37|167|0;Saquon Barkley|PHI|RB|4|36|182|0;Tyler Allgeier|ARI|RB|5|35|119|1;De'Von Achane|MIA|RB|3|34|127|0;Keaton Mitchell|LAC|RB|5|33|135|0;George Holani|SEA|RB|6|31|97|1;Travis Etienne|NOR|RB|3|30|128|0;Drake Maye|NWE|QB|5|30|161|1;Kendre Miller|NOR|RB|4|29|83|2;Rachaad White|WAS|RB|4|29|118|0;Tank Bigsby|PHI|RB|4|28|91|1;Alvin Kamara|NOR|RB|4|28|86|2;Jadarian Price|SEA|RB|3|28|119|0;Chris Rodriguez|JAX|RB|5|28|113|2;Najee Harris|NYG|RB|4|27|97|0;Kaleb Johnson|GNB|RB|5|27|106|0;Samaje Perine|CIN|RB|5|27|110|0;Malik Willis|MIA|QB|5|27|186|2;Brock Purdy|SFO|QB|5|25|128|1;Mike Washington Jr.|LVR|RB|5|25|125|1;Justin Herbert|LAC|QB|5|24|142|0;Jalen Hurts|PHI|QB|5|23|107|1;Jayden Daniels|WAS|QB|3|21|203|2;RJ Harvey|DEN|RB|5|21|81|1;Corey Kiner|NWE|RB|5|20|81|0;Lamar Jackson|BAL|QB|4|19|144|1;Justice Hill|BAL|RB|5|18|133|0",pass:"Matthew Stafford|LAR|5|139|216|1572|9|6;Jared Goff|DET|5|128|191|1485|12|0;Jordan Love|GNB|5|112|185|1408|10|3;C.J. Stroud|HOU|5|119|185|1402|6|0;Dak Prescott|DAL|5|129|192|1381|9|3;Joe Burrow|CIN|5|135|189|1361|11|3;Tyler Shough|NOR|5|137|205|1299|9|5;Kirk Cousins|LVR|5|112|172|1269|12|4;Bryce Young|CAR|4|101|162|1268|9|2;Josh Allen|BUF|5|91|138|1249|7|4;Aaron Rodgers|PIT|5|110|184|1234|10|4;Drake Maye|NWE|5|99|151|1228|8|7;Brock Purdy|SFO|5|98|142|1196|13|2;Trevor Lawrence|JAX|5|96|143|1174|10|3;Jacoby Brissett|ARI|5|132|199|1110|9|5;Geno Smith|NYJ|5|102|147|1084|6|0;Bo Nix|DEN|6|114|189|1049|6|3;Patrick Mahomes|KAN|4|82|128|1037|9|2;Sam Darnold|SEA|5|90|149|1033|7|7;Daniel Jones|IND|5|108|176|1021|3|4;Deshaun Watson|CLE|5|95|148|1010|7|2;Lamar Jackson|BAL|4|68|96|967|6|1;Justin Herbert|LAC|5|85|143|937|5|7;Jalen Hurts|PHI|5|89|154|933|8|3;Cam Ward|TEN|5|98|155|896|3|3;Malik Willis|MIA|5|73|130|849|2|4;Jameis Winston|NYG|4|76|132|805|6|3;Michael Penix|ATL|3|52|77|719|3|1;Kyler Murray|MIN|4|69|101|662|2|2;Baker Mayfield|TAM|3|61|96|615|2|2;Jayden Daniels|WAS|3|46|76|459|3|0;Caleb Williams|CHI|2|36|55|407|2|1"};
+var DEEPSRC={asOf:'NFL season totals through Week 9, read Nov 15',rec:"Jaxon Smith-Njigba|SEA|WR|9|99|71|1036|9;CeeDee Lamb|DAL|WR|9|108|70|904|7;Christian Watson|GB|WR|9|74|49|879|7;Matthew Golden|GB|WR|9|92|53|783|5;Tee Higgins|CIN|WR|8|67|48|758|6;Chris Olave|NO|WR|8|83|56|734|2;Puka Nacua|LAR|WR|7|93|70|715|4;Drake London|ATL|WR|9|68|44|692|1;Malik Nabers|NYG|WR|9|85|58|692|2;Brock Bowers|LV|TE|7|70|48|658|6;Amon-Ra St. Brown|DET|WR|8|86|61|657|5;Ja'Marr Chase|CIN|WR|8|73|53|647|7;Luther Burden III|CHI|WR|9|66|49|644|4;Tetairoa McMillan|CAR|WR|8|71|46|625|3;Zay Flowers|BAL|WR|8|64|43|614|3;Trey McBride|ARI|TE|9|94|73|598|5;Isaiah Likely|NYG|TE|9|80|55|575|7;Michael Wilson|ARI|WR|9|88|51|546|2;George Pickens|DAL|WR|8|62|39|533|2;Tre Tucker|LV|WR|9|56|33|529|4;Rome Odunze|CHI|WR|9|51|32|528|1;Garrett Wilson|NYJ|WR|8|63|43|527|3;Denzel Boston|CLE|WR|9|61|32|507|3;Parker Washington|JAX|WR|8|55|29|493|5;George Kittle|SF|TE|8|53|38|483|5;Travis Kelce|KC|TE|8|48|33|482|2;Davante Adams|LAR|WR|6|49|30|480|4;Jameson Williams|DET|WR|8|46|28|468|5;Harold Fannin Jr.|CLE|TE|9|53|37|453|4;KC Concepcion Jr.|CLE|WR|9|55|37|437|1;DeMario Douglas|NE|WR|9|46|31|434|4;Dalton Kincaid|BUF|TE|8|38|30|429|2;Mike Evans|SF|WR|6|39|27|420|3;Carnell Tate|TEN|WR|7|51|34|413|1;Khalil Shakir|BUF|WR|8|42|31|412|1;Sam LaPorta|DET|TE|8|49|35|399|3;Ryan Flournoy|DAL|WR|9|47|32|395|2;Justin Jefferson|MIN|WR|7|51|31|393|4;Jalen Coker|CAR|WR|7|49|31|393|3;Michael Mayer|LV|TE|9|46|39|388|1;Stefon Diggs|WAS|WR|8|59|36|386|6;Nico Collins|HOU|WR|6|39|28|384|4;DK Metcalf|PIT|WR|8|64|33|378|1;Jakobi Meyers|JAX|WR|8|37|26|374|2;Ashton Jeanty|LV|RB|9|55|42|371|3;Devaughn Vele|NO|WR|8|52|35|365|3;Dalton Schultz|HOU|TE|8|47|35|364|0;Colston Loveland|CHI|TE|9|57|37|363|2;Hunter Henry|NE|TE|9|37|32|361|2;Brenton Strange|JAX|TE|8|37|30|356|1;Josh Downs|IND|WR|9|57|33|354|1;Jahan Dotson|ATL|WR|9|33|16|353|2;Keenan Allen|IND|WR|8|58|40|351|1;Tucker Kraft|GB|TE|9|52|36|351|3;Malik Washington|MIA|WR|8|48|33|350|1;Malachi Fields|NYG|WR|9|39|22|350|1;Jaylen Waddle|DEN|WR|9|52|30|337|2;Jaylin Noel|HOU|WR|7|23|19|331|2;T.J. Hockenson|MIN|TE|8|44|35|328|3;Antonio Williams|WAS|WR|9|41|28|326|2;Kayshon Boutte|HOU|WR|8|28|19|319|2;Makai Lemon|PHI|WR|9|54|37|312|1;DeVonta Smith|PHI|WR|4|41|26|310|2;Dallas Goedert|PHI|TE|7|42|31|308|2;Omar Cooper Jr.|NYJ|WR|5|24|20|306|2;Keon Coleman|BUF|WR|8|33|23|304|3;Darren Waller|CAR|TE|8|35|23|299|4;Caleb Douglas|MIA|WR|5|27|19|296|2;Rashod Bateman|BAL|WR|9|31|20|294|1;Jaylen Warren|PIT|RB|8|36|25|294|1;Rashee Rice|KC|WR|6|32|25|292|2;Kalif Raymond|CHI|WR|9|41|32|290|1;Juwan Johnson|NO|TE|8|39|28|289|4;Tyler Higbee|LAR|TE|9|39|28|287|1;Xavier Hutchinson|HOU|WR|8|45|24|287|2;Ladd McConkey|LAC|WR|6|24|17|286|1;DJ Moore|BUF|WR|6|32|19|285|2;Jahmyr Gibbs|DET|RB|8|45|34|285|2;Dontayvion Wicks|PHI|WR|6|32|19|284|1;Germie Bernard|PIT|WR|8|42|32|284|1;Xavier Worthy|KC|WR|8|47|33|278|1;Emeka Egbuka|TB|WR|7|54|31|278|2;Jordan Addison|MIN|WR|7|36|18|277|1;Tyler Warren|IND|TE|7|53|38|275|2;Christian McCaffrey|SF|RB|8|45|36|270|1;Greg Dulcich|MIA|TE|8|32|24|270|0;Courtland Sutton|DEN|WR|9|46|25|266|2;Adonai Mitchell|NYJ|WR|5|34|16|265|1;Kendrick Bourne|ARI|WR|8|38|26|263|0;Chig Okonkwo|WAS|TE|7|39|27|263|0;Wan'Dale Robinson|TEN|WR|8|50|35|262|3;Tre' Harris|LAC|WR|7|35|21|262|0;Romeo Doubs|NE|WR|6|24|14|261|3;Treylon Burks|WAS|WR|7|25|14|260|2;Quentin Johnston|LAC|WR|7|30|13|260|1;Chris Godwin Jr.|TB|WR|9|38|29|259|0;Rhamondre Stevenson|NE|RB|9|31|26|258|2;Kyren Williams|LAR|RB|9|46|36|258|1;Darnell Washington|PIT|TE|8|28|19|254|3;Tez Johnson|TB|WR|9|20|11|254|1",rush:"Bijan Robinson|ATL|RB|9|169|880|5;Kenneth Walker III|KC|RB|8|159|872|7;Jahmyr Gibbs|DET|RB|8|177|847|9;Bucky Irving|TB|RB|9|167|825|7;James Cook III|BUF|RB|8|169|814|8;Jaylen Warren|PIT|RB|8|119|704|2;Derrick Henry|BAL|RB|9|175|689|8;Jonathan Taylor|IND|RB|9|161|656|8;Javonte Williams|DAL|RB|9|154|629|9;Chuba Hubbard|CAR|RB|8|134|619|5;Braelon Allen|NYJ|RB|9|120|598|3;Tony Pollard|TEN|RB|8|133|595|6;Kyren Williams|LAR|RB|9|127|593|6;D'Andre Swift|CHI|RB|9|155|576|10;Bhayshul Tuten|JAX|RB|8|122|521|4;Cam Skattebo|NYG|RB|8|116|496|4;Aaron Jones Sr.|MIN|RB|8|115|474|2;Ollie Gordon II|MIA|RB|8|107|463|4;Christian McCaffrey|SF|RB|8|102|457|9;Blake Corum|LAR|RB|9|86|447|4;Emanuel Wilson|SEA|RB|8|111|403|3;Rhamondre Stevenson|NE|RB|9|102|399|2;Chase Brown|CIN|RB|8|103|397|1;Quinshon Judkins|CLE|RB|8|116|385|3;Tyler Allgeier|ARI|RB|9|89|369|2;Omarion Hampton|LAC|RB|8|102|369|3;Ashton Jeanty|LV|RB|9|114|362|1;Woody Marks|HOU|RB|8|95|341|2;J.K. Dobbins|DEN|RB|9|98|324|3;Kyle Monangai|CHI|RB|4|60|324|3;Kenny Gainwell|TB|RB|9|63|305|0;Kaelon Black|SF|RB|8|68|303|1;Saquon Barkley|PHI|RB|7|69|296|3;Josh Allen|BUF|QB|8|61|285|9;Jayden Daniels|WAS|QB|7|42|280|2;Rachaad White|WAS|RB|8|65|275|1;Mike Washington Jr.|LV|RB|9|71|275|1;Jeremiyah Love|ARI|RB|6|76|268|1;Corey Kiner|NE|RB|9|50|244|1;Justice Hill|BAL|RB|9|33|240|1;Jacory Croskey-Merritt|WAS|RB|5|67|239|2;Malik Willis|MIA|QB|8|38|232|3;Chris Rodriguez Jr.|JAX|RB|8|55|228|4;Breece Hall|NYJ|RB|4|66|224|1;Drake Maye|NE|QB|9|47|219|3;Deshaun Watson|CLE|QB|8|51|217|1;Brian Robinson Jr.|ATL|RB|6|53|211|4;Seth McGowan|IND|RB|9|43|208|1;TreVeyon Henderson|NE|RB|6|52|203|1;Brock Purdy|SF|QB|8|39|201|2;Jonah Coleman|DEN|RB|5|47|191|3;Justin Herbert|LAC|QB|8|34|190|0;Jordan Mason|MIN|RB|4|44|182|1;Samaje Perine|CIN|RB|8|46|179|1;Keaton Mitchell|LAC|RB|8|46|178|0;Rico Dowdle|PIT|RB|5|46|174|1;Kaleb Johnson|GB|RB|7|42|172|1;Jadarian Price|SEA|RB|5|47|172|0;Bam Knight|ARI|RB|8|28|168|0;Kyler Murray|MIN|QB|6|29|167|0;Tyler Goodson|DAL|RB|7|40|163|0;Tyler Shough|NO|QB|8|34|162|2;Kimani Vidal|LAC|RB|8|36|162|1;Kendre Miller|NO|RB|6|57|159|2;Alvin Kamara|NO|RB|7|47|157|2;MarShawn Lloyd|GB|RB|8|57|149|2;Caleb Williams|CHI|QB|6|31|145|2;Lamar Jackson|BAL|QB|5|19|144|1;David Montgomery|HOU|RB|5|52|138|2;Sione Vaki|DET|RB|8|30|135|0;Travis Etienne Jr.|NO|RB|3|30|128|0;De'Von Achane|MIA|RB|3|34|127|0;Jalon Daniels|TB|QB|5|22|123|0;George Holani|SEA|RB|9|37|117|1;Bo Nix|DEN|QB|9|37|116|2",pass:"Jordan Love|GB|9|215|341|2618|19|6;Joe Burrow|CIN|8|219|296|2386|23|6;Dak Prescott|DAL|9|218|336|2381|16|5;Matthew Stafford|LAR|9|230|346|2374|16|9;Kirk Cousins|MIN|9|202|315|2340|20|8;Drake Maye|NE|9|178|272|2282|18|11;C.J. Stroud|HOU|8|181|282|2251|16|2;Bryce Young|CAR|8|186|308|2197|16|6;Jared Goff|DET|8|185|273|2134|15|2;Geno Smith|NYJ|9|183|271|2078|12|3;Patrick Mahomes|KC|8|177|263|2037|14|4;Josh Allen|BUF|8|156|236|2027|12|6;Tyler Shough|NO|8|204|308|1986|14|6;Brock Purdy|SF|8|163|236|1980|17|5;Trevor Lawrence|JAX|8|146|224|1932|18|4;Aaron Rodgers|PIT|8|175|288|1871|13|6;Deshaun Watson|CLE|8|163|249|1806|7|3;Bo Nix|DEN|9|174|287|1730|11|4;Daniel Jones|IND|9|182|302|1722|6|10;Jacoby Brissett|BAL|8|193|305|1719|10|7;Justin Herbert|LAC|8|144|235|1591|6|11;Caleb Williams|CHI|6|134|195|1546|8|5;Jayden Daniels|WAS|7|138|213|1499|10|2;Cam Ward|TEN|8|155|248|1483|6|5;Sam Darnold|SEA|7|127|211|1478|10|9;Michael Penix Jr.|ATL|7|124|199|1444|10|6;Malik Willis|MIA|8|121|208|1396|6|6;Jameis Winston|NYG|8|96|166|1028|8|5;Kyler Murray|MIN|6|100|154|1022|5|3;Lamar Jackson|BAL|5|68|97|967|6|1;Jalen Hurts|PHI|5|89|154|933|8|3;Baker Mayfield|TB|6|86|142|922|3|4;J.J. McCarthy|NYG|5|66|104|915|2|2;Tyler Huntley|BAL|5|76|110|727|4|1;Tanner McKee|PHI|3|72|114|638|2|2;Drew Lock|SEA|3|54|76|597|5|0"};
 var DEEP=[];
 (function(){
   function tm(t){return TM[t]||t}
-  DEEPSRC.rec.split(';').forEach(function(l){var p=l.split('|');DEEP.push({n:p[0],t:tm(p[1]),pos:p[2],g:+p[3],kind:'rec',stat:'Rec Yds',avg:+p[6]/+p[3],note:p[5]+' catches on '+p[4]+' targets, '+p[7]+' TD'})});
-  DEEPSRC.rush.split(';').forEach(function(l){var p=l.split('|');DEEP.push({n:p[0],t:tm(p[1]),pos:p[2],g:+p[3],kind:'rush',stat:'Rush Yds',avg:+p[5]/+p[3],note:p[4]+' carries, '+p[6]+' TD'})});
-  DEEPSRC.pass.split(';').forEach(function(l){var p=l.split('|');DEEP.push({n:p[0],t:tm(p[1]),pos:'QB',g:+p[2],kind:'pass',stat:'Pass Yds',avg:+p[5]/+p[2],note:p[3]+'/'+p[4]+', '+p[6]+' TD, '+p[7]+' INT'})});
+  DEEPSRC.rec.split(';').forEach(function(l){var p=l.split('|');DEEP.push({n:p[0],t:tm(p[1]),pos:p[2],g:+p[3],kind:'rec',stat:'Rec Yds',avg:+p[6]/+p[3],vol:+p[4]/+p[3],note:p[5]+' catches on '+p[4]+' targets, '+p[7]+' TD'})});
+  DEEPSRC.rush.split(';').forEach(function(l){var p=l.split('|');DEEP.push({n:p[0],t:tm(p[1]),pos:p[2],g:+p[3],kind:'rush',stat:'Rush Yds',avg:+p[5]/+p[3],vol:+p[4]/+p[3],note:p[4]+' carries, '+p[6]+' TD'})});
+  DEEPSRC.pass.split(';').forEach(function(l){var p=l.split('|');DEEP.push({n:p[0],t:tm(p[1]),pos:'QB',g:+p[2],kind:'pass',stat:'Pass Yds',avg:+p[5]/+p[2],vol:+p[4]/+p[2],note:p[3]+'/'+p[4]+', '+p[6]+' TD, '+p[7]+' INT'})});
 })();
-(function(){var sum={},n={};DEEP.forEach(function(d){if(d.g<3)return;var k=d.kind+'|'+d.pos;sum[k]=(sum[k]||0)+d.avg;n[k]=(n[k]||0)+1});DEEP.forEach(function(d){var k=d.kind+'|'+d.pos,pr=n[k]?sum[k]/n[k]:d.avg;d.avgS=(d.g*d.avg+3*pr)/(d.g+3)})})();
+(function(){var sum={},n={};DEEP.forEach(function(d){if(d.g<3)return;var k=d.kind+'|'+d.pos;sum[k]=(sum[k]||0)+d.avg;n[k]=(n[k]||0)+1});DEEP.forEach(function(d){var k=d.kind+'|'+d.pos,pr=n[k]?sum[k]/n[k]:d.avg,big=(d.kind==='rush'&&d.vol>=12)||(d.kind==='rec'&&d.vol>=5.5)||(d.kind==='pass'&&d.vol>=24),w=big&&d.g>=6?1:d.g>=4?2:3;d.avgS=(d.g*d.avg+w*pr)/(d.g+w);d.src0='season';})})();
 S.dk='rec';S.dgm='All';S.dmore=false;
 function covLabel(m){return m>=25?'man-heavy':m<=14?'zone-heavy':'balanced'}
 function covTxt(k){var c=COV[k];return c?'man '+Math.round(c[0])+'% / zone '+Math.round(c[1])+'% ('+covLabel(c[0])+')':''}
@@ -2646,10 +2646,10 @@ function deepRows(){
     if(!avail(d.n,d.t).show)return;
     var nx=nextOpp(nt(d.t));if(!nx||!TS[nx.opp])return;
     if(S.dgm!=='All'&&nx.key!==S.dgm)return;
-    var dm=d.kind==='rush'?'drush':'dpass',f=mv(nx.opp,dm)/lavg[dm],pct=Math.max(-12,Math.min(12,(f-1)*50));pct=Math.max(-15,Math.min(15,pct+defLearn('nfl',d.kind,nx.opp)));
-    var p={avg:d.avgS,kind:d.kind,g:d.g},mid=roundHalf(d.avgS),lo=roundHalf(d.avgS*.75),hi=roundHalf(d.avgS*1.25);
+    var dm=d.kind==='rush'?'drush':'dpass',pct=defPctNfl(nx.opp,d.kind);
+    var p={avg:d.avgS,kind:d.kind,g:d.g,cv:d.cv},mid=roundHalf(d.avgS),lo=roundHalf(d.avgS*.75),hi=roundHalf(d.avgS*1.25);
     var P=function(l){return calc(p,l,-110,-110,pct).po};
-    out.push({d:d,nx:nx,pct:pct,proj:d.avgS*(1+pct/100),rk:mrank(nx.opp,dm),allow:mv(nx.opp,dm),marks:[[lo,P(lo)],[mid,P(mid)],[hi,P(hi)]]});
+    out.push({d:d,nx:nx,pct:pct,proj:d.avgS*(1+pct/100),rk:defRank179(nx.opp,d.kind,mrank(nx.opp,dm)),allow:defAllow179(nx.opp,d.kind,mv(nx.opp,dm)),marks:[[lo,P(lo)],[mid,P(mid)],[hi,P(hi)]]});
   });
   out.sort(function(a,b){return b.proj-a.proj});
   return out;
@@ -6502,9 +6502,9 @@ function nflGameProps(g){
     if(d.kind!==kd)return;var t=nt(d.t);if(t!==A&&t!==H)return;
     try{if(!avail(d.n,d.t).show)return}catch(e){}
     var opp=t===A?H:A;if(!TS[opp])return;
-    var f=mv(opp,dm)/lav[dm],pct=Math.max(-12,Math.min(12,(f-1)*50));pct=Math.max(-15,Math.min(15,pct+defLearn('nfl',d.kind,opp)));
-    var p={avg:d.avgS,kind:d.kind,g:d.g},mid=roundHalf(d.avgS),lo=roundHalf(d.avgS*.75),hi=roundHalf(d.avgS*1.25),P=function(l){return calc(p,l,-110,-110,pct).po};
-    rows.push({d:d,opp:opp,pct:pct,proj:d.avgS*(1+pct/100),rk:mrank(opp,dm),allow:mv(opp,dm),marks:[[lo,P(lo)],[mid,P(mid)],[hi,P(hi)]]});
+    var pct=defPctNfl(opp,d.kind);
+    var p={avg:d.avgS,kind:d.kind,g:d.g,cv:d.cv},mid=roundHalf(d.avgS),lo=roundHalf(d.avgS*.75),hi=roundHalf(d.avgS*1.25),P=function(l){return calc(p,l,-110,-110,pct).po};
+    rows.push({d:d,opp:opp,pct:pct,proj:d.avgS*(1+pct/100),rk:defRank179(opp,d.kind,mrank(opp,dm)),allow:defAllow179(opp,d.kind,mv(opp,dm)),marks:[[lo,P(lo)],[mid,P(mid)],[hi,P(hi)]]});
   });
   rows.sort(function(a,b){return b.proj-a.proj});
   if(!rows.length)return h+'<p class="note" style="margin-top:0">No players with '+esc(KS.filter(function(k){return k[0]===kd})[0][1].toLowerCase())+' data are listed for this game.</p>';
@@ -8935,7 +8935,7 @@ deepRows=function(){
   rows.forEach(function(r){
     try{
       var x=nflExtra(r.d,r.nx);if(!x.notes.length)return;
-      var pct=Math.max(-25,Math.min(25,r.pct+x.pct)),p={avg:r.d.avgS,kind:r.d.kind,g:r.d.g};
+      var pct=Math.max(-25,Math.min(25,r.pct+x.pct)),p={avg:r.d.avgS,kind:r.d.kind,g:r.d.g,cv:r.d.cv};
       r.pct=pct;r.proj=r.d.avgS*(1+pct/100);
       r.marks=r.marks.map(function(m){return [m[0],calc(p,m[0],-110,-110,pct).po]});
       r.nx=Object.assign({},r.nx,{txt:r.nx.txt+' · '+x.notes.join(' ')});
@@ -8953,11 +8953,10 @@ function pmBlocks(lg,name,team){
       DEEP.forEach(function(d){
         if(normName(d.n)!==nm||nt(d.t)!==nt(team))return;
         var nx=nextOpp(nt(d.t));if(!nx||!TS[nx.opp])return;
-        var dm=d.kind==='rush'?'drush':'dpass',lav=leagueAvg(dm),f=mv(nx.opp,dm)/lav,base=Math.max(-12,Math.min(12,(f-1)*50));
-        base=Math.max(-15,Math.min(15,base+defLearn('nfl',d.kind,nx.opp)));
+        var dm=d.kind==='rush'?'drush':'dpass',base=defPctNfl(nx.opp,d.kind);
         var x=nflExtra(d,nx),pct=Math.max(-25,Math.min(25,base+x.pct));
-        out.push({lg:'nfl',kind:d.kind,avg:d.avgS,g:d.g,p:{avg:d.avgS,kind:d.kind,g:d.g},pct:pct,parts:{m:base,s:x.parts.s,u:x.parts.u},notes:x.notes,
-          opp:nx.opp,own:mv(nx.opp,dm),ref:lav,rk:mrank(nx.opp,dm),n:Object.keys(TS).length,what:dm==='drush'?'rushing yards':'passing yards',when:nx.txt,pos:d.pos});
+        out.push({lg:'nfl',kind:d.kind,avg:d.avgS,g:d.g,p:{avg:d.avgS,kind:d.kind,g:d.g,cv:d.cv},pct:pct,parts:{m:base,s:x.parts.s,u:x.parts.u},notes:x.notes,
+          opp:nx.opp,own:defAllow179(nx.opp,d.kind,mv(nx.opp,dm)),ref:defLg179(d.kind,leagueAvg(dm)),rk:defRank179(nx.opp,d.kind,mrank(nx.opp,dm)),n:Object.keys(TS).length,what:dm==='drush'?'rushing yards':'passing yards',when:nx.txt,pos:d.pos});
       });
     }else{
       pxRefresh(lg);
@@ -9461,7 +9460,7 @@ function spCats(lg){return (SP_CATS[lg]||(PXK[lg]||[])).concat([['pl','Parlays']
 function spTag(r){return r<=.9?['lo','tough']:r>=1.1?['hi','soft']:['mid','average']}
 function spDefNfl(kd,opp){
   if(!opp||!TS[opp])return null;
-  var dm=kd==='rush'?'drush':'dpass',own=mv(opp,dm),ref=leagueAvg(dm),rk=mrank(opp,dm),n=Object.keys(TS).length,t=spTag(own/ref);
+  var dm=kd==='rush'?'drush':'dpass',own=defAllow179(opp,kd,mv(opp,dm)),ref=defLg179(kd,leagueAvg(dm)),rk=defRank179(opp,kd,mrank(opp,dm)),n=Object.keys(TS).length,t=spTag(1+defPctNfl(opp,kd)/50);
   return {txt:opp+' allows '+hbF0(own)+' '+(kd==='rush'?'rushing':'passing')+' yards a game · '+ordn(rk)+' of '+n,tag:t};
 }
 function spRows(lg,cat){
@@ -9470,7 +9469,7 @@ function spRows(lg,cat){
     if(cat==='pass'||cat==='rush'||cat==='rec'||cat==='recp'){
       var dk0=S.dk;S.dk=cat==='recp'?'rec':cat;
       try{deepRows().forEach(function(r){
-        var d=r.d,u=cat==='rush'?'rushing yds':cat==='pass'?'passing yds':'receiving yds',proj=r.proj,avg=d.avgS,fm=function(v){return String(hbF0(v))};
+        var d=r.d,u=cat==='rush'?'rushing yds':cat==='pass'?'passing yds':'receiving yds',proj=r.proj,avg=d.avg,fm=function(v){return String(hbF0(v))};
         if(cat==='recp'){var P=rcProj(d,r.pct,null);if(!P)return;proj=P.mu;avg=P.r.pg;u='receptions';fm=function(v){return v.toFixed(1)}}
         out.push({n:d.n,t:d.t,pos:d.pos,lg:'nfl',when:(nextOpp(nt(d.t))||{txt:''}).txt,gk:r.nx.key,gl:r.nx.key.replace('@',' @ '),def:spDefNfl(cat==='rush'?'rush':'pass',r.nx.opp),proj:proj,projTxt:fm(proj),unit:u,avgTxt:'avg '+fm(avg),sort:proj,badge:badge(d.n,d.t)})
       })}finally{S.dk=dk0}
@@ -9622,7 +9621,7 @@ spRows=function(lg,cat){
       var dk0=S.dk;S.dk=cat;var by={};
       try{deepRows().forEach(function(r){by[normName(r.d.n)+'|'+nt(r.d.t)]=r})}finally{S.dk=dk0}
       rows.forEach(function(x){var r=by[normName(x.n)+'|'+nt(x.t)];if(!r)return;x.pct=r.pct;x.mg=mgGrade(r.pct);
-        var mark=roundHalf(r.d.avgS*(1+r.pct/100)),c=calc({avg:r.d.avgS,kind:r.d.kind,g:r.d.g},mark,-110,-110,r.pct);x.ou={l:mark,o:c.po,u:c.pu!=null?c.pu:1-c.po}})
+        var mark=roundHalf(r.d.avgS*(1+r.pct/100)),c=calc({avg:r.d.avgS,kind:r.d.kind,g:r.d.g,cv:r.d.cv},mark,-110,-110,r.pct);x.ou={l:mark,o:c.po,u:c.pu!=null?c.pu:1-c.po}})
     }else if(lg!=='nfl'){
       pxList(lg,cat).forEach(function(p){
         var x=rows.filter(function(y){return y.n===p.name&&y.t===p.team})[0];if(!x)return;
@@ -15308,6 +15307,233 @@ var legList178=legList;
 legList=function(lg){return dropOut178(lg,legList178(lg),function(l){return (l.name||'')+' '+(l.mk||'')})};
 var straightList178=straightList;
 straightList=function(lg){return dropOut178(lg,straightList178(lg),function(b){return b.label==='Game bet'?'':(b.title||'')+' '+(b.sub||'')})};
+
+/* v238: projection model rebuilt. Player baselines come from every game this season (live box scores), weighted toward recent games.
+   Defenses are rated against the offenses they actually faced (schedule-adjusted) and adjusted for missing defenders.
+   NFL and NBA parlay legs use this season's game logs. Projections are checked against results and the model corrects its own bias. */
+var _d179K='',_d179={};
+function _i179(kind){return kind==='rush'?1:0}
+function _tot179(ent,i){var s=0,any=false;Object.keys(ent.pres||{}).forEach(function(k){var v=ent.pres[k][i];if(v!=null){s+=v;any=true}});return any?s:null}
+function defAll179(){
+  var I;try{I=pbIdx('nfl')}catch(e){return {}}
+  var key=S.dlV+'|'+Object.keys(S.dlog).length;if(_d179K===key)return _d179;
+  var T=I.T,out={},off={};
+  Object.keys(T).forEach(function(X){off[X]=[0,1].map(function(i){return T[X].map(function(e){return _tot179(e,i)})})});
+  [0,1].forEach(function(i){
+    var acc={};
+    Object.keys(T).forEach(function(X){
+      var vals=off[X][i];
+      T[X].forEach(function(e,j){
+        var a=vals[j];if(a==null||!e.o)return;
+        var oth=vals.filter(function(v,k){return k!==j&&v!=null});
+        var D=e.o,A=acc[D]=acc[D]||{n:0,s:0,r:0,rn:0};A.n++;A.s+=a;
+        if(oth.length>=2){var b=oth.reduce(function(t,v){return t+v},0)/oth.length;if(b>0){A.r+=Math.max(.2,Math.min(3,a/b));A.rn++}}
+      });
+    });
+    var ks=Object.keys(acc).filter(function(D){return acc[D].n>=2}),lg=ks.length?ks.reduce(function(t,D){return t+acc[D].s/acc[D].n},0)/ks.length:null;
+    ks.forEach(function(D){var A=acc[D];(out[D]=out[D]||{})[i]={n:A.n,allow:A.s/A.n,adj:A.rn?A.r/A.rn:null,rn:A.rn,lg:lg}});
+    ks.map(function(D){return [D,acc[D].s/acc[D].n]}).sort(function(a,b){return a[1]-b[1]}).forEach(function(x,r){out[x[0]][i].rk=r+1});
+  });
+  _d179K=key;_d179=out;return out;
+}
+function defSt179(opp,kind){var D=defAll179()[nt(opp)];return D?D[_i179(kind)]||null:null}
+function defOk179(opp){return !!defAll179()[nt(opp)]}
+function defAllow179(opp,kind,fb){var s=defSt179(opp,kind);return s&&s.n>=3?s.allow:fb}
+function defLg179(kind,fb){var s=null,A=defAll179();Object.keys(A).some(function(D){s=A[D][_i179(kind)];return !!s});return s&&s.lg?s.lg:fb}
+function defRank179(opp,kind,fb){var s=defSt179(opp,kind);return s&&s.n>=3&&s.rk?s.rk:fb}
+var DEFPOS179={rush:/^(DT|DE|DL|NT|LB|ILB|MLB|OLB|EDGE)$/i,pass:/^(CB|S|FS|SS|DB|NB|EDGE|OLB|DE)$/i};
+function defInj179(opp,kind){
+  var re=kind==='rush'?DEFPOS179.rush:DEFPOS179.pass,seen={},names=[];opp=nt(opp);
+  try{var K=KEYOUT.nfl&&KEYOUT.nfl[opp];keyItems(K).forEach(function(x){if(x.lv==='out'&&re.test(x.pos)){var k=normName(x.n);if(!seen[k]){seen[k]=1;names.push(x.pos+' '+x.n)}}})}catch(e){}
+  try{var I=S.inj.nfl;(I&&I.by&&I.by[opp]||[]).forEach(function(x){if(OUTX.test(x.st||'')&&re.test(x.pos||'')){var k=normName(x.n);if(!seen[k]){seen[k]=1;names.push(x.pos+' '+x.n)}}})}catch(e){}
+  return {pct:Math.min(7.5,names.length*2.5),names:names};
+}
+function defPctNfl(opp,kind){
+  var s=defSt179(opp,kind),pct;
+  if(s&&s.rn>=3&&s.adj!=null){var w=s.rn/(s.rn+2);pct=Math.max(-15,Math.min(15,(s.adj-1)*w*70))}
+  else{
+    var dm=kind==='rush'?'drush':'dpass';pct=0;
+    try{if(TS[opp]){var f=mv(opp,dm)/leagueAvg(dm);pct=Math.max(-12,Math.min(12,(f-1)*50))}}catch(e){}
+    pct=Math.max(-15,Math.min(15,pct+defLearn('nfl',kind,opp)));
+  }
+  pct+=defInj179(opp,kind).pct;
+  return Math.max(-20,Math.min(20,pct));
+}
+var spDefNfl179=spDefNfl;
+spDefNfl=function(kd,opp){
+  var r=spDefNfl179(kd,opp);if(!r)return r;
+  try{
+    var s=defSt179(opp,kd);
+    if(s&&s.rn>=3&&s.adj!=null&&s.lg){var raw=s.allow/s.lg;
+      if(s.adj-raw>.08)r.txt+=' · its opponents run'+(kd==='rush'?'':'/pass')+' poorly, so it is softer than this looks';
+      else if(raw-s.adj>.08)r.txt+=' · it faced strong offenses, so it is tougher than this looks'}
+    var J=defInj179(opp,kd);if(J.names.length)r.txt+=' · missing '+J.names.slice(0,3).join(', ');
+  }catch(e){}
+  return r;
+};
+
+/* projection bias learned from results */
+var PJ179={};try{PJ179=JSON.parse(localStorage.getItem('hb.pj179')||'{}')||{}}catch(e){PJ179={}}
+function pjSave179(){try{var ks=Object.keys(PJ179);if(ks.length>1500)ks.sort(function(a,b){return PJ179[a].at-PJ179[b].at}).slice(0,ks.length-1500).forEach(function(k){delete PJ179[k]});localStorage.setItem('hb.pj179',JSON.stringify(PJ179))}catch(e){}}
+function pjBias179(kind){
+  var s=0,n=0;Object.keys(PJ179).forEach(function(k){var r=PJ179[k];if(r.kd===kind&&r.r!=null){s+=r.r;n++}});
+  if(!n)return {m:1,n:0};var m=s/n,w=n/(n+30);return {m:Math.max(.9,Math.min(1.1,1+(m-1)*w)),n:n};
+}
+function pjGrade179(I){
+  var ch=false,now=Date.now();
+  Object.keys(PJ179).forEach(function(k){var r=PJ179[k];if(r.r!=null||!r.st||now<r.st+4*3600e3)return;
+    var L=I.P[r.nm]||[],hit=L.filter(function(x){return Math.abs(x.at-r.st)<36*3600e3})[0];
+    if(hit){var v=hit.v[r.i];if(v==null)v=0;if(r.p>0){r.r=Math.max(0,Math.min(3,v/r.p));r.v=v;ch=true}}
+    else if(now>r.st+5*864e5){delete PJ179[k];ch=true}
+  });
+  if(ch)pjSave179();
+}
+
+/* player baselines from game logs */
+var _s179K='';
+function _med(a){var b=a.slice().sort(function(x,y){return x-y}),m=b.length>>1;return b.length%2?b[m]:(b[m-1]+b[m])/2}
+function logVals179(I,name,kind,pos){
+  var i=kind==='pass'?0:kind==='rush'?1:2,L=I.P[normName(name)]||[],out=[];
+  L.forEach(function(x){var v=x.v[i];if(v==null){var any=x.v.some(function(y){return y!=null});if(!any)return;if(kind==='pass')return;if(kind==='rush'&&pos!=='RB')return;v=0}out.push({v:v,at:x.at,t:x.t,o:x.o})});
+  return out;
+}
+function deepSync179(){
+  var I;try{I=pbIdx('nfl')}catch(e){return}
+  var key=S.dlV+'|'+Object.keys(S.dlog).length;if(_s179K===key)return;_s179K=key;
+  try{pjGrade179(I)}catch(e){}
+  var pri={},pn={};DEEP.forEach(function(d){if(d.d0==null){d.d0={avg:d.avg,g:d.g,avgS:d.avgS,t:d.t}}if(d.d0.g<3)return;var k=d.kind+'|'+d.pos;pri[k]=(pri[k]||0)+d.d0.avg;pn[k]=(pn[k]||0)+1});
+  var B={pass:pjBias179('pass').m,rush:pjBias179('rush').m,rec:pjBias179('rec').m};
+  DEEP.forEach(function(d){
+    var o=d.d0,L=logVals179(I,d.n,d.kind,d.pos),n=L.length,pr=pn[d.kind+'|'+d.pos]?pri[d.kind+'|'+d.pos]/pn[d.kind+'|'+d.pos]:o.avg;
+    if(n>=3){
+      var vs=L.map(function(x){return x.v}),ms=vs.reduce(function(t,v){return t+v},0)/n,ws=0,wt=0;
+      vs.forEach(function(v,j){var w=Math.pow(.8,j);ws+=w*v;wt+=w});
+      var mw=ws/wt,md=_med(vs);
+      if(n<o.g-1){ms=(n*ms+(o.g-n)*o.avg)/o.g}
+      var base=.45*ms+.35*mw+.2*md,sd=Math.sqrt(vs.reduce(function(t,v){return t+(v-ms)*(v-ms)},0)/Math.max(1,n-1)),cvE=ms>0?Math.max(.25,Math.min(.85,sd/ms)):CV[d.kind];
+      var w0=n>=6?.75:1.5;
+      d.avg=ms;d.g=Math.max(n,o.g);d.avgS=((n*base+w0*pr)/(n+w0))*B[d.kind];d.cv=(n*cvE+4*CV[d.kind])/(n+4);d.src0='log';d.l3=vs.slice(0,3).reduce(function(t,v){return t+v},0)/Math.min(3,n);d.nlog=n;
+      if(L[0].t&&nt(L[0].t)!==nt(d.t))d.t=nt(L[0].t);
+    }else{d.avg=o.avg;d.g=o.g;d.avgS=o.avgS*B[d.kind];d.cv=null;d.src0='season';d.nlog=n}
+  });
+  /* store this week's pre-game projections so results can grade them */
+  try{var ch=false,now=Date.now();DEEP.forEach(function(d){var nx=nextOpp(nt(d.t));if(!nx||!nx.start||nx.start<now||nx.start-now>7*864e5)return;
+    var k=nx.key+'|'+nx.start+'|'+normName(d.n)+'|'+d.kind;if(PJ179[k])return;
+    var pct=defPctNfl(nx.opp,d.kind);PJ179[k]={nm:normName(d.n),kd:d.kind,i:d.kind==='pass'?0:d.kind==='rush'?1:2,st:nx.start,p:d.avgS*(1+pct/100),at:now,r:null};ch=true});if(ch)pjSave179()}catch(e){}
+}
+var deepRows179=deepRows;deepRows=function(){try{deepSync179()}catch(e){}return deepRows179.apply(this,arguments)};
+var spRows179=spRows;spRows=function(){try{deepSync179()}catch(e){}return spRows179.apply(this,arguments)};
+var pmBlocks179=pmBlocks;pmBlocks=function(){try{deepSync179()}catch(e){}return pmBlocks179.apply(this,arguments)};
+var analyzeBet179=analyzeBet;analyzeBet=function(){try{deepSync179()}catch(e){}return analyzeBet179.apply(this,arguments)};
+
+/* NBA and college baselines from game logs */
+var _x179K='';
+function pxSync179(){
+  var key=S.dlV+'|'+Object.keys(S.dlog).length+'|'+PROPS.length;if(_x179K===key)return;_x179K=key;
+  ['nba','ncaamb','ncaafb'].forEach(function(lg){
+    var C=DL_LG[lg],I;if(!C)return;try{I=pbIdx(lg)}catch(e){return}
+    PROPS.forEach(function(p){
+      if(p.lg!==lg||C.ix[p.kind]==null)return;if(p.p0==null)p.p0={avg:p.avg,g:p.g};
+      var i=C.ix[p.kind],L=(I.P[normName(p.name)]||[]).filter(function(x){return x.v.some(function(y){return y!=null})}),vs=L.map(function(x){return x.v[i]==null?0:x.v[i]}),n=vs.length;
+      if(n<3){p.avg=p.p0.avg;p.g=p.p0.g;p.cv=null;return}
+      var ms=vs.reduce(function(t,v){return t+v},0)/n,ws=0,wt=0;vs.forEach(function(v,j){var w=Math.pow(.85,j);ws+=w*v;wt+=w});
+      var base=.5*ms+.35*(ws/wt)+.15*_med(vs),sd=Math.sqrt(vs.reduce(function(t,v){return t+(v-ms)*(v-ms)},0)/Math.max(1,n-1));
+      p.avg=(n*base+1*p.p0.avg)/(n+1);p.g=n;p.cv=ms>0&&CV[p.kind]?(n*Math.max(.2,Math.min(.9,sd/ms))+4*CV[p.kind])/(n+4):null;
+    });
+  });
+}
+var pxRefresh179=typeof pxRefresh==='function'?pxRefresh:null;
+if(pxRefresh179)pxRefresh=function(){try{pxSync179()}catch(e){}return pxRefresh179.apply(this,arguments)};
+
+/* parlay legs rebuilt from this season */
+var NFLTHR179={rush:[40,50,60,70,80,100],rec:[30,40,50,60,70,80,100],pass:[175,200,225,250,275,300]};
+var NFLSTAT179={rush:'Rush Yds',rec:'Rec Yds',pass:'Pass Yds'};
+function nflLegs179(){
+  deepSync179();var I=null;try{I=pbIdx('nfl')}catch(e){}
+  var L=[],seen={};
+  DEEP.forEach(function(d){
+    var key=d.kind+'|'+normName(d.n);if(seen[key])return;seen[key]=1;
+    var nx=nextOpp(nt(d.t));if(!nx||!nx.key)return;
+    if(d.g<3)return;
+    var x={pct:0};try{x=nflExtra(d,nx)}catch(e){}
+    var pct=Math.max(-25,Math.min(25,defPctNfl(nx.opp,d.kind)+(x.pct||0))),p={avg:d.avgS,kind:d.kind,g:d.g,cv:d.cv},mu=d.avgS*(1+pct/100);
+    var vs=I?logVals179(I,d.n,d.kind,d.pos).map(function(z){return z.v}):[];
+    var pos=d.kind==='pass'?'Quarterbacks, passing yards':d.kind==='rush'?'Running backs, rushing yards':(d.pos==='TE'?'Tight ends, receiving yards':'Wide receivers, receiving yards');
+    NFLTHR179[d.kind].forEach(function(thr){
+      var pm=calc(p,thr-.5,-110,-110,pct).po,pe=null,src;
+      if(vs.length>=4){var hh=vs.filter(function(v){return v>=thr}).length;pe=(hh+1)/(vs.length+2);src=hh+' of '+vs.length+' games this season · projects '+Math.round(mu)}
+      else src='Season average '+Math.round(d.avg)+' · projects '+Math.round(mu);
+      var pr=pe==null?pm:.5*pm+.5*pe;if(pr<.3)return;
+      L.push({name:d.n,team:nt(d.t),mk:NFLSTAT179[d.kind]+' '+thr+'+',p:pr,src:src,nx:{txt:nx.txt,opp:nx.opp,id:nx.key},kind:'yds',pos:pos,mu:mu});
+    });
+  });
+  return L;
+}
+var NBATHR179=[['Points',0,[10,15,20,25,30]],['Rebounds',1,[4,6,8,10,12]],['Assists',2,[3,5,7,9]],['Threes',3,[1,2,3,4]]];
+function nbaLegs179(){
+  var I;try{I=pbIdx('nba')}catch(e){return null}
+  var names=Object.keys(I.P).filter(function(n){return I.P[n].length>=3});if(names.length<40)return null;
+  var L=[];
+  names.forEach(function(nm){
+    var G=I.P[nm],tm=G[0].t,g0=pxNext('nba',tm);if(!g0)return;
+    var home=tabb(g0.h)===tabb(tm),txt=(home?'vs ':'at ')+(home?g0.a:g0.h)+', '+gTime(g0);
+    NBATHR179.forEach(function(s){
+      var vs=G.map(function(x){return x.v[s[1]]==null?0:x.v[s[1]]}),n=vs.length,r10=vs.slice(0,10);
+      s[2].forEach(function(thr){
+        var ha=vs.filter(function(v){return v>=thr}).length,h10=r10.filter(function(v){return v>=thr}).length;
+        var p=.6*smooth(h10,r10.length)+.4*smooth(ha,n);if(p<.45)return;
+        L.push({name:pfPretty(nm),team:tm,mk:s[0]+' over '+(thr-.5),p:p,src:h10+' of last '+r10.length+' games this season',nx:{txt:txt},kind:'nba'});
+      });
+    });
+  });
+  return L;
+}
+var legList179=legList;
+legList=function(lg){
+  var L=legList179(lg);
+  try{
+    if(lg==='nfl'){var N=nflLegs179();if(N.length)L=L.filter(function(l){return l.kind!=='yds'}).concat(N)}
+    else if(lg==='nba'){var B=nbaLegs179();if(B&&B.length)L=L.filter(function(l){return l.kind!=='nba'}).concat(B)}
+  }catch(e){}
+  return dropOut178(lg,L,function(l){return (l.name||'')+' '+(l.mk||'')});
+};
+
+/* the Over/Under check: an Under below a player's normal level (or an Over above it) needs a reason */
+var gradeProp179=gradeProp;
+gradeProp=function(lg,cat,r,o,dir){
+  var G=gradeProp179.apply(this,arguments);
+  try{
+    if(G&&!G._g179&&o&&o.c&&o.c.s&&o.c.s.n>=4&&o.ln){
+      G._g179=1;var c=o.c,ln=o.ln.v,sa=c.s.avg,l5=c.l5&&c.l5.n>=3?c.l5.avg:null,pen=0,txt='';
+      if(dir==='Under'&&sa>ln*1.12&&(l5==null||l5>ln*1.05)){pen=-15;txt='His season average ('+fmt106(sa)+') is well above '+ln+'. The Under needs one of his worst games'}
+      if(dir==='Over'&&sa<ln*.88&&(l5==null||l5<ln*.95)){pen=-15;txt='His season average ('+fmt106(sa)+') is well below '+ln+'. The Over needs one of his best games'}
+      if(pen){G.F.push({k:'Season level',pts:pen,txt:txt});G.sum+=pen;G.letter=grLetter(G.sum)}
+    }
+  }catch(e){}
+  return G;
+};
+
+/* this week's expert prop picks (entered Nov 15) */
+(function(){
+  var U=Date.UTC(2026,10,17,11);
+  [['Patriots at Lions','Amon-Ra St. Brown','receiving yards','Over','80','New England’s secondary allows the second-most explosive passes and plays a lot of man coverage, which suits him. The writer projects about 84.'],
+   ['Patriots at Lions','Hunter Henry','touchdown','Yes','anytime','Detroit has allowed the most yards and 11 touchdowns to tight ends. Henry is playing through a foot injury.'],
+   ['Patriots at Lions','Jahmyr Gibbs','touchdown','Yes','anytime','Detroit’s lead scoring threat: 9 rushing touchdowns in 8 games. New England is down its top two running backs, which tilts the game script to Detroit.'],
+   ['49ers at Cowboys','CeeDee Lamb','receiving yards','Over','90','57 targets over the past four weeks, and San Francisco’s secondary is banged up.'],
+   ['49ers at Cowboys','Dak Prescott','passing yards','Over','275','275-plus in five of eight games, and Dallas is likely to be throwing from behind.'],
+   ['Bills at Jets','James Cook III','rushing attempts','Over','19.5','Buffalo runs for about 147 yards a game and New York allows 128. Cook controls most of the work near the goal line.'],
+   ['Texans at Browns','C.J. Stroud','passing yards','Over','243.5','Houston’s passing game is far more productive, and Cleveland has struggled to protect its own quarterback.'],
+   ['Texans at Browns','Deshaun Watson','passing yards','Under','201.5','Cleveland’s line has allowed the most sacks in the league against a strong Houston pass rush.'],
+   ['Dolphins at Colts','Ollie Gordon II','rushing yards','Over','61.5','Miami’s lead back with De’Von Achane out. Indianapolis allows about 137 rushing yards a game.'],
+   ['Seahawks at Raiders','Zach Charbonnet','rushing yards','Over','60','77 rushing yards last week. Las Vegas has allowed nine running back touchdowns in six games and starts a rookie quarterback.'],
+   ['Chargers at Ravens','Omarion Hampton','rushing yards','Over','29.5','13 carries in his last game. Baltimore should lean on the run with Jacoby Brissett starting, slowing the game.'],
+   ['Chiefs at Falcons','Travis Kelce','receptions','Over','3.5','Kansas City should control the clock, with Kelce as the chain-mover against zone coverage.'],
+   ['Steelers at Bengals','Mike Gesicki','receiving yards','Over','25','Has cleared this mark in each of his last three games against Pittsburgh.']
+  ].forEach(function(x){if(!PROP_X.some(function(y){return y.lg==='nfl'&&y.p===x[1]&&y.m===x[2]}))PROP_X.push({lg:'nfl',until:U,game:x[0],p:x[1],m:x[2],s:x[3],l:x[4],why:x[5]})});
+  try{var NE=KEYOUT.nfl.NE;NE.items=NE.items.map(function(t){return /Rhamondre Stevenson/.test(t)?'RB Rhamondre Stevenson:o':t});
+    ['CB Charles Woods:q','S Kevin Byard:q'].forEach(function(t){if(NE.items.indexOf(t)<0)NE.items.push(t)});
+    NE.chg=['New England is expected to be without its top two running backs (TreVeyon Henderson and Rhamondre Stevenson), so Corey Kiner leads the backfield. Three offensive line starters are questionable and CB Carlton Davis is out.']}catch(e){}
+})();
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
