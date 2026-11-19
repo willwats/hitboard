@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v242, Nov 15';
+var BUILD='v243, Nov 19';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -15751,6 +15751,30 @@ pbSheet=function(s){
 
 var vParl241=vParl;
 vParl=function(lg){var h=vParl241.apply(this,arguments);try{var sec=xpSec241(lg||S.sport);if(sec)h=sec+h}catch(e){}return h};
+
+/* v243: NFL Week 11 expert picks (entered Nov 19). Earlier hand-entered picks are removed so an old pick cannot attach to a rematch. */
+(function(){
+  var W=[
+   {a:'IND',h:'HOU',win:'h',cov:null,ln:'Texans -10.5',ag:'Split: one panel takes Houston 3 to 1, two other writers take the Colts and the points',why:['Houston’s offense is top 10 in scoring and red-zone touchdowns, and its last four games all reached 48 combined points.','Indianapolis ranks 28th in points allowed and 30th in yards per play allowed.','The other side: Indianapolis won the first meeting 19-17, and Houston is 0-6 against the spread in its last six home games.'],watch:['Thursday night. One writer also likes the Over 44.5.','Houston is coming off blowing a 17-0 lead.']},
+   {a:'BAL',h:'CAR',win:'h',cov:'h',ln:'Panthers -2.5',ag:'Most experts take Carolina; one writer leans Baltimore',why:['Carolina scores about 24 a game to Baltimore’s 21 and gains more yards per game.','Baltimore is 2-7 against the spread.'],watch:['Baltimore is starting Jacoby Brissett at quarterback and is coming off a Monday loss.']},
+   {a:'ARI',h:'KC',win:'h',cov:null,ln:'Chiefs -16.5',ag:'Experts expect a Chiefs win; the cover of a big number is split',why:['Kansas City has beaten six losing teams by an average of 13.5 points.','The other side: 16.5 is a lot of points, and Arizona is 4-5 against the spread.'],watch:['Arizona has been starting rookie Carson Beck.']},
+   {a:'MIA',h:'BUF',win:'h',cov:'h',ln:'Bills -16.5',ag:'Most experts take the Bills even at 16.5',why:['Buffalo leads the league in scoring (about 32 a game) and is 8-1.','Miami scores about 16 a game with a backup rookie quarterback.'],watch:['Miami: rookie Kyle McCord has been starting.']},
+   {a:'NO',h:'CHI',win:'h',cov:null,ln:'Bears -10',ag:'Bears to win; the cover is split, with a computer model and one writer on the Saints',why:['Chicago is 7-2, rested after its bye, and has won four straight.','The other side: New Orleans has covered eight straight road games and is the only team unbeaten against the spread on the road this season.'],watch:['Saints RB Travis Etienne and rookie WR Jordyn Tyson are back after missing most of the season.']},
+   {a:'PIT',h:'PHI',win:'a',cov:'a',ln:'Steelers -4.5',ag:'Every expert takes Pittsburgh',why:['Philadelphia is on its backup quarterback’s second start, scores about 16 a game and is 1-8 against the spread.','Pittsburgh is 6-2 against the spread.'],watch:['Eagles: the backup quarterback makes his second start.']},
+   {a:'TB',h:'DET',win:'h',cov:'h',ln:'Lions -5.5',ag:'Every expert takes Detroit',why:['Detroit has won five straight and scores about 29 a game.','Tampa Bay has been held under 20 points five times.'],watch:[]},
+   {a:'TEN',h:'DAL',win:'h',cov:'h',ln:'Cowboys -7.5',ag:'Most experts and a computer model take Dallas; the model also likes the Over 54.5',why:['Dallas scores about 27 a game and converts 71% of red-zone trips; Tennessee is 1-8.','Tennessee has allowed 40-plus points in back-to-back games.','The model projects about 200 combined receiving yards for CeeDee Lamb and George Pickens.'],watch:[]},
+   {a:'NYJ',h:'LAC',win:'h',cov:null,ln:'Chargers -3',ag:'One panel takes the Chargers 3 to 1; another writer takes the Jets and the points',why:['The Chargers’ defense just shut down Derrick Henry, and Justin Herbert has led 45 points over the last two games.'],watch:[]},
+   {a:'JAX',h:'NYG',win:'a',cov:null,ln:'Jaguars -6.5',ag:'Jaguars to win; the cover is split',why:['Jacksonville has won three straight by wide margins and scores about 30 a game.','The Giants have not beaten a winning team this season.','The other side: both teams are 6-3 against the spread.'],watch:[]},
+   {a:'LV',h:'DEN',win:'h',cov:null,ln:'Broncos -10',ag:'Broncos to win; the cover is split',why:['Denver’s pass rush faces rookie quarterback Fernando Mendoza, and Denver is 7-2 against the spread.','The other side: 10 points is a lot for a Denver offense that is not dominant.'],watch:[]},
+   {a:'MIN',h:'SF',win:'h',cov:null,ln:'49ers -3',ag:'Split: one panel takes the Vikings +3 by 3 to 1, another writer takes San Francisco',why:['Minnesota’s defense has held four opponents to their lowest-scoring games.','San Francisco scores about 29 a game and converts 85% of red-zone trips; Christian McCaffrey is the main threat.'],watch:['Played in Mexico City.','Minnesota’s quarterback is Kirk Cousins, acquired at the deadline.']},
+   {a:'CIN',h:'WAS',win:'a',cov:'a',ln:'Bengals -4.5',ag:'Most experts take Cincinnati',why:['Joe Burrow leads the league with 27 touchdown passes, 20 in his last five games.','Cincinnati scores about 30 a game and converts 54% of third downs.'],watch:['Monday night.']}
+  ];
+  var flip=function(e){var f=function(s){return s==='a'?'h':s==='h'?'a':s};var x={};Object.keys(e).forEach(function(k){x[k]=e[k]});x.a=e.h;x.h=e.a;x.win=f(e.win);x.cov=f(e.cov);return x};
+  var nfl=W.map(function(e){e.lg='nfl';return e});
+  nfl=nfl.concat(nfl.filter(function(e){return (e.a==='MIN'&&e.h==='SF')||(e.a==='PIT'&&e.h==='PHI')}).map(flip));
+  EXPERTS=nfl;
+  EXP_AT='Nov 19';
+})();
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
