@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v243, Nov 19';
+var BUILD='v244, Nov 19';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -15775,6 +15775,184 @@ vParl=function(lg){var h=vParl241.apply(this,arguments);try{var sec=xpSec241(lg|
   EXPERTS=nfl;
   EXP_AT='Nov 19';
 })();
+
+/* v244: the game window, reorganized.
+   1 Hitboard's pick and why · 2 Expert picks and why (with a best guess when they are split) ·
+   3 Player props: lean, why it can hit, why it can miss, and a Track button that follows the result · 4 everything else, folded */
+var TRK185={};try{TRK185=JSON.parse(localStorage.getItem('hb.trk185')||'{}')||{}}catch(e){TRK185={}}
+function trk185Save(){try{var now=Date.now();Object.keys(TRK185).forEach(function(k){if(TRK185[k].start&&now-TRK185[k].start>21*864e5)delete TRK185[k]});localStorage.setItem('hb.trk185',JSON.stringify(TRK185))}catch(e){}}
+function bal185(s){
+  ['div','details','ul'].forEach(function(t){
+    var re=new RegExp('<(/?)'+t+'\\b[^>]*>','gi'),depth=0,out='',last=0,m;
+    while((m=re.exec(s))){out+=s.slice(last,m.index);last=re.lastIndex;if(m[1]){if(depth>0){depth--;out+=m[0]}}else{depth++;out+=m[0]}}
+    out+=s.slice(last);while(depth-->0)out+='</'+t+'>';s=out;
+  });
+  return s;
+}
+function sec185(h,title){
+  var i=h.indexOf('<h3>'+title);if(i<0)return '';
+  var j=h.indexOf('<h3',i+4);return bal185(h.slice(i,j<0?h.length:j));
+}
+function strip185(s){return s.replace(/^<h3>[\s\S]*?<\/h3>/,'')}
+function num185(x){var m=String(x||'').match(/-?\d+(\.\d+)?/);return m?parseFloat(m[0]):null}
+/* 2 · expert section with a best guess when the experts are split */
+function expGuess185(g,e){
+  var ps=null;try{var m=pickModel(g),L=m&&m.ln&&m.ln.pts!=null?m.mk:0;if(m&&m.M!=null)ps=predScore(g,m,L,'a','h')}catch(x){}
+  if(!ps)return 'There is no Hitboard score projection for this game yet, so there is no tiebreaker.';
+  var na=shortNm(g,'a'),nh=shortNm(g,'h'),mg=ps.h-ps.a,win=mg>=0?nh:na,by=Math.abs(mg).toFixed(1);
+  var out='Hitboard projects '+win+' by about '+by+'.';
+  var sp=num185(e.ln);
+  if(e.cov==null&&sp!=null){
+    var lnTxt=String(e.ln||''),favH=null,tok=function(s){return String(s||'').toLowerCase().split(/\s+/).filter(function(w){return w.length>2})};
+    var lt=lnTxt.toLowerCase();
+    if(tok(nh).some(function(w){return lt.indexOf(w)>=0})||lt.indexOf(String(g.h).toLowerCase()+' ')===0)favH=sp<0;
+    else if(tok(na).some(function(w){return lt.indexOf(w)>=0})||lt.indexOf(String(g.a).toLowerCase()+' ')===0)favH=!(sp<0);
+    if(favH!=null){
+      var n=Math.abs(sp),favMg=favH?mg:-mg,fav=favH?nh:na,dog=favH?na:nh;
+      out+=favMg>n+1?' That is more than the '+n+'-point spread, so the best guess is '+fav+' covers.':
+           favMg<n-1?' That is short of the '+n+'-point spread, so the best guess is '+dog+' +'+n+' covers'+(favMg<0?' and may win outright':'')+'.':
+           ' That is right around the '+n+'-point spread, so it is close to a coin flip on the cover.';
+    }
+  }
+  if(e.win==null)out+=' On the winner, the best guess follows that projection: '+win+'.';
+  return out;
+}
+function expertBlock185(g,h){
+  var s=sec185(h,'Expert locks'),e=null;try{e=expFor(g)}catch(x){}
+  if(!e)return '<div class="card" style="padding:10px 12px"><p style="margin:0">No expert picks are entered for this game yet.</p><p class="src" style="margin:4px 0 0">They are added each week as the writers publish.</p></div>';
+  var split=e.cov==null||e.win==null,g2='';
+  if(split)g2='<div class="card" style="padding:10px 12px;margin-bottom:8px;border-color:#b8860b"><p style="margin:0"><b>The experts are split'+(e.cov==null?' on the cover':'')+(e.win==null?(e.cov==null?' and the winner':' on the winner'):'')+'.</b></p><p style="margin:6px 0 0">'+esc(expGuess185(g,e))+'</p><p class="src" style="margin:6px 0 0">A best guess, not a lock.</p></div>';
+  return g2+(s?strip185(s):'');
+}
+/* 3 · player props */
+function trkId185(g,o){return g.lg+'|'+g.id+'|'+normName(o.r.n)+'|'+o.cat}
+function trkVal185(g,t){
+  try{
+    var k=kind(g);if(k==='up')return null;
+    var o=S.gbx[g.id];if(!o||!o.j)return null;
+    var B=g.lg==='nfl'?{P:trkParseBox(o.j)}:g.lg==='nhl'?{P:trkParseNhl(o.j)}:g.lg==='mlb'?{P:trkParseMlb(o.j)}:trkBox(g.lg,o.j);
+    var v=trkValue({lg:g.lg,cat:t.cat,n:t.n,t:t.t},B);return v;
+  }catch(e){return null}
+}
+function trkStatus185(g,t){
+  var k=kind(g);
+  if(t.res)return t.res==='void'?'<span class="src">Did not play</span>':'<span class="hrpill '+(t.res==='hit'?'hi':'lo')+'" style="display:inline-block">'+(t.res==='hit'?'Hit':'Missed')+'</span> <span class="src">finished with '+fmt106(t.act)+'</span>';
+  if(k==='up')return '<span class="src">Tracking · waiting for kickoff</span>';
+  var v=trkVal185(g,t);
+  if(v==='void'){if(k==='final'){t.res='void';trk185Save()}return '<span class="src">Did not play</span>'}
+  if(v==null)return '<span class="src">Tracking · stat not posted yet</span>';
+  var ok=t.dir==='Over'?v>t.ln:v<t.ln;
+  if(k==='final'){t.res=ok?'hit':'miss';t.act=v;trk185Save();return trkStatus185(g,t)}
+  var need=t.dir==='Over'?Math.max(0,t.ln-v):null;
+  return '<b>'+fmt106(v)+'</b> <span class="src">so far · '+(t.dir==='Over'?(ok?'already over '+t.ln:'needs '+fmt106(need+.5)+' more'):(ok?'under '+t.ln+' so far':'already over '+t.ln))+'</span>';
+}
+function propWhy185(g,o,dir){
+  var hit=[],miss=[],seen={},add=function(arr,t){t=String(t||'').trim();if(!t||seen[t])return;seen[t]=1;arr.push(t)};
+  var ln=o.ln.v,pj=o.r.proj,unit=o.r.unit||'';
+  if(typeof pj==='number')add((dir==='Over'?pj>ln:pj<ln)?hit:miss,'Projected '+(o.r.projTxt||fmt106(pj))+' '+unit+' against a line of '+ln+'.');
+  if(o.gr&&o.gr.F)o.gr.F.forEach(function(f){if(f.k==='Price'||f.k==='Confidence'||!f.txt||/^Projected /.test(f.txt))return;if(f.pts>=2)add(hit,f.txt);else if(f.pts<=-2)add(miss,f.txt)});
+  var c=o.c;
+  if(c&&c.s&&c.s.n>=3){
+    var on=dir==='Over'?c.s.h.o:c.s.h.u;add(on/c.s.n>=.5?hit:miss,(dir==='Over'?'Went over ':'Stayed under ')+ln+' in '+on+' of '+c.s.n+' games this season.');
+    if(c.l5&&c.l5.n>=3){var o5=dir==='Over'?c.l5.h.o:c.l5.h.u;add(o5/c.l5.n>=.6?hit:o5/c.l5.n<=.4?miss:miss,'Last '+c.l5.n+' games: '+o5+' of '+c.l5.n+' on the '+dir.toLowerCase()+' side (average '+fmt106(c.l5.avg)+').')}
+    try{var vs=c.all.map(function(x){return x.v[c.i]}).filter(function(v){return v!=null});if(vs.length>=3){
+      if(dir==='Over')add(miss,'His lowest game this season was '+fmt106(Math.min.apply(null,vs))+', so a quiet day can sink it.');
+      else add(miss,'His best game this season was '+fmt106(Math.max.apply(null,vs))+', so one big play can bust it.')}}catch(e){}
+  }else add(miss,'Few games in the log yet, so this is less certain.');
+  try{var it=injIt108({lg:g.lg,t:o.r.t,n:o.r.n});if(it&&it.st)add(miss,'Listed as '+it.st+' on the injury report.')}catch(e){}
+  try{var d=DEEP.filter(function(x){return normName(x.n)===normName(o.r.n)&&x.tr})[0];if(d)add(miss,'New team since '+d.tr.at+', so his role is still settling.')}catch(e){}
+  return {hit:hit.slice(0,4),miss:miss.slice(0,3)};
+}
+function props185(g){
+  var R=[];try{R=gpRows(g)}catch(e){}
+  var k=kind(g),per={},seenP={},L=[];
+  R.forEach(function(o){
+    if(!o.ln||o.ln.v==null||typeof o.r.proj!=='number'||o.cat==='td')return;
+    var rl=null;try{rl=depRole(g.lg,o.r.t,o.r.n)}catch(e){}if(rl&&!rl.start)return;
+    var nk=normName(o.r.n);if((seenP[nk]=(seenP[nk]||0)+1)>2)return;
+    var t=o.r.t;if((per[t]=(per[t]||0)+1)>7)return;
+    var dir=o.gr?o.gr.dir:null;
+    if(!dir){var gap=(o.r.proj-o.ln.v)/Math.max(1,o.ln.v);if(Math.abs(gap)<.04)return;dir=gap>0?'Over':'Under'}
+    L.push({o:o,dir:dir});
+  });
+  L=L.slice(0,14);
+  var tracked=Object.keys(TRK185).map(function(id){return TRK185[id]}).filter(function(t){return t.gid===g.id});
+  var h='';
+  if(!L.length&&!tracked.length)return '<div class="card" style="padding:10px 12px"><p class="src" style="margin:0">No player props for this game yet. Players appear once the app has read this season’s box scores for both teams.</p></div>';
+  h+='<p class="src" style="margin:0 0 6px">The line is each player’s season average, fixed for this game. The lean follows Hitboard’s projection. Tap a prop for why it can hit or miss, and Track it to follow the result.</p>';
+  var catName=function(c){var x=(pbCats(g.lg).filter(function(y){return y[0]===c})[0]||[0,c])[1];return x};
+  var item=function(x){
+    var o=x.o,id=trkId185(g,o),t=TRK185[id],W=propWhy185(g,o,x.dir);
+    var gr=o.gr?' '+grPill(o.gr.letter):'';
+    return '<details data-p185="'+esc(id)+'"'+(S.p185o&&S.p185o[id]?' open':'')+' style="border-top:1px solid var(--line)"><summary style="cursor:pointer;padding:8px 0;list-style:none"><div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><div style="min-width:0"><b>'+(t?'★ ':'')+esc(o.r.n)+'</b> <span class="src">'+esc(o.r.t)+' · '+esc(catName(o.cat))+'</span><div style="margin-top:2px"><b>'+x.dir+' '+o.ln.v+'</b> <span class="src">projected '+esc(o.r.projTxt||fmt106(o.r.proj))+'</span></div>'+(t?'<div style="margin-top:2px">'+trkStatus185(g,t)+'</div>':'')+'</div><div>'+gr+'</div></div></summary>'+
+      '<div style="padding:0 0 10px"><div class="src"><b>Why it can hit</b></div><ul class="pts" style="margin:2px 0 6px">'+(W.hit.length?W.hit.map(function(s){return '<li>'+esc(s)+'</li>'}).join(''):'<li>No strong reason beyond the projection.</li>')+'</ul>'+
+      '<div class="src"><b>Why it can miss</b></div><ul class="pts" style="margin:2px 0 6px">'+(W.miss.length?W.miss.map(function(s){return '<li>'+esc(s)+'</li>'}).join(''):'<li>Nothing stands out against it.</li>')+'</ul>'+
+      '<div class="actions" style="margin-top:6px"><button class="btn'+(t?' primary':'')+'" data-act="trk185" data-id="'+esc(id)+'" data-n="'+esc(o.r.n)+'" data-t="'+esc(o.r.t)+'" data-cat="'+esc(o.cat)+'" data-ln="'+o.ln.v+'" data-dir="'+x.dir+'" data-gid="'+esc(g.id)+'" style="padding:6px 10px;font-size:13px">'+(t?'★ Tracking · tap to stop':'☆ Track this prop')+'</button><button class="btn" data-act="pfopen" data-n="'+esc(o.r.n)+'" data-lg="'+g.lg+'" data-team="'+esc(o.r.t)+'" style="padding:6px 10px;font-size:13px">Game log</button></div></div></details>';
+  };
+  var inL={};L.forEach(function(x){inL[trkId185(g,x.o)]=1});
+  var extra=tracked.filter(function(t){return !inL[t.id]});
+  if(extra.length)h+='<div class="card" style="padding:8px 12px;margin-bottom:6px"><b>Tracking</b>'+extra.map(function(t){return '<div style="display:flex;justify-content:space-between;gap:8px;border-top:1px solid var(--line);padding:6px 0"><span><b>'+esc(t.n)+'</b> <span class="src">'+esc(t.dir+' '+t.ln+' '+catName(t.cat))+'</span></span><span>'+trkStatus185(g,t)+'</span></div>'}).join('')+'</div>';
+  L.sort(function(a,b){return (TRK185[trkId185(g,b.o)]?1:0)-(TRK185[trkId185(g,a.o)]?1:0)});
+  return h+'<div class="card" style="padding:4px 12px">'+L.map(item).join('')+'</div>';
+}
+document.addEventListener('toggle',function(e){var d=e.target;if(d&&d.dataset){if(d.dataset.p185){S.p185o=S.p185o||{};if(d.open)S.p185o[d.dataset.p185]=1;else delete S.p185o[d.dataset.p185]}if(d.dataset.m185!=null)S.m185=d.open}},true);
+document.addEventListener('click',function(e){
+  var el=e.target&&e.target.closest?e.target.closest('[data-act="trk185"]'):null;if(!el)return;
+  e.stopImmediatePropagation();e.preventDefault();
+  var d=el.dataset,id=d.id;
+  if(TRK185[id])delete TRK185[id];
+  else{var g=null;Object.keys(S.feed).forEach(function(lg){(S.feed[lg]||[]).forEach(function(x){if(String(x.id)===String(d.gid))g=x})});
+    TRK185[id]={id:id,gid:d.gid,lg:g?g.lg:id.split('|')[0],n:d.n,t:d.t,cat:d.cat,ln:parseFloat(d.ln),dir:d.dir,start:g?g.start:Date.now(),game:g?(g.a+' @ '+g.h):'',at:Date.now()}}
+  trk185Save();try{_usrAt=Date.now()}catch(x){}if(S.sheet)renderSheet();else render();
+},true);
+/* tracked props in Results, beside the app's own record */
+var followCard185=followCard;
+followCard=function(){
+  var h=followCard185.apply(this,arguments);
+  try{
+    var ts=Object.keys(TRK185).map(function(k){return TRK185[k]}).sort(function(a,b){return (a.res?1:0)-(b.res?1:0)||b.start-a.start});
+    if(!ts.length)return h;
+    var hit=ts.filter(function(t){return t.res==='hit'}).length,miss=ts.filter(function(t){return t.res==='miss'}).length;
+    h+='<div class="card"><b>Props you are tracking</b><p class="src" style="margin:4px 0 6px">'+hit+' hit · '+miss+' missed · '+ts.filter(function(t){return !t.res}).length+' open</p>'+
+      ts.slice(0,30).map(function(t){var g=null;(S.feed[t.lg]||[]).forEach(function(x){if(String(x.id)===String(t.gid))g=x});
+        var st=t.res?(t.res==='void'?'<span class="src">did not play</span>':'<span class="hrpill '+(t.res==='hit'?'hi':'lo')+'" style="display:inline-block">'+(t.res==='hit'?'Hit':'Missed')+'</span>'):(g?trkStatus185(g,t):'<span class="src">open</span>');
+        return '<div style="display:flex;justify-content:space-between;gap:8px;border-top:1px solid var(--line);padding:6px 0"><span><b>'+esc(t.n)+'</b> <span class="src">'+esc(t.dir+' '+t.ln+' · '+t.game)+'</span></span><span>'+st+'</span></div>'}).join('')+'</div>';
+  }catch(e){}
+  return h;
+};
+/* the new layout */
+var feedSheet185=feedSheet;
+feedSheet=function(g){
+  var h=feedSheet185.apply(this,arguments);
+  try{
+    var p0=h.indexOf('<h3>');if(p0<0)return h;
+    var hd=h.indexOf('</button></div>');var head=hd>=0&&hd<p0?h.slice(0,hd+15):h.slice(0,0);
+    var body=h.slice(p0),k=kind(g);
+    var live='';
+    try{if(k!=='up'){var c=gbxCall(g)||'',pl=gbxPlayersHtml(g)||'';if(c||pl)live='<div class="card" style="margin:10px 0">'+c+(pl?'<div style="margin:6px 0 4px" class="src"><b>Player stats</b></div>'+pl:'')+'</div>'}}catch(e){}
+    var H=function(n,t){return '<h2 style="margin:22px 0 8px;font-size:19px">'+n+' · '+t+'</h2>'};
+    var used={},take=function(t){var s=sec185(body,t);if(s)used[t]=1;return s};
+    var pred=take('Prediction'),picks=take('Picks for this game'),hold=take('Does the pick hold up?');
+    var out=head+live;
+    out+=H(1,'Hitboard’s pick');
+    out+=pred?strip185(pred):'<div class="card" style="padding:10px 12px"><p class="src" style="margin:0">The prediction is still building for this game.</p></div>';
+    if(hold)out+=hold;
+    if(picks)out+=picks;
+    take('Expert locks');
+    out+=H(2,'Expert picks');
+    out+=expertBlock185(g,body);
+    out+=H(3,'Player props');
+    out+=props185(g);
+    var td=take('Anytime touchdown predictions');if(td)out+=td;
+    ['Player props for this game','Props the app predicted','Player projections','Season stats for the key players'].forEach(function(t){take(t)});
+    var more=['Reported absences','Trades this season','Season so far','Learning model','Correlated parlays','Props the app predicted','Player props for this game','Player projections','Season stats for the key players'];
+    var rest='';more.forEach(function(t){var s=sec185(body,t);if(s)rest+=s});
+    /* any other section not placed above */
+    body.split(/(?=<h3)/).forEach(function(s){var m=s.match(/^<h3>([\s\S]*?)<\/h3>/);if(!m)return;var t=m[1].replace(/<[^>]+>/g,'').trim();if(used[t]||more.some(function(x){return t.indexOf(x)===0}))return;rest+=bal185(s)});
+    if(rest)out+=H(4,'More on this game')+'<details data-m185=""'+(S.m185?' open':'')+' class="card" style="padding:8px 12px"><summary style="cursor:pointer"><b>Injuries, trades, season results, parlays and the app’s prop record</b></summary>'+rest+'</details>';
+    return out;
+  }catch(e){return h}
+};
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
