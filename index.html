@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v247, Nov 20';
+var BUILD='v248, Nov 20';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -16363,6 +16363,82 @@ feedSheet=function(g){
   ];
   EXPERTS=EXPERTS.filter(function(e){return e.lg!=='ncaafb'}).concat(C);
   EXP_AT='Nov 20';
+})();
+
+/* v248: notable injuries move Hitboard's own pick. A missing starter (quarterback above all) lowers his team's projected points;
+   for college, missing defenders also raise the opponent's. Sources: the live injury feed, game-day inactives, the hand-entered
+   absences, and injuries entered with each week's college expert picks. */
+var CFBOUT=[];
+var INJW189={nfl:{QB:4,RB:.8,WR:1,TE:.5,OL:.4,cap:8},ncaafb:{QB:6,RB:1.2,WR:1.3,TE:.6,OL:.5,DB:.7,FR:.5,cap:10}};
+function stMul189(st){st=String(st||'').toLowerCase();return /^o|out|inactive|injured reserve|\bir\b|suspend|season/.test(st)?1:/doubt|^d$/.test(st)?.75:/question|^q$|game-time/.test(st)?.25:0}
+function posGrp189(p){p=String(p||'').toUpperCase();return p==='QB'?'QB':/^(RB|HB|FB)$/.test(p)?'RB':p==='WR'?'WR':p==='TE'?'TE':/^(T|G|C|OT|OG|OL|LT|LG|RG|RT)$/.test(p)?'OL':/^(CB|S|FS|SS|DB|NB)$/.test(p)?'DB':/^(DE|DT|DL|NT|EDGE|LB|ILB|MLB|OLB)$/.test(p)?'FR':null}
+function nflStarter189(team,name,grp){
+  var D=S.dep[nt(team)],n=normName(name);
+  if(D){var key={QB:'qb',RB:'rb',WR:'wr',TE:'te'}[grp];if(key&&D[key]){var i=D[key].map(normName).indexOf(n);if(i>=0)return i<DEP_START[key]}}
+  if(grp==='QB'){var q=DEEP.filter(function(d){return d.kind==='pass'&&nt(d.t)===nt(team)&&d.g>=3}).sort(function(a,b){return b.avg-a.avg})[0];return !!(q&&normName(q.n)===n)}
+  if(grp==='RB'||grp==='WR'||grp==='TE'){var kd=grp==='RB'?'rush':'rec',L=DEEP.filter(function(d){return d.kind===kd&&nt(d.t)===nt(team)&&d.g>=3&&(grp!=='TE'||d.pos==='TE')}).sort(function(a,b){return b.avg-a.avg}),top=L.slice(0,grp==='WR'?3:1).map(function(d){return normName(d.n)});return top.indexOf(n)>=0}
+  return grp==='OL';
+}
+function injList189(g,side){
+  var team=side==='a'?g.a:g.h,L=[],seen={};
+  var add=function(n,pos,st,src){var k=normName(n),m=stMul189(st);if(!m||seen[k])return;seen[k]=1;L.push({n:n,pos:String(pos||'').toUpperCase(),st:st,m:m,src:src})};
+  if(g.lg==='nfl'){
+    try{mergeInact187()}catch(e){}
+    try{(S.inj.nfl&&S.inj.nfl.by&&S.inj.nfl.by[nt(team)]||[]).forEach(function(x){add(x.n,x.pos,x.st,'feed')})}catch(e){}
+    try{keyItems(KEYOUT.nfl&&KEYOUT.nfl[nt(team)]).forEach(function(x){add(x.n,x.pos,x.lv==='out'?'Out':x.lv==='doubtful'?'Doubtful':x.lv==='q'||x.lv==='questionable'?'Questionable':x.lv,'report')})}catch(e){}
+  }else if(g.lg==='ncaafb'){
+    var nm=normName(side==='a'?g.an:g.hn),hit=function(kws){return (kws||[]).some(function(k){return (' '+nm+' ').indexOf(' '+k+' ')>=0||(' '+String(team).toLowerCase()+' ')===' '+k+' '})};
+    var e=null;try{e=expFor(g)}catch(x){}
+    var raw=null;if(e){EXPERTS.forEach(function(x){if(x.lg==='ncaafb'&&x.ln===e.ln&&x.why===e.why)raw=x})}
+    ((raw&&raw.out)||[]).concat(CFBOUT).forEach(function(o){if(hit(o.kw))add(o.n,o.pos,o.st,'report')});
+  }
+  return L;
+}
+function injAdj189(g){
+  var W=INJW189[g.lg];if(!W)return null;
+  var res={a:0,h:0,notes:[]};
+  ['a','h'].forEach(function(s){
+    var own=0,opp=0,who=[];
+    injList189(g,s).forEach(function(x){
+      var grp=posGrp189(x.pos);if(!grp)return;
+      if(g.lg==='nfl'&&(grp==='DB'||grp==='FR'))return; /* NFL defense is handled by the secondary and front ratings */
+      var st=g.lg==='nfl'?nflStarter189(s==='a'?g.a:g.h,x.n,grp):(grp==='QB'||grp==='OL'||grp==='DB'||grp==='FR'||x.src==='report');
+      if(!st)return;
+      var w=W[grp]||0;if(!w)return;var v=w*x.m;
+      if(grp==='DB'||grp==='FR')opp+=v;else own+=v;
+      who.push(x.pos+' '+x.n+(x.m<1?' ('+String(x.st).toLowerCase()+')':''));
+    });
+    own=Math.min(W.cap,own);opp=Math.min(3,opp);
+    res[s]-=own;res[s==='a'?'h':'a']+=opp;
+    if(own+opp>=.5)res.notes.push({s:s,pts:own+opp,who:who});
+  });
+  return res;
+}
+var predScore189=predScore;
+predScore=function(g,m,L,na,nh){
+  var r=predScore189.apply(this,arguments);
+  try{
+    if(!r||(g.lg!=='nfl'&&g.lg!=='ncaafb'))return r;
+    var J=injAdj189(g);if(!J||(!J.a&&!J.h))return r;
+    var a=Math.max(0,r.a+J.a),h=Math.max(0,r.h+J.h),o={};Object.keys(r).forEach(function(k){o[k]=r[k]});o.a=a;o.h=h;o.mine=h-a;o.inj189=J;return o;
+  }catch(e){return r}
+};
+var report189=report187;
+report187=function(g){
+  var h=report189.apply(this,arguments)||'';
+  try{
+    var J=injAdj189(g);if(!J||!J.notes.length)return h;
+    var li=J.notes.map(function(n){return '<li><b>'+esc(shortNm(g,n.s))+' injuries in Hitboard’s pick</b>: '+esc(n.who.slice(0,5).join(', '))+'. About '+n.pts.toFixed(1)+' points '+(n.pts>0?'against them':'')+' in the projected score.</li>'}).join('');
+    if(h)return h.replace('<ul class="pts" style="margin:0">','<ul class="pts" style="margin:0">'+li);
+    return '<h3>Lineup report and tendencies</h3><div class="card" style="padding:10px 12px"><ul class="pts" style="margin:0">'+li+'</ul></div>';
+  }catch(e){return h}
+};
+/* injuries noted with this week's college picks */
+(function(){
+  var add=function(kw,pos,n,st){CFBOUT.push({kw:kw,pos:pos,n:n,st:st})};
+  add(['fighting illini'],'QB','Katin Houser','Doubtful');
+  add(['cornhuskers'],'CB','Andrew Marshall','Out');
+  add(['hurricanes'],'WR','Malachi Toney','Out');
 })();
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
