@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v244, Nov 19';
+var BUILD='v245, Nov 19';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -13604,7 +13604,7 @@ function gmCard(g){
     var R=gpRows(g),seen={},T={};
     R.forEach(function(o){var k=normName(o.r.n);if(seen[k]||!o.gr)return;var rl0=null;try{rl0=depRole(lg,o.r.t,o.r.n)}catch(e){}if(rl0&&!rl0.start)return;seen[k]=1;var t=bkAb(lg,o.r.t);T[t]=(T[t]||0)+1;if(T[t]>2)return;
       var lv=pbLev(lg,o.cat,o.r,o,o.gr.dir),ln=lv&&lv.L.filter(function(x){return !/^He accounts/.test(x)})[0];
-      pl+='<li><b>'+esc(o.r.n)+'</b> '+esc(o.r.t)+': projected '+esc(o.r.projTxt||'')+' '+esc(o.r.unit||'')+' vs '+(o.ln&&o.ln.base==='season'?'his season average of ':'a line of ')+(o.ln&&o.ln.v!=null?o.ln.v:'')+', so lean '+o.gr.dir.toLowerCase()+' · grade '+esc(o.gr.letter)+(ln?'. '+esc(ln):'')+'</li>'});
+      pl+='<li><b>'+esc(o.r.n)+'</b> '+esc(o.r.t)+': projected '+esc(o.r.projTxt||'')+' '+esc(o.r.unit||'')+' vs '+(o.ln&&o.ln.base==='season'?'his season average of ':o.ln&&o.ln.base==='dk'?'the DraftKings line of ':'a line of ')+(o.ln&&o.ln.v!=null?o.ln.v:'')+', so lean '+o.gr.dir.toLowerCase()+' · grade '+esc(o.gr.letter)+(ln?'. '+esc(ln):'')+'</li>'});
   }catch(e){}
   var inj='';
   var wx='';try{var wt=String(wxLong(g)||'').replace(/<[^>]*>/g,'').replace(/ ?\(Open-Meteo\)/,'').replace(/^Forecast for the start:/,'Forecast for the start:').trim();if(wt)wx='<li>'+esc(wt)+'</li>'}catch(e){}
@@ -15849,7 +15849,7 @@ function trkStatus185(g,t){
 function propWhy185(g,o,dir){
   var hit=[],miss=[],seen={},add=function(arr,t){t=String(t||'').trim();if(!t||seen[t])return;seen[t]=1;arr.push(t)};
   var ln=o.ln.v,pj=o.r.proj,unit=o.r.unit||'';
-  if(typeof pj==='number')add((dir==='Over'?pj>ln:pj<ln)?hit:miss,'Projected '+(o.r.projTxt||fmt106(pj))+' '+unit+' against a line of '+ln+'.');
+  if(typeof pj==='number')add((dir==='Over'?pj>ln:pj<ln)?hit:miss,'Projected '+(o.r.projTxt||fmt106(pj))+' '+unit+' against '+(o.ln.base==='dk'?'the DraftKings line of ':'a line of ')+ln+'.');
   if(o.gr&&o.gr.F)o.gr.F.forEach(function(f){if(f.k==='Price'||f.k==='Confidence'||!f.txt||/^Projected /.test(f.txt))return;if(f.pts>=2)add(hit,f.txt);else if(f.pts<=-2)add(miss,f.txt)});
   var c=o.c;
   if(c&&c.s&&c.s.n>=3){
@@ -15884,7 +15884,7 @@ function props185(g){
   var item=function(x){
     var o=x.o,id=trkId185(g,o),t=TRK185[id],W=propWhy185(g,o,x.dir);
     var gr=o.gr?' '+grPill(o.gr.letter):'';
-    return '<details data-p185="'+esc(id)+'"'+(S.p185o&&S.p185o[id]?' open':'')+' style="border-top:1px solid var(--line)"><summary style="cursor:pointer;padding:8px 0;list-style:none"><div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><div style="min-width:0"><b>'+(t?'★ ':'')+esc(o.r.n)+'</b> <span class="src">'+esc(o.r.t)+' · '+esc(catName(o.cat))+'</span><div style="margin-top:2px"><b>'+x.dir+' '+o.ln.v+'</b> <span class="src">projected '+esc(o.r.projTxt||fmt106(o.r.proj))+'</span></div>'+(t?'<div style="margin-top:2px">'+trkStatus185(g,t)+'</div>':'')+'</div><div>'+gr+'</div></div></summary>'+
+    return '<details data-p185="'+esc(id)+'"'+(S.p185o&&S.p185o[id]?' open':'')+' style="border-top:1px solid var(--line)"><summary style="cursor:pointer;padding:8px 0;list-style:none"><div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><div style="min-width:0"><b>'+(t?'★ ':'')+esc(o.r.n)+'</b> <span class="src">'+esc(o.r.t)+' · '+esc(catName(o.cat))+'</span><div style="margin-top:2px"><b>'+x.dir+' '+o.ln.v+'</b> <span class="src">'+(o.ln.base==='dk'?'DraftKings'+(x.dir==='Over'&&o.ln.o!=null?' '+(o.ln.o>0?'+':'')+o.ln.o:x.dir==='Under'&&o.ln.u!=null?' '+(o.ln.u>0?'+':'')+o.ln.u:'')+' · ':'season avg · ')+'projected '+esc(o.r.projTxt||fmt106(o.r.proj))+'</span></div>'+(t?'<div style="margin-top:2px">'+trkStatus185(g,t)+'</div>':'')+'</div><div>'+gr+'</div></div></summary>'+
       '<div style="padding:0 0 10px"><div class="src"><b>Why it can hit</b></div><ul class="pts" style="margin:2px 0 6px">'+(W.hit.length?W.hit.map(function(s){return '<li>'+esc(s)+'</li>'}).join(''):'<li>No strong reason beyond the projection.</li>')+'</ul>'+
       '<div class="src"><b>Why it can miss</b></div><ul class="pts" style="margin:2px 0 6px">'+(W.miss.length?W.miss.map(function(s){return '<li>'+esc(s)+'</li>'}).join(''):'<li>Nothing stands out against it.</li>')+'</ul>'+
       '<div class="actions" style="margin-top:6px"><button class="btn'+(t?' primary':'')+'" data-act="trk185" data-id="'+esc(id)+'" data-n="'+esc(o.r.n)+'" data-t="'+esc(o.r.t)+'" data-cat="'+esc(o.cat)+'" data-ln="'+o.ln.v+'" data-dir="'+x.dir+'" data-gid="'+esc(g.id)+'" style="padding:6px 10px;font-size:13px">'+(t?'★ Tracking · tap to stop':'☆ Track this prop')+'</button><button class="btn" data-act="pfopen" data-n="'+esc(o.r.n)+'" data-lg="'+g.lg+'" data-team="'+esc(o.r.t)+'" style="padding:6px 10px;font-size:13px">Game log</button></div></div></details>';
@@ -15952,6 +15952,160 @@ feedSheet=function(g){
     if(rest)out+=H(4,'More on this game')+'<details data-m185=""'+(S.m185?' open':'')+' class="card" style="padding:8px 12px"><summary style="cursor:pointer"><b>Injuries, trades, season results, parlays and the app’s prop record</b></summary>'+rest+'</details>';
     return out;
   }catch(e){return h}
+};
+
+/* v245: DraftKings player-prop lines (the same lines ESPN shows) and a fresher depth chart that skips injured players */
+function https186(u){return String(u||'').replace(/^http:\/\//,'https://')}
+/* athlete id -> name, from a team's ESPN roster */
+S.aid186=S.aid186||{};
+function rosIds186(lg,id){
+  var path={nfl:'football/nfl',nba:'basketball/nba',ncaafb:'football/college-football',ncaamb:'basketball/mens-college-basketball'}[lg];
+  if(!path||!id)return Promise.resolve();
+  return getJson('https://site.api.espn.com/apis/site/v2/sports/'+path+'/teams/'+id+'/roster').then(function(j){
+    var walk=function(o){if(Array.isArray(o)){o.forEach(walk);return}if(o&&typeof o==='object'){if(o.id&&(o.displayName||o.fullName))S.aid186[lg+'|'+o.id]=o.displayName||o.fullName;Object.keys(o).forEach(function(k){if(o[k]&&typeof o[k]==='object')walk(o[k])})}};
+    walk(j);
+  }).catch(function(){});
+}
+function aidOf186(ref){var m=String(ref||'').match(/athletes\/(\d+)/);return m?m[1]:null}
+
+/* ---------- depth charts ---------- */
+function depParseCore186(j,lg){
+  var out={},items=(j&&j.items)||[];
+  var best=items.filter(function(it){return /wr/i.test(it.name||'')})[0]||items[0];if(!best||!best.positions)return out;
+  var slots={qb:[],rb:[],wr:[],te:[]};
+  Object.keys(best.positions).forEach(function(k){
+    var P=best.positions[k],ab=String((P.position&&P.position.abbreviation)||k).toLowerCase().replace(/\d+/g,'');
+    var pos=/^(lwr|rwr|swr|wr)$/.test(ab)?'wr':/^(qb|rb|te)$/.test(ab)?ab:null;if(!pos)return;
+    var L=(P.athletes||[]).slice().sort(function(a,b){return (a.rank||a.slot||0)-(b.rank||b.slot||0)}).map(function(a){var id=aidOf186(a.athlete&&a.athlete.$ref);return id&&S.aid186[lg+'|'+id]}).filter(Boolean);
+    slots[pos].push(L);
+  });
+  Object.keys(slots).forEach(function(p){
+    if(!slots[p].length)return;
+    var first=[],rest=[];slots[p].forEach(function(L){if(L[0]&&first.indexOf(L[0])<0)first.push(L[0]);L.slice(1).forEach(function(n){if(rest.indexOf(n)<0)rest.push(n)})});
+    out[p]=first.concat(rest.filter(function(n){return first.indexOf(n)<0}));
+  });
+  return out;
+}
+S.depMsg='';
+loadDepth=function(force){
+  if(window.claude||typeof fetch!=='function'||S.depBusy)return Promise.resolve();
+  var now=Date.now();if(!force&&now-S.depAt<60*60000)return Promise.resolve();
+  var teams={};(S.feed.nfl||[]).forEach(function(g){if(kind(g)==='final')return;teams[nt(g.a)]={ab:g.a,nm:g.an};teams[nt(g.h)]={ab:g.h,nm:g.hn}});
+  var ks=Object.keys(teams);if(!ks.length)return Promise.resolve();
+  S.depBusy=true;var ok=0,fail=0,yr=new Date().getMonth()<2?new Date().getFullYear()-1:new Date().getFullYear();
+  return Promise.all(ks.map(function(k){
+    return tmIdFor('nfl',teams[k].ab,teams[k].nm).then(function(id){
+      return getJson('https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/'+id+'/depthcharts').then(function(j){return depParse(j)}).catch(function(){return {}}).then(function(d){
+        if(d.qb||d.rb||d.wr)return d;
+        return Promise.all([getJson('https://sports.core.api.espn.com/v2/sports/football/leagues/nfl/seasons/'+yr+'/teams/'+id+'/depthcharts'),rosIds186('nfl',id)]).then(function(r){return depParseCore186(r[0],'nfl')});
+      });
+    }).then(function(d){if(d&&(d.qb||d.rb||d.wr)){S.dep[k]=d;S.depN++;ok++}else fail++}).catch(function(){fail++});
+  })).then(function(){
+    S.depBusy=false;S.depAt=Date.now();S.depMsg=ok?'Depth charts updated '+new Date().toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})+(fail?' ('+fail+' teams could not be read)':''):'Depth charts could not be loaded';
+    try{_grC={}}catch(e){}
+    try{if(!S.sheet)softRender()}catch(e){}
+  });
+};
+setInterval(function(){try{loadDepth()}catch(e){}},30*60000);
+/* a player who is out does not count as a starter: the next man up does */
+function out186(team,name){
+  try{if(isOutInj({lg:'nfl',t:team,n:name}))return true}catch(e){}
+  try{var it=injIt108({lg:'nfl',t:team,n:name});if(it&&OUTX.test(it.st||''))return true}catch(e){}
+  try{var K=KEYOUT.nfl&&KEYOUT.nfl[nt(team)];if(K&&keyItems(K).some(function(x){return x.lv==='out'&&normName(x.n)===normName(name)}))return true}catch(e){}
+  try{if(INJO['nfl|'+normName(name)]&&INJO['nfl|'+normName(name)].v==='out')return true}catch(e){}
+  return false;
+}
+depRole=function(lg,team,name){
+  if(lg!=='nfl')return null;var D=S.dep[nt(team)];if(!D)return null;
+  var n=normName(name),res=null;
+  ['qb','rb','wr','te'].forEach(function(p){
+    var L=(D[p]||[]).filter(function(x){return !out186(team,x)}),i=-1;
+    L.forEach(function(x,j){if(i<0&&normName(x)===n)i=j});
+    if(!res&&i>=0)res={pos:p.toUpperCase(),rank:i+1,start:i<DEP_START[p]};
+    if(!res&&(D[p]||[]).some(function(x){return normName(x)===n}))res={pos:p.toUpperCase(),rank:99,start:false,out:true};
+  });
+  return res;
+};
+depStarter=function(lg,team,pos){var D=S.dep[nt(team)];if(!D||!D[pos])return null;var L=D[pos].filter(function(x){return !out186(team,x)});return L[0]||null};
+
+/* ---------- DraftKings player-prop lines ---------- */
+S.dk186=S.dk186||{};S.dkAt186={};
+var DKCAT186={nfl:[[/pass(ing)?\s*y(ar)?ds|passing yards/i,'pass'],[/rush(ing)?\s*y(ar)?ds|rushing yards/i,'rush'],[/rec(eiving)?\s*y(ar)?ds|receiving yards/i,'rec'],[/receptions/i,'recp'],[/anytime.*(td|touchdown)|to score/i,'td']],
+  nba:[[/^(total\s*)?points$|player points|points scored/i,'npts'],[/rebounds/i,'nreb'],[/assists/i,'nast'],[/three|3-?pt|3 point/i,'ntpm']]};
+DKCAT186.ncaafb=[[/pass(ing)?\s*y(ar)?ds|passing yards/i,'cpass'],[/rush(ing)?\s*y(ar)?ds|rushing yards/i,'crush'],[/rec(eiving)?\s*y(ar)?ds|receiving yards/i,'crec']];
+DKCAT186.ncaamb=DKCAT186.nba;
+function dkCat186(lg,s){var L=DKCAT186[lg]||[];for(var i=0;i<L.length;i++){if(/combo|\+|&|alt|1st|first|quarter|half|longest/i.test(s))return null;if(L[i][0].test(s))return L[i][1]}return null}
+function numIn186(o,keys){for(var i=0;i<keys.length;i++){var v=o&&o[keys[i]];if(v!=null&&typeof v==='object')v=v.value!=null?v.value:v.american!=null?v.american:v.displayValue;var n=parseFloat(v);if(isFinite(n))return n}return null}
+function dkLoad186(g){
+  var lg=g.lg,path={nfl:'football/leagues/nfl',nba:'basketball/leagues/nba',ncaafb:'football/leagues/college-football',ncaamb:'basketball/leagues/mens-college-basketball'}[lg];
+  if(!path||!g.sid||window.claude||typeof fetch!=='function')return Promise.resolve();
+  var k=lg+'|'+g.sid;if(S.dkAt186[k]&&Date.now()-S.dkAt186[k]<20*60000)return Promise.resolve();S.dkAt186[k]=Date.now();
+  var base='https://sports.core.api.espn.com/v2/sports/'+path+'/events/'+g.sid+'/competitions/'+g.sid+'/odds';
+  var ids=[];try{ids=[g.aid,g.hid].filter(Boolean)}catch(e){}
+  var rp=Promise.all(ids.map(function(id){return rosIds186(lg,id)}));
+  return getJson(base+'?limit=50').then(function(j){
+    var its=(j&&j.items)||[],dk=null;
+    its.forEach(function(it){var nm=String((it.provider&&(it.provider.name||it.provider.displayName))||'');if(!dk&&/draft\s*kings/i.test(nm))dk=it});
+    var refs=its.map(function(it){return it.$ref}).filter(Boolean);
+    var findDk=dk?Promise.resolve(dk):Promise.all(refs.slice(0,8).map(function(u){return getJson(https186(u)).catch(function(){return null})})).then(function(R){var d=null;R.forEach(function(x){if(!d&&x&&x.provider&&/draft\s*kings/i.test(x.provider.name||''))d=x});return d});
+    return findDk;
+  }).then(function(dk){
+    if(!dk)return null;
+    var pu=dk.propBets&&dk.propBets.$ref?https186(dk.propBets.$ref):(dk.$ref?https186(dk.$ref).replace(/\?.*$/,'')+'/propBets':null);
+    if(!pu)return null;
+    return getJson(pu+(pu.indexOf('?')<0?'?':'&')+'limit=1000');
+  }).then(function(j){
+    if(!j)return;
+    return rp.then(function(){
+      var by={},n=0;
+      ((j&&j.items)||[]).forEach(function(it){
+        var tn=String((it.type&&(it.type.name||it.type.displayName))||it.name||'');var cat=dkCat186(lg,tn);if(!cat)return;
+        var aid=aidOf186(it.athlete&&it.athlete.$ref);var nm=aid&&S.aid186[lg+'|'+aid];if(!nm)return;
+        var cur=it.current||it.odds||it;
+        var ln=numIn186(cur.target||cur,['value','line','total','target'])||numIn186(it.odds&&it.odds.total,['value'])||numIn186(it,['line','total']);
+        var ov=numIn186(cur.over||(it.odds&&it.odds.over)||{},['american','value']),un=numIn186(cur.under||(it.odds&&it.odds.under)||{},['american','value']);
+        if(cat==='td'){var am=numIn186(it.odds||cur,['american','value']);if(am==null)return;by[cat+'|'+normName(nm)]={am:am,n:nm};n++;return}
+        if(ln==null||!(ln>0))return;
+        var key=cat+'|'+normName(nm),sc=Math.abs((ov==null?-110:ov)+110)+Math.abs((un==null?-110:un)+110)+(ov==null||un==null?50:0);
+        if(!by[key]||sc<by[key].sc){by[key]={ln:ln,o:ov,u:un,n:nm,sc:sc};n++}
+      });
+      if(n){S.dk186[k]={at:Date.now(),by:by};try{_grC={}}catch(e){}try{if(S.sheet)renderSheet();else softRender()}catch(e){}}
+    });
+  }).catch(function(){});
+}
+function dkFor186(lg,cat,name){
+  var key=cat+'|'+normName(name),best=null;
+  Object.keys(S.dk186).forEach(function(k){if(k.indexOf(lg+'|')!==0)return;var x=S.dk186[k].by[key];if(x&&(!best||S.dk186[k].at>best.at))best={at:S.dk186[k].at,x:x}});
+  return best?best.x:null;
+}
+/* load lines for the next day's games in the background, and whenever a game is opened */
+function dkSweep186(){
+  ['nfl','nba'].forEach(function(lg){(S.feed[lg]||[]).forEach(function(g){if(kind(g)==='up'&&g.start-Date.now()<40*3600e3)dkLoad186(g)})});
+}
+setTimeout(function(){try{dkSweep186()}catch(e){}},9000);
+setInterval(function(){try{dkSweep186()}catch(e){}},30*60000);
+var feedSheet186=feedSheet;
+feedSheet=function(g){
+  try{if(kind(g)==='up'){dkLoad186(g);if(g.lg==='nfl'&&Date.now()-S.depAt>60*60000)loadDepth(true)}}catch(e){}
+  var h=feedSheet186.apply(this,arguments);
+  try{
+    if(g.lg==='nfl'){
+      var msg=S.depMsg?esc(S.depMsg)+'. Players ruled out are skipped, so the next man up counts as the starter.':'';
+      h=h.replace('Depth chart could not be loaded, so starters come from rosters and the injury report only.',S.depMsg&&/updated/.test(S.depMsg)?msg:'Depth chart could not be loaded yet, so starters come from rosters and the injury report only.');
+    }
+    var has=S.dk186[g.lg+'|'+g.sid];
+    var note=has?'Prop lines are DraftKings’ (the same lines ESPN shows), read '+new Date(has.at).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})+'. Players without a DraftKings line use their season average.':'DraftKings prop lines are not posted for this game yet, so each line is the player’s season average.';
+    h=h.replace('The line is each player’s season average, fixed for this game.',esc(note));
+  }catch(e){}
+  return h;
+};
+/* the line: DraftKings when posted, otherwise the season-average line */
+var pbLine186=pbLine;
+pbLine=function(lg,cat,n,proj){
+  var own=PB_L[pbLKey(lg,cat,n)];if(own!=null)return {v:own,own:true};
+  var d=dkFor186(lg,cat,n);
+  if(d&&d.ln>0)return {v:d.ln,own:false,base:'dk',o:d.o,u:d.u};
+  return pbLine186.apply(this,arguments);
 };
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
