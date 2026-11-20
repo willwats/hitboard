@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v246, Nov 20';
+var BUILD='v247, Nov 20';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -4497,7 +4497,7 @@ document.addEventListener('click',function(e){
   else if(act==='hbcopy'){hbCopy(el.dataset.lg,el.dataset.t)}
   else if(act==='hbprop'){hbProp(el.dataset.i)}
   else if(act==='tour'){tourStart()}
-  else if(act==='bbgame'){S.sheet={type:'fgame',id:el.dataset.id,why:{t:el.dataset.t}};var bg0=find(el.dataset.id);if(bg0){try{loadStats(bg0)}catch(e3){}if(kind(bg0)!=='final')trendEnsure(bg0);try{if(wxLeagueOn(bg0.lg))wxEnsure(bg0).then(function(){if(S.sheet&&S.sheet.id===bg0.id)renderSheet()})}catch(e4){}}renderSheet()}
+  else if(act==='bbgame'){S.sheet={type:'fgame',id:el.dataset.id,why:{t:el.dataset.t}};var bg0=find(el.dataset.id);if(bg0){try{loadStats(bg0)}catch(e3){}try{if(kind(bg0)!=='final')trendEnsure(bg0)}catch(e8){}try{if(wxLeagueOn(bg0.lg))wxEnsure(bg0).then(function(){if(S.sheet&&S.sheet.id===bg0.id)renderSheet()})}catch(e4){}}renderSheet()}
   else if(act==='phk'){S.phk[el.dataset.key]=el.dataset.v;renderSheet()}
   else if(act==='thin'){S.thin=el.dataset.v==='true';render()}
   else if(act==='phcopy'){var tx=phCard();try{navigator.clipboard.writeText(tx).then(function(){el.textContent='Copied'},function(){hbCopyOld(tx);el.textContent='Copied'})}catch(e2){hbCopyOld(tx);el.textContent='Copied'}}
@@ -4510,7 +4510,7 @@ document.addEventListener('click',function(e){
   else if(act==='dmore'){S.dmore=true;render()}
   else if(act==='gprops'){S.gf=el.dataset.id;S.tab='props';S.sport='nfl';S.cat='calc';render();scTop()}
   else if(act==='game'){S.sheet={type:'game',id:el.dataset.id};var gw=gameById(el.dataset.id),fw=gw&&feedFor(gw);if(gw)loadWx(gw.h).then(function(){if(S.sheet&&S.sheet.id===gw.id)renderSheet()});renderSheet()}
-  else if(act==='fgame'){S.sheet={type:'fgame',id:el.dataset.id};var fg0=find(el.dataset.id);if(fg0)loadStats(fg0);if(fg0&&kind(fg0)!=='final')trendEnsure(fg0);if(fg0&&wxLeagueOn(fg0.lg))wxEnsure(fg0).then(function(){if(S.sheet&&S.sheet.id===fg0.id)renderSheet()});renderSheet()}
+  else if(act==='fgame'){S.sheet={type:'fgame',id:el.dataset.id};var fg0=find(el.dataset.id);try{if(fg0)loadStats(fg0)}catch(e5){}try{if(fg0&&kind(fg0)!=='final')trendEnsure(fg0)}catch(e6){}try{if(fg0&&wxLeagueOn(fg0.lg))wxEnsure(fg0).then(function(){if(S.sheet&&S.sheet.id===fg0.id)renderSheet()})}catch(e7){}renderSheet()}
   else if(act==='prop'){openProp(el.dataset.id)}
   else if(act==='prof'){var d2=el.dataset;S.sheet={type:'prof',name:d2.n,lg:d2.lg,team:d2.team,pid:d2.id||'',si:0,ti:0};renderSheet();loadProf(S.sheet)}
   else if(act==='profs'){if(S.sheet&&S.sheet.type==='prof'){S.sheet.si=+el.dataset.v;S.sheet.ti=0;renderSheet()}}
@@ -16338,6 +16338,32 @@ feedSheet=function(g){
   try{var rep=report187(g);if(rep){var mk2='<h2 style="margin:22px 0 8px;font-size:19px">2 · Expert picks</h2>';var i=h.indexOf(mk2);h=i>=0?h.slice(0,i)+rep+h.slice(i):h}}catch(e){}
   return h;
 };
+
+/* v247: college football Week 12 expert picks (entered Nov 20), with the matchup breakdowns behind them */
+(function(){
+  var C=[
+   XC(['lsu'],['volunteers'],'h','h','Tennessee +1.5','One writer takes Tennessee to win outright at home; lean Under 45.5',['Tennessee is second nationally in sacks (39) and third in havoc rate.','LSU QB Sam Leavitt has six interceptions and five touchdown passes in four games against ranked teams.','LSU’s run defense ranks 41st in rush success rate, while Tennessee ranks 11th in efficiency per rush.'],['Expected to be low scoring.']),
+   XC(['bulldogs','georgia'],['gamecocks'],'a','a','Georgia -14.5','The writer takes Georgia to cover; lean Over 50.5',['Georgia is 8-2 against the spread and covered its last three by an average of 16.5.','Georgia is third in offensive success rate; South Carolina’s defense ranks 111th.'],['South Carolina QB LaNorris Sellers is expected back on a hurt ankle.']),
+   XC(['buckeyes'],['cornhuskers'],'a','a','Ohio State -3.5','The writer takes Ohio State; lean Under 42.5',['Ohio State’s defense is fifth in success rate.','Nebraska started 5-0, then went 1-4, scoring about 17 a game since Week 6.','WR Jeremiah Smith has 28 catches for 333 yards and three touchdowns in QB Luke Fahey’s three starts.'],['Nebraska is without CB Andrew Marshall.']),
+   XC(['mustangs'],['fighting irish'],'h','h','Notre Dame -20.5','The writer takes Notre Dame; lean Over 55.5',['Notre Dame has won all eight games as a 20-point favorite by double digits.','SMU QB Kevin Jennings has 13 turnover-worthy plays.','Notre Dame’s offense leads the nation in available yards gained.'],[]),
+   XC(['kentucky'],['missouri'],'h','h','Missouri -5.5','The writer takes Missouri; lean Over 48.5',['Kentucky has failed to cover two straight and its defense ranks 110th in success rate.','Missouri QB Austin Simmons runs an offense 28th in efficiency per dropback behind a strong line.','Kentucky QB Kenny Minchey has eight turnover-worthy plays in his last two games.'],[]),
+   XC(['mountaineers'],['houston'],'h','h','Houston -7.5','The writer takes Houston; lean Over 70.5',['Houston leads the nation in offensive success rate and QB Conner Weigman is top 10 in QBR.','West Virginia ranks 126th in success rate allowed.'],['Houston is coming off an upset loss to Colorado. Michael Hawkins Jr. is questionable.']),
+   XC(['red raiders'],['baylor'],'a','a','Texas Tech -3.5','The writer takes Texas Tech; lean Under 56.5',['Since Thomas Castellanos took over at QB, Texas Tech averages 46 points and 517 yards a game.','Baylor QB DJ Lagway has 12 turnover-worthy plays in eight games.'],['A win clinches Texas Tech a spot in the Big 12 title game.']),
+   XC(['bruins'],['wolverines'],'a','a','UCLA -3.5','Two writers take UCLA; lean Under 36.5',['UCLA is 10-0 and 9-1 against the spread; its defense is first in efficiency per dropback.','Michigan has scored more than seven points in only one of its last four games and averages about 12 against Top 25 teams.'],['Michigan’s defense is good enough to keep it close.']),
+   XC(['hoosiers'],['washington huskies'],'a','a','Indiana -7.5','A writer and a computer model take Indiana; they split on the total (43.5)',['Indiana allows 12.5 points a game, fourth in the country.','Washington is 0-6 against the spread at home and ranks 111th in efficiency per rush.','QB Grant Wilson threw for 305 yards in his first start, a win over USC.'],['A win sends Indiana to the Big Ten title game.']),
+   XC(['aggies'],['sooners'],'h','a','Oklahoma -7.5','The writer expects Oklahoma to win but takes Texas A&M and the points; lean Under 38.5',['Oklahoma runs first, and QB John Mateer’s passes have been short under interim coordinator Jason Witten.','Texas A&M is 13th in rush success rate.'],['Expected to be low scoring.']),
+   XC(['fighting illini'],['hawkeyes'],'h','h','Iowa -7.5','The writer takes Iowa; lean Under 41.5',['Iowa has covered three straight, winning by an average of 27 to 6.','Illinois’ defense ranks 124th in success rate allowed.'],['Illinois QB Katin Houser is doubtful.']),
+   XC(['hokies'],['hurricanes'],'h','h','Miami -20.5','The writer takes Miami; lean Over 60.5',['Virginia Tech is 2-5 against the spread in ACC play and has allowed 40-plus points in back-to-back games.','Miami’s offense is first in efficiency per dropback.'],['Miami WR Malachi Toney is out.']),
+   XC(['aztecs'],['boise'],'h','h','Boise State -16.5','The writer takes Boise State; lean Over 61.5',['Boise QB Maddux Madsen is second in QBR and RB Dylan Riley is third in rushing yards (1,291).','San Diego State’s defense ranks 134th in success rate allowed.'],[]),
+   XC(['razorbacks'],['longhorns'],'h','h','Texas -20.5','A writer and a computer model take Texas; the model projects about a 30-point win',['Texas has won four straight and is third in success rate allowed.','Arkansas has scored more than 23 points only twice in eight Power Four games, and QB KJ Jackson has more interceptions than touchdowns on the road.'],['Lean: Under 46.5.']),
+   XC(['terrapins'],['trojans'],'h','h','USC -17.5','A writer and a computer model take USC; they split on the total (57.5)',['Maryland’s offense ranks 123rd in success rate and travels cross-country after an upset of Wisconsin.','The model projects USC 38, Maryland 14, with about 300 passing yards for Jayden Maiava.'],[]),
+   XC(['commodores'],['gators'],'h','a','Florida -13.5','The writer expects Florida to win but takes Vanderbilt and the points; lean Over 47.5',['Florida is 3-4 against the spread since Week 4 and has lost outright as a favorite three times.','Possible letdown after Florida’s upset of Kentucky.'],[]),
+   XC(['byu'],['jayhawks'],'a','a','BYU -5.5','Two writers take BYU',['BYU’s defense allows 4.59 yards per play, fifth in the country.','Kansas converts only 36% of third downs (112th); BYU’s offense is 10th on third down.'],['BYU has been inconsistent on the road.']),
+   XC(['yellow jackets'],['demon deacons'],'h','h','Wake Forest -20.5','The writer takes Wake Forest',['Wake Forest averages 7.68 yards per play (second) and allows 4.51 (best in the country).','Wake Forest is 8-2 against the spread; Georgia Tech is 2-8 and converts 31.5% of third downs (131st).'],[])
+  ];
+  EXPERTS=EXPERTS.filter(function(e){return e.lg!=='ncaafb'}).concat(C);
+  EXP_AT='Nov 20';
+})();
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
