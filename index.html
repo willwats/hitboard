@@ -182,6 +182,27 @@ details.more{margin-top:16px;border-top:1px solid rgba(128,128,128,.3)}details.m
 <script>
 (function(){
 "use strict";
+/* v250: faster dates. Building a new date formatter on every call was the single biggest cause of lag when opening a game.
+   The same formatter is now reused for the same settings; output is unchanged. */
+(function(){
+  if(typeof Intl==='undefined'||!Intl.DateTimeFormat||Date.prototype.__hbfast)return;
+  var C={},DF=['weekday','era','year','month','day','dateStyle'],TF=['dayPeriod','hour','minute','second','fractionalSecondDigits','timeStyle'];
+  var has=function(o,L){for(var i=0;i<L.length;i++)if(o[L[i]]!==undefined)return true;return false};
+  var wrap=function(name,need){
+    var orig=Date.prototype[name];
+    Date.prototype[name]=function(loc,opt){
+      if(!opt||typeof opt!=='object'||isNaN(this.getTime())||!need(opt))return orig.apply(this,arguments);
+      var k;try{k=String(loc)+'|'+JSON.stringify(opt)}catch(e){return orig.apply(this,arguments)}
+      var f=C[k];
+      if(!f){try{f=C[k]=new Intl.DateTimeFormat(loc,opt)}catch(e){return orig.apply(this,arguments)}}
+      return f.format(this);
+    };
+  };
+  wrap('toLocaleString',function(o){return has(o,DF)||has(o,TF)});
+  wrap('toLocaleDateString',function(o){return has(o,DF)&&!has(o,['timeStyle'])});
+  wrap('toLocaleTimeString',function(o){return has(o,TF)&&!has(o,['dateStyle'])});
+  Date.prototype.__hbfast=1;
+})();
 /* =====================================================================
    DATA BLOCK. Replaced each week by the refresh task. Everything below
    the "LOGIC" marker reads from this object and needs no changes.
@@ -1936,7 +1957,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v249, Nov 20';
+var BUILD='v250, Nov 20';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -16481,6 +16502,42 @@ report187=function(g){
    ['Cardinals at Chiefs','Travis Kelce','receiving yards','Over','40.5','About 57 receiving yards a game, a full practice week, and Kenneth Walker III is out, which leaves more on the passing game.'],
    ['Ravens at Panthers','Mark Andrews','receiving yards','Over','33.5','Dropped his hand protection last week and caught 8 for 82. Jacoby Brissett throws to tight ends more often than almost any quarterback.']
   ].forEach(function(x){if(!PROP_X.some(function(y){return y.lg==='nfl'&&y.p===x[1]&&y.m===x[2]&&y.until>=U}))PROP_X.push({lg:'nfl',until:U,game:x[0],p:x[1],m:x[2],s:x[3],l:x[4],why:x[5]})});
+})();
+/* v250: speed. The same answers, computed less often: player-name cleanup, game times and each team's next opponent
+   are remembered instead of being worked out again hundreds of times per screen. */
+(function(){
+  var NN=new Map(),nn0=normName;
+  normName=function(n){var k=n==null?'':String(n),v=NN.get(k);if(v===undefined){v=nn0(k);if(NN.size>20000)NN.clear();NN.set(k,v)}return v};
+  var NK=new Map(),nk0=nameKeys;
+  nameKeys=function(n){var k=n==null?'':String(n),v=NK.get(k);if(!v){v=nk0(k);if(NK.size>20000)NK.clear();NK.set(k,v)}return v.slice()};
+  var ft=null,fc=null;
+  try{ft=new Intl.DateTimeFormat([],{weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});fc=new Intl.DateTimeFormat([],{hour:'numeric',minute:'2-digit'})}catch(e){}
+  var ft0=fmtTime,fc0=fmtClock;
+  if(ft)fmtTime=function(ms){var d=new Date(ms);return isNaN(d.getTime())?ft0(ms):ft.format(d)};
+  if(fc)fmtClock=function(ms){var d=new Date(ms);return isNaN(d.getTime())?fc0(ms):fc.format(d)};
+  var no0=nextOpp,NO={},noFeed=null,noMin=-1;
+  nextOpp=function(team){
+    var f=S.feed&&S.feed.nfl,m=Math.floor(Date.now()/6e4);
+    if(f!==noFeed||m!==noMin||(f&&f.length!==NO.__n)){NO={__n:f&&f.length};noFeed=f;noMin=m}
+    if(!Object.prototype.hasOwnProperty.call(NO,team))NO[team]=no0.apply(this,arguments);
+    var v=NO[team];if(v&&typeof v==='object'){var o={};for(var k in v)o[k]=v[k];return o}return v;
+  };
+  /* One tap used to rebuild the same player-prop lists hundreds of times (about 300 times for one game window).
+     They are now built once per screen update and reused until the screen finishes drawing. */
+  var TC={},tcOn=false;
+  var tcKey=function(name,args){var a=[];for(var i=0;i<args.length;i++){var x=args[i];a.push(x==null||typeof x!=='object'?String(x):'#')}
+    for(var j=0;j<args.length;j++)if(args[j]!=null&&typeof args[j]==='object')return null;
+    return name+'|'+a.join(',')+'|'+S.dk+'|'+S.thin+'|'+S.sport+'|'+(typeof SP_ONLY!=='undefined'&&SP_ONLY?Object.keys(SP_ONLY).sort().join(','):'-')};
+  var tcCopy=function(v){return Array.isArray(v)?v.map(function(r){if(r&&typeof r==='object'&&!Array.isArray(r)){var o={};for(var k in r)o[k]=r[k];return o}return r}):v};
+  var memo=function(name,fn){return function(){
+    var k=null;try{k=tcKey(name,arguments)}catch(e){}
+    if(k==null)return fn.apply(this,arguments);
+    if(!tcOn){tcOn=true;setTimeout(function(){TC={};tcOn=false},0)}
+    if(!Object.prototype.hasOwnProperty.call(TC,k))TC[k]=fn.apply(this,arguments);
+    return tcCopy(TC[k]);
+  }};
+  deepRows=memo('deep',deepRows);
+  spRows=memo('sp',spRows);
 })();
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
