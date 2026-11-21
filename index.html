@@ -1936,7 +1936,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v248, Nov 20';
+var BUILD='v249, Nov 20';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -16441,6 +16441,47 @@ report187=function(g){
   add(['hurricanes'],'WR','Malachi Toney','Out');
 })();
 
+/* v249: NFL Week 11 player-prop expert picks and notable injuries (entered Nov 20). A newer status replaces an older one for the same player. */
+(function(){
+  var nm=function(s){return normName(String(s).replace(/:[a-z]+$/,'').replace(/^\S+\s+/,''))};
+  var add=function(t,s){var T=KEYOUT.nfl[t]||(KEYOUT.nfl[t]={items:[],chg:[]});T.items=T.items.filter(function(x){return nm(x)!==nm(s)});T.items.push(s)};
+  var drop=function(t,n){var T=KEYOUT.nfl[t];if(T)T.items=T.items.filter(function(x){return nm(x)!==normName(n)})};
+  drop('MIN','T.J. Hockenson');
+  add('MIN','QB Kyler Murray:o');add('MIN','WR Jordan Addison:o');
+  add('BAL','QB Lamar Jackson:o');
+  add('MIA','QB Malik Willis:o');
+  add('PHI','QB Jalen Hurts:o');add('PHI','WR Dontayvion Wicks:o');
+  add('NYG','QB Jaxson Dart:o');
+  add('ARI','QB Gardner Minshew:o');
+  add('TB','QB Baker Mayfield:q');
+  add('KC','RB Kenneth Walker III:o');
+  add('BUF','TE Dalton Kincaid:d');
+  add('NYJ','WR Omar Cooper Jr.:o');
+  add('TEN',"WR Wan'Dale Robinson:o");add('TEN','WR Carnell Tate:q');
+  add('DAL','TE Jake Ferguson:o');
+  add('WAS','WR Terry McLaurin:o');
+  add('NO','C Erik McCoy:o');add('NO','T Taliese Fuaga:o');
+  add('SF','WR Mike Evans:q');
+  add('LV','TE Brock Bowers:q');
+})();
+(function(){
+  var U=Date.UTC(2026,10,24,11);
+  [['Dolphins at Bills','James Cook III','rushing yards','Over','89.5','90-plus rushing yards in six of nine games and 344 on 70 carries over his last three. Miami allows 4.0 yards a carry.'],
+   ['Dolphins at Bills','Khalil Shakir','receiving yards','Over','32.5','Averages about 49 receiving yards a game, and Dalton Kincaid is doubtful.'],
+   ['Dolphins at Bills','Ray Davis','rushing yards','Over','19.5','His snap share hit a season high last week, and Buffalo is a big favorite likely to run late. Miami is 25th in yards per carry allowed and down several defensive tackles.'],
+   ['Dolphins at Bills','DJ Moore','touchdown','Yes','anytime','Scored in three games, including 4 catches for 90 yards and a touchdown last week.'],
+   ['Vikings at 49ers','Christian McCaffrey','rushing yards','Under','74.5','Under this mark in eight of nine games, with a median of 64 rushing yards.'],
+   ['Vikings at 49ers','Justin Jefferson','touchdown','Yes','anytime','Four touchdowns in eight games, scoring in half of them, though his output has been uneven with Kyler Murray out.'],
+   ["Bengals at Commanders","Ja'Marr Chase",'receptions','Over','7.5','32 catches over his last three games and eight or more in four of nine. Washington has allowed 217 completions.'],
+   ['Bengals at Commanders','Stefon Diggs','touchdown','Yes','anytime','Six touchdowns this season, including one last week on 6 catches for 83 yards.'],
+   ['Titans at Cowboys','Tony Pollard','touchdown','Yes','anytime','Six rushing touchdowns on 133 carries (4.5 a carry) and 99 total yards with a score last week.'],
+   ['Titans at Cowboys','Carnell Tate','receiving yards','Over','65.5','145, 6, 70 and 69 yards in his last four; about a 23% target share without Wan’Dale Robinson, who is out. Dallas allows 8.7 yards per target. He is questionable with a shoulder injury.'],
+   ['Jaguars at Giants','Parker Washington','touchdown','Yes','anytime','Six receiving touchdowns in nine games at 17.9 yards a catch, with 152 yards and a score last week.'],
+   ['Cardinals at Chiefs','Patrick Mahomes','passing + rushing yards','Over','258.5','363 combined yards last week and about 36 pass attempts a game over his last three. The risk is a big early lead that slows the passing.'],
+   ['Cardinals at Chiefs','Travis Kelce','receiving yards','Over','40.5','About 57 receiving yards a game, a full practice week, and Kenneth Walker III is out, which leaves more on the passing game.'],
+   ['Ravens at Panthers','Mark Andrews','receiving yards','Over','33.5','Dropped his hand protection last week and caught 8 for 82. Jacoby Brissett throws to tight ends more often than almost any quarterback.']
+  ].forEach(function(x){if(!PROP_X.some(function(y){return y.lg==='nfl'&&y.p===x[1]&&y.m===x[2]&&y.until>=U}))PROP_X.push({lg:'nfl',until:U,game:x[0],p:x[1],m:x[2],s:x[3],l:x[4],why:x[5]})});
+})();
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
 setTimeout(function(){doRefresh(true)},600);
