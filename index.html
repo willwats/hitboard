@@ -1957,7 +1957,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v255, Nov 21';
+var BUILD='v256, Nov 21';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -16713,6 +16713,238 @@ document.addEventListener('click',function(e){
     if(!e.isTrusted){handledAt=Date.now();hx=lastUp.x;hy=lastUp.y;return}
     if(Date.now()-handledAt<800&&Math.abs(e.clientX-hx)<30&&Math.abs(e.clientY-hy)<30){e.stopImmediatePropagation();e.preventDefault()}
   },true);
+})();
+/* v256: a cleaner Games tab and a Deep dive for every game.
+   Games: one section per sport (tap the header to fold it), split by day and kickoff time, with tidier game cards that show
+   team colors, rankings, records, the line, Hitboard's best outcome and what the experts say.
+   Deep dive: every game window opens with one recommended outcome. It weighs the model's chance for the spread, the winner
+   and the total, Hitboard's grade, the expert picks and research entered this week, line movement, injuries, the matchup
+   and weather, then names the strongest play, how confident the app is, why, and what could go wrong. */
+
+/* team colors, rankings and records from the scoreboard */
+(function(){
+  var en0=espnNorm;
+  espnNorm=function(lg,events){
+    var out=en0.apply(this,arguments);
+    try{
+      var X={};
+      (events||[]).forEach(function(e){
+        var c=e.competitions&&e.competitions[0];if(!c||!c.competitors)return;
+        var o={};c.competitors.forEach(function(x){
+          var s=x.homeAway==='home'?'h':'a',t=x.team||{},r=(x.records&&x.records[0]&&x.records[0].summary)||'',rk=x.curatedRank&&x.curatedRank.current;
+          o[s]={c:t.color?'#'+String(t.color).replace('#',''):'',r:r,k:rk&&rk<=25?rk:null};
+        });
+        X[e.id]=o;
+      });
+      out.forEach(function(g){var o=X[g.sid];if(o){g.tc={a:o.a&&o.a.c,h:o.h&&o.h.c};g.rec={a:o.a&&o.a.r,h:o.h&&o.h.r};g.rk={a:o.a&&o.a.k,h:o.h&&o.h.k}}});
+    }catch(e){}
+    return out;
+  };
+})();
+
+/* ---------- the deep dive ---------- */
+var _dd256={};
+function ddFor(g){
+  var key=g.id+'|'+S.feedAt+'|'+Math.floor(Date.now()/120000);
+  if(_dd256[g.id]&&_dd256[g.id].k===key)return _dd256[g.id].v;
+  var v=ddBuild(g);_dd256[g.id]={k:key,v:v};return v;
+}
+function ddCached(g){var c=_dd256[g.id];return c&&c.k===g.id+'|'+S.feedAt+'|'+Math.floor(Date.now()/120000)?c.v:undefined}
+function ddBuild(g){
+  var out={mk:[],best:null,why:[],risk:[],pred:null,e:null,na:'',nh:''};
+  if(kind(g)!=='up')return out;
+  var na=shortNm(g,'a'),nh=shortNm(g,'h');out.na=na;out.nh=nh;
+  var nm=function(s){return s==='a'?na:s==='h'?nh:''};
+  var m=null;try{m=pickModel(g)}catch(e){}
+  try{if(m&&m.M!=null){var L=m.ln&&m.ln.pts!=null?m.mk:0,ps=predScore(g,m,L,na,nh);if(ps)out.pred={a:ps.a,h:ps.h}}}catch(e){}
+  var pk=[],hv={},e=null;
+  try{pk=picksFor(g)||[]}catch(x){}
+  try{hv=hbGradesFor(g)||{}}catch(x){}
+  try{e=expFor(g)}catch(x){}
+  out.e=e;
+  var er=null;try{er=e?expRatio(e):null}catch(x){}
+  var etxt=e?String(e.ag||'')+' '+[].concat(e.why||[],e.watch||[],e.tr||[]).join(' '):'';
+  var eTot=e&&e.tot?e.tot:(/\blean (over|under)\b/i.test(String(e&&e.ag||''))?(/\blean over\b/i.test(e.ag)?'o':'u'):null);
+  var sp=g.dk&&g.dk.sp,op=g.dk&&g.dk.open||{};
+  var homeLine=sp?(sp.fav==='h'?-sp.pts:sp.pts):null;
+  ['sp','ml','tot'].forEach(function(t){
+    var x=pk.filter(function(q){return q&&q.t===t})[0],gr=hv[t];
+    if(!x&&!gr)return;
+    var base=gr&&gr.sum!=null?hbScore(gr.sum):(x&&x.p!=null?Math.round(x.p*100):null);if(base==null)return;
+    var side=x?(t==='tot'?(x.over?'o':'u'):x.side):null;
+    var o={t:t,pick:(x&&x.pick)||(gr&&gr.pick)||'',p:x&&x.p!=null?x.p:null,grade:gr?gr.l:null,base:base,adj:0,plus:[],minus:[],side:side,x:x};
+    /* experts */
+    if(e){
+      var w=er!=null?Math.max(.5,Math.min(1.5,er*1.5)):1;
+      if(t==='sp'&&e.cov&&side){if(e.cov===side){o.adj+=Math.round(5*w);o.plus.push('The experts also take '+nm(side)+' to cover ('+e.ln+').')}else{o.adj-=Math.round(5*w);o.minus.push('The experts take '+nm(e.cov)+' to cover instead ('+e.ln+').')}}
+      if(t==='ml'&&e.win&&side){if(e.win===side){o.adj+=3;o.plus.push('The experts also pick '+nm(side)+' to win.')}else{o.adj-=4;o.minus.push('The experts pick '+nm(e.win)+' to win.')}}
+      if(t==='tot'&&eTot&&side){if(eTot===side){o.adj+=3;o.plus.push('Expert lean on the total matches: '+(side==='o'?'Over':'Under')+'.')}else{o.adj-=3;o.minus.push('Expert lean on the total is the '+(eTot==='o'?'Over':'Under')+'.')}}
+    }
+    /* line movement since open */
+    try{
+      if(t==='sp'&&side&&homeLine!=null&&op.spH!=null&&Math.abs(homeLine-op.spH)>=1){
+        var toHome=homeLine<op.spH,good=(side==='h')===toHome;
+        if(good){o.adj+=2;o.plus.push('The line has moved toward '+nm(side)+' since it opened ('+sgn(op.spH)+' to '+sgn(homeLine)+' for '+nh+'), so the market agrees.')}
+        else{o.adj-=1;o.plus.push('The line moved away from '+nm(side)+' since it opened ('+sgn(op.spH)+' to '+sgn(homeLine)+' for '+nh+'), which gives this side a better number.')}
+      }
+      if(t==='tot'&&side&&g.dk.tt!=null&&op.tt!=null&&Math.abs(g.dk.tt-op.tt)>=1){
+        var up=g.dk.tt>op.tt,ag=(side==='o')===up;
+        if(ag){o.adj+=1;o.plus.push('The total moved '+(up?'up':'down')+' from '+op.tt+' to '+g.dk.tt+', the same way as this pick.')}else o.minus.push('The total moved '+(up?'up':'down')+' from '+op.tt+' to '+g.dk.tt+', against this pick.');
+      }
+    }catch(x2){}
+    /* price: what the bet has to win to break even */
+    try{
+      if(o.p!=null&&side){
+        var d0=g.dk||{},px=d0.px||{},pr=null;
+        if(t==='ml'&&d0.ml)pr=side==='h'?d0.ml.h:d0.ml.a;
+        else if(t==='sp')pr=side==='h'?px.sh:px.sa;
+        else if(t==='tot')pr=side==='o'?px.to:px.tu;
+        if(pr==null)pr=-110;
+        var be=pr<0?(-pr)/(-pr+100):100/(pr+100),val=o.p-be;
+        o.be=be;o.pr=pr;
+        if(val<0){o.adj-=Math.min(20,Math.round(-val*100));o.minus.push('At '+prc(pr)+' this needs to win '+Math.round(be*100)+'% of the time to break even; the model gives it '+Math.round(o.p*100)+'%.')}
+        else if(val>=.03)o.plus.push('The model gives it '+Math.round(o.p*100)+'%, above the '+Math.round(be*100)+'% the '+prc(pr)+' price needs.');
+      }
+    }catch(x3){}
+    if(o.p!=null&&o.p<.55)o.minus.push('The model’s chance is only '+Math.round(o.p*100)+'%, close to a coin flip.');
+    o.score=Math.max(1,Math.min(99,o.base+o.adj));
+    out.mk.push(o);
+  });
+  if(out.mk.length){
+    var b=out.mk.slice().sort(function(a,c){return c.score-a.score})[0];
+    b.conf=b.score>=72?'Strong':b.score>=62?'Lean':'Small edge';
+    out.best=b;
+  }
+  /* reasons */
+  try{var GS=gameScript(g),okS=function(s){return !/prop spots|over \d|under \d/i.test(String(s))};if(GS&&GS.full)GS.full.filter(okS).slice(0,3).forEach(function(s){out.why.push(s)});if(GS&&GS.more)GS.more.filter(okS).slice(0,2).forEach(function(s){out.why.push(s)})}catch(x){}
+  if(e&&e.why)[].concat(e.why).slice(0,3).forEach(function(s){out.why.push(s)});
+  if(out.best)out.best.plus.forEach(function(s){out.why.push(s)});
+  /* risks */
+  if(out.best)out.best.minus.forEach(function(s){out.risk.push(s)});
+  try{var J=injAdj189(g);if(J&&J.notes)J.notes.forEach(function(n){out.risk.push(nm(n.s)+' injuries: '+n.who.slice(0,4).join(', ')+' (about '+n.pts.toFixed(1)+' points in the projection).')})}catch(x){}
+  if(e){[].concat(e.watch||[],e.tr||[]).slice(0,3).forEach(function(s){out.risk.push(s)})}
+  try{var wx=wxShort(g);if(wx){var wt=String(wx).replace(/<[^>]+>/g,'');if(/wind|rain|snow|storm|cold|°/i.test(wt))out.risk.push('Weather: '+wt)}}catch(x){}
+  var seen={};out.why=out.why.filter(function(s){s=String(s);if(!s||seen[s])return false;seen[s]=1;return true}).slice(0,7);
+  out.risk=out.risk.filter(function(s){s=String(s);if(!s||seen[s])return false;seen[s]=1;return true}).slice(0,6);
+  return out;
+}
+function ddConfPill(b){if(!b)return '';var c=b.conf==='Strong'?'hi':b.conf==='Lean'?'':'lo';return '<span class="hrpill '+c+'" style="display:inline-block;font-weight:700">'+esc(b.conf)+' · '+b.score+'</span>'}
+var MKN256={sp:'Spread',ml:'Winner',tot:'Total'};
+function ddHtml(g){
+  if(kind(g)!=='up')return '';
+  var d=null;try{d=ddFor(g)}catch(e){d=null}
+  var h='<h2 style="margin:18px 0 8px;font-size:19px">Deep dive</h2>';
+  if(!d||!d.best){
+    h+='<div class="card dd256"><p class="src" style="margin:0">Not enough data yet for a recommended outcome in this game. It fills in once the app has read both teams’ results and a line is posted.</p>';
+    if(d&&d.e)h+='<p style="margin:8px 0 0"><b>Experts:</b> '+esc(d.e.ln||'')+' · '+esc(d.e.ag||'')+'</p>';
+    return h+'</div>';
+  }
+  var b=d.best;
+  h+='<div class="card dd256"><div class="src" style="text-transform:uppercase;letter-spacing:.06em;font-size:11px">Best outcome · '+esc(MKN256[b.t])+'</div>'+
+    '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin:4px 0 6px"><div class="dd-pick">'+esc(b.pick)+'</div>'+ddConfPill(b)+'</div>';
+  if(d.pred)h+='<div class="src">Projected score: '+esc(d.pred.h>=d.pred.a?d.nh+' '+Math.round(d.pred.h)+', '+d.na+' '+Math.round(d.pred.a):d.na+' '+Math.round(d.pred.a)+', '+d.nh+' '+Math.round(d.pred.h))+'</div>';
+  h+='<div class="dd-rows">'+d.mk.map(function(o){
+      var ex=o.plus.some(function(s){return /expert/i.test(s)})?' · <span class="ok256">experts agree</span>':o.minus.some(function(s){return /expert/i.test(s)})?' · <span class="no256">experts disagree</span>':'';
+      return '<div class="dd-row'+(o===b?' dd-best':'')+'"><div><span class="src">'+esc(MKN256[o.t])+'</span><div><b>'+esc(o.pick)+'</b></div></div><div class="dd-r">'+(o.p!=null?Math.round(o.p*100)+'% chance':'')+'<div><b>'+o.score+'</b>'+(o.grade?' <span class="src">('+esc(o.grade)+')</span>':'')+ex+'</div></div></div>'}).join('')+'</div>';
+  if(d.why.length)h+='<div class="dd-h">Why</div><ul class="pts" style="margin:4px 0 0">'+d.why.map(function(s){return '<li>'+esc(s)+'</li>'}).join('')+'</ul>';
+  if(d.risk.length)h+='<div class="dd-h">What could go wrong</div><ul class="pts" style="margin:4px 0 0">'+d.risk.map(function(s){return '<li>'+esc(s)+'</li>'}).join('')+'</ul>';
+  if(d.e)h+='<p class="src" style="margin:10px 0 0">Expert research entered '+esc(EXP_AT)+': '+esc(d.e.ln||'')+' · '+esc(d.e.ag||'')+'</p>';
+  h+='<p class="src" style="margin:8px 0 0">Score out of 100: Hitboard’s grade for that bet, raised or lowered for the experts, line movement and the other signals. Strong is 72 and up, Lean 62 to 71. A guide, not a guarantee.</p>';
+  if(b.x){var lg0=gameLeg(g,b.x),on=inSlip(lg0.key);h+='<div style="margin-top:10px"><button class="btn'+(on?'':' primary')+'" data-act="gsadd" data-id="'+esc(g.id)+'" data-pk="'+esc(b.x.pick)+'">'+(on?'In slip ✓':'+ Add best outcome to slip')+'</button></div>'}
+  return h+'</div>';
+}
+(function(){
+  var fs0=feedSheet;
+  feedSheet=function(g){
+    var h=fs0.apply(this,arguments);
+    try{
+      if(kind(g)!=='up')return h;
+      var dd=ddHtml(g);if(!dd)return h;
+      var i=h.indexOf('<h2 style="margin:22px 0 8px;font-size:19px">1 · ');
+      if(i<0)i=h.indexOf('<h3');
+      return i>=0?h.slice(0,i)+dd+h.slice(i):h+dd;
+    }catch(e){return h}
+  };
+})();
+
+/* ---------- the Games tab: sport → day → kickoff time ---------- */
+S.sxc=S.sxc||{};
+document.addEventListener('toggle',function(e){var d=e.target;if(d&&d.dataset&&d.dataset.sx)S.sxc[d.dataset.sx]=!d.open},true);
+function gcTeam256(g,s){
+  var ab=s==='a'?g.a:g.h,nm=s==='a'?(g.an||g.a):(g.hn||g.h),col=g.tc&&g.tc[s]||'',rec=g.rec&&g.rec[s]||'',rk=g.rk&&g.rk[s];
+  var sc=s==='a'?g.sa:g.sh,other=s==='a'?g.sh:g.sa,win=sc!=null&&other!=null&&kind(g)==='final'&&sc>other;
+  var dot='<span class="gc-dot" style="'+(col?'background:'+esc(col)+';':'')+'">'+esc(String(ab).slice(0,4))+'</span>';
+  return '<div class="gc-team'+(win?' gc-win':'')+'">'+dot+'<span class="gc-nm">'+(rk?'<span class="gc-rk">'+rk+'</span> ':'')+esc(nm)+'</span>'+(rec?'<span class="gc-rec">'+esc(rec)+'</span>':'')+(sc!=null?'<span class="gc-sc">'+sc+'</span>':'')+'</div>';
+}
+function gcLine256(g){
+  var d=g.dk;if(!d)return '';var t=[];
+  if(d.sp)t.push(esc(d.sp.fav==='h'?g.h:g.a)+' '+(d.sp.pts===0?'PK':'-'+d.sp.pts));
+  if(d.tt!=null)t.push('O/U '+d.tt);
+  return t.join(' · ');
+}
+function gameCard256(g,budget){
+  var k=kind(g),top=k==='up'?esc(new Date(g.start).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})):statusPill(g);
+  var h='<div class="gc256" data-act="fgame" data-id="'+esc(g.id)+'" role="button" tabindex="0"><div class="gc-top"><span>'+(k==='up'?(g.title?esc(g.title):''):top)+'</span><span class="gc-line">'+gcLine256(g)+'</span></div>'+gcTeam256(g,'a')+gcTeam256(g,'h');
+  if(k==='up'){
+    var d=ddCached(g);
+    if(d===undefined&&budget.n>0){budget.n--;try{d=ddFor(g)}catch(e){d=null}}
+    if(d===undefined){budget.pend++;h+='<div class="gc-pick src">Deep dive building…</div>'}
+    else if(d&&d.best){
+      var ex='';if(d.e)ex='<div class="gc-ex src">Experts: '+esc(d.e.ln||'')+(d.e.cov&&d.best.t==='sp'&&d.best.side?(d.e.cov===d.best.side?' · agree':' · disagree'):'')+'</div>';
+      h+='<div class="gc-pick"><span class="src">Best bet</span> <b>'+esc(d.best.pick)+'</b>'+(d.best.t==='ml'?'':' <span class="src">'+esc(MKN256[d.best.t].toLowerCase())+'</span>')+' '+ddConfPill(d.best)+'</div>'+(d.pred?'<div class="gc-ex src">Projected '+esc(d.pred.h>=d.pred.a?d.nh+' '+Math.round(d.pred.h)+'–'+Math.round(d.pred.a):d.na+' '+Math.round(d.pred.a)+'–'+Math.round(d.pred.h))+'</div>':'')+ex;
+    }else if(d&&d.e)h+='<div class="gc-ex src">Experts: '+esc(d.e.ln||'')+' · '+esc(String(d.e.ag||'').slice(0,80))+'</div>';
+  }
+  return h+'</div>';
+}
+var _gx256=null;
+schHtml=function(){
+  var T=gdTest(),sel=T.sel,now=Date.now(),budget={n:14,pend:0};
+  var lgs=LG.filter(function(l){return S.gs==='all'||!S.gs||S.gs===l[0]});
+  var h='',any=false;
+  lgs.forEach(function(l){
+    var list=(S.feed[l[0]]||[]).filter(function(g){var k=kind(g);if(sel==='today')return T.ok(g);return k==='up'&&T.ok(g)}).sort(function(a,b){return a.start-b.start});
+    if(!list.length)return;any=true;
+    var up=list.filter(function(g){return kind(g)==='up'}),strong=0,lean=0;
+    up.forEach(function(g){var d=ddCached(g);if(d&&d.best){if(d.best.conf==='Strong')strong++;else if(d.best.conf==='Lean')lean++}});
+    var open=!S.sxc[l[0]];
+    h+='<details class="sx256" data-sx="'+l[0]+'"'+(open?' open':'')+'><summary><span class="sx-t">'+esc(l[1])+'</span><span class="sx-s">'+list.length+' game'+(list.length>1?'s':'')+(strong?' · '+strong+' strong':'')+(lean?' · '+lean+' lean':'')+'</span></summary>';
+    var curDay='',curSlot=null;
+    list.forEach(function(g){
+      var dk=new Date(g.start).toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});
+      if(sel==='week'&&dk!==curDay){curDay=dk;curSlot=null;h+='<div class="dayh256">'+esc(dk)+'</div>'}
+      var sk=slotKey253(g.start);
+      if(sk!==curSlot){curSlot=sk;var n=list.filter(function(x){return slotKey253(x.start)===sk&&(sel!=='week'||new Date(x.start).toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'})===dk)}).length;h+='<div class="slot256"><span>'+esc(new Date(sk).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}))+'</span><span class="src">'+n+' game'+(n>1?'s':'')+'</span></div>'}
+      h+=gameCard256(g,budget);
+    });
+    h+='</details>';
+  });
+  if(!any)return '';
+  if(budget.pend){clearTimeout(_gx256);_gx256=setTimeout(function(){try{if(S.tab==='games'&&!S.sheet)render()}catch(e){}},500)}
+  var title=sel==='today'?'Today':sel==='tomorrow'?'Tomorrow':'This week';
+  return '<p class="src" style="margin:12px 0 6px">'+esc(title)+' · tap a game for its deep dive. “Best” is the strongest bet the app finds in that game; Strong is 72+ out of 100, Lean 62–71.</p>'+h;
+};
+(function(){
+  try{var st=document.createElement('style');st.textContent=
+    '.sx256{margin:12px 0;border:1px solid var(--line);border-radius:14px;background:var(--surface);overflow:hidden}'+
+    '.sx256>summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:12px 14px;background:var(--surface2)}'+
+    '.sx256>summary::-webkit-details-marker{display:none}'+
+    '.sx256>summary::after{content:"▾";color:var(--muted);margin-left:6px}.sx256:not([open])>summary::after{content:"▸"}'+
+    '.sx-t{font-family:var(--font-display);font-size:22px;font-weight:700;letter-spacing:.02em;text-transform:uppercase}.sx-s{color:var(--muted);font-size:13px;margin-left:auto}'+
+    '.dayh256{padding:10px 14px 2px;font-family:var(--font-display);font-size:17px;font-weight:600;text-transform:uppercase;letter-spacing:.03em}'+
+    '.slot256{display:flex;justify-content:space-between;padding:8px 14px 4px;font-family:var(--font-data);font-size:12px;color:var(--muted);border-top:1px solid var(--line)}'+
+    '.gc256{margin:6px 10px 10px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--bg);cursor:pointer}'+
+    '.gc256:active{background:var(--surface2)}'+
+    '.gc-top{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--muted);margin-bottom:6px;font-family:var(--font-data)}.gc-line{color:var(--ink)}'+
+    '.gc-team{display:flex;align-items:center;gap:8px;padding:3px 0;font-size:15px}.gc-team.gc-win .gc-nm,.gc-team.gc-win .gc-sc{font-weight:700}'+
+    '.gc-dot{flex:none;min-width:38px;height:22px;padding:0 4px;border-radius:6px;background:var(--surface2);color:#fff;font:700 11px/22px var(--font-data);text-align:center;text-shadow:0 1px 1px rgba(0,0,0,.45);box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)}'+
+    '.gc-nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}.gc-rk{font:700 11px var(--font-data);color:var(--muted)}'+
+    '.gc-rec{font:12px var(--font-data);color:var(--muted)}.gc-sc{font:700 15px var(--font-data);min-width:24px;text-align:right}'+
+    '.gc-pick{margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:14px}'+
+    '.gc-ex{margin-top:3px;font-size:12px}'+
+    '.dd256{padding:14px}.dd-pick{font-family:var(--font-display);font-size:26px;font-weight:700;line-height:1.1}'+
+    '.dd-h{margin-top:12px;font-weight:700}.dd-rows{margin-top:10px;border:1px solid var(--line);border-radius:10px;overflow:hidden}.dd-row{display:flex;justify-content:space-between;gap:10px;padding:8px 10px;border-top:1px solid var(--line)}.dd-row:first-child{border-top:0}.dd-row.dd-best{background:var(--hit-bg)}.dd-r{text-align:right;font-size:13px;font-family:var(--font-data)}'+
+    '.ok256{color:var(--hit);font-weight:600}.no256{color:var(--miss);font-weight:600}';
+  document.head.appendChild(st)}catch(e){}
 })();
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
