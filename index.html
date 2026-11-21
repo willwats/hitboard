@@ -1957,7 +1957,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v259, Nov 21';
+var BUILD='v260, Nov 21';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -17471,7 +17471,7 @@ function matchupPara259(g,d){
   var TA=T259(ddNick(g.an||g.a)),TH=T259(ddNick(g.hn||g.h)),hw=d.pred.h>=d.pred.a,TW=hw?TH:TA,W=TW.n,ws=hw?'h':'a',na=TA.n,nh=TH.n;
   var ws1=Math.round(hw?d.pred.h:d.pred.a),ls1=Math.round(hw?d.pred.a:d.pred.h),mg=Math.abs(d.pred.h-d.pred.a),S1=[];
   var cov='';
-  try{var sp=g.dk&&g.dk.sp;if(sp&&sp.pts>0){var fav=sp.fav,fm=fav===ws?mg:-mg,F=fav==='h'?TH.n:TA.n,Dg=fav==='h'?TA.n:TH.n;cov=fm>sp.pts+1?', enough for '+F+' to cover the '+sp.pts:fm<sp.pts-1?', short of the '+sp.pts+'-point spread, so '+Dg+' covers':', right around the '+sp.pts+'-point spread'}}catch(x){}
+  try{var sp=g.dk&&g.dk.sp;if(sp&&sp.pts>0){var fav=sp.fav,fm=fav===ws?mg:-mg,F=fav==='h'?TH.n:TA.n,DT=fav==='h'?TA:TH;cov=fm>sp.pts+1?', enough for '+F+' to cover the '+sp.pts:fm<sp.pts-1?', short of the '+sp.pts+'-point spread, so '+DT.n+' '+(DT.is==='are'?'cover':'covers'):', right around the '+sp.pts+'-point spread'}}catch(x){}
   S1.push('Hitboard has '+W+' winning about '+ws1+'–'+ls1+cov+'.');
   /* key absences, quarterbacks first */
   var abs=[];['a','h'].forEach(function(s){keyOut259(g,s).forEach(function(x){abs.push({s:s,x:x})})});
@@ -17486,7 +17486,8 @@ function matchupPara259(g,d){
   var qbOutLoser=abs.some(function(o){return o.x.qb&&o.s!==ws});
   if(qbOutLoser)S1.push('A backup quarterback is a big part of why the projection leans toward '+W+'.');
   /* strength against weakness */
-  var ed=[];try{ed=edges259(g)}catch(x){}
+  var ex0=null;try{ex0=expFor(g)}catch(x){}
+  var ed=[];if(ex0&&ex0.preview&&ex0.preview.length){S1.push(String(ex0.preview[0]))}else{try{ed=edges259(g)}catch(x){}}
   ed.forEach(function(o,i){var pre=i===0&&!o.clash;S1.push(pre?'The mismatch: '+o.txt+'.':o.txt.charAt(0).toUpperCase()+o.txt.slice(1)+'.')});
   /* form */
   try{
@@ -17507,7 +17508,7 @@ function matchupPara259(g,d){
       var mk='<div class="dd-sec"><div class="dd-h">Game preview</div>',i=h.indexOf(mk);if(i<0)return h;
       var j=h.indexOf('<div class="dd-sec">',i+mk.length);var sec=h.slice(i,j>0?j:h.length);
       /* drop the per-player injury lines; keep one "key players out" line */
-      var li=sec.match(/<li>[\s\S]*?<\/li>/g)||[],keep=li.filter(function(x){var t=x.replace(/<[^>]+>/g,'');return !/ is (out|doubtful)(,| so|\.)/.test(t)&&!/^No starters are listed/.test(t)});
+      var e0=null;try{e0=expFor(g)}catch(x){}var p0=e0&&e0.preview&&e0.preview[0]?esc(String(e0.preview[0])):null;var li=sec.match(/<li>[\s\S]*?<\/li>/g)||[],keep=li.filter(function(x){var t=x.replace(/<[^>]+>/g,'');if(p0&&x.indexOf(p0)>=0)return false;return !/ is (out|doubtful)(,| so|\.)/.test(t)&&!/^No starters are listed/.test(t)});
       var ko=[];['a','h'].forEach(function(s){keyOut259(g,s).forEach(function(x){ko.push((s==='a'?g.a:g.h)+' '+x.pos+' '+x.n+(x.st==='doubtful'?' (doubtful)':''))})});
       var para=matchupPara259(g,d);
       var body='<div class="dd-h">Game preview</div>'+(para?'<p class="dd-para"><b>The matchup.</b> '+esc(para)+'</p>':'')+
@@ -17545,6 +17546,102 @@ function matchupPara259(g,d){
 })();
 (function(){
   try{var st=document.createElement('style');st.textContent='.dd-para{margin:6px 0 8px;line-height:1.55}.dd-key{margin:0 0 6px;font-size:14px}';document.head.appendChild(st)}catch(e){}
+})();
+/* v260: Week 11 NFL matchup research for every remaining game (entered Nov 21): key players out and who replaces them,
+   strength-versus-weakness notes, form and preview articles. Plus "The matchup" for NBA and NHL games, using the live
+   injury report to name the key players who are out. */
+(function(){
+  var R={
+   'BAL@CAR':{
+     sub:[{out:'Lamar Jackson',next:'Jacoby Brissett',note:'Baltimore’s fourth starting quarterback in four games; he threw for 340 yards with no touchdowns and an interception in his Ravens debut, a 23-20 loss to the Chargers'}],
+     preview:['Carolina allows 124 rushing yards a game, a fit for a Ravens run game averaging 126 (9th), but Baltimore ran for just 16 yards on 15 carries last week.','Carolina’s passing offense (253 yards a game, 8th) faces a Ravens pass defense allowing 220 (25th); Baltimore gives up 25.9 points a game.'],
+     form:['Baltimore has lost five straight, is 2-8 against the spread, and plays on a short week after a Monday-night loss.','Carolina leads the NFC South after a 20-17 win over New Orleans, though Bryce Young has been held under 280 passing yards in four straight games.'],
+     reads:[{t:'Ravens vs. Panthers Prediction, Odds, Spread, Injuries, Trends for NFL Week 11',u:'https://www.si.com/betting/ravens-vs-panthers-prediction-odds-spread-injuries-trends-for-nfl-week-11-2026',d:'Baltimore’s quarterback injuries, the short week and its 2-8 record against the spread.'}]},
+   'MIA@BUF':{
+     sub:[{out:'Malik Willis',next:'Kyle McCord',note:'in his first start he went 17 of 32 for 209 yards and ran for a touchdown, but lost a fumble returned for a score in a 24-22 loss at Indianapolis'}],
+     preview:['James Cook leads AFC rushers with 971 yards and 9 touchdowns and faces a Miami line that has lost defensive tackles Zach Sieler, Zeek Biggers and Jordan Phillips to injured reserve in two weeks.','Buffalo’s defense has allowed 28 points over its last three games after giving up 28.5 a game in its first six, and now sees a quarterback making his second start.'],
+     form:['Buffalo has won five straight, including 31-12 over the Jets, and is 7-2 against the spread.','Miami is 1-8 but four of its last five losses were by one score; it cut its kicker after missing two field goals and an extra point last week.'],
+     reads:[{t:'Bills get chance to feast on another backup QB with McCord, Dolphins up next',u:'https://www.tsn.ca/nfl/article/bills-get-chance-to-feast-on-another-backup-qb-with-mccord-dolphins-up-next/',d:'Buffalo’s defensive turnaround against a run of backup quarterbacks, with McCord next.'},{t:'Bills’ potent running game faces depleted Dolphins defensive line',u:'https://www.yardbarker.com/nfl/articles/bills_potent_running_game_faces_depleted_dolphins_defensive_line/s1_17049_44583954',d:'Cook and Allen’s rushing against Miami’s injury-gutted interior line.'}]},
+   'NO@CHI':{
+     preview:['Chicago runs for 142 yards a game (4th) and gets RB Kyle Monangai back from a five-game absence, against a Saints run defense allowing 130 (27th).','New Orleans’ edge rushers Carl Granderson (8.5 sacks) and Chase Young (8) face Caleb Williams, who threw a career-high four interceptions in his last game.'],
+     form:['Chicago is off a bye with four straight wins and has outscored its last four opponents 45-0 in the first quarter, but it has 17 turnovers.','New Orleans has scored an NFL-low 9 first-quarter points all season and lost 20-17 to Carolina on a 54-yard field goal at the gun.'],
+     reads:[{t:'Rested Bears carry four-game winning streak into Saints clash',u:'https://fieldlevelmedia.com/?p=504207',d:'Chicago’s run efficiency, its turnover problem and New Orleans’ slow starts.'}]},
+   'PIT@PHI':{
+     sub:[{out:'Jalen Hurts',next:'Joe Milton III',note:'Hurts is out for the season (blood clots); Milton went 18 of 34 for 169 yards and ran for 64 in his first start, a 19-11 loss to the Giants'},{out:'Dontayvion Wicks',next:'DeVonta Smith',note:'Smith is back at full practice from a hamstring injury'}],
+     preview:['Jaylen Warren (719 yards, 5.7 a carry) leads a Steelers run game at 4.8 yards a carry against an Eagles run defense allowing 126 a game (25th).','Pittsburgh’s 27 sacks (tied for 5th), led by T.J. Watt’s 7.5, face an Eagles line that has allowed 30 (29th) in front of a quarterback making his second start.'],
+     form:['Pittsburgh won four straight before a 38-18 loss at Cincinnati; it is 2-3 on the road.','Philadelphia is 2-7, scoring 16.4 points a game with an NFL-low five takeaways, and comes off its bye.'],
+     reads:[{t:'Eagles-Steelers Week 11 injury report, with analysis',u:'https://www.phillyvoice.com/eagles-steelers-week-11-injury-report-analysis/',d:'Who is out and who is back for both teams, including Smith and Barkley available.'}]},
+   'TB@DET':{
+     preview:['Tampa’s NFL-best run game (164 yards a game; Bucky Irving 825 yards) runs into Detroit’s No. 5 run defense, while Tampa’s last-ranked passing offense faces a Lions pass defense near the bottom (242 allowed).','Baker Mayfield (foot, thumb) is questionable; if he sits, undrafted rookie Jalon Daniels (1-2 as a starter, 3 touchdowns, 5 interceptions) starts, and Detroit moved from -5.5 to -7 on the news.','Detroit’s offense (3rd in yards; Jahmyr Gibbs over 1,000 yards and 13 touchdowns) meets a Tampa defense that is 1st against the run but without S Antoine Winfield Jr. and CB Josh Hayes.'],
+     form:['Detroit has won five straight, allowing 14.4 points a game in that run, though it lost DE Aidan Hutchinson for the season.','Tampa Bay is 3-6 with six one-score losses but leads the NFL with 21 takeaways.'],
+     reads:[{t:'Buccaneers-Lions: Top Storylines & Key Matchups in Week 11',u:'https://www.buccaneers.com/news/buccaneers-lions-top-storylines-key-matchups-week-11-2026',d:'Mayfield’s status and four position matchups that decide the game.'},{t:'Baker Mayfield Injury Update Tanks Buccaneers’ Odds vs. Lions in NFL Week 11',u:'https://www.si.com/betting/baker-mayfield-injury-update-tanks-buccaneers-odds-vs-lions-in-nfl-week-11-2026',d:'How the line moved as Daniels became the likely starter.'}]},
+   'TEN@DAL':{
+     sub:[{out:"Wan'Dale Robinson",next:'Carnell Tate',note:'Robinson is out for the season; Tate (34 catches, 413 yards) is questionable with a shoulder injury but expected to play, with Xavier Restrepo up from the practice squad'},{out:'Jake Ferguson',next:'Brevyn Spann-Ford',note:'he had one catch for 26 yards as the starter last week'}],
+     preview:['Dallas’s No. 3 passing offense (266 yards a game; Prescott 21 touchdowns) faces a Titans defense allowing 26.6 points a game.','Tennessee has scored 23 or more in four straight and Dallas allows 28.2 points a game, so points on both sides are expected (total 54.5).'],
+     form:['Tennessee is 1-8 and has lost three straight, but Cam Ward has thrown for 535 yards and four touchdowns over his last two games.','Dallas has not won back-to-back games all season and lost a 46-40 shootout to San Francisco in which Prescott threw five touchdowns.'],
+     reads:[{t:'Game Preview: Titans Travel to Dallas for the First Time Since 2018',u:'https://www.tennesseetitans.com/news/game-preview-titans-travel-to-dallas-for-the-first-time-since-2018',d:'Cam Ward’s recent production against Dallas’s top-three passing attack.'}]},
+   'NYJ@LAC':{
+     sub:[{out:'Omar Cooper Jr.',next:'Adonai Mitchell',note:'he caught 3 passes for 59 yards on 8 targets last week'}],
+     preview:['The Jets are last in red-zone touchdown rate (37.9%) and went 2 for 9 inside the 20 over three games, facing a Chargers red-zone defense ranked 10th.','Justin Herbert has struggled (6 touchdowns, 11 interceptions), and Geno Smith (ankle) makes his 11th straight start for the Jets.'],
+     form:['The Jets have lost five straight and failed to score a touchdown in either of their last two games.','The Chargers snapped an eight-game losing streak by beating Baltimore 23-20, holding the Ravens to 16 rushing yards.'],
+     reads:[{t:'Jets-Chargers Game Preview | Mining for California Gold in the Red Zone',u:'https://www.newyorkjets.com/news/jets-chargers-game-preview-geno-smith-justin-herbert-week-11-11-22-2026',d:'New York’s red-zone problems against a mid-pack Chargers red-zone defense.'}]},
+   'JAX@NYG':{
+     sub:[{out:'Jaxson Dart',next:'J.J. McCarthy',note:'Dart is out for the season; McCarthy has started since Week 7 and went 23 of 36 for 293 yards, a touchdown and an interception last week'}],
+     preview:['Giants defensive coordinator Dennard Wilson blitzes on 40.6% of dropbacks, and Trevor Lawrence drops from the league’s best passer rating without a blitz to 18th against one.','Jacksonville’s league-best +9 turnover margin meets a Giants offense with 17 fumbles in nine games, and New York allows touchdowns on 80% of opponents’ red-zone trips, the worst rate in the league.'],
+     form:['Jacksonville has won three straight, scoring 33 or more each time, and leads the league with a +125 point differential.','The Giants still lead the NFC East but blew a fourth-quarter lead in a 24-21 loss to Washington; Cam Skattebo has 202 yards on 5.8 a carry since returning.'],
+     reads:[{t:'Giants vs. Jaguars Week 11 preview: The test starts now',u:'https://www.amny.com/sports/giants-jaguars-w11-pre-11-18-26/',d:'The Giants’ fumbles and blitz rate against Jacksonville’s turnover edge and Lawrence’s blitz splits.'}]},
+   'LV@DEN':{
+     preview:['Las Vegas traded Kirk Cousins to Minnesota, so rookie Fernando Mendoza makes his second start; he was sacked six times in his debut (143 passing yards) and now faces a Denver pass rush that is top 10 in sacks and pressure rate.','The Raiders give up 28.9 points (31st) and 151 rushing yards a game (31st) and have allowed 30-plus in five of six, while their own run game ranks 31st; TE Brock Bowers (ankle) is questionable.'],
+     form:['Denver has won five straight, is 4-0 at home and 7-2 against the spread, and comes off a bye, though four of those wins were by six points or fewer.','Las Vegas has lost two straight and scored 30 points in total over the last two weeks.'],
+     reads:[{t:'Game Preview: Fernando Mendoza, Raiders face another stiff test against potent Broncos defense',u:'https://www.raiders.com/news/game-preview-fernando-mendoza-raiders-face-another-stiff-test-against-potent-broncos-defense',d:'Denver’s pass-rush numbers, Bowers’ status and Mendoza’s up-and-down debut.'}]},
+   'MIN@SF':{
+     sub:[{out:'Kyler Murray',next:'Kirk Cousins',note:'acquired from Las Vegas after Week 9, he went 21 of 31 for 207 yards and two touchdowns in a 30-10 win at Green Bay; he threw three interceptions against San Francisco in Week 9 with the Raiders'},{out:'Jordan Addison',next:'Jauan Jennings',note:'Jennings is back at full practice; without Addison last week Myles Price caught a touchdown and Justin Jefferson had 9 catches'}],
+     preview:['Strength against strength: Minnesota’s defense allows an NFL-low 14 points a game, and San Francisco’s offense is first in efficiency per play after Brock Purdy threw for 389 yards against Dallas.','The Under is 8-1 in Minnesota games; WR Mike Evans (Achilles) is questionable for San Francisco after missing three games. Played in Mexico City.'],
+     form:['Minnesota is 7-2 and just won 30-10 at Lambeau; TE T.J. Hockenson is expected back.','San Francisco is 8-1, but its defense gave up 584 yards in a 46-40 win over Dallas.'],
+     reads:[{t:'Kirk Cousins Addition Shifts Vikings vs. 49ers Odds for NFL Week 11 Towards Minnesota',u:'https://www.si.com/betting/kirk-cousins-addition-shifts-vikings-vs-49ers-odds-for-nfl-week-11-towards-minnesota',d:'How the line moved toward Minnesota and its elite defense against San Francisco’s top offense.'}]},
+   'CIN@WAS':{
+     sub:[{out:'Terry McLaurin',next:'Stefon Diggs',note:'McLaurin tore a patellar tendon in October; Diggs leads Washington with 386 receiving yards and six touchdowns'}],
+     preview:['Cincinnati’s No. 1 passing offense (299 yards a game; Burrow had 409 yards and four touchdowns last week, Ja’Marr Chase 231 receiving yards) faces Washington’s 31st-ranked pass defense.','Washington’s path is the run: Cincinnati allows 5.0 yards a carry and ranks 30th on third down, but both Washington backs (Rachaad White, Jacory Croskey-Merritt) are questionable and LT Laremy Tunsil is on injured reserve.'],
+     form:['Cincinnati has won five straight and scored 31 or more in every one (36.2 a game).','Washington is 3-5-1 and has held its last three opponents to 21 or fewer.'],
+     reads:[{t:'Commanders vs. Bengals preview | An AFC contender comes to town',u:'https://www.commanders.com/news/commanders-vs-bengals-preview-week-11-2026',d:'Full statistical matchup, led by Cincinnati’s passing attack against Washington’s pass defense.'}]}
+  };
+  EXPERTS.forEach(function(e){
+    if(e.lg!=='nfl')return;
+    var r=R[e.a+'@'+e.h]||R[e.h+'@'+e.a];if(!r)return;
+    ['sub','preview','form','reads'].forEach(function(k){if(r[k])e[k]=r[k]});
+  });
+  try{
+    var add=function(t,s){var T=KEYOUT.nfl[t]||(KEYOUT.nfl[t]={items:[],chg:[]});var nm=normName(String(s).replace(/:[a-z]$/,'').replace(/^\S+\s+/,''));T.items=T.items.filter(function(x){return normName(String(x).replace(/:[a-z]$/,'').replace(/^\S+\s+/,''))!==nm});T.items.push(s)};
+    add('BAL','QB Lamar Jackson:o');add('MIA','QB Malik Willis:o');add('BUF','TE Dalton Kincaid:d');add('PHI','QB Jalen Hurts:o');add('PHI','WR Dontayvion Wicks:o');
+    add('TB','QB Baker Mayfield:q');add('TEN',"WR Wan'Dale Robinson:o");add('TEN','WR Carnell Tate:q');add('DAL','TE Jake Ferguson:o');add('NYJ','WR Omar Cooper Jr.:o');
+    add('NYG','QB Jaxson Dart:o');add('LV','TE Brock Bowers:q');add('MIN','QB Kyler Murray:o');add('MIN','WR Jordan Addison:o');add('WAS','WR Terry McLaurin:o');add('SF','WR Mike Evans:q');
+  }catch(e){}
+  EXP_AT='Nov 21';
+})();
+
+/* NBA and NHL: key players out from the live injury report (stars and top scorers only) */
+(function(){
+  var ko0=keyOut259;
+  keyOut259=function(g,s){
+    if(g.lg==='nfl'||g.lg==='ncaafb')return ko0.apply(this,arguments);
+    var L=[];
+    try{
+      var I=S.inj[g.lg],tk=injKey(g,s);if(!I||!I.by)return L;
+      (I.by[tk]||[]).forEach(function(x){
+        var st=String(x.st||'').toLowerCase();if(!(OUT_RE.test(st)||/doubtful/.test(st)))return;
+        var v=null;try{v=injValue(g.lg,tk,x.n)}catch(e){}
+        if(!v)return;
+        L.push({pos:x.pos||'',n:x.n,st:/doubtful/.test(st)?'doubtful':'out',qb:false,why:v.why||''});
+      });
+    }catch(e){}
+    return L.slice(0,3);
+  };
+  var al0=absenceLine259;
+  absenceLine259=function(g,s,x){
+    if(g.lg==='nfl'||g.lg==='ncaafb')return al0.apply(this,arguments);
+    var T=T259(ddNick(s==='a'?(g.an||g.a):(g.hn||g.h)));
+    return T.N+' '+T.is+' without '+x.n+(x.st==='doubtful'?' (doubtful)':'')+(x.why?', who '+x.why.replace(/^averages/,'averages'):'')+'.';
+  };
 })();
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
