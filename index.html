@@ -1957,7 +1957,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v253, Nov 21';
+var BUILD='v254, Nov 21';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -16605,15 +16605,102 @@ document.addEventListener('click',function(e){
   else legs.forEach(function(l){if(!inSlip(l.key)&&S.slip.length<15)S.slip.push(l)});
   saveSlip();updateSlipBar();render();
 });
+/* v254: this section moved to the Parlays tab */
+/* v254: the bottom bar sits on the bottom edge of the screen. In the home-screen app on recent iPhones the page area can end
+   above the bottom of the screen, which left the bar floating with an empty strip under it. The page now stretches to the
+   full screen height and the bar (and the betslip bar and pop-up windows) move down by the missing amount. */
 (function(){
-  var vG=vGames;
-  vGames=function(){
-    var h=vG.apply(this,arguments);
-    if(S.gd==='prev')return h;
-    var s='';try{s=parlaySlotsHtml()}catch(e){s=''}
-    if(!s)return h;
-    var j=h.lastIndexOf('<p class="foot">');
-    return j>=0?h.slice(0,j)+s+h.slice(j):h+s;
+  var root=document.documentElement,nav=document.querySelector('nav');
+  try{var st=document.createElement('style');
+    st.textContent='html{height:calc(100% + var(--hbgap,0px))}body{height:100%}nav,#slipBar{transform:translateY(var(--hbgap,0px))!important}.scrim{bottom:calc(-1 * var(--hbgap,0px))!important}';
+    document.head.appendChild(st)}catch(e){}
+  var standalone=!!(navigator.standalone||(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches));
+  var fit=function(){
+    var gap=0;
+    try{
+      var ae=document.activeElement,typing=ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA');
+      if(standalone&&!typing&&screen&&screen.height){
+        var portrait=window.innerHeight>=window.innerWidth,sh=portrait?Math.max(screen.height,screen.width):Math.min(screen.height,screen.width);
+        var d=sh-window.innerHeight;if(d>2&&d<200)gap=d;
+      }
+    }catch(e){}
+    root.style.setProperty('--hbgap',gap+'px');
+  };
+  window.addEventListener('resize',fit);window.addEventListener('orientationchange',function(){setTimeout(fit,300)});
+  document.addEventListener('focusin',fit,true);document.addEventListener('focusout',function(){setTimeout(fit,150)},true);
+  document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')setTimeout(fit,100)});
+  fit();setTimeout(fit,500);setTimeout(fit,2000);
+})();
+
+/* v254: Parlays tab. Hitboard's parlays (the model's best four spread picks) and the expert picks parlays (the four spread
+   picks the writers agree on most), one of each per kickoff time. Games are grouped by start time rounded to the nearest
+   quarter hour; a window needs at least four games with a pick. Uses the same sport and day choice as Games. */
+var PSL4={};
+function pl4Legs(kindKey){
+  var T=gdTest(),now=Date.now(),G={};
+  LG.forEach(function(l){if(S.gs==='all'||S.gs===l[0])(S.feed[l[0]]||[]).forEach(function(g){
+    if(kind(g)!=='up'||!(g.start>now)||!T.ok(g))return;
+    var pk=null;try{pk=picksFor(g)}catch(e){}
+    var msp=(pk||[]).filter(function(x){return x&&x.t==='sp'&&x.p!=null&&isFinite(x.p)})[0];
+    var leg=null;
+    if(kindKey==='hb'){if(msp)leg={g:g,x:msp,score:msp.p,note:'model '+Math.round(msp.p*100)+'% to cover'}}
+    else{
+      var e=null;try{e=expFor(g)}catch(x){}
+      var sp=g.dk&&g.dk.sp;
+      if(e&&e.cov&&sp){
+        var side=e.cov,num=side===sp.fav?-sp.pts:sp.pts,nm=side==='h'?(g.hn||g.h):(g.an||g.a);
+        var p=msp?(msp.side===side?msp.p:1-msp.p):null,r=null;try{r=expRatio(e)}catch(x){}
+        var x={t:'sp',side:side,num:num,p:p==null?.5:p,pick:nm+' '+(num>0?'+':'')+num,mk:'Spread'};
+        leg={g:g,x:x,score:(r==null?.5:r)+(p==null?0:p/100),note:'experts: '+String(e.ag||'').slice(0,90)+(p!=null?' · model '+Math.round(p*100)+'%':'')};
+      }
+    }
+    if(leg){var k=slotKey253(g.start);(G[k]=G[k]||[]).push(leg)}
+  })});
+  return G;
+}
+function pl4Section(kindKey,title,blurb){
+  var G=pl4Legs(kindKey),keys=Object.keys(G).map(Number).sort(function(a,b){return a-b}),h='<h3 style="margin-top:18px">'+title+'</h3><p class="src" style="margin-top:0">'+blurb+'</p>',short=[],n=0;
+  keys.forEach(function(k){
+    var L=G[k].slice().sort(function(a,b){return b.score-a.score});
+    if(L.length<4){short.push(slotLabel253(k)+' ('+L.length+')');return}
+    var four=L.slice(0,4),id=kindKey+k;PSL4[id]=four;n++;
+    var pc=kindKey==='hb'||four.every(function(o){return o.x.p!==.5})?four.reduce(function(a,o){return a*o.x.p},1):null;
+    var inAll=four.every(function(o){return inSlip(gameLeg(o.g,o.x).key)});
+    h+='<div class="card" style="padding:12px 14px;margin-bottom:10px"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><b>'+esc(slotLabel253(k))+'</b><span class="src">'+L.length+' games with a pick</span></div>'+
+      four.map(function(o){return '<div data-act="fgame" data-id="'+esc(o.g.id)+'" style="padding:8px 0;border-top:1px solid var(--line);cursor:pointer"><div><b>'+esc(o.x.pick)+'</b></div><div class="src">'+esc((o.g.an||o.g.a)+' @ '+(o.g.hn||o.g.h))+' · '+esc(lgName(o.g.lg))+' · '+esc(o.note)+'</div></div>'}).join('')+
+      '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:8px"><span class="src">'+(pc!=null?'All four cover: about '+Math.round(pc*100)+'%':'')+'</span><button class="btn'+(inAll?'':' primary')+'" style="flex:none;padding:8px 12px" data-act="pl4add" data-k="'+id+'">'+(inAll?'In slip ✓':'+ Add all 4 to slip')+'</button></div></div>';
+  });
+  if(!n)h+='<div class="card empty">No kickoff window has four games with '+(kindKey==='hb'?'a model spread pick':'an expert spread pick')+' for this selection. Try another sport or day.</div>';
+  if(short.length)h+='<p class="src">Fewer than four picks, so no parlay: '+esc(short.join(' · '))+'.</p>';
+  return h;
+}
+function vPl4(){
+  PSL4={};
+  var sel=S.gd==='prev'?'week':(S.gd||gdTest().sel);
+  var h='<h2>Parlays</h2>'+gsChips()+refreshBar()+'<div class="chips" role="group" aria-label="Day">'+[['today','Today'],['tomorrow','Tomorrow'],['week','This week']].map(function(m){return '<button class="chip" data-act="set" data-k="gd" data-v="'+m[0]+'" aria-pressed="'+(sel===m[0])+'">'+m[1]+'</button>'}).join('')+'</div>'+
+    '<p class="src">One 4-team spread parlay per kickoff time. Start times are rounded to the nearest quarter hour (:00, :15, :30, :45). A parlay pays only if all four cover.</p>';
+  try{h+=pl4Section('hb','Hitboard’s parlays','The four spread picks the model gives the best chance to cover in each window.')}catch(e){h+='<div class="card empty">Hitboard’s parlays could not be built right now.</div>'}
+  try{h+=pl4Section('ex','Expert picks parlays','The four spread picks the experts agree on most in each window, at the current line. Expert picks are entered by hand as of '+esc(EXP_AT)+'.')}catch(e){h+='<div class="card empty">Expert parlays could not be built right now.</div>'}
+  return h+foot();
+}
+document.addEventListener('click',function(e){
+  var el=e.target&&e.target.closest?e.target.closest('[data-act="pl4add"]'):null;if(!el)return;
+  e.stopImmediatePropagation();e.preventDefault();
+  var four=PSL4[el.dataset.k];if(!four)return;
+  var legs=four.map(function(o){return gameLeg(o.g,o.x)}),allIn=legs.every(function(l){return inSlip(l.key)});
+  if(allIn)S.slip=S.slip.filter(function(q){return !legs.some(function(l){return l.key===q.key})});
+  else legs.forEach(function(l){if(!inSlip(l.key)&&S.slip.length<15)S.slip.push(l)});
+  saveSlip();updateSlipBar();render();
+});
+(function(){
+  var gi=-1;TABS.forEach(function(t,i){if(t[0]==='games')gi=i});
+  if(!TABS.some(function(t){return t[0]==='pl4'}))TABS.splice(gi>=0?gi+1:TABS.length,0,['pl4','Parlays','<path d="M4 7h10M4 12h16M4 17h7"/><circle cx="18" cy="7" r="2"/><circle cx="14" cy="17" r="2"/>']);
+  NAVG.pl4=['pl4'];
+  var r0=render;
+  render=function(){
+    if(S.tab!=='pl4')return r0.apply(this,arguments);
+    var sv=vToday;vToday=vPl4;S.tab='today';
+    try{return r0.apply(this,arguments)}finally{S.tab='pl4';vToday=sv;try{renderNav()}catch(e){}}
   };
 })();
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
