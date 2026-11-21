@@ -1957,7 +1957,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v258, Nov 21';
+var BUILD='v259, Nov 21';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -17415,6 +17415,136 @@ ddHtml=function(g){
     '.dd-alert{margin:10px 0 0;padding:8px 10px;border-radius:8px;background:var(--miss-bg);color:var(--miss);font-weight:600;font-size:14px}'+
     '.gc-out{margin-top:6px;display:flex;flex-wrap:wrap;gap:6px}.gc-out .tag{font-size:11px;padding:2px 7px}.tag.bad258{background:var(--miss-bg);color:var(--miss)}';
   document.head.appendChild(st)}catch(e){}
+})();
+/* v259: "The matchup" — a short paragraph in each game's preview explaining why Hitboard predicts that score: where one team's
+   strength meets the other's weakness, the key players who are out and who replaces them (with how the replacement played
+   last time out), and each team's form. Only key players are listed (QB, lead running back, top receivers), not every injury. */
+var KEYPOS259={QB:1,RB:1,WR:1,TE:1};
+function T259(nick){nick=String(nick||'');var pl=/s$/i.test(nick)&&!/ss$/i.test(nick);return pl?{n:'the '+nick,N:'The '+nick,is:'are',has:'have',pos:'the '+nick+'’',adj:nick}:{n:nick,N:nick,is:'is',has:'has',pos:nick+'’s',adj:nick}}
+
+function keyOut259(g,s){return startersOut258(g,s).filter(function(x){return KEYPOS259[posGrp189(x.pos)]})}
+function lastGame259(lg,name,idx){
+  var best=null,n=normName(name);
+  try{Object.keys(S.glog||{}).forEach(function(k){var e=S.glog[k];if(e.lg!==lg)return;var a=e.p&&e.p[n];if(a&&a[idx]!=null&&(!best||e.at>best.at))best={v:a[idx],at:e.at}})}catch(e){}
+  return best;
+}
+function nextMan259(g,s,grp,outName){
+  var team=s==='a'?g.a:g.h,outs={};keyOut259(g,s).forEach(function(x){outs[normName(x.n)]=1});outs[normName(outName)]=1;
+  var e=null;try{e=expFor(g)}catch(x){}
+  if(e&&e.sub){var m=[].concat(e.sub).filter(function(q){return q&&normName(q.out)===normName(outName)})[0];if(m)return {n:m.next,note:m.note||''}}
+  if(g.lg==='nfl'){
+    try{var D=S.dep[nt(team)],L=D&&D[grp.toLowerCase()];if(L)for(var i=0;i<L.length;i++){if(!outs[normName(L[i])])return {n:L[i]}}}catch(x){}
+    try{var kd=grp==='QB'?'pass':grp==='RB'?'rush':'rec',c=DEEP.filter(function(d){return d.kind===kd&&nt(d.t)===nt(team)&&!outs[normName(d.n)]&&(grp!=='TE'||d.pos==='TE')}).sort(function(a,b){return b.avg-a.avg})[0];if(c)return {n:c.n}}catch(x){}
+  }
+  return null;
+}
+function absenceLine259(g,s,x){
+  var T=T259(ddNick(s==='a'?(g.an||g.a):(g.hn||g.h))),grp=posGrp189(x.pos),nx=nextMan259(g,s,grp,x.n),st=x.st==='doubtful'?' (doubtful)':'';
+  var lgIdx=grp==='QB'?0:grp==='RB'?1:2,unit=grp==='QB'?'passing':grp==='RB'?'rushing':'receiving';
+  var lastTxt='';
+  if(nx&&nx.note)lastTxt=' — '+nx.note;
+  else if(nx&&(g.lg==='nfl'||g.lg==='ncaafb')){var lg=lastGame259(g.lg,nx.n,lgIdx);if(lg&&lg.v>=(grp==='QB'?120:grp==='RB'?40:40))lastTxt=' — he had '+Math.round(lg.v)+' '+unit+' yards in his last game'}
+  if(grp==='QB')return T.N+' '+T.is+' without QB '+x.n+st+(nx?', so '+nx.n+' starts'+lastTxt:' and '+(T.is==='are'?'turn':'turns')+' to a backup')+'.';
+  if(grp==='RB')return T.N+' '+T.is+' missing lead back '+x.n+st+(nx?'; '+nx.n+' takes the carries'+lastTxt:'')+'.';
+  return T.N+' '+T.is+' without '+(grp==='TE'?'tight end':'receiver')+' '+x.n+st+(nx?', putting more on '+nx.n:'')+'.';
+}
+function edges259(g){
+  var out=[],TA=T259(ddNick(g.an||g.a)),TH=T259(ddNick(g.hn||g.h)),na=TA,nh=TH;
+  if(g.lg==='nfl'){
+    var A=nt(g.a),H=nt(g.h);if(!TS[A]||!TS[H])return out;
+    var P=[['opass','dpass','passing game','pass defense'],['orush','drush','run game','run defense'],['ppg','papg','scoring offense','scoring defense']];
+    [[A,H,na,nh],[H,A,nh,na]].forEach(function(t){
+      var best=null;
+      P.forEach(function(p){var ro=mrank(t[0],p[0]),rd=mrank(t[1],p[1]);if(ro<=10&&rd>=21){var gap=rd-ro;if(!best||gap>best.gap)best={gap:gap,txt:t[2].pos+' '+p[2]+' ('+ordn(ro)+' in the league, '+MET[p[0]].fm(mv(t[0],p[0]))+') goes against a '+t[3].adj+' '+p[3]+' that ranks '+ordn(rd)+' ('+MET[p[1]].fm(mv(t[1],p[1]))+')'}}});
+      if(best)out.push(best);
+    });
+    if(!out.length){
+      [[A,H,na,nh],[H,A,nh,na]].forEach(function(t){P.forEach(function(p){var ro=mrank(t[0],p[0]),rd=mrank(t[1],p[1]);if(ro<=6&&rd<=6&&!out.some(function(o){return o.clash}))out.push({gap:0,clash:1,txt:'the key battle is '+t[2].pos+' '+p[2]+' ('+ordn(ro)+') against '+t[3].pos+' '+p[3]+' ('+ordn(rd)+')'})})});
+    }
+  }else if(g.lg==='ncaafb'){
+    try{var m=gmLev(g,g.a,g.h);if(m){[[m.mine,na,nh],[m.their,nh,na]].forEach(function(t){var b=t[0].slice().sort(function(x,y){return y.a-x.a})[0];if(b&&b.a>=.12)out.push({gap:b.a*40,txt:t[1].pos+' '+b.k+' game ('+Math.round(b.ao)+' yards a game) meets a '+t[2].adj+' defense that gives up '+Math.round(b.al)+' through the '+(b.k==='rushing'?'ground':'air')})})}}catch(x){}
+  }
+  return out.sort(function(a,b){return b.gap-a.gap}).slice(0,2);
+}
+function matchupPara259(g,d){
+  if(!d||!d.pred)return '';
+  var TA=T259(ddNick(g.an||g.a)),TH=T259(ddNick(g.hn||g.h)),hw=d.pred.h>=d.pred.a,TW=hw?TH:TA,W=TW.n,ws=hw?'h':'a',na=TA.n,nh=TH.n;
+  var ws1=Math.round(hw?d.pred.h:d.pred.a),ls1=Math.round(hw?d.pred.a:d.pred.h),mg=Math.abs(d.pred.h-d.pred.a),S1=[];
+  var cov='';
+  try{var sp=g.dk&&g.dk.sp;if(sp&&sp.pts>0){var fav=sp.fav,fm=fav===ws?mg:-mg,F=fav==='h'?TH.n:TA.n,Dg=fav==='h'?TA.n:TH.n;cov=fm>sp.pts+1?', enough for '+F+' to cover the '+sp.pts:fm<sp.pts-1?', short of the '+sp.pts+'-point spread, so '+Dg+' covers':', right around the '+sp.pts+'-point spread'}}catch(x){}
+  S1.push('Hitboard has '+W+' winning about '+ws1+'–'+ls1+cov+'.');
+  /* key absences, quarterbacks first */
+  var abs=[];['a','h'].forEach(function(s){keyOut259(g,s).forEach(function(x){abs.push({s:s,x:x})})});
+  abs.sort(function(a,b){return (b.x.qb?1:0)-(a.x.qb?1:0)});
+  var qbDone={};
+  abs.slice(0,4).forEach(function(o){
+    if(o.x.qb){if(qbDone[o.s])return;qbDone[o.s]=1;var q=abs.filter(function(z){return z.s===o.s&&z.x.qb});
+      if(q.length>1){var T=T259(ddNick(o.s==='a'?(g.an||g.a):(g.hn||g.h))),last=q[q.length-1].x,nx=nextMan259(g,o.s,'QB',last.n)||nextMan259(g,o.s,'QB',q[0].x.n),note=nx&&(nx.note||(nextMan259(g,o.s,'QB',q[0].x.n)||{}).note);
+        S1.push(T.N+' '+T.is+' without quarterbacks '+q.map(function(z){return z.x.n}).join(' and ')+(nx?', so '+nx.n+' starts'+(note?' — '+note:''):' and '+(T.is==='are'?'turn':'turns')+' to a backup')+'.');return}}
+    S1.push(absenceLine259(g,o.s,o.x));
+  });
+  var qbOutLoser=abs.some(function(o){return o.x.qb&&o.s!==ws});
+  if(qbOutLoser)S1.push('A backup quarterback is a big part of why the projection leans toward '+W+'.');
+  /* strength against weakness */
+  var ed=[];try{ed=edges259(g)}catch(x){}
+  ed.forEach(function(o,i){var pre=i===0&&!o.clash;S1.push(pre?'The mismatch: '+o.txt+'.':o.txt.charAt(0).toUpperCase()+o.txt.slice(1)+'.')});
+  /* form */
+  try{
+    var fa=ddForm(g,'a'),fh=ddForm(g,'h'),desc=function(f,T){if(!f||!f.lines||!f.lines.length)return '';var st=f.lines.filter(function(l){return /straight/.test(l)})[0];if(st)return T.n+' '+T.has+' '+st.charAt(0).toLowerCase()+st.slice(1,-1);var tr=f.lines.filter(function(l){return /^Trending/.test(l)})[0];return tr?T.n+' '+T.is+' '+(/up/.test(tr)?'playing better lately':'slipping lately'):''};
+    var x=[desc(fa,TA),desc(fh,TH)].filter(Boolean);
+    if(x.length){var y=x.join(', while ');S1.push(y.charAt(0).toUpperCase()+y.slice(1)+'.')}
+  }catch(x){}
+  return S1.join(' ');
+}
+/* the preview: the matchup paragraph first, then key players only */
+(function(){
+  var dd0=ddHtml;
+  ddHtml=function(g){
+    var h=dd0.apply(this,arguments);
+    try{
+      if(kind(g)!=='up')return h;
+      var d=null;try{d=ddFor(g)}catch(e){}
+      var mk='<div class="dd-sec"><div class="dd-h">Game preview</div>',i=h.indexOf(mk);if(i<0)return h;
+      var j=h.indexOf('<div class="dd-sec">',i+mk.length);var sec=h.slice(i,j>0?j:h.length);
+      /* drop the per-player injury lines; keep one "key players out" line */
+      var li=sec.match(/<li>[\s\S]*?<\/li>/g)||[],keep=li.filter(function(x){var t=x.replace(/<[^>]+>/g,'');return !/ is (out|doubtful)(,| so|\.)/.test(t)&&!/^No starters are listed/.test(t)});
+      var ko=[];['a','h'].forEach(function(s){keyOut259(g,s).forEach(function(x){ko.push((s==='a'?g.a:g.h)+' '+x.pos+' '+x.n+(x.st==='doubtful'?' (doubtful)':''))})});
+      var para=matchupPara259(g,d);
+      var body='<div class="dd-h">Game preview</div>'+(para?'<p class="dd-para"><b>The matchup.</b> '+esc(para)+'</p>':'')+
+        (ko.length?'<p class="dd-key"><b>Key players out:</b> '+esc(ko.join(' · '))+'</p>':'')+
+        '<ul class="pts" style="margin:4px 0 0">'+keep.join('')+'</ul>';
+      var news=sec.indexOf('<div class="dd-news">');if(news>=0)body+=sec.slice(news,sec.lastIndexOf('</div>'));
+      return h.slice(0,i)+'<div class="dd-sec">'+body+'</div>'+(j>0?h.slice(j):'');
+    }catch(e){return h}
+  };
+  var gc0=gameCard256;
+  gameCard256=function(g,budget){
+    var h=gc0.apply(this,arguments);
+    try{
+      if(h.indexOf('class="gc-out"')<0)return h;
+      var outs=[];['a','h'].forEach(function(s){keyOut259(g,s).forEach(function(x){outs.push({s:s,x:x})})});
+      outs.sort(function(a,b){return (b.x.qb?1:0)-(a.x.qb?1:0)});
+      var tag=outs.slice(0,2).map(function(o){return '<span class="tag '+(o.x.qb?'bad258':'warn')+'">'+esc((o.s==='a'?g.a:g.h)+' '+o.x.pos+' '+o.x.n+' '+o.x.st)+'</span>'}).join(' ');
+      return h.replace(/<div class="gc-out">[\s\S]*?<\/div><\/div>$/,tag?'<div class="gc-out">'+tag+'</div></div>':'</div>');
+    }catch(e){return h}
+  };
+})();
+/* Week 11 update: Cardinals at Chiefs (entered Nov 21) */
+(function(){
+  try{
+    var add=function(t,s){var T=KEYOUT.nfl[t]||(KEYOUT.nfl[t]={items:[],chg:[]});var nm=normName(String(s).replace(/:[a-z]$/,'').replace(/^\S+\s+/,''));T.items=T.items.filter(function(x){return normName(String(x).replace(/:[a-z]$/,'').replace(/^\S+\s+/,''))!==nm});T.items.push(s)};
+    add('ARI','QB Carson Beck:o');add('ARI','QB Gardner Minshew:o');add('KC','RB Kenneth Walker III:o');
+    EXPERTS.forEach(function(e){
+      if(e.lg!=='nfl'||e.a!=='ARI'||e.h!=='KC')return;
+      e.watch=['Arizona is starting 40-year-old Josh Johnson, signed off a practice squad less than two weeks ago; it is his 12th career start and his teams are 2-9 in them.','Kansas City plays Buffalo on Thanksgiving, so a big lead could mean starters rest late.'];
+      e.preview=['Arizona is on its third quarterback: Minshew is on injured reserve (torn UCL) and Beck was ruled out Friday with back spasms. The line reached 16.5 for Kansas City this week.'];
+      e.sub=[{out:'Carson Beck',next:'Josh Johnson',note:'a 40-year-old journeyman making his first start since last season'},{out:'Gardner Minshew',next:'Josh Johnson',note:''},{out:'Kenneth Walker III',next:'Emmett Johnson',note:'he ran 22 times for 101 yards and added 70 receiving yards and two touchdowns last week'}];
+      e.reads=[{t:'Cardinals rule out rookie Carson Beck, turn to 40-year-old Josh Johnson vs. Chiefs',u:'https://africa.espn.com/nfl/story/_/id/50553035/cardinals-downgrade-qb-carson-beck-josh-johnson-set-start',d:'Beck’s back spasms flared again; Johnson, on his 15th NFL team, makes his first start since Week 18 of last season.'},{t:'Cardinals QB Carson Beck ruled out, 40-year-old Josh Johnson to start vs. Chiefs',u:'https://sports.yahoo.com/nfl/article/cardinals-qb-carson-beck-ruled-out-40-year-old-josh-johnson-to-start-vs-chiefs-192807401.html',d:'How Arizona got to its third quarterback, and what the coach said about Beck’s timeline.'}];
+    });
+  }catch(e){}
+})();
+(function(){
+  try{var st=document.createElement('style');st.textContent='.dd-para{margin:6px 0 8px;line-height:1.55}.dd-key{margin:0 0 6px;font-size:14px}';document.head.appendChild(st)}catch(e){}
 })();
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
