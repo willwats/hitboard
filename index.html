@@ -1957,7 +1957,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v254, Nov 21';
+var BUILD='v255, Nov 21';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -16702,6 +16702,17 @@ document.addEventListener('click',function(e){
     var sv=vToday;vToday=vPl4;S.tab='today';
     try{return r0.apply(this,arguments)}finally{S.tab='pl4';vToday=sv;try{renderNav()}catch(e){}}
   };
+})();
+/* v255: closing a window no longer opens search. The app answers a tap as soon as the finger lifts; the phone then sends its
+   own late "click" to whatever is now under the finger. After a window closed, that was the search button in the header.
+   A late click that follows a tap the app already handled is now ignored, wherever it lands. */
+(function(){
+  var handledAt=0,hx=0,hy=0,lastUp={x:0,y:0};
+  window.addEventListener('pointerup',function(e){lastUp={x:e.clientX,y:e.clientY}},true);
+  window.addEventListener('click',function(e){
+    if(!e.isTrusted){handledAt=Date.now();hx=lastUp.x;hy=lastUp.y;return}
+    if(Date.now()-handledAt<800&&Math.abs(e.clientX-hx)<30&&Math.abs(e.clientY-hy)<30){e.stopImmediatePropagation();e.preventDefault()}
+  },true);
 })();
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
