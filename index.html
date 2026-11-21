@@ -1957,7 +1957,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v261, Nov 21';
+var BUILD='v262, Nov 21';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -16772,24 +16772,24 @@ function ddBuild(g){
     if(!x&&!gr)return;
     var base=gr&&gr.sum!=null?hbScore(gr.sum):(x&&x.p!=null?Math.round(x.p*100):null);if(base==null)return;
     var side=x?(t==='tot'?(x.over?'o':'u'):x.side):null;
-    var o={t:t,pick:(x&&x.pick)||(gr&&gr.pick)||'',p:x&&x.p!=null?x.p:null,grade:gr?gr.l:null,base:base,adj:0,plus:[],minus:[],side:side,x:x};
+    var o={t:t,pick:(x&&x.pick)||(gr&&gr.pick)||'',p:x&&x.p!=null?x.p:null,grade:gr?gr.l:null,base:base,adj:0,plus:[],minus:[],side:side,x:x,sig:{ex:0,mv:0}};var LW=(typeof ddWeights==='function')?ddWeights():{ex:1,mv:1},XT=(typeof expTrust==='function')?expTrust(g.lg):{sp:1,ml:1};
     /* experts */
     if(e){
       var w=er!=null?Math.max(.5,Math.min(1.5,er*1.5)):1;
-      if(t==='sp'&&e.cov&&side){if(e.cov===side){o.adj+=Math.round(5*w);o.plus.push('The experts also take '+nm(side)+' to cover ('+e.ln+').')}else{o.adj-=Math.round(5*w);o.minus.push('The experts take '+nm(e.cov)+' to cover instead ('+e.ln+').')}}
-      if(t==='ml'&&e.win&&side){if(e.win===side){o.adj+=3;o.plus.push('The experts also pick '+nm(side)+' to win.')}else{o.adj-=4;o.minus.push('The experts pick '+nm(e.win)+' to win.')}}
-      if(t==='tot'&&eTot&&side){if(eTot===side){o.adj+=3;o.plus.push('Expert lean on the total matches: '+(side==='o'?'Over':'Under')+'.')}else{o.adj-=3;o.minus.push('Expert lean on the total is the '+(eTot==='o'?'Over':'Under')+'.')}}
+      if(t==='sp'&&e.cov&&side){if(e.cov===side){o.sig.ex=1;o.adj+=Math.round(5*w*LW.ex*XT.sp);o.plus.push('The experts also take '+nm(side)+' to cover ('+e.ln+').')}else{o.sig.ex=-1;o.adj-=Math.round(5*w*LW.ex*XT.sp);o.minus.push('The experts take '+nm(e.cov)+' to cover instead ('+e.ln+').')}}
+      if(t==='ml'&&e.win&&side){if(e.win===side){o.sig.ex=1;o.adj+=Math.round(3*LW.ex*XT.ml);o.plus.push('The experts also pick '+nm(side)+' to win.')}else{o.sig.ex=-1;o.adj-=Math.round(4*LW.ex*XT.ml);o.minus.push('The experts pick '+nm(e.win)+' to win.')}}
+      if(t==='tot'&&eTot&&side){if(eTot===side){o.sig.ex=1;o.adj+=Math.round(3*LW.ex*XT.sp);o.plus.push('Expert lean on the total matches: '+(side==='o'?'Over':'Under')+'.')}else{o.sig.ex=-1;o.adj-=Math.round(3*LW.ex*XT.sp);o.minus.push('Expert lean on the total is the '+(eTot==='o'?'Over':'Under')+'.')}}
     }
     /* line movement since open */
     try{
       if(t==='sp'&&side&&homeLine!=null&&op.spH!=null&&Math.abs(homeLine-op.spH)>=1){
         var toHome=homeLine<op.spH,good=(side==='h')===toHome;
-        if(good){o.adj+=2;o.plus.push('The line has moved toward '+nm(side)+' since it opened ('+sgn(op.spH)+' to '+sgn(homeLine)+' for '+nh+'), so the market agrees.')}
-        else{o.adj-=1;o.plus.push('The line moved away from '+nm(side)+' since it opened ('+sgn(op.spH)+' to '+sgn(homeLine)+' for '+nh+'), which gives this side a better number.')}
+        if(good){o.sig.mv=1;o.adj+=Math.round(2*LW.mv);o.plus.push('The line has moved toward '+nm(side)+' since it opened ('+sgn(op.spH)+' to '+sgn(homeLine)+' for '+nh+'), so the market agrees.')}
+        else{o.sig.mv=-1;o.adj-=Math.round(1*LW.mv);o.plus.push('The line moved away from '+nm(side)+' since it opened ('+sgn(op.spH)+' to '+sgn(homeLine)+' for '+nh+'), which gives this side a better number.')}
       }
       if(t==='tot'&&side&&g.dk.tt!=null&&op.tt!=null&&Math.abs(g.dk.tt-op.tt)>=1){
         var up=g.dk.tt>op.tt,ag=(side==='o')===up;
-        if(ag){o.adj+=1;o.plus.push('The total moved '+(up?'up':'down')+' from '+op.tt+' to '+g.dk.tt+', the same way as this pick.')}else o.minus.push('The total moved '+(up?'up':'down')+' from '+op.tt+' to '+g.dk.tt+', against this pick.');
+        if(ag){o.sig.mv=1;o.adj+=Math.round(1*LW.mv);o.plus.push('The total moved '+(up?'up':'down')+' from '+op.tt+' to '+g.dk.tt+', the same way as this pick.')}else o.minus.push('The total moved '+(up?'up':'down')+' from '+op.tt+' to '+g.dk.tt+', against this pick.');
       }
     }catch(x2){}
     /* price: what the bet has to win to break even */
@@ -17661,6 +17661,242 @@ function matchupPara259(g,d){
   };
   EXPERTS.forEach(function(e){if(e.lg!=='nfl')return;var p=P[e.a+'@'+e.h]||P[e.h+'@'+e.a];if(p)e.preview=p});
 })();
+/* v262: the app learns from its own results.
+   1 Deep dive learning: every Deep dive best bet is saved before the game with the signals behind it (experts agreeing or not,
+     the line moving toward or away), graded on the final score, and a small model refits how much each signal is worth.
+   2 Closing line: each saved pick keeps updating its line until kickoff; the gap between the number the app took and the closing
+     number (closing-line value) is the fastest honest test of an edge.
+   3 Expert trust: the experts' own graded record, by sport, scales how much their agreement moves a pick.
+   6 Strength of schedule: each team's season is read and its opponents' average margin is compared, so a team that padded
+     its numbers against weak opponents is marked down (and the reverse).
+   7 Backup and restore: everything the app has learned can be saved to a file and restored on any device; the browser is
+     also asked to keep the app's data from being cleared. */
+
+/* ---------- storage ---------- */
+S.ddlog=[];try{var _dl=JSON.parse(localStorage.getItem('hitboard.ddlog.v1')||'null');if(Array.isArray(_dl))S.ddlog=_dl}catch(e){}
+function ddlSave(){try{localStorage.setItem('hitboard.ddlog.v1',JSON.stringify(S.ddlog.slice(-1500)))}catch(e){}}
+try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(function(){})}catch(e){}
+
+function feedGame262(gid){var f=null;Object.keys(S.feed||{}).forEach(function(lg){(S.feed[lg]||[]).forEach(function(x){if(x.id===gid)f=x})});return f}
+function gradeBet262(g,t,side,num,over){
+  if(!g||kind(g)!=='final'||g.sa==null||g.sh==null)return null;
+  var mh=g.sh-g.sa;
+  if(t==='ml')return mh===0?'P':((side==='h')===(mh>0)?'W':'L');
+  if(t==='sp'){if(num==null)return null;var tm=side==='h'?mh:-mh,v=tm+num;return v===0?'P':v>0?'W':'L'}
+  if(t==='tot'){if(num==null)return null;var tot=g.sa+g.sh;return tot===num?'P':((tot>num)===!!over?'W':'L')}
+  return null;
+}
+/* current line for one side of one market */
+function sideLine262(g,t,side){
+  var d=g&&g.dk;if(!d)return null;
+  if(t==='sp'&&d.sp&&(side==='a'||side==='h')){var hl=d.sp.fav==='h'?-d.sp.pts:d.sp.pts;return side==='h'?hl:-hl}
+  if(t==='tot'&&d.tt!=null)return d.tt;
+  if(t==='ml'&&d.ml&&(side==='a'||side==='h'))return side==='h'?d.ml.h:d.ml.a;
+  return null;
+}
+function impl262(pr){return pr==null?null:pr<0?(-pr)/(-pr+100):100/(pr+100)}
+
+/* ---------- 1. Deep dive picks: save, grade, learn ---------- */
+function ddSnap262(){
+  var ch=false,have={},now=Date.now();S.ddlog.forEach(function(x){have[x.gid]=1});
+  ['nfl','ncaafb','nba','nhl'].forEach(function(lg){(S.feed[lg]||[]).forEach(function(g){
+    if(kind(g)!=='up'||have[g.id]||!(g.start>now)||g.start>now+3*864e5)return;
+    var d=ddCached(g);if(!d||!d.best)return;var b=d.best,x=b.x||{};
+    var num=b.t==='ml'?null:(x.num!=null?x.num:sideLine262(g,b.t,b.t==='tot'?null:b.side));
+    S.ddlog.push({gid:g.id,lg:lg,st:g.start,at:now,t:b.t,side:b.t==='tot'?null:b.side,over:b.t==='tot'?b.side==='o':null,num:num,p:b.p,base:b.base,score:b.score,conf:b.conf,ex:b.sig?b.sig.ex:0,mv:b.sig?b.sig.mv:0,pick:b.pick,game:g.a+' @ '+g.h,pr:b.t==='ml'?sideLine262(g,'ml',b.side):null,res:null});
+    have[g.id]=1;ch=true;
+  })});
+  S.ddlog.forEach(function(x){
+    if(x.res)return;var g=feedGame262(x.gid);if(!g)return;
+    var r=gradeBet262(g,x.t,x.side,x.num,x.over);if(r){x.res=r;x.score2=g.a+' '+g.sa+', '+g.h+' '+g.sh;ch=true}
+  });
+  if(ch)ddlSave();
+}
+var _ddw=null,_ddwK='';
+function ddWeights(){
+  var D=S.ddlog.filter(function(x){return (x.res==='W'||x.res==='L')&&x.p!=null});
+  var k=D.length+'|'+S.ddlog.length;if(_ddw&&_ddwK===k)return _ddw;
+  var out={n:D.length,on:false,ex:1,mv:1,w:[0,1,.25,.1]};
+  if(D.length>=30){
+    var mu=[0,1,.25,.1],w=mu.slice(),lam=20,lr=.1;
+    for(var it=0;it<300;it++){
+      var gr=[0,0,0,0];
+      D.forEach(function(x){var f=[1,lmLogit(x.p),x.ex||0,x.mv||0],z=0;for(var i=0;i<4;i++)z+=w[i]*f[i];var e=lmSig(z)-(x.res==='W'?1:0);for(var j=0;j<4;j++)gr[j]+=e*f[j]});
+      for(var j2=0;j2<4;j2++)w[j2]-=lr*(gr[j2]+lam*(w[j2]-mu[j2]))/(D.length+lam);
+    }
+    out.w=w;out.on=true;out.ex=Math.max(0,Math.min(2,w[2]/.25));out.mv=Math.max(0,Math.min(2.5,w[3]/.1));
+  }
+  _ddw=out;_ddwK=k;return out;
+}
+
+/* ---------- 3. expert trust from their graded record ---------- */
+function expTrust(lg){
+  var c=[0,0],w=[0,0];
+  (S.xlog||[]).forEach(function(x){if(x.lg!==lg||!x.res)return;if(x.res.c==='W'||x.res.c==='L'){c[1]++;if(x.res.c==='W')c[0]++}if(x.res.w==='W'||x.res.w==='L'){w[1]++;if(x.res.w==='W')w[0]++}});
+  var sp=1,ml=1;
+  if(c[1]>=10){var h=(c[0]+.524*20)/(c[1]+20);sp=Math.max(.4,Math.min(1.6,1+(h-.524)*8))}
+  if(w[1]>=10){var h2=(w[0]+.65*20)/(w[1]+20);ml=Math.max(.5,Math.min(1.5,1+(h2-.65)*6))}
+  return {sp:sp,ml:ml,cov:c,win:w};
+}
+
+/* ---------- 2. closing line value ---------- */
+function clvTick262(){
+  var ch=false;
+  var upd=function(x,t,side,isTot){
+    var g=feedGame262(x.gid);if(!g||kind(g)!=='up'||!(g.start>Date.now()))return;
+    var v=sideLine262(g,t,isTot?null:side);if(v==null)return;
+    if(t==='ml'){if(x.op==null){x.op=v;ch=true}if(x.cp!==v){x.cp=v;ch=true}}
+    else{if(x.num0==null&&x.num!=null){x.num0=x.num;ch=true}if(x.cl!==v){x.cl=v;ch=true}}
+  };
+  (S.log||[]).forEach(function(x){if(x.res||!x.gid||!x.t)return;upd(x,x.t,x.side,x.t==='tot')});
+  S.ddlog.forEach(function(x){if(x.res)return;upd(x,x.t,x.side,x.t==='tot');if(x.t==='ml'&&x.op==null&&x.pr!=null)x.op=x.pr});
+  if(ch){try{saveLog()}catch(e){}ddlSave()}
+}
+function clvOf262(x){
+  if(x.t==='sp'&&x.num!=null&&x.cl!=null)return {pts:x.num-x.cl};
+  if(x.t==='tot'&&x.num!=null&&x.cl!=null){var over=x.over!=null?x.over:/over/i.test(String(x.pick||''));return {pts:over?x.cl-x.num:x.num-x.cl}}
+  if(x.t==='ml'&&x.op!=null&&x.cp!=null){var a=impl262(x.op),b=impl262(x.cp);return {pp:(b-a)*100}}
+  return null;
+}
+function clvSummary262(L){
+  var pts=[],pp=[];
+  L.forEach(function(x){var st=x.st||0;if(st>Date.now())return;var c=clvOf262(x);if(!c)return;if(c.pts!=null)pts.push(c.pts);if(c.pp!=null)pp.push(c.pp)});
+  var avg=function(a){return a.length?a.reduce(function(s,v){return s+v},0)/a.length:null};
+  return {n:pts.length,avg:avg(pts),beat:pts.filter(function(v){return v>0}).length,same:pts.filter(function(v){return v===0}).length,nml:pp.length,avgml:avg(pp)};
+}
+
+/* ---------- 6. strength of schedule ---------- */
+function oppMargin262(lg,o){
+  try{
+    if(!o)return null;var ab=o.abbreviation,nm=o.displayName||o.shortDisplayName||'';
+    if(lg==='nfl'){var t=TS[nt(ab)];return t&&t.G?(t.PF-t.PA)/t.G:null}
+    if(lg==='nba'){var n=NBAT[ab]||NBAT[{NY:'NYK',GS:'GSW',SA:'SAS',NO:'NOP',UTAH:'UTA',WSH:'WAS'}[ab]];return n?n.PF-n.PA:null}
+    if(lg==='nhl'){var h=NHLT[nhlK(ab)];return h&&h.gp?(h.gf-h.ga)/h.gp:null}
+    if(lg==='ncaafb'){var c=cfbFind(nm);return c&&c.off!=null&&c.def!=null?c.off-c.def:null}
+  }catch(e){}
+  return null;
+}
+function sos262(g){
+  var d=S.seasX&&S.seasX[expSeasonKey(g)];if(!d||d.busy||!d.a||!d.h)return null;
+  var f=function(o){var L=o&&o.L||[],v=[];L.forEach(function(x){var m=oppMargin262(g.lg,x.opp);if(m!=null)v.push(m)});return v.length>=3?{v:v.reduce(function(a,b){return a+b},0)/v.length,n:v.length}:null};
+  var a=f(d.a),h=f(d.h);if(!a||!h)return null;
+  var cap={nfl:4,ncaafb:6,nba:3,nhl:.3}[g.lg]||3,sh=Math.max(-cap,Math.min(cap,.5*(h.v-a.v)));
+  return {a:a.v,h:h.v,shift:sh};
+}
+(function(){
+  var ft0=feedTeams;
+  feedTeams=function(g){
+    var r=ft0.apply(this,arguments);
+    try{
+      if(!r||r.missing||!r.A||!r.H)return r;
+      var s=sos262(g);if(!s||Math.abs(s.shift)<.05)return r;
+      var o={};for(var k in r)o[k]=r[k];
+      var H={};for(var k2 in r.H)H[k2]=r.H[k2];H.pf+=s.shift;H.pa-=s.shift;o.H=H;o.sos=s;return o;
+    }catch(e){return r}
+  };
+  var db0=ddBuild;
+  ddBuild=function(g){
+    var v=db0.apply(this,arguments);
+    try{
+      var s=sos262(g);if(s&&Math.abs(s.shift)>=.3){
+        var na=ddNick(g.an||g.a),nh=ddNick(g.hn||g.h),tough=s.h>s.a?nh:na,u=g.lg==='nhl'?'goals':'points';
+        v.why.push('Schedule: '+tough+'’ opponents have been about '+Math.abs(s.h-s.a).toFixed(1)+' '+u+' a game stronger, so the projection moves about '+Math.abs(s.shift).toFixed(1)+' toward '+tough+'.');
+      }
+    }catch(e){}
+    return v;
+  };
+})();
+/* read upcoming teams' seasons in the background, a few at a time */
+function sosLoader262(){
+  if(window.claude||typeof fetch!=='function')return;
+  var now=Date.now(),n=0;
+  ['nfl','ncaafb','nba'].forEach(function(lg){(S.feed[lg]||[]).forEach(function(g){
+    if(n>=3||kind(g)!=='up'||!(g.start>now)||g.start>now+4*864e5)return;
+    if(S.seasX[expSeasonKey(g)])return;
+    try{seasonLoad(g);n++}catch(e){}
+  })});
+}
+
+/* ---------- 7. backup and restore ---------- */
+var BAK262=['hitboard.log.v1','hitboard.mine.v1','hitboard.lrn.v1','hb.angles.v1','hitboard.xlog.v1','hitboard.ddlog.v1','hitboard.glock.v1','hitboard.glog.v1','hb.trk185','hitboard.slip.v1'];
+function bakExport262(){
+  var data={};BAK262.forEach(function(k){try{var v=localStorage.getItem(k);if(v!=null)data[k]=v}catch(e){}});
+  var txt=JSON.stringify({app:'hitboard',v:1,at:new Date().toISOString(),data:data});
+  var name='hitboard-learning-'+new Date().toISOString().slice(0,10)+'.json';
+  try{localStorage.setItem('hitboard.bak.at',String(Date.now()))}catch(e){}
+  try{
+    var file=new File([txt],name,{type:'application/json'});
+    if(navigator.canShare&&navigator.canShare({files:[file]})){navigator.share({files:[file],title:'Hitboard learning backup'}).catch(function(){});return}
+  }catch(e){}
+  try{var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:'application/json'}));a.download=name;document.body.appendChild(a);a.click();setTimeout(function(){a.remove()},500)}catch(e){alert('Could not save the backup file.')}
+}
+function bakMerge262(k,cur,inc){
+  try{
+    var A=cur?JSON.parse(cur):null,B=JSON.parse(inc);
+    if(Array.isArray(B)){
+      A=Array.isArray(A)?A:[];var key=function(x){return x&&(x.k||x.id||(x.gid?x.gid+'|'+(x.t||''):null))||JSON.stringify(x)},have={};
+      A.forEach(function(x){have[key(x)]=1});B.forEach(function(x){if(!have[key(x)]){A.push(x);have[key(x)]=1}});
+      return JSON.stringify(A);
+    }
+    if(B&&typeof B==='object'){A=A&&typeof A==='object'&&!Array.isArray(A)?A:{};Object.keys(B).forEach(function(x){if(!(x in A))A[x]=B[x]});return JSON.stringify(A)}
+  }catch(e){}
+  return cur||inc;
+}
+function bakImport262(){
+  var inp=document.createElement('input');inp.type='file';inp.accept='application/json,.json';
+  inp.onchange=function(){
+    var f=inp.files&&inp.files[0];if(!f)return;var rd=new FileReader();
+    rd.onload=function(){
+      try{
+        var o=JSON.parse(rd.result);if(!o||o.app!=='hitboard'||!o.data)throw 0;var n=0;
+        Object.keys(o.data).forEach(function(k){if(BAK262.indexOf(k)<0)return;var cur=null;try{cur=localStorage.getItem(k)}catch(e){}try{localStorage.setItem(k,bakMerge262(k,cur,o.data[k]));n++}catch(e){}});
+        alert('Restored and merged '+n+' parts of what Hitboard has learned. The app will reload.');location.reload();
+      }catch(e){alert('That file is not a Hitboard backup.')}
+    };
+    rd.readAsText(f);
+  };
+  document.body.appendChild(inp);inp.click();setTimeout(function(){inp.remove()},60000);
+}
+document.addEventListener('click',function(e){
+  var el=e.target&&e.target.closest?e.target.closest('[data-act="hbbak"],[data-act="hbres"]'):null;if(!el)return;
+  e.stopImmediatePropagation();e.preventDefault();
+  if(el.dataset.act==='hbbak')bakExport262();else bakImport262();
+});
+
+/* ---------- the learning dashboard, at the top of My bets → App's record ---------- */
+function learnCard262(){
+  var M=lmModel(),W=ddWeights(),graded=S.ddlog.filter(function(x){return x.res==='W'||x.res==='L'}),wins=graded.filter(function(x){return x.res==='W'}).length;
+  var c1=clvSummary262((S.log||[]).concat(S.ddlog)),lgs=['nfl','ncaafb'],last=0;try{last=+localStorage.getItem('hitboard.bak.at')||0}catch(e){}
+  var row=function(a,b){return '<tr><td>'+a+'</td><td>'+b+'</td></tr>'};
+  var h='<h3>How Hitboard is learning</h3><div class="card" style="padding:12px 14px"><div class="tblwrap"><table><tbody>';
+  h+=row('Game picks graded (win chances)',M.n+(M.on?' · tuning is on':' · tuning starts at '+LM_MIN));
+  h+=row('Deep dive best bets graded',graded.length+(graded.length?' · '+wins+'-'+(graded.length-wins)+' ('+Math.round(100*wins/graded.length)+'%)':'')+(W.on?' · weights are learned':' · learning starts at 30'));
+  h+=row('Weight on experts agreeing',W.on?'×'+W.ex.toFixed(2)+' of the starting value':'starting value');
+  h+=row('Weight on line movement',W.on?'×'+W.mv.toFixed(2)+' of the starting value':'starting value');
+  lgs.forEach(function(lg){var T=expTrust(lg);h+=row('Expert trust · '+esc(lgName(lg)),'cover '+T.cov[0]+'-'+(T.cov[1]-T.cov[0])+(T.cov[1]>=10?' → ×'+T.sp.toFixed(2):' (needs 10)')+' · winner '+T.win[0]+'-'+(T.win[1]-T.win[0])+(T.win[1]>=10?' → ×'+T.ml.toFixed(2):''))});
+  h+=row('Closing line (spreads, totals)',c1.n?(c1.avg>=0?'+':'')+c1.avg.toFixed(2)+' points a pick · beat the close '+c1.beat+' of '+c1.n+(c1.same?' · matched '+c1.same:''):'none yet: measured once picked games kick off');
+  if(c1.nml)h+=row('Closing line (moneylines)',(c1.avgml>=0?'+':'')+c1.avgml.toFixed(1)+' percentage points a pick over '+c1.nml);
+  var sosN=Object.keys(S.seasX||{}).filter(function(k){var d=S.seasX[k];return d&&d.t&&d.a&&d.a.L&&d.a.L.length&&d.h&&d.h.L&&d.h.L.length}).length;
+  h+=row('Strength of schedule','on · '+sosN+' matchups read');
+  h+='</tbody></table></div>';
+  h+='<p class="src" style="margin:8px 0 0">Closing line: how many points better (or worse) the number Hitboard took was than the final number before kickoff. Consistently beating it is the clearest early sign of a real edge, well before win-loss records settle.</p>';
+  h+='<p class="src" style="margin:6px 0 0">What the app learns is stored on this device. '+(last?'Last backup '+esc(new Date(last).toLocaleDateString([],{month:'short',day:'numeric'}))+'.':'No backup yet.')+(Date.now()-last>7*864e5?' <b>Save a backup</b> so nothing is lost if the app’s data is cleared, and restore it on another device to share what it has learned.':'')+'</p>';
+  h+='<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap"><button class="btn primary" data-act="hbbak">Save backup</button><button class="btn" data-act="hbres">Restore from backup</button></div></div>';
+  return h;
+}
+(function(){
+  var vr0=vResults;
+  vResults=function(){
+    var h=vr0.apply(this,arguments),c='';try{c=learnCard262()}catch(e){c=''}
+    var i=h.indexOf('</h2>');return i>=0?h.slice(0,i+5)+c+h.slice(i+5):c+h;
+  };
+})();
+
+/* timers */
+setTimeout(function(){try{ddSnap262();clvTick262()}catch(e){}},9000);
+setInterval(function(){try{ddSnap262();clvTick262()}catch(e){}},60000);
+setTimeout(function(){try{sosLoader262()}catch(e){}},12000);
+setInterval(function(){try{sosLoader262()}catch(e){}},20000);
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
 setTimeout(function(){doRefresh(true)},600);
