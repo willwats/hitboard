@@ -1957,7 +1957,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v252, Nov 21';
+var BUILD='v253, Nov 21';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -16540,29 +16540,81 @@ report187=function(g){
   deepRows=memo('deep',deepRows);
   spRows=memo('sp',spRows);
 })();
-/* v252: the bottom bar stays pinned to the bottom of the screen while scrolling on iPhone.
-   iOS could leave it floating mid-screen when the page height changed during a scroll. The page now clips sideways overflow
-   without becoming its own scroller, and the bar is re-pinned to the visible screen whenever it scrolls or resizes. */
+/* v253: the bottom bar is locked. On iPhone the whole page used to scroll, and iOS could leave a bar pinned to the bottom
+   floating partway up the screen. Now the page itself never moves: the content scrolls inside it, so the bar has nothing to drift
+   against. Scroll position, scroll-to-top and "keep my place" keep working through the same calls as before. */
 (function(){
+  var B=document.body;if(!B||!B.scrollTo)return;
   try{
     var st=document.createElement('style');
-    st.textContent='html,body{overflow-x:clip}body{-webkit-overflow-scrolling:auto}@supports not (overflow:clip){html,body{overflow-x:hidden}}nav{-webkit-transform:none;transform:none;will-change:transform}';
+    st.textContent='html{height:100%;overflow:hidden}body{height:100%;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain}nav{-webkit-transform:none;transform:none}';
     document.head.appendChild(st);
+  }catch(e){return}
+  var y0=window.pageYOffset||0;
+  try{
+    var gy=function(){return B.scrollTop};
+    Object.defineProperty(window,'pageYOffset',{get:gy,configurable:true});
+    Object.defineProperty(window,'scrollY',{get:gy,configurable:true});
   }catch(e){}
-  var vv=window.visualViewport,nav=document.querySelector('nav'),raf=0;
-  if(!vv||!nav)return;
-  var pin=function(){
-    raf=0;
-    var ae=document.activeElement;if(ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA')){if(nav.style.transform)nav.style.transform='';return}
-    var gap=window.innerHeight-(vv.height+vv.offsetTop);
-    if(vv.scale>1.01||Math.abs(gap)<1||gap<0){if(nav.style.transform)nav.style.transform='';return}
-    nav.style.transform='translateY('+(-gap)+'px)';
+  var to0=window.scrollTo,by0=window.scrollBy;
+  window.scrollTo=function(x,y){try{if(x&&typeof x==='object')B.scrollTo(x);else B.scrollTo(+x||0,+y||0)}catch(e){to0.apply(window,arguments)}};
+  window.scrollBy=function(x,y){try{if(x&&typeof x==='object')B.scrollBy(x);else B.scrollBy(+x||0,+y||0)}catch(e){by0.apply(window,arguments)}};
+  if(y0)B.scrollTop=y0;
+})();
+
+/* v253: best 4-team spread parlay for each kickoff time, under Games.
+   Games are grouped by start time rounded to the nearest quarter hour (:00, :15, :30, :45). In each group with at least four
+   games that have a spread, the four spread picks the model is most confident in make the parlay. */
+var PSLOT={};
+function slotKey253(ms){var q=15*6e4;return Math.round(ms/q)*q}
+function slotLabel253(ms){try{return new Date(ms).toLocaleString([],{weekday:'short',hour:'numeric',minute:'2-digit'})}catch(e){return fmtTime(ms)}}
+function parlaySlotsHtml(){
+  var T=gdTest(),all=[];
+  LG.forEach(function(l){if(S.gs==='all'||S.gs===l[0])(S.feed[l[0]]||[]).forEach(function(g){all.push(g)})});
+  var now=Date.now(),G={};
+  all.forEach(function(g){
+    if(kind(g)!=='up'||!(g.start>now)||!T.ok(g))return;
+    var pk=null;try{pk=picksFor(g)}catch(e){}
+    var sp=(pk||[]).filter(function(x){return x&&x.t==='sp'&&x.p!=null&&isFinite(x.p)})[0];if(!sp)return;
+    var k=slotKey253(g.start);(G[k]=G[k]||[]).push({g:g,x:sp});
+  });
+  var keys=Object.keys(G).map(Number).sort(function(a,b){return a-b});
+  PSLOT={};
+  var h='<h3 style="margin-top:22px">Best 4-team spread parlay by kickoff time</h3><p class="src" style="margin-top:0">Games are grouped by start time, rounded to the nearest quarter hour. Each parlay is the four spread picks the model gives the best chance to cover in that window. A parlay pays only if all four cover, so the combined chance is much lower than any single leg.</p>';
+  if(!keys.length)return h+'<div class="card empty">No upcoming games with a spread for this selection.</div>';
+  var short=[];
+  keys.forEach(function(k){
+    var L=G[k].slice().sort(function(a,b){return b.x.p-a.x.p});
+    if(L.length<4){short.push(slotLabel253(k)+' ('+L.length+' game'+(L.length>1?'s':'')+')');return}
+    var four=L.slice(0,4),pc=four.reduce(function(a,o){return a*o.x.p},1);
+    PSLOT[k]=four;
+    var inAll=four.every(function(o){return inSlip(gameLeg(o.g,o.x).key)});
+    h+='<div class="card" style="padding:12px 14px;margin-bottom:10px"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><b>'+esc(slotLabel253(k))+'</b><span class="src">'+L.length+' games in this window</span></div>'+
+      four.map(function(o){return '<div data-act="fgame" data-id="'+esc(o.g.id)+'" style="padding:8px 0;border-top:1px solid var(--line);cursor:pointer"><div><b>'+esc(o.x.pick||'')+'</b></div><div class="src">'+esc((o.g.an||o.g.a)+' @ '+(o.g.hn||o.g.h))+' · '+esc(lgName(o.g.lg))+' · model '+Math.round(o.x.p*100)+'% to cover</div></div>'}).join('')+
+      '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:8px"><span class="src">All four cover: about '+Math.round(pc*100)+'%</span><button class="btn'+(inAll?'':' primary')+'" style="flex:none;padding:8px 12px" data-act="pslot" data-k="'+k+'">'+(inAll?'In slip ✓':'+ Add all 4 to slip')+'</button></div></div>';
+  });
+  if(short.length)h+='<p class="src">Fewer than four games with a spread, so no 4-team parlay: '+esc(short.join(' · '))+'.</p>';
+  return h;
+}
+document.addEventListener('click',function(e){
+  var el=e.target&&e.target.closest?e.target.closest('[data-act="pslot"]'):null;if(!el)return;
+  e.stopImmediatePropagation();e.preventDefault();
+  var four=PSLOT[el.dataset.k];if(!four)return;
+  var legs=four.map(function(o){return gameLeg(o.g,o.x)}),allIn=legs.every(function(l){return inSlip(l.key)});
+  if(allIn)S.slip=S.slip.filter(function(q){return !legs.some(function(l){return l.key===q.key})});
+  else legs.forEach(function(l){if(!inSlip(l.key)&&S.slip.length<15)S.slip.push(l)});
+  saveSlip();updateSlipBar();render();
+});
+(function(){
+  var vG=vGames;
+  vGames=function(){
+    var h=vG.apply(this,arguments);
+    if(S.gd==='prev')return h;
+    var s='';try{s=parlaySlotsHtml()}catch(e){s=''}
+    if(!s)return h;
+    var j=h.lastIndexOf('<p class="foot">');
+    return j>=0?h.slice(0,j)+s+h.slice(j):h+s;
   };
-  var q=function(){if(!raf)raf=requestAnimationFrame(pin)};
-  vv.addEventListener('resize',q);vv.addEventListener('scroll',q);window.addEventListener('scroll',q,{passive:true});window.addEventListener('resize',q);
-  /* after the keyboard closes, iOS can leave fixed bars shifted until the next scroll: nudge it to redraw */
-  document.addEventListener('focusout',function(e){var t=e.target;if(!t||(t.tagName!=='INPUT'&&t.tagName!=='TEXTAREA'))return;setTimeout(function(){var y=window.pageYOffset||0;window.scrollTo(0,y+1);window.scrollTo(0,y);q()},120)},true);
-  q();
 })();
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
