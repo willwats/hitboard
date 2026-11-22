@@ -1957,7 +1957,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v265, Nov 22';
+var BUILD='v266, Nov 22';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -16208,14 +16208,16 @@ function inactLoad187(g){
           if(nm){if(o.active===false)out.push({n:nm,pos:pos});if(o.starter===true)st.push({n:nm,pos:pos})}}
         Object.keys(o).forEach(function(k2){if(o[k2]&&typeof o[k2]==='object')walk(o[k2])})};
       walk(j);
-      if(seen>=20&&(out.length||st.length))S.inact[nt(s[2])]={at:Date.now(),gid:g.id,out:out,start:st};
+      if(seen>=20&&(out.length||st.length)&&ok266(out,seen))S.inact[nt(s[2])]={at:Date.now(),gid:g.id,out:out,start:st};else if(seen>=20&&!ok266(out,seen))delete S.inact[nt(s[2])];
     }).catch(function(){});
   })).then(function(){mergeInact187();try{_grC={};_d179K='';_s179K=''}catch(e){}try{if(S.sheet)renderSheet();else softRender()}catch(e){}});
 }
+/* v266: a real NFL inactive list has at most 7 players (plus a few on short lists). Before the list is posted ESPN can mark the whole roster inactive, which listed every quarterback as out. Ignore any list that large, and any list with three or more quarterbacks out (an injured starter plus the emergency third QB is the most a real list has). */
+function ok266(out,seen){if(!out||!out.length)return true;var qb=out.filter(function(p){return /^QB$/i.test(p.pos||'')}).length;return out.length<=10&&out.length<seen/4&&qb<=2}
 function mergeInact187(){
   var I=S.inj.nfl||(S.inj.nfl={at:Date.now(),by:{},idx:{}});if(!I.by)I.by={};if(!I.idx)I.idx={};
   Object.keys(S.inact).forEach(function(t){
-    var X=S.inact[t];if(Date.now()-X.at>8*3600e3)return;
+    var X=S.inact[t];if(Date.now()-X.at>8*3600e3||!ok266(X.out,99))return;
     var L=I.by[t]||(I.by[t]=[]);
     X.out.forEach(function(p){
       var hit=L.filter(function(x){return normName(x.n)===normName(p.n)})[0];
