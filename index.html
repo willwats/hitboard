@@ -1957,7 +1957,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v268, Nov 22';
+var BUILD='v269, Nov 22';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -18222,6 +18222,29 @@ parlaysBody=function(lg){
   var k=h.lastIndexOf('<p class="note" style="margin-top:12px">Parlays need every leg');
   return k>0?h.slice(0,k)+card+h.slice(k):h+card;
 };
+})();
+/* v269: kickers in the Props section: a "Kickers today" group on Best chances today, and the kicker table under NFL All players. Kicker legs stay in Parlays. */
+(function(){
+function kickBets269(){
+  var L=[];try{L=legList('nfl').filter(function(l){if(l.kind!=='kick')return false;var g=find(l.gid);return g&&isToday(g.start)&&g.start>Date.now()})}catch(e){}
+  var best={};L.forEach(function(l){if(!best[l.name]||l.p>best[l.name].p)best[l.name]=l});
+  return Object.keys(best).map(function(k){return best[k]}).sort(function(a,b){return b.p-a.p}).slice(0,5).map(function(l){
+    var r={pro:[],con:[]};try{r=propReasons('nfl',l)}catch(e){}
+    return {label:'NFL · Kicker prop',title:l.name+' '+l.mk,sub:(l.nx&&l.nx.txt||'')+' · '+l.team,p:l.p,why:[l.src],pro:r.pro,con:r.con,lgKey:'nfl',rec:{t:'manual',key:'nfl-prop'}};
+  });
+}
+var vPropsTop0=vPropsTop;
+vPropsTop=function(){
+  var h=vPropsTop0(),K=kickBets269();if(!K.length)return h;
+  var base=(S.recList||[]).length,sec='<h2 style="margin-top:22px">NFL · kickers today</h2><p class="lede">The kicker props most likely to hit on today’s slate, from season field goal and extra point rates scaled by the points today’s line expects his team to score. The full kicker table is in NFL props under Kicking.</p>'+K.map(function(b,i){S.recList.push(b);return betCard(b,base+i)}).join('');
+  var a=h.indexOf('NFL · best of today</h2>'),cut=-1;
+  if(a>=0){cut=h.indexOf('<h2 style="margin-top:2',a);}
+  if(cut<0)cut=h.indexOf('<h2 style="margin-top:26px">Later this week');
+  if(cut<0){var f=foot();cut=h.lastIndexOf(f);if(cut<0)cut=h.length}
+  return h.slice(0,cut)+sec+h.slice(cut);
+};
+var nflDeep0=nflDeep;
+nflDeep=function(only){var h=nflDeep0(only);if(only)return h;var k='';try{k=nflKick()}catch(e){}return k?h+'<h3 style="margin-top:20px">Kickers</h3>'+k:h};
 })();
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
