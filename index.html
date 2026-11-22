@@ -1957,7 +1957,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v262, Nov 21';
+var BUILD='v263, Nov 21';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -17897,6 +17897,168 @@ setTimeout(function(){try{ddSnap262();clvTick262()}catch(e){}},9000);
 setInterval(function(){try{ddSnap262();clvTick262()}catch(e){}},60000);
 setTimeout(function(){try{sosLoader262()}catch(e){}},12000);
 setInterval(function(){try{sosLoader262()}catch(e){}},20000);
+/* v263: strength of schedule from this season's actual games.
+   The app reads every completed game of the season (NFL and college football week by week, NBA and NHL day by day), keeps
+   them on the device, and rebuilds each team's record, margin and opponents. From that it computes:
+   - an opponent-adjusted rating (each team's average margin plus the average rating of the teams it played, solved together),
+     so a win over a good team counts for more than a win over a bad one, and a loss to a bad team costs more;
+   - strength of schedule: the opponents' winning percentage and average rating, ranked;
+   - record against winning teams, the best win and the worst loss;
+   - NFL points for and against from this season's real games (replacing the older built-in numbers).
+   Projections blend in the opponent-adjusted rating, and each game's Deep dive explains the schedules. */
+var SR263={nfl:{g:{},f:{}},ncaafb:{g:{},f:{}},nba:{g:{},f:{}},nhl:{g:{},f:{}}},SRC263={},SRV263=0;
+try{var _sr=JSON.parse(localStorage.getItem('hitboard.sres.v1')||'null');if(_sr)Object.keys(SR263).forEach(function(lg){if(_sr[lg])SR263[lg]=_sr[lg]})}catch(e){}
+function srSave263(){try{localStorage.setItem('hitboard.sres.v1',JSON.stringify(SR263))}catch(e){}}
+var SRCFG263={
+  nfl:{path:'football/nfl',mode:'week',start:Date.UTC(2026,8,8),weeks:18,q:'&seasontype=2&dates=2026',hfa:2,cap:21,shr:3},
+  ncaafb:{path:'football/college-football',mode:'week',start:Date.UTC(2026,7,25),weeks:15,q:'&seasontype=2&groups=80&limit=300&dates=2026',hfa:3,cap:28,shr:2},
+  nba:{path:'basketball/nba',mode:'day',start:Date.UTC(2026,9,20),q:'&limit=100',hfa:2.5,cap:25,shr:8},
+  nhl:{path:'hockey/nhl',mode:'day',start:Date.UTC(2026,9,6),q:'&limit=100',hfa:.25,cap:4,shr:10}
+};
+function srKeys263(lg){
+  var c=SRCFG263[lg],now=Date.now(),out=[];
+  if(c.mode==='week'){var cw=Math.min(c.weeks,Math.floor((now-c.start)/(7*864e5))+1);for(var w=1;w<=cw;w++)out.push('w'+w)}
+  else{for(var t=c.start;t<now-6*36e5;t+=864e5){out.push('d'+new Date(t).toISOString().slice(0,10).replace(/-/g,''))}}
+  return out;
+}
+function srNeeds263(lg,k){var f=SR263[lg].f[k];if(!f)return true;if(f.done)return false;return Date.now()-f.at>3*36e5}
+function srFetch263(lg,k){
+  var c=SRCFG263[lg],u='https://site.api.espn.com/apis/site/v2/sports/'+c.path+'/scoreboard?'+(k.charAt(0)==='w'?'week='+k.slice(1):'dates='+k.slice(1))+c.q;
+  SR263[lg].f[k]={at:Date.now(),done:false,busy:1};
+  return fetch(u).then(function(r){return r.ok?r.json():null}).catch(function(){return null}).then(function(j){
+    var ev=(j&&j.events)||[],allDone=true,last=0;
+    ev.forEach(function(e){
+      var cp=e.competitions&&e.competitions[0];if(!cp||!cp.competitors)return;
+      var st=(cp.status&&cp.status.type)||(e.status&&e.status.type)||{},done=st.completed===true||st.state==='post';
+      var t=Date.parse(e.date)||0;if(t>last)last=t;
+      if(!done){allDone=false;return}
+      var A=null,H=null;cp.competitors.forEach(function(x){if(x.homeAway==='home')H=x;else A=x});if(!A||!H)return;
+      var sa=parseInt(A.score&&A.score.value!=null?A.score.value:A.score,10),sh=parseInt(H.score&&H.score.value!=null?H.score.value:H.score,10);if(!isFinite(sa)||!isFinite(sh))return;
+      var tm=function(x){var t2=x.team||{};return {id:String(t2.id),ab:t2.abbreviation||'',nm:t2.displayName||t2.shortDisplayName||''}};
+      SR263[lg].g[e.id]=[tm(A),tm(H),sa,sh,t,cp.neutralSite?1:0];
+    });
+    if(j)SR263[lg].f[k]={at:Date.now(),done:allDone&&ev.length>0&&last<Date.now()-6*36e5};
+    else SR263[lg].f[k]={at:Date.now()-2*36e5,done:false};
+  });
+}
+var _srQ=false;
+function srTick263(){
+  if(_srQ||window.claude||typeof fetch!=='function'||document.visibilityState==='hidden')return;
+  var todo=[];
+  ['nfl','ncaafb','nba','nhl'].forEach(function(lg){srKeys263(lg).forEach(function(k){if(srNeeds263(lg,k))todo.push([lg,k])})});
+  if(!todo.length)return;
+  _srQ=true;
+  var batch=todo.slice(0,3);
+  Promise.all(batch.map(function(b){return srFetch263(b[0],b[1])})).then(function(){
+    _srQ=false;srSave263();delete SRC263[batch[0][0]];batch.forEach(function(b){delete SRC263[b[0]]});SRV263++;
+    try{_dd256={}}catch(e){}
+    clearTimeout(srTick263._t);srTick263._t=setTimeout(function(){try{if(!S.sheet&&(S.tab==='games'||S.tab==='picks2'))render()}catch(e){}},2500);
+  });
+}
+/* ratings, records and schedule strength for one league */
+function srCalc263(lg){
+  if(SRC263[lg])return SRC263[lg];
+  var c=SRCFG263[lg],T={},G=SR263[lg].g;
+  var team=function(x){return T[x.id]||(T[x.id]={id:x.id,ab:x.ab,nm:x.nm,games:[],w:0,l:0,t:0,pf:0,pa:0})};
+  Object.keys(G).forEach(function(id){var r=G[id],A=team(r[0]),H=team(r[1]),sa=r[2],sh=r[3],neu=r[5];
+    A.games.push({o:r[1].id,pf:sa,pa:sh,home:false,neu:neu,t:r[4]});H.games.push({o:r[0].id,pf:sh,pa:sa,home:true,neu:neu,t:r[4]});
+    [[A,sa,sh],[H,sh,sa]].forEach(function(z){z[0].pf+=z[1];z[0].pa+=z[2];if(z[1]>z[2])z[0].w++;else if(z[1]<z[2])z[0].l++;else z[0].t++});
+  });
+  var ids=Object.keys(T);if(ids.length<4){SRC263[lg]=null;return null}
+  ids.forEach(function(k){var t=T[k],n=t.games.length;t.n=n;t.wp=n?(t.w+.5*t.t)/n:.5;t.mg=0;
+    t.games.forEach(function(x){var m=Math.max(-c.cap,Math.min(c.cap,x.pf-x.pa));m-=x.neu?0:(x.home?c.hfa:-c.hfa);t.mg+=m});t.mg=n?t.mg/n:0;t.r=t.mg});
+  /* teams seen only a couple of times (non-FBS opponents in college) are treated as weak */
+  var minR=Math.min.apply(null,ids.filter(function(k){return T[k].n>=4}).map(function(k){return T[k].mg}).concat([0]));
+  for(var it=0;it<60;it++){
+    var nr={};
+    ids.forEach(function(k){var t=T[k];if(t.n<3&&lg==='ncaafb'){nr[k]=minR-3;return}var s=0;t.games.forEach(function(x){s+=T[x.o]?T[x.o].r:0});nr[k]=t.mg+(t.n?s/t.n:0)});
+    var mean=ids.reduce(function(a,k){return a+nr[k]},0)/ids.length;ids.forEach(function(k){T[k].r=nr[k]-mean});
+  }
+  ids.forEach(function(k){var t=T[k];t.rs=t.r*t.n/(t.n+c.shr);
+    var ow=0,orr=0,n=0,vw=[0,0],best=null,worst=null;
+    t.games.forEach(function(x){var o=T[x.o];if(!o)return;n++;ow+=o.wp;orr+=o.r;
+      if(o.wp>=.5&&o.n>=3){if(x.pf>x.pa)vw[0]++;else if(x.pf<x.pa)vw[1]++}
+      if(x.pf>x.pa&&(!best||o.r>best.r))best={r:o.r,o:o,x:x};
+      if(x.pf<x.pa&&(!worst||o.r<worst.r))worst={r:o.r,o:o,x:x}});
+    t.sosWp=n?ow/n:null;t.sosR=n?orr/n:null;t.vsWin=vw;t.best=best;t.worst=worst;
+    var last=t.games.slice().sort(function(a,b){return b.t-a.t}).slice(0,5),pv=0,pn=0;
+    last.forEach(function(x){var o=T[x.o];if(!o)return;var exp=t.r-o.r+(x.neu?0:(x.home?c.hfa:-c.hfa));pv+=(Math.max(-c.cap,Math.min(c.cap,x.pf-x.pa))-exp);pn++});
+    t.perf5=pn?pv/pn:null;
+  });
+  var real=ids.filter(function(k){return T[k].n>=3&&T[k].sosR!=null});
+  var rk=function(f,desc){var L=real.slice().sort(function(a,b){return desc?T[b][f]-T[a][f]:T[a][f]-T[b][f]});L.forEach(function(k,i){T[k][f+'Rk']=i+1})};
+  rk('sosR',true);rk('rs',true);
+  var out={T:T,N:real.length,byAb:{},byNm:{}};
+  ids.forEach(function(k){var t=T[k];if(t.ab)out.byAb[t.ab]=t;if(t.nm)out.byNm[normName(t.nm)]=t});
+  SRC263[lg]=out;return out;
+}
+function srTeam263(g,s){
+  var R=null;try{R=srCalc263(g.lg)}catch(e){}if(!R)return null;
+  var id=s==='a'?g.aid:g.hid,t=id&&R.T[String(id)];
+  if(!t){var ab=s==='a'?g.a:g.h;t=R.byAb[ab]||(g.lg==='nfl'?R.byAb[{LAR:'LA',WAS:'WSH',JAX:'JAX'}[ab]||ab]:null)||R.byNm[normName(s==='a'?g.an:g.hn)]}
+  return t&&t.n>=3?{t:t,R:R}:null;
+}
+/* projections: blend in the opponent-adjusted rating; NFL points from this season's games */
+(function(){
+  var s0=sos262;
+  sos262=function(g){if(srTeam263(g,'a')&&srTeam263(g,'h'))return null;return s0.apply(this,arguments)};
+  var ft0=feedTeams;
+  feedTeams=function(g){
+    var r=ft0.apply(this,arguments);
+    try{
+      if(!r||r.missing||!r.A||!r.H)return r;
+      var A=srTeam263(g,'a'),H=srTeam263(g,'h');if(!A||!H)return r;
+      var c=SRCFG263[g.lg],o={};for(var k in r)o[k]=r[k];
+      var cp=function(x){var y={};for(var k2 in x)y[k2]=x[k2];return y},a=cp(r.A),h=cp(r.H);
+      if(g.lg==='nfl'&&A.t.n>=4&&H.t.n>=4){a.pf=A.t.pf/A.t.n;a.pa=A.t.pa/A.t.n;h.pf=H.t.pf/H.t.n;h.pa=H.t.pa/H.t.n}
+      var M0=(h.pf+a.pa)/2-(a.pf+h.pa)/2+(r.he||0),Ms=H.t.rs-A.t.rs+(r.he!=null?r.he:c.hfa);
+      var cap={nfl:5,ncaafb:8,nba:4,nhl:.4}[g.lg]||4,x=Math.max(-cap,Math.min(cap,.4*(Ms-M0)));
+      h.pf+=x/2;h.pa-=x/2;a.pf-=x/2;a.pa+=x/2;
+      o.A=a;o.H=h;o.srs={a:A.t,h:H.t,shift:x,Ms:Ms};return o;
+    }catch(e){return r}
+  };
+  var db0=ddBuild;
+  ddBuild=function(g){
+    var v=db0.apply(this,arguments);
+    try{
+      var A=srTeam263(g,'a'),H=srTeam263(g,'h');if(!A||!H||!v)return v;
+      var na=ddNick(g.an||g.a),nh=ddNick(g.hn||g.h),N=A.R.N,u=g.lg==='nhl'?'goals':'points';
+      var tA=A.t,tH=H.t,tough=tH.sosR>tA.sosR?nh:na,gap=Math.abs(tH.sosR-tA.sosR);
+      if(gap>=(g.lg==='nhl'?.1:1))v.why.push('Schedule: '+tough+' have faced the tougher schedule ('+ordn(Math.min(tA.sosRRk,tH.sosRRk))+' hardest of '+N+'), about '+gap.toFixed(1)+' '+u+' a game stronger in opponent rating, so their results count for more.');
+      var dr=tH.rs-tA.rs;v.why.push('Opponent-adjusted rating: '+nh+' '+(tH.rs>=0?'+':'')+tH.rs.toFixed(1)+' ('+ordn(tH.rsRk)+'), '+na+' '+(tA.rs>=0?'+':'')+tA.rs.toFixed(1)+' ('+ordn(tA.rsRk)+'), a '+Math.abs(dr).toFixed(1)+'-'+u.replace(/s$/,'')+' edge to '+(dr>=0?nh:na)+' on a neutral field.');
+    }catch(e){}
+    return v;
+  };
+  var df0=ddForm;
+  ddForm=function(g,s){
+    var f=df0.apply(this,arguments);
+    try{
+      var X=srTeam263(g,s);if(!X)return f;var t=X.t,N=X.R.N;
+      f=f||{nm:s==='a'?(g.an||g.a):(g.hn||g.h),rec:t.w+'-'+t.l+(t.t?'-'+t.t:''),ats:'',n:0,lines:[]};
+      var L=[];
+      L.push('Schedule: opponents have won '+Math.round(t.sosWp*100)+'% of their games ('+ordn(t.sosRRk)+' toughest of '+N+'); '+t.vsWin[0]+'-'+t.vsWin[1]+' against teams with winning records.');
+      var bw=t.best&&t.best.o,wl=t.worst&&t.worst.o;
+      if(bw)L.push('Best win: '+t.best.x.pf+'-'+t.best.x.pa+' over '+bw.nm+' ('+bw.w+'-'+bw.l+')'+(wl?'. Worst loss: '+t.worst.x.pf+'-'+t.worst.x.pa+' to '+wl.nm+' ('+wl.w+'-'+wl.l+')':'')+'.');
+      else if(wl)L.push('Worst loss: '+t.worst.x.pf+'-'+t.worst.x.pa+' to '+wl.nm+' ('+wl.w+'-'+wl.l+').');
+      if(t.perf5!=null&&Math.abs(t.perf5)>=(g.lg==='nhl'?.4:3))L.push('Last five, against what their opponents’ strength predicted: '+(t.perf5>0?'about '+t.perf5.toFixed(1)+' better':'about '+Math.abs(t.perf5).toFixed(1)+' worse')+' a game.');
+      f.lines=L.concat(f.lines||[]);
+      return f;
+    }catch(e){return f}
+  };
+})();
+/* the learning card: what has been read */
+(function(){
+  var lc0=learnCard262;
+  learnCard262=function(){
+    var h=lc0.apply(this,arguments);
+    try{
+      var parts=['nfl','ncaafb','nba','nhl'].map(function(lg){var n=Object.keys(SR263[lg].g).length;return n?lgName(lg)+' '+n:null}).filter(Boolean);
+      h=h.replace(/Strength of schedule<\/td><td>[^<]*/,'Strength of schedule</td><td>'+(parts.length?'from this season’s games: '+esc(parts.join(' · '))+' games read':'reading this season’s games…'));
+    }catch(e){}
+    return h;
+  };
+})();
+setTimeout(srTick263,7000);setInterval(srTick263,2500);
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
 setTimeout(function(){doRefresh(true)},600);
