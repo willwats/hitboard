@@ -1957,7 +1957,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v266, Nov 22';
+var BUILD='v267, Nov 22';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -17275,6 +17275,8 @@ ddHtml=function(g){
    "How the game could go" removed, a shorter "More", and Hitboard's pick shown with its predicted score. */
 
 /* starters ruled out or doubtful for one side of a game */
+/* v267: a quarterback counts as a starter if he is QB1 on the depth chart, or he has started this season (4+ games at 180+ passing yards a game). Backups like a third-stringer are left off the out list. */
+function qbStarter267(team,name){var n=normName(name),D=S.dep[nt(team)];if(D&&D.qb&&D.qb.length&&normName(D.qb[0])===n)return true;return DEEP.some(function(d){return d.kind==='pass'&&nt(d.t)===nt(team)&&normName(d.n)===n&&d.g>=4&&d.avg>=180})}
 function startersOut258(g,s){
   var L=[];
   try{
@@ -17282,7 +17284,7 @@ function startersOut258(g,s){
     (injList189(g,s)||[]).forEach(function(x){
       if(x.m<.75)return;
       var grp=posGrp189(x.pos),st=true;
-      if(g.lg==='nfl'){try{st=grp==='QB'||nflStarter189(team,x.n,grp)}catch(e){st=grp==='QB'}}
+      if(g.lg==='nfl'){try{st=grp==='QB'?qbStarter267(team,x.n):nflStarter189(team,x.n,grp)}catch(e){st=false}} /* v267: backup QBs are not listed, only a starter */
       if(!st)return;
       L.push({pos:x.pos||'',n:x.n,st:x.m>=1?'out':'doubtful',qb:grp==='QB'});
     });
