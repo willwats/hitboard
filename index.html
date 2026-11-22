@@ -1957,7 +1957,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v270, Nov 22';
+var BUILD='v271, Nov 22';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -18558,6 +18558,85 @@ vPl4=function(){
     if(a>=0){s='<h2 style="margin-top:22px">More parlay types · '+esc(lgName(lg))+'</h2><p class="src">Cover parlay, teasers, props plus a cover, one prop per game, a round robin'+(lg==='nfl'?' and the kicker parlay':'')+'. '+(S.gs&&S.gs!=='all'?'':'Pick a sport above to see it for that sport. ')+'Tap <b>Use in parlay builder</b> on any slip to load it.</p>'+p.slice(a,b>a?b:p.length).replace('<h3>Teams most likely to cover, and more parlay types</h3>','<h3>Teams most likely to cover</h3>')}}catch(e){s=''}
   var j=h.lastIndexOf('<p class="foot">');
   return j>=0?h.slice(0,j)+s+h.slice(j):h+s;
+};
+/* v271: which quarterback is likely to throw an interception. Props → NFL → Interceptions, plus "throws an interception" legs for parlays.
+   Chance = 1 − e^(−λ), λ = expected attempts × his interception rate (pulled toward the league rate, 150-attempt prior) × the opponent's takeaway rate against average. Attempts follow the spread (trailing teams throw more) and the team's implied points. */
+function intLg271(){var a=0,i=0;DEEP.forEach(function(d){if(d.kind!=='pass')return;var m=/, (\d+) INT/.exec(d.note||'');if(!m)return;a+=d.vol*d.g;i+=+m[1]});return a>200?i/a:.023}
+function intStarter271(team){
+  var D=S.dep&&S.dep[team],L=DEEP.filter(function(d){return d.kind==='pass'&&nt(d.t)===team}).sort(function(a,b){return b.vol*b.g-a.vol*a.g});
+  var isOut=function(n){try{return out186(team,n)}catch(e){return false}};
+  if(D&&D.qb&&D.qb.length){for(var i=0;i<D.qb.length;i++){if(!isOut(D.qb[i]))return {n:D.qb[i],d:L.filter(function(x){return normName(x.n)===normName(D.qb[i])})[0]||null}}}
+  for(var j=0;j<L.length;j++){if(!isOut(L[j].n)&&L[j].g>=2)return {n:L[j].n,d:L[j]}}
+  return null;
+}
+function intRows271(){
+  var lgR=intLg271(),T0=Object.keys(TS),avgTO=T0.reduce(function(s,k){return s+TS[k].dTO/TS[k].G},0)/T0.length,out=[],seen={},now=Date.now();
+  (S.feed.nfl||[]).forEach(function(g){
+    if(kind(g)!=='up'||!(g.start>now)||g.start>now+8*864e5)return;
+    [[nt(g.a),nt(g.h),false],[nt(g.h),nt(g.a),true]].forEach(function(s){
+      var team=s[0],opp=s[1];if(seen[team])return;seen[team]=1;
+      var st=intStarter271(team);if(!st)return;
+      try{if(!avail(st.n,team).show)return}catch(e){}
+      var d=st.d,ints=0,att=0;if(d){var m=/, (\d+) INT/.exec(d.note||'');ints=m?+m[1]:0;att=d.vol*d.g}
+      var rate=(ints+150*lgR)/(att+150),apg=d?d.vol:(TS[team]?TS[team].oPA/TS[team].G:32);
+      var f=1,txt=[];try{if(d){var A=uAdj270(d);f=A.f;A.txt.forEach(function(x){if(!/% of/.test(x.t))txt.push(x.t)})}else{var sc=uScript270(team);if(sc){f=(1-.01*Math.max(-10,Math.min(10,sc.m)))}}}catch(e){}
+      var expA=apg*f,O=TS[opp],tko=O?O.dTO/O.G:avgTO,of=Math.max(.75,Math.min(1.3,1+.6*(tko/avgTO-1)));
+      var lam=expA*rate*of,p1=1-Math.exp(-lam),p2=1-Math.exp(-lam)*(1+lam);
+      var rk=O?mrank(opp,'tko'):null;
+      out.push({n:st.n,t:team,opp:opp,home:s[2],g:g,ints:ints,att:Math.round(att),gp:d?d.g:0,rate:rate,raw:att?ints/att:null,expA:expA,tko:tko,rk:rk,of:of,lam:lam,p1:p1,p2:p2,txt:txt,thin:!d||att<100});
+    });
+  });
+  return out.sort(function(a,b){return b.p1-a.p1});
+}
+function intLegs271(){
+  var L=[];try{intRows271().forEach(function(r){
+    var nx={txt:(r.home?'vs ':'at ')+r.opp+', '+gTime(r.g),id:r.g.id,opp:r.opp};
+    L.push({name:r.n,team:r.t,mk:'throws an interception',p:r.p1,src:(r.gp?r.ints+' INT on '+r.att+' attempts':'little data this season')+', about '+Math.round(r.expA)+' attempts expected',nx:nx,kind:'int',gid:r.g.id,pos:'QB',r271:r});
+  })}catch(e){}
+  return L;
+}
+var legList271=legList;
+legList=function(lg){var L=legList271.apply(this,arguments);if(lg==='nfl'){try{var k=calK270('nfl','prop');L=L.concat(intLegs271().map(function(l){if(k!==1){l.pr=l.p;l.kc270=k;l.p=calP270('nfl','prop',l.p)}return l}))}catch(e){}}return L};
+var propReasons271=propReasons;
+propReasons=function(lg,l){
+  if(l&&l.kind==='int'&&l.r271){var r=l.r271,pro=[],con=[],lgR=intLg271();
+    if(r.gp)(r.raw>lgR?pro:con).push(r.n+' has thrown '+r.ints+' interception'+(r.ints===1?'':'s')+' on '+r.att+' attempts ('+(r.raw*100).toFixed(1)+'% of throws; the league rate is '+(lgR*100).toFixed(1)+'%).');
+    else pro.push(r.n+' has little or no passing this season, so the league interception rate ('+(lgR*100).toFixed(1)+'%) is used. Backups and new starters throw interceptions more often than that.');
+    if(r.rk)(r.of>1.03?pro:r.of<.97?con:pro).push(r.opp+' force '+r.tko.toFixed(1)+' takeaways a game ('+ordn(r.rk)+' of '+Object.keys(TS).length+').');
+    r.txt.forEach(function(t){(/throw more|rises|more plays/.test(t)?pro:con).push(t)});
+    pro.push('He is expected to throw about '+Math.round(r.expA)+' passes. Each one is a chance, so volume matters as much as accuracy.');
+    con.push('Interceptions are rare and random: tipped balls and receiver errors decide many. Even a mistake-prone quarterback goes without one in many games.');
+    con.push('Check the price. This prop is often priced near even money, so it is worth it only when the chance clears the price.');
+    return {pro:pro,con:con}}
+  return propReasons271(lg,l);
+};
+function intTab271(){
+  var R=[];try{R=intRows271()}catch(e){}
+  var lgR=intLg271();
+  if(!R.length)return '<div class="card empty">No NFL games with a starting quarterback in the next 8 days.</div>';
+  var legs=intLegs271(),k=calK270('nfl','prop'),top=legs.slice(0,6).map(function(l){if(k!==1)l.p=calP270('nfl','prop',l.p);var rs={pro:[],con:[]};try{rs=propReasons('nfl',l)}catch(e){}return {label:'Interception prop',title:l.name+' '+l.mk,sub:l.nx.txt+' · '+l.team,p:l.p,why:[l.src],pro:rs.pro,con:rs.con,lgKey:'nfl',rec:{t:'manual',key:'nfl-prop'}}});
+  S.recList=top;
+  var h='<p class="lede">The starting quarterbacks most likely to throw an interception. Each chance comes from his interception rate this season (pulled toward the league rate of '+(lgR*100).toFixed(1)+'% when he has few throws), how many passes the spread and the team’s expected points say he will throw, and how often the opponent takes the ball away. Quarterbacks ruled out are skipped and the next starter is used.</p>';
+  h+=top.map(function(b,i){return betCard(b,i)}).join('');
+  h+='<h3 style="margin-top:18px">Every starting quarterback</h3><div class="tblwrap"><table><thead><tr><th>Quarterback</th><th>INT rate</th><th>Passes</th><th class="lc">1+ INT</th><th class="lc">2+ INT</th></tr></thead><tbody>'+R.map(function(r){
+    var pill=function(x){return '<td class="lc"><span class="hrpill '+(x>=.6?'hi':x<.3?'lo':'mid')+'">'+Math.round(x*100)+'%</span></td>'};
+    return '<tr><td><b>'+esc(r.n)+'</b> <span class="src">'+esc(r.t)+'</span><br><span class="src">'+(r.home?'vs ':'at ')+esc(r.opp)+', '+esc(gTime(r.g))+(r.rk?' · '+esc(r.opp)+' takeaways '+ordn(r.rk):'')+'</span></td><td>'+(r.gp?r.ints+'/'+r.att+'<br><span class="src">'+(r.raw*100).toFixed(1)+'%</span>':'<span class="src">little data</span>')+'</td><td>'+Math.round(r.expA)+'</td>'+pill(k!==1?calP270('nfl','prop',r.p1):r.p1)+pill(r.p2)+'</tr>'}).join('')+'</tbody></table></div>';
+  return h+'<p class="note" style="margin-top:12px">Sportsbook interception lines were not readable here, so compare each chance with your book’s price ("fair odds" on each card is the break-even price). Takeaways include fumble recoveries, so the opponent effect is kept modest.</p>';
+}
+var vBoard271=vBoard;
+vBoard=function(){
+  var isI=S.sport==='nfl'&&S.bc==='int',sv=S.bc;if(isI)S.bc='pass';
+  var h;try{h=vBoard271.apply(this,arguments)}finally{S.bc=sv}
+  if(S.sport!=='nfl')return h;
+  try{
+    var a=h.indexOf('aria-label="Stat">');if(a<0)return h;var end=h.indexOf('</div>',a);if(end<0)return h;
+    var grp=h.slice(a,end);if(isI)grp=grp.replace(/aria-pressed="true"/g,'aria-pressed="false"');
+    var chip='<button class="chip" data-act="set" data-k="bc" data-v="int" aria-pressed="'+isI+'">Interceptions</button>',pi=grp.indexOf('<button class="chip" data-act="set" data-k="bc" data-v="parl"');
+    grp=pi>=0?grp.slice(0,pi)+chip+grp.slice(pi):grp+chip;
+    h=h.slice(0,a)+grp+h.slice(end);
+    if(isI){var e2=h.indexOf('</div>',h.indexOf('aria-label="Stat">'))+6;h=h.slice(0,e2)+intTab271()+foot()}
+  }catch(e){}
+  return h;
 };
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
