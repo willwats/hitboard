@@ -1957,7 +1957,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v264, Nov 22';
+var BUILD='v265, Nov 22';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -18060,6 +18060,76 @@ function srTeam263(g,s){
 })();
 setTimeout(srTick263,7000);setInterval(srTick263,2500);
 (function(){var add=function(t,s){var T=KEYOUT.nfl[t]||(KEYOUT.nfl[t]={items:[],chg:[]});var nm=normName(String(s).replace(/:[a-z]$/,'').replace(/^\S+\s+/,''));T.items=T.items.filter(function(x){return normName(String(x).replace(/:[a-z]$/,'').replace(/^\S+\s+/,''))!==nm});T.items.push(s)};add('BAL','CB Marlon Humphrey:o');add('BAL','DT Nnamdi Madubuike:o');add('BAL','S Jaylinn Hawkins:o');add('BUF','CB Christian Benford:o');add('NO','CB Martin Emerson Jr.:o');add('CHI','CB Kyler Gordon:o');add('TB','S Antoine Winfield Jr.:o');add('DAL','CB DaRon Bland:o');add('PIT','OLB Nick Herbig:o');add('PHI','LB Zack Baun:o');})();
+/* v265: more parlay types: cover parlay, teasers, props plus a cover, one leg per game, round robin */
+(function(){
+var _pb265=parlaysBody;
+function sgn(n){return (n>0?'+':'')+(Math.round(n*2)/2)}
+function gKey(l,lg){return l.gid||(l.nx&&l.nx.id)||feedGidFor(lg,l.team)||(l.nx&&l.nx.txt)||l.team}
+function sdOf(lg){return lg==='nfl'?13.5:lg==='nba'?12:lg==='ncaafb'?17:lg==='nhl'?2.3:13.5}
+function coverLegs(lg){
+  var R=[];try{R=coverRows([lg],'sp',12,false)}catch(e){}
+  return R.map(function(r){var g=r.g,x=r.x,tm=x.side==='h'?g.h:g.a;
+    return {kind:'game',t:'sp',side:x.side,num:x.num,pick:x.pick,name:x.pick,mk:x.mk||'Spread',p:r.p,team:tm,gid:g.id,
+      src:(r.dk?'DraftKings line':'Kalshi line')+', model cover chance',nx:{txt:g.a+' @ '+g.h+', '+gTime(g),id:g.id},g:g}});
+}
+function tease(lg,l,tp){
+  var sd=sdOf(lg),p=Math.min(.97,Math.max(.03,l.p)),q=Phi(invPhi(p)+tp/sd),keys=[];
+  if(lg==='nfl'){var lo=-l.num-tp,hi=-l.num;[[3,.02],[-3,.02],[7,.01],[-7,.01]].forEach(function(k){if(k[0]>lo&&k[0]<=hi){q+=k[1];keys.push(Math.abs(k[0]))}})}
+  var nn=l.num+tp,tm=l.side==='h'?l.g.h:l.g.a;
+  return {kind:'game',t:'sp',side:l.side,num:nn,pick:tm+' '+sgn(nn),name:tm+' '+sgn(nn),mk:tp+'-pt teaser (from '+sgn(l.num)+')',p:Math.min(.95,q),team:l.team,gid:l.gid,
+    src:keys.length?'Crosses '+keys.filter(function(v,i,a){return a.indexOf(v)===i}).join(' and ')+', the most common winning margins':'Does not cross 3 or 7',nx:l.nx,wong:keys.indexOf(3)>=0&&keys.indexOf(7)>=0,g:l.g};
+}
+function oneEach(L,lg,n,minP){var seen={},out=[];L.slice().sort(function(a,b){return b.p-a.p}).forEach(function(l){var k=gKey(l,lg);if(out.length>=n||l.p<minP||seen[k])return;seen[k]=1;out.push(l)});return out}
+function teaserCard(lg,title,desc,legs,be,price){
+  if(legs.length<2)return '<div class="card bcard"><div class="label">'+title+'</div><p class="src">Not enough spreads posted for games still to play.</p></div>';
+  var prob=1;legs.forEach(function(l){prob*=l.p});
+  var ok=legs.every(function(l){return l.p>=be});
+  return '<div class="card bcard"><div class="label">'+title+'</div><p class="src" style="margin:4px 0 8px">'+desc+'</p>'+
+   '<div class="tblwrap"><table><thead><tr><th>Leg</th><th>Chance</th></tr></thead><tbody>'+legs.map(function(l){return '<tr><td>'+esc(l.name)+' · '+esc(l.mk)+'<br><span class="src">'+esc(l.nx.txt)+' · '+esc(l.src)+'</span></td><td><span class="hrpill '+(l.p>=be?'hi':l.p<.6?'lo':'mid')+'">'+pc(l.p)+'%</span></td></tr>'}).join('')+'</tbody></table></div>'+
+   '<div class="facts"><span>All legs hit <b>'+(prob*100).toFixed(1)+'%</b></span><span>Fair odds <b>'+fairOdds(prob)+'</b></span><span>Typical price <b>'+price+'</b></span></div>'+
+   '<p class="src" style="margin-top:6px">At a typical price of '+price+', each leg needs about '+Math.round(be*100)+'% to break even. '+(ok?'Every leg here clears that.':'Not every leg clears that, so this teaser is weaker than its price unless your book pays more.')+'</p>'+
+   '<div class="actions"><button class="btn" data-act="useparlay" data-i="'+(S.sugList.push({lg:lg,legs:legs})-1)+'">Use in parlay builder</button></div></div>';
+}
+function rrCard(lg,legs){
+  if(legs.length<4)return '<div class="card bcard"><div class="label">Round robin by 2s</div><p class="src">Needs four strong legs from different games.</p></div>';
+  var pairs=[];for(var i=0;i<4;i++)for(var j=i+1;j<4;j++)pairs.push([legs[i],legs[j]]);
+  var dist=[0,0,0,0,0,0,0];
+  for(var m=0;m<16;m++){var pr=1,w=[];for(var k=0;k<4;k++){var h=(m>>k)&1;w.push(h);pr*=h?legs[k].p:1-legs[k].p}
+    var c=0;for(var a=0;a<4;a++)for(var b=a+1;b<4;b++)if(w[a]&&w[b])c++;dist[c]+=pr}
+  var ev=pairs.reduce(function(s,p){return s+p[0].p*p[1].p},0),atl1=1-dist[0],atl3=dist[3]+dist[6];
+  return '<div class="card bcard"><div class="label">Round robin by 2s</div><p class="src" style="margin:4px 0 8px">Four strong legs from four different games, split into all six two-leg parlays. One missed leg still leaves three pairs that can win.</p>'+
+   '<div class="tblwrap"><table><thead><tr><th>Leg</th><th>Chance</th></tr></thead><tbody>'+legs.map(function(l){return '<tr><td>'+esc(l.name)+' · '+esc(l.mk)+'<br><span class="src">'+esc(l.nx.txt)+'</span></td><td><span class="hrpill '+(l.p>=.8?'hi':l.p<.5?'lo':'mid')+'">'+pc(l.p)+'%</span></td></tr>'}).join('')+'</tbody></table></div>'+
+   '<div class="tblwrap" style="margin-top:6px"><table><thead><tr><th>Pair</th><th>Both hit</th><th>Fair</th></tr></thead><tbody>'+pairs.map(function(p){var q=p[0].p*p[1].p;return '<tr><td>'+esc(p[0].name)+' + '+esc(p[1].name)+'</td><td>'+pc(q)+'%</td><td>'+fairOdds(q)+'</td></tr>'}).join('')+'</tbody></table></div>'+
+   '<div class="facts"><span>Pairs expected to win <b>'+ev.toFixed(1)+' of 6</b></span><span>At least one pair <b>'+pc(atl1)+'%</b></span><span>Three or more <b>'+pc(atl3)+'%</b></span></div>'+
+   '<p class="src">Each pair is its own bet, so six bets in total. It pays off when most legs hit. It loses money when only one pair wins, unless the pair prices are long.</p>'+
+   '<div class="actions"><button class="btn" data-act="useparlay" data-i="'+(S.sugList.push({lg:lg,legs:legs})-1)+'">Use the four legs in parlay builder</button></div></div>';
+}
+parlaysBody=function(lg){
+  var h=_pb265(lg);
+  if(lg==='mlb'||lg==='ncaamb')return h;
+  var x='<h3>Teams most likely to cover, and more parlay types</h3>';
+  try{x+='<div class="card" style="padding:4px 12px">'+coverSection([lg],false,false)+'</div>'}catch(e){}
+  var CL=[],PL=[];try{CL=coverLegs(lg)}catch(e){}try{PL=legList(lg)}catch(e){}
+  var cv=oneEach(CL,lg,3,.55);
+  try{x+=parlayCard('Cover parlay','The teams most likely to cover the spread, one per game.',cv)}catch(e){}
+  if(lg==='nfl'||lg==='nba'||lg==='ncaafb'){
+    var tp=lg==='nba'?4:6;
+    var TL=CL.map(function(l){return tease(lg,l,tp)});
+    var t2=oneEach(TL,lg,2,0),t3=oneEach(TL,lg,3,0);
+    var d=lg==='nfl'?'Each spread moved '+tp+' points in your favor. Legs that cross both 3 and 7, the most common NFL winning margins (favorites of 7.5 to 8.5, underdogs of 1.5 to 2.5), gain the most from those points. The legs with the best chance after the move are chosen.':'Each spread moved '+tp+' points in your favor. Without football’s 3 and 7, teaser points are worth less, so the legs need a strong base.';
+    x+=teaserCard(lg,tp+'-point teaser, 2 teams',d,t2,lg==='nfl'?.739:.75,'-120');
+    x+=teaserCard(lg,tp+'-point teaser, 3 teams','The same idea with three legs. It pays more and needs a slightly lower chance per leg.',t3,lg==='nfl'?.727:.74,'+160');
+  }
+  var top1=cv[0],pp=[];
+  if(top1){var used={};used[gKey(top1,lg)]=1;pp=[top1].concat(oneEach(PL.filter(function(l){return !used[gKey(l,lg)]}),lg,2,.75))}
+  try{x+=parlayCard('Props plus a cover','The best spread cover with the two most reliable player props from other games.',pp)}catch(e){}
+  var oe=oneEach(PL,lg,4,.75);
+  try{x+=parlayCard('One prop per game','The most reliable prop from each of four different games. Spreading the legs across games keeps one bad game from sinking the slip.',oe)}catch(e){}
+  x+=rrCard(lg,oneEach(PL,lg,4,.7));
+  var k=h.lastIndexOf('<p class="note" style="margin-top:12px">Parlays need every leg');
+  return k>0?h.slice(0,k)+x+h.slice(k):h+x;
+};
+})();
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
 setTimeout(function(){doRefresh(true)},600);
