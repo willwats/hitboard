@@ -1957,7 +1957,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v267, Nov 22';
+var BUILD='v268, Nov 22';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -18132,6 +18132,95 @@ parlaysBody=function(lg){
   x+=rrCard(lg,oneEach(PL,lg,4,.7));
   var k=h.lastIndexOf('<p class="note" style="margin-top:12px">Parlays need every leg');
   return k>0?h.slice(0,k)+x+h.slice(k):h+x;
+};
+})();
+/* v268: kickers upgraded. Season numbers refreshed by hand (StatMuse, through about Week 10), live ESPN kicking stats on the phone, projections from today's betting line (the kicker's team implied points) and wind, injured kickers hidden, and kicker legs in parlays. */
+(function(){
+var UPD={"Jason Sanders":[10,28,25,14,13],"Will Reichard":[9,25,23,13,13],"Spencer Shrader":[10,25,23,20,19],"Chase McLaughlin":[9,22,22,18,18],"Chad Ryland":[10,24,22,17,16],"Matt Gay":[10,23,21,22,22],"Andre Szmyt":[10,24,21,16,15],"Tyler Bass":[9,20,20,29,27],"Chris Boswell":[9,24,19,17,17],"Ka'imi Fairbairn":[9,20,19,24,24],"Brandon Aubrey":[10,24,19,27,25],"Cameron Dicker":[9,20,18,12,12],"Cam Little":[9,20,18,30,29],"Dominic Zvada":[9,23,17,16,16],"Drew Stevens":[9,20,17,18,15],"Jason Myers":[10,19,16,23,21],"Wil Lutz":[9,19,16,16,16],"Jake Bates":[9,17,16,29,29],"Cairo Santos":[9,19,15,28,28],"Joey Slye":[9,16,15,14,14],"Ryan Fitzgerald":[9,17,15,23,18],"Trey Smack":[10,21,15,24,21],"Nick Folk":[9,18,13,18,17],"Evan McPherson":[9,14,13,33,33],"Tyler Loop":[8,17,13,18,18]};
+var HAND=KICKERS;
+HAND.forEach(function(k){var u=UPD[k.n];if(u){k.g=u[0];k.fa=u[1];k.fm=u[2];k.xa=u[3];k.xm=u[4];k.src='StatMuse, through about Week 10'}else k.src='Pro Football Reference, read Oct 20'});
+KICKERS=HAND.slice();
+/* live ESPN season kicking stats (phone only). Accepted only when the list looks complete. */
+S.kk268={at:0,busy:false,n:0};
+function kkLoad268(){
+  if(window.claude||typeof fetch!=='function'||S.kk268.busy||Date.now()-S.kk268.at<6*3600e3)return;
+  S.kk268.busy=true;var yr=new Date().getMonth()<2?new Date().getFullYear()-1:new Date().getFullYear();
+  rsFetchJson('https://site.web.api.espn.com/apis/common/v3/sports/football/nfl/statistics/byathlete?region=us&lang=en&contentorigin=espn&isqualified=false&limit=100&category=kicking&sort=kicking.fieldGoalsMade%3Adesc&season='+yr+'&seasontype=2').then(function(j){
+    var out=[];
+    (j&&j.athletes||[]).forEach(function(a){
+      var m={};(a.categories||[]).forEach(function(c){var nm=rsCols(j,c.name);(c.values||[]).forEach(function(v,i){var k=nm[i]||(c.names||[])[i];if(k&&m[k]==null)m[k]=v})});
+      var get=function(re){for(var k in m)if(re.test(k)&&m[k]!=null&&!isNaN(+m[k]))return +m[k];return null};
+      var fa=get(/^fieldGoalAttempts$|^fieldGoalsAttempted$/i),fm=get(/^fieldGoalsMade$/i),g=get(/^gamesPlayed$/i);
+      if(!fa||fm==null||!g)return;
+      var n=(a.athlete||{}).displayName||'';if(!n)return;
+      out.push({n:n,t:nt(rsTeam(a,'nfl')),g:g,fa:fa,fm:fm,xa:get(/^extraPointAttempts$|^extraPointsAttempted$/i)||0,xm:get(/^extraPointsMade$/i)||0,lng:get(/^longFieldGoalMade$|^longFieldGoal$/i),
+        a50:get(/^fieldGoalAttempts50$|^fieldGoalAttempts50Plus$/i),m50:get(/^fieldGoalsMade50$|^fieldGoalsMade50Plus$/i)});
+    });
+    if(out.length<24)return;
+    var byN={};HAND.forEach(function(k){byN[normName(k.n)]=k});
+    KICKERS=out.map(function(o){var h=byN[normName(o.n)]||{};return {n:o.n,t:TS[o.t]?o.t:(h.t||o.t),g:o.g,fa:o.fa,fm:o.fm,xa:o.xa,xm:o.xm,lng:o.lng!=null?o.lng:(h.lng||0),a50:o.a50!=null?o.a50:(h.a50||0),m50:o.m50!=null?o.m50:(h.m50||0),a40:h.a40||0,m40:h.m40||0,src:'ESPN live season stats'}});
+    S.kk268.n=KICKERS.length;try{_llc={}}catch(e){}try{if(!S.sheet)softRender()}catch(e){}
+  }).catch(function(){}).then(function(){S.kk268.busy=false;S.kk268.at=Date.now()});
+}
+setTimeout(function(){try{kkLoad268()}catch(e){}},2500);setInterval(function(){try{kkLoad268()}catch(e){}},30*60000);
+/* the kicker's game, the implied points for his team from today's line, and wind */
+function kkGame268(t){var best=null;(S.feed.nfl||[]).forEach(function(g){if(kind(g)!=='up')return;if(nt(g.a)!==t&&nt(g.h)!==t)return;if(!best||g.start<best.start)best=g});return best}
+var kickCtx0=kickCtx;
+kickCtx=function(t){
+  var g=kkGame268(nt(t));if(!g)return kickCtx0(t);
+  var ln=null;try{ln=lineFor(g)}catch(e){}
+  var home=nt(g.h)===nt(t),opp=home?nt(g.a):nt(g.h),txt=(home?'vs ':'at ')+opp+', '+gTime(g);
+  var adj=1,imp=null;
+  if(ln&&ln.tt!=null){var half=ln.pts!=null?ln.pts/2:0,fav=ln.fav?((ln.fav==='h')===home):null;imp=ln.tt/2+(fav==null?0:fav?half:-half);adj=Math.max(.75,Math.min(1.25,imp/22.5));txt+=' · team implied '+imp.toFixed(1)+' pts'}
+  else{var c=kickCtx0(t);adj=c.adj;if(c.tot)txt+=' · total '+c.tot.toFixed(1)}
+  var w=null;try{w=wxAdj(nt(g.h),g.start)}catch(e){}
+  if(w&&w.adj<=-2.3){adj*=.88;txt+=' · strong wind'}else if(w&&w.adj<=-.9){adj*=.95;txt+=' · windy'}
+  return {adj:adj,txt:txt,tot:ln&&ln.tt,imp:imp,g:g,opp:opp};
+};
+var nflKick0=nflKick;
+nflKick=function(){
+  var all=KICKERS;
+  KICKERS=all.filter(function(k){var s=true;try{s=avail(k.n,k.t).show}catch(e){}return s});
+  var h;try{h=nflKick0()}finally{KICKERS=all}
+  var src=KICKERS[0]&&KICKERS[0].src==='ESPN live season stats'?'ESPN live season stats, updated '+new Date(S.kk268.at||Date.now()).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}):'2026 season totals (StatMuse through about Week 10; kickers not in that list use Pro Football Reference, Oct 20). Live ESPN numbers replace these when the app is opened on your phone';
+  h=h.replace(/<p class="lede">Kicker props from[^<]*<\/p>/,'<p class="lede">Kicker props from '+esc(src)+'. Projected points are field goals times three plus extra points, per game, scaled by the points today’s betting line expects his team to score (22.5 is average), and cut for wind at outdoor stadiums. Chances come from a Poisson count of field goals and extra points. Kickers listed out are hidden. Tap a kicker leg in Parlays to add it to a slip.</p>');
+  return h.replace('Sample is five or six games.','Sample is about nine or ten games.');
+};
+/* kicker legs for parlays: 2+ field goals and 7+ kicking points */
+function kickLegs268(){
+  var L=[];
+  KICKERS.forEach(function(k){
+    try{if(!avail(k.n,k.t).show)return}catch(e){}
+    var g=kkGame268(nt(k.t));if(!g||!(k.g>0))return;
+    var c=kickCtx(k.t),pr=kickProj(k.fm/k.g,k.xm/k.g,c.adj),opp=c.opp||'';
+    var nx={txt:c.txt,id:g.id,opp:opp},src=k.fm+'/'+k.fa+' FG, '+(k.fm/k.g).toFixed(1)+' a game';
+    L.push({name:k.n,team:nt(k.t),mk:'2+ field goals',p:pr.p2,src:src,nx:nx,kind:'kick',gid:g.id,pos:'K'});
+    L.push({name:k.n,team:nt(k.t),mk:'7+ kicking points',p:pr.p7,src:src+', '+pr.pts.toFixed(1)+' pts projected',nx:nx,kind:'kick',gid:g.id,pos:'K'});
+  });
+  return L;
+}
+var legList0=legList;
+legList=function(lg){var L=legList0(lg);if(lg==='nfl'){try{L=L.concat(kickLegs268())}catch(e){}}return L};
+var propReasons0=propReasons;
+propReasons=function(lg,l){
+  if(l&&l.kind==='kick'){var pro=[],con=[];
+    pro.push(l.name+' has made '+l.src+'.');
+    if(/implied/.test(l.nx&&l.nx.txt||''))pro.push('The betting line expects his team to score '+(l.nx.txt.match(/implied ([\d.]+)/)||[0,'?'])[1]+' points; kickers score more when the offense reaches the red zone without finishing.');
+    con.push('Kicker volume is streaky. A team that scores touchdowns instead of field goals, or a coach who goes for it on fourth down, can sink the leg.');
+    if(/wind/.test(l.nx&&l.nx.txt||''))con.push('Wind is forecast at kickoff, which cuts long field goals.');
+    con.push('Sportsbook kicker lines were not readable here, so compare the chance with your book.');
+    return {pro:pro,con:con}}
+  return propReasons0(lg,l);
+};
+/* a kicker parlay on the Parlays tab */
+var pb0=parlaysBody;
+parlaysBody=function(lg){
+  var h=pb0(lg);if(lg!=='nfl')return h;
+  var K=[];try{K=kickLegs268()}catch(e){}
+  var seen={},legs=K.filter(function(l){return l.mk==='7+ kicking points'}).sort(function(a,b){return b.p-a.p}).filter(function(l){if(seen[l.gid])return false;seen[l.gid]=1;return true}).slice(0,3);
+  var card='';try{card=parlayCard('Kicker parlay','The three kickers most likely to score 7 or more points, one per game. Kickers on teams expected to score a lot, indoors or in calm weather, rate highest.',legs)}catch(e){}
+  var k=h.lastIndexOf('<p class="note" style="margin-top:12px">Parlays need every leg');
+  return k>0?h.slice(0,k)+card+h.slice(k):h+card;
 };
 })();
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
