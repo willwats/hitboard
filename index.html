@@ -1957,7 +1957,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v273, Nov 22';
+var BUILD='v274, Nov 22';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -17708,7 +17708,7 @@ function ddSnap262(){
     if(kind(g)!=='up'||have[g.id]||!(g.start>now)||g.start>now+3*864e5)return;
     var d=ddCached(g);if(!d||!d.best)return;var b=d.best,x=b.x||{};
     var num=b.t==='ml'?null:(x.num!=null?x.num:sideLine262(g,b.t,b.t==='tot'?null:b.side));
-    S.ddlog.push({gid:g.id,lg:lg,st:g.start,at:now,t:b.t,side:b.t==='tot'?null:b.side,over:b.t==='tot'?b.side==='o':null,num:num,p:b.p,base:b.base,score:b.score,conf:b.conf,ex:b.sig?b.sig.ex:0,mv:b.sig?b.sig.mv:0,pick:b.pick,game:g.a+' @ '+g.h,pr:b.t==='ml'?sideLine262(g,'ml',b.side):null,res:null});
+    S.ddlog.push({gid:g.id,lg:lg,st:g.start,at:now,t:b.t,side:b.t==='tot'?null:b.side,over:b.t==='tot'?b.side==='o':null,num:num,p:b.p,base:b.base,score:b.score,conf:b.conf,grade:b.grade||null,ex:b.sig?b.sig.ex:0,mv:b.sig?b.sig.mv:0,pick:b.pick,game:g.a+' @ '+g.h,pr:b.t==='ml'?sideLine262(g,'ml',b.side):null,res:null});
     have[g.id]=1;ch=true;
   })});
   S.ddlog.forEach(function(x){
@@ -18520,7 +18520,7 @@ function dataHtml270(){
 }
 document.addEventListener('click',function(e){var el=e.target&&e.target.closest?e.target.closest('[data-act="lvrefresh"]'):null;if(!el)return;e.stopImmediatePropagation();e.preventDefault();try{lvRun270(true);if(typeof kkLoad268==='function'){S.kk268.at=0;kkLoad268()}}catch(x){}el.textContent='Refreshing…'},true);
 var vPicks270=vPicks;
-vPicks=function(){var h=vPicks270.apply(this,arguments),x='';try{x=calHtml270()}catch(e){}try{x+=dataHtml270()}catch(e){}var j=h.lastIndexOf('<p class="foot">');return j>=0?h.slice(0,j)+x+h.slice(j):h+x};
+vPicks=function(){var h=vPicks270.apply(this,arguments),x='';if(S.mbv!=='rec')return h;var sm=function(t){return '<summary style="font-weight:700;padding:8px 0">'+t+'</summary>'};try{x='<details style="margin-top:4px">'+sm('How accurate are Hitboard’s chances?')+calHtml270().replace('<h3 style="margin-top:18px">How accurate are Hitboard’s chances?</h3>','')+'</details>'}catch(e){}try{x+='<details>'+sm('Where the numbers come from')+dataHtml270().replace('<h3 style="margin-top:18px">Where the numbers come from</h3>','')+'</details>'}catch(e){}var j=h.lastIndexOf('<p class="foot">');return j>=0?h.slice(0,j)+x+h.slice(j):h+x};
 
 /* ---- Kickers tab in Props ---- */
 function kickTab270(){
@@ -18640,6 +18640,63 @@ vBoard=function(){
 };
 (function(){var add=function(t,s){var T=KEYOUT.nfl[t]||(KEYOUT.nfl[t]={items:[],chg:[]});var nm=normName(String(s).replace(/:[a-z]$/,'').replace(/^\S+\s+/,''));T.items=T.items.filter(function(x){return normName(String(x).replace(/:[a-z]$/,'').replace(/^\S+\s+/,''))!==nm});T.items.push(s)};add('LAC','LB Daiyan Henley:o');add('JAX','C Robert Hainsey:o');})();
 (function(){var add=function(t,s){var T=KEYOUT.nfl[t]||(KEYOUT.nfl[t]={items:[],chg:[]});var nm=normName(String(s).replace(/:[a-z]$/,'').replace(/^\S+\s+/,''));T.items=T.items.filter(function(x){return normName(String(x).replace(/:[a-z]$/,'').replace(/^\S+\s+/,''))!==nm});T.items.push(s)};add('MIN','CB Isaiah Rodgers:o');})();
+/* v274: My bets → App's record opens with one screen of results: Hitboard's best bets by sport and grade, and every pick by sport and market. The learning, accuracy and data panels fold away below it. */
+function rgBucket274(x){
+  var l=String(x.grade||'').charAt(0).toUpperCase();
+  if(/[ABC]/.test(l))return l;if(/[DF]/.test(l))return 'D';
+  var s=+x.score;if(isNaN(s))return null;return s>=75?'A':s>=55?'B':s>=35?'C':'D';
+}
+function rgCell274(w,l,bold){
+  var n=w+l;if(!n)return '<td style="text-align:center;color:var(--muted);padding:1px;border-top:1px solid var(--line)">–</td>';
+  var pc=w/n,c=pc>=.55?'var(--good,#5bd08a)':pc<.45?'var(--bad,#e5735a)':'inherit';
+  return '<td style="text-align:center;padding:1px 1px 2px;line-height:1.05;font-size:12.5px;white-space:nowrap;border-top:1px solid var(--line);'+(bold?'font-weight:700;':'')+'"><div>'+w+'-'+l+'</div><div style="font-size:10px;color:'+c+'">'+Math.round(100*w/n)+'%</div></td>';
+}
+function rgTable274(title,cols,rows,get){
+  var h='<div style="font-weight:700;font-size:14px;margin:0 0 2px">'+title+'</div><table style="width:100%;table-layout:fixed;border-collapse:collapse;font-size:12.5px"><thead><tr><th style="text-align:left;padding:2px 1px;font-size:10.5px;white-space:nowrap">Sport</th>'+cols.map(function(c){return '<th style="text-align:center;padding:2px 1px;font-size:10.5px;white-space:nowrap">'+c[1]+'</th>'}).join('')+'</tr></thead><tbody>';
+  rows.forEach(function(r){h+='<tr><td style="text-align:left;padding:1px;line-height:1.05;border-top:1px solid var(--line);font-size:12.5px;white-space:nowrap;font-family:inherit;'+(r==='all'?'font-weight:700':'')+'">'+(r==='all'?'All':esc(lgName(r)))+'</td>'+cols.map(function(c){var v=get(r,c[0]);return rgCell274(v[0],v[1],r==='all'||c[0]==='all')}).join('')+'</tr>'});
+  return h+'</tbody></table>';
+}
+function glance274(){
+  var ord=['nfl','ncaafb','nba','ncaamb','nhl','mlb'];
+  var D=(S.ddlog||[]).filter(function(x){return x&&(x.res==='W'||x.res==='L')});
+  var A=[];
+  (S.log||[]).forEach(function(x){if(x&&(x.res==='W'||x.res==='L')&&/^(ml|sp|tot)$/.test(x.t))A.push({lg:x.lg,m:x.t,y:x.res==='W'})});
+  (S.auto||[]).forEach(function(x){if(x&&(x.res==='W'||x.res==='L'))A.push({lg:x.lg,m:'prop',y:x.res==='W'})});
+  var cnt=function(L,f){var w=0,l=0;L.forEach(function(x){if(f(x)){if(x.y)w++;else l++}});return [w,l]};
+  D=D.map(function(x){return {lg:x.lg,g:rgBucket274(x),y:x.res==='W'}});
+  var h='<div class="card" style="padding:8px 10px">';
+  var tw=cnt(D,function(){return true}),ta=cnt(A,function(){return true});
+  h+='<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:6px;align-items:baseline"><div><span class="src">Best bets </span><span style="font-size:18px;font-weight:700">'+tw[0]+'-'+tw[1]+(tw[0]+tw[1]?' <span style="font-size:13px;font-weight:400">'+Math.round(100*tw[0]/(tw[0]+tw[1]))+'%</span>':'')+'</span></div><div><span class="src">Every pick </span><span style="font-size:18px;font-weight:700">'+ta[0]+'-'+ta[1]+(ta[0]+ta[1]?' <span style="font-size:13px;font-weight:400">'+Math.round(100*ta[0]/(ta[0]+ta[1]))+'%</span>':'')+'</span></div></div>';
+  var sD=ord.filter(function(lg){return D.some(function(x){return x.lg===lg})}),sA=ord.filter(function(lg){return A.some(function(x){return x.lg===lg})});
+  if(!sD.length&&!sA.length)return h+'<p class="note" style="margin:0">No graded picks yet. Results fill in here as games finish.</p></div>';
+  if(sD.length){
+    var gc=[['A','A'],['B','B'],['C','C'],['D','D–F'],['all','All']];
+    h+=rgTable274('Best bets by grade',gc,sD.concat(sD.length>1?['all']:[]),function(lg,g){return cnt(D,function(x){return (lg==='all'||x.lg===lg)&&(g==='all'||x.g===g)})});
+  }
+  if(sA.length){
+    var mc=[['ml','Winner'],['sp','Spread'],['tot','Total'],['prop','Props'],['all','All']];
+    h+='<div style="height:6px"></div>'+rgTable274('Every pick by market',mc,sA.concat(sA.length>1?['all']:[]),function(lg,m){return cnt(A,function(x){return (lg==='all'||x.lg===lg)&&(m==='all'||x.m===m)})});
+  }
+  h+='<p class="src" style="margin:8px 0 0">Wins-losses, pushes left out. Green is 55% or better, red under 45%. Best bets are the Deep dive pick for each game, graded A to F when it was made. Every pick includes all three game markets plus the app’s top props.</p>';
+  return h+'</div>';
+}
+/* the long learning card folds away */
+var learnCard274=learnCard262;
+learnCard262=function(){
+  var h=learnCard274.apply(this,arguments);
+  h=h.replace('<h3>How Hitboard is learning</h3>','').replace('<table><tbody>','<table style="width:100%;table-layout:fixed"><tbody>').replace(/<td>/g,'<td style="white-space:normal;word-break:break-word;text-align:left;font-family:inherit">');
+  return '<details style="margin-top:12px"><summary style="font-weight:700;padding:8px 0">How Hitboard is learning</summary>'+h+'</details>';
+};
+var vPicks274=vPicks;
+vPicks=function(){
+  var h=vPicks274.apply(this,arguments);
+  if(S.mbv!=='rec')return h;
+  try{
+    var g=glance274(),k=h.indexOf('aria-label="View"');
+    if(k>=0){var e=h.indexOf('</div>',k)+6;h=h.slice(0,e)+g+h.slice(e)}else h=g+h;
+  }catch(e){}
+  return h;
+};
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
 setTimeout(function(){doRefresh(true)},600);
