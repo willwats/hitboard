@@ -1957,7 +1957,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v281, Nov 25';
+var BUILD='v282, Nov 25';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -14143,7 +14143,7 @@ function gameScript(g,light){
     if(ft.length)S2.push('Best prop spots in this script: '+ft.join(', ')+'.');
     /* weather */
     try{var wt=String(wxLong(g)||'').replace(/<[^>]*>/g,''),mm=wt.match(/(\d+)\s*mph/);
-      if(!/not known|no forecast|loads in the phone|Check wind/i.test(wt)&&(/rain|snow|shower|storm/i.test(wt)||(mm&&+mm[1]>=15)))S2.push('Weather could slow the passing game and shorten the game: '+wt.replace(/ ?\(Open-Meteo\)/,'').replace(/^Forecast for the start:\s*/,'').slice(0,90)+'.');
+      if(!/not known|no forecast|loads in the phone|Check wind|blocked|dome|roof|covered|indoor/i.test(wt)&&(/rain|snow|shower|storm/i.test(wt)||(mm&&+mm[1]>=15)))S2.push('Weather could slow the passing game and shorten the game: '+wt.replace(/ ?\(Open-Meteo\)/,'').replace(/^Forecast for the start:\s*/,'').slice(0,90)+'.');
     }catch(e){}
     var dn=lg==='nfl'?(S.depN?'Depth charts loaded for '+Object.keys(S.dep).length+' NFL teams; players who are out or off the roster are left out.':'Depth chart could not be loaded, so starters come from rosters and the injury report only.'):'Starters come from current rosters and the injury report (no depth chart for this league).';
     out={short:S1.slice(0,2).join(' '),full:S1,more:S2,note:dn};
@@ -19414,6 +19414,216 @@ function mu280Html(g){
 EXPERTS=EXPERTS.filter(function(x){return !(x.lg==='nfl'&&((x.a==='GB'&&x.h==='LAR')||(x.a==='LAR'&&x.h==='GB')))}).concat([{"lg": "nfl", "a": "GB", "h": "LAR", "win": "h", "cov": "a", "tot": "u", "ln": "Rams -2.5 (-3 at some books), total 43.5 to 44.5", "ag": "About two-thirds of the experts take Green Bay with the points even though slightly more pick the Rams to win; the Under is the clear lean, with one simulation model the main voice for the Over", "why": ["Green Bay runs for a league-low 67 yards a game at about 3.2 yards per carry, and with Josh Jacobs expected to sit, Jordan Love has to carry the offense.", "Love has thrown a league-high 63 passes of 20-plus air yards, but the Rams have allowed only 8 completions on 30 deep throws and about 188 passing yards a game (3rd fewest).", "Green Bay is 4-1 against the spread as an underdog and 4-0 straight up after a loss; Matt LaFleur is 5-0 against Sean McVay.", "Green Bay has forced 20 turnovers (2nd) with a league-high 14 interceptions, and Micah Parsons returns on a limited snap count.", "The total has fallen from as high as 49.5 to 43.5, and Packers games are 7-3 to the Under."], "watch": ["Green Bay’s line has the league’s worst pass-block win rate (31 percent), Love was sacked eight times in the 30-10 loss to Minnesota, and Myles Garrett is coming off three sacks.", "The Rams have won four straight, outrushed opponents 653-175 in that run, and scored 34 on Arizona without Puka Nacua, Davante Adams and Terrance Ferguson.", "Green Bay’s rookie kicker has missed nine kicks in 10 games, a real risk in a close game; one model projects 47 points."], "preview": ["The decisive mismatch is the Rams’ run game against Green Bay’s line problems: Los Angeles averages 4.8 yards per carry with a 52 percent rush success rate, while Green Bay manages 3.2 and 37 percent, and Kyren Williams and Blake Corum have out-rushed the entire Packers offense (1,163 yards to 670).", "Christian Watson and Matthew Golden have combined for a league-best 32 catches of 20-plus yards, and they face backup corners Josh Wallace and Emmanuel Forbes with Jaylen Watson hurt.", "Without Nacua and Adams, Tyler Higbee is Matthew Stafford’s top target and rookie CJ Daniels has a bigger role; Stafford has 10 interceptions in 10 games against a defense with 14.", "Both interior lines are patched: the Rams start a backup center and left guard, and Green Bay has three interior linemen listed questionable."], "form": ["The Rams started 2-4, then won four straight, three on the road, and have held opponents to about 13 points a game over their last five.", "Green Bay is 6-4 but lost 30-10 at home to Minnesota on Nov 15 with eight sacks allowed; Love is at 20 touchdowns and 7 interceptions for the season.", "Both teams come off a bye at 6-4, and the winner takes the head-to-head tiebreaker in the NFC."], "sub": [{"out": "Josh Jacobs", "next": "Kaleb Johnson", "note": "Jacobs is listed questionable but his coach said he is unlikely to play; Johnson has led the team in carries since the injury, with 24 runs for 110 yards over the last two games"}, {"out": "Puka Nacua", "next": "Tyler Higbee", "note": "Higbee is now the top target with 31 catches for 304 yards, and rookie CJ Daniels takes on more snaps"}, {"out": "Davante Adams", "next": "CJ Daniels", "note": "the replacement group produced 436 yards and 34 points against Arizona in Week 10"}]}]);
 (function(){var nmOf=function(x){return x.replace(/:[a-z]$/,'').split(' ').slice(1).join(' ')},rm=function(t,n){var T=KEYOUT.nfl[t];if(T)T.items=T.items.filter(function(x){return nmOf(x)!==n})},add=function(t,s){var T=KEYOUT.nfl[t]||(KEYOUT.nfl[t]={items:[],chg:[]});rm(t,nmOf(s));T.items.push(s)};rm('LAR','Myles Garrett');rm('LAR','Trent McDuffie');add('GB','EDGE Micah Parsons:q');add('GB','C Sean Rhyan:q');add('GB','LB Zaire Franklin:q');add('LAR','G Steve Avila:o');add('LAR','C Coleman Shelton:o');add('LAR','TE Terrance Ferguson:o');add('LAR','WR Puka Nacua:o');add('LAR','WR Davante Adams:o');add('GB','RB Josh Jacobs:q');})();
 (function(){var U=Date.UTC(2026,10,26,15);[["Packers at Rams", "Matthew Golden", "receptions", "Over", "5.5", "He has six or more catches in five of his last six games, on about 10.7 targets a game."], ["Packers at Rams", "Christian Watson", "receiving yards", "Over", "72.5", "He averages about 92 receiving yards a game (916 in 10 games)."], ["Packers at Rams", "Blake Corum", "rushing yards", "Over", "55.5", "He has cleared this in four straight games with 11 or more carries, at 5.3 yards a carry."], ["Packers at Rams", "Blake Corum", "touchdown", "Yes", "anytime", "He has scored in six straight games."], ["Packers at Rams", "Christian Watson", "touchdown", "Yes", "anytime", "He has seven touchdowns, and the Rams have allowed 11 passing touchdowns but only four rushing."], ["Packers at Rams", "Matthew Stafford", "passing yards", "Over", "226.5", "He has cleared this in six of 10 starts and averages 262 passing yards a game."], ["Packers at Rams", "Jordan Love", "passing touchdowns", "Over", "1.5", "He has thrown two or more touchdowns in eight of 10 games."]].forEach(function(x){if(!PROP_X.some(function(y){return y.lg==='nfl'&&y.p===x[1]&&y.m===x[2]&&y.until>=U}))PROP_X.push({lg:'nfl',until:U,game:x[0],p:x[1],m:x[2],s:x[3],l:x[4],why:x[5]})})})();
+/* ---------- v282: Hitboard's prediction (who wins and covers, and why, in words), matchup mismatches,
+   weather, news, and NHL starting goalies that feed the simulation and the saves props ---------- */
+/* starting goalies by NHL team for one date (ET). st: confirmed | likely | expected. sv: season save % reported today when known. */
+var GOALIES={};
+function gkSet282(date,list){list.forEach(function(x){GOALIES[x[0]]={n:x[1],st:x[2],sv:x[3]||null,note:x[4]||'',d:date}})}
+function etDate282(ms){try{return new Date(ms).toLocaleDateString('en-CA',{timeZone:'America/New_York'})}catch(e){return ''}}
+function gkFor282(g,side){
+  if(g.lg!=='nhl')return null;var t=nhlK(side==='a'?g.a:g.h),x=GOALIES[t];
+  if(!x||x.d!==etDate282(g.start))return null;
+  var row=null;try{row=NHL_GK.filter(function(k){return normName(k.n)===normName(x.n)})[0]}catch(e){}
+  var sv=x.sv!=null?x.sv:(row&&row.sa?row.sv/row.sa:null),n=row&&row.sa?row.sa:(x.sv!=null?300:0);
+  return {n:x.n,st:x.st,note:x.note,sv:sv,n0:n,t:t,adj:sv!=null?(sv*n+.9*600)/(n+600):null};
+}
+function gkTeamSv282(t){var sv=0,sa=0;try{NHL_GK.forEach(function(k){if(nhlK(k.t)===t&&k.sa){sv+=k.sv;sa+=k.sa}})}catch(e){}return sa>200?sv/sa:.9}
+/* goals-allowed factor for each team from tonight's goalie, compared with the team's usual goaltending */
+function simGk282(g){
+  if(g.lg!=='nhl')return null;
+  var out={fa:1,fh:1,txt:[]};
+  ['a','h'].forEach(function(s){
+    var G=gkFor282(g,s);if(!G||G.sv==null)return;
+    var adj=(G.sv*G.n0+.9*600)/(G.n0+600),base=gkTeamSv282(G.t),f=Math.max(.8,Math.min(1.25,(1-adj)/Math.max(.05,1-base)));
+    if(s==='a')out.fh=f;else out.fa=f;   /* the away goalie changes how many the home team scores, and the reverse */
+    out.txt.push(G.t+' '+G.n+' ('+G.st+(G.sv!=null?', '+G.sv.toFixed(3).replace(/^0/,''):'')+')');
+  });
+  out.k=out.txt.join('|');return out;
+}
+(function(){
+  var si0=simInputs276;
+  simInputs276=function(g){
+    var I=si0.apply(this,arguments);if(!I||g.lg!=='nhl')return I;
+    try{var G=simGk282(g);if(G&&(G.fa!==1||G.fh!==1)){
+      var w=I.w!=null?I.w:.5,sw=I.st?(1-w):0; /* goalie effect on the team-stats half (the market already prices the expected starter) */
+      I.ea=Math.max(.8,I.ea*(1+sw*(G.fa-1)));I.eh=Math.max(.8,I.eh*(1+sw*(G.fh-1)));
+    }I.gk=G}catch(e){}
+    return I;
+  };
+  var sk0=simKey276;simKey276=function(g,I){return sk0(g,I)+'|'+(I.gk?I.gk.k:'')};
+  /* saves props and box-score rows only for tonight's starting goalie */
+  var gp0=gpRows;gpRows=function(g){var R=gp0.apply(this,arguments);try{if(g.lg==='nhl')R=R.filter(function(o){if(o.cat!=='hsv')return true;var s=simSide276(g,o.r.t),G=s&&gkFor282(g,s);return !G||normName(G.n)===normName(o.r.n)})}catch(e){}return R};
+  var pr0=pbRows;pbRows=function(lg,cat){var R=pr0.apply(this,arguments);if(lg!=='nhl'||cat!=='hsv')return R;try{R=R.filter(function(o){var x=GOALIES[nhlK(o.r.t)];if(!x)return true;var g=simGameFor276('nhl',o.r.t);if(!g||x.d!==etDate282(g.start))return true;return normName(x.n)===normName(o.r.n)})}catch(e){}return R};
+})();
+function nick282(g,s){var f=(s==='a'?g.an:g.hn)||(s==='a'?g.a:g.h);try{var n=ddNick(f);if(n)return n}catch(e){}return f}
+function pos282(n){return /s$/.test(n)?n+'’':n+'’s'}
+/* where one team's strength meets the other's weakness */
+function mism282(g){
+  var L=[],na=nick282(g,'a'),nh=nick282(g,'h'),nm=function(s){return s==='a'?na:nh},ps=function(s){return pos282(nm(s))};
+  var add=function(side,txt,w){L.push({side:side,txt:txt,w:w||1})};
+  try{
+    if(g.lg==='nfl'){
+      var k={a:nt(g.a),h:nt(g.h)};if(!TS[k.a]||!TS[k.h])return L;var N=Object.keys(TS).length,top=Math.round(N*.32),bot=N-top+1;
+      var P=[['orush','drush','run game','run defense','rushing yds a game'],['opass','dpass','passing game','pass defense','passing yds a game'],['ppg','papg','scoring offense','scoring defense','pts a game']];
+      ['a','h'].forEach(function(s){var o=s==='a'?'h':'a';
+        P.forEach(function(p){var ro=mrank(k[s],p[0]),rd=mrank(k[o],p[1]),vo=mv(k[s],p[0]),vd=mv(k[o],p[1]);
+          if(ro<=top&&rd>=bot)add(s,ps(s)+' '+p[2]+' is a strength ('+Math.round(vo)+' '+p[4]+', '+ordn(ro)+') and '+ps(o)+' '+p[3]+' is a weakness (allows '+Math.round(vd)+', '+ordn(rd)+' of '+N+').',2);
+          else if(ro>=bot&&rd<=top)add(o,ps(s)+' '+p[2]+' has struggled ('+Math.round(vo)+' '+p[4]+', '+ordn(ro)+') and runs into '+ps(o)+' '+p[3]+', one of the best (allows '+Math.round(vd)+', '+ordn(rd)+').',2);
+        });
+        var rp=mrank(k[s],'prs');if(rp>=bot)add(o,ps(s)+' offensive line allows pressure on '+mv(k[s],'prs').toFixed(1)+'% of dropbacks ('+ordn(rp)+' of '+N+'), which '+ps(o)+' pass rush can attack.',1);
+        var rt=mrank(k[o],'tko');if(rt<=Math.round(N*.2))add(o,ps(o)+' defense forces '+mv(k[o],'tko').toFixed(1)+' takeaways a game ('+ordn(rt)+'), so '+ps(s)+' ball security matters.',1);
+      });
+    }else if(g.lg==='nhl'){
+      var A=NHLT[nhlK(g.a)],H=NHLT[nhlK(g.h)];if(!A||!H)return L;var T={a:A,h:H},M=Object.keys(NHLT).length,tp=Math.round(M*.28),bt=M-tp+1;
+      ['a','h'].forEach(function(s){var o=s==='a'?'h':'a',X=T[s],Y=T[o];
+        var r1=nhlRank('pp',X.pp,1),r2=nhlRank('pk',Y.pk,1);
+        if(r1<=tp&&r2>=bt)add(s,ps(s)+' power play ('+(X.pp*100).toFixed(1)+'%, '+ordn(r1)+') meets '+ps(o)+' weak penalty kill ('+(Y.pk*100).toFixed(1)+'%, '+ordn(r2)+' of '+M+'), so penalties should be costly for the '+nm(o)+'.',2);
+        else if(r1>=bt&&r2<=tp)add(o,ps(s)+' power play has struggled ('+(X.pp*100).toFixed(1)+'%, '+ordn(r1)+') and faces '+ps(o)+' strong penalty kill ('+(Y.pk*100).toFixed(1)+'%, '+ordn(r2)+').',1);
+        var r3=nhlRank('gf',X.gf,1),r4=nhlRank('ga',Y.ga,0);
+        if(r3<=tp&&r4>=bt)add(s,ps(s)+' offense ('+X.gf.toFixed(2)+' goals a game, '+ordn(r3)+') meets '+ps(o)+' leaky defense ('+Y.ga.toFixed(2)+' allowed, '+ordn(r4)+').',2);
+        else if(r3>=bt&&r4<=tp)add(o,ps(s)+' offense has struggled ('+X.gf.toFixed(2)+' goals a game, '+ordn(r3)+') and faces '+ps(o)+' tight defense ('+Y.ga.toFixed(2)+' allowed, '+ordn(r4)+').',2);
+        var r5=nhlRank('sf',X.sf,1),r6=nhlRank('sa',Y.sa,0);
+        if(r5<=tp&&r6>=bt)add(s,ps(s)+' shot volume ('+X.sf.toFixed(1)+' a game, '+ordn(r5)+') meets '+ps(o)+' habit of allowing shots ('+Y.sa.toFixed(1)+', '+ordn(r6)+'), so expect the '+nm(s)+' to control play.',1);
+      });
+      var ga=gkFor282(g,'a'),gh=gkFor282(g,'h');
+      if(ga&&gh&&ga.sv!=null&&gh.sv!=null&&Math.abs(ga.sv-gh.sv)>=.012){var b=ga.sv>gh.sv?'a':'h',GB=b==='a'?ga:gh,GW=b==='a'?gh:ga;add(b,'Goalie edge: '+GB.n+' ('+GB.sv.toFixed(3).replace(/^0/,'')+') against '+GW.n+' ('+GW.sv.toFixed(3).replace(/^0/,'')+'). After allowing for small samples, that is worth about '+(Math.round(Math.abs(ga.adj-gh.adj)*30*10)/10)+' goals over 30 shots.',2)}
+    }else if(g.lg==='nba'){
+      var a=NBAT[g.a],h=NBAT[g.h];if(!a||!h)return L;var B={a:a,h:h};
+      ['a','h'].forEach(function(s){var o=s==='a'?'h':'a',X=B[s],Y=B[o],r1=nbaRank('PF',X.PF),r2=nbaRank('PA',Y.PA);
+        if(r1<=8&&r2>=23)add(s,ps(s)+' offense ('+X.PF.toFixed(1)+' a game, '+ordn(r1)+') meets '+ps(o)+' weak defense ('+Y.PA.toFixed(1)+' allowed, '+ordn(r2)+' of 30).',2);
+        else if(r1>=23&&r2<=8)add(o,ps(s)+' offense ('+X.PF.toFixed(1)+', '+ordn(r1)+') runs into '+ps(o)+' top defense ('+Y.PA.toFixed(1)+' allowed, '+ordn(r2)+').',2)});
+    }else if(g.lg==='ncaafb'){
+      var c={a:cfbFind(g.an),h:cfbFind(g.hn)};if(!c.a||!c.h||c.a.def==null||c.h.def==null)return L;var CN=Object.keys(CFB).length;
+      ['a','h'].forEach(function(s){var o=s==='a'?'h':'a',r1=cfbRank(null,'off',c[s].off),r2=cfbRank(null,'def',c[o].def);
+        if(r1<=30&&r2>=CN-40)add(s,ps(s)+' offense ('+c[s].off.toFixed(1)+' a game, '+ordn(r1)+') meets '+ps(o)+' weak defense ('+c[o].def.toFixed(1)+' allowed, '+ordn(r2)+' of '+CN+').',2);
+        else if(r1>=CN-40&&r2<=30)add(o,ps(s)+' offense ('+c[s].off.toFixed(1)+', '+ordn(r1)+') faces '+ps(o)+' strong defense ('+c[o].def.toFixed(1)+' allowed, '+ordn(r2)+').',2)});
+    }
+  }catch(e){}
+  return L.sort(function(x,y){return y.w-x.w});
+}
+function wxLine282(g){
+  if(g.lg!=='nfl'&&g.lg!=='ncaafb')return '';
+  var w=null;try{w=simWx276(g)}catch(e){}
+  if(!w)return '';
+  if(w.k==='roof')return w.txt+' Weather will not affect this game.';
+  if(w.k==='none')return 'The forecast has not loaded yet. Open this game again closer to kickoff to see whether wind or rain matters.';
+  return w.adj?w.txt+' Expect fewer points and a more run-heavy game than usual.':w.txt;
+}
+function news282(g,e){
+  var N=[];(e&&e.news||[]).forEach(function(t){N.push(t)});
+  try{['a','h'].forEach(function(s){(startersOut258(g,s)||[]).slice(0,4).forEach(function(x){var sub=(e&&e.sub||[]).filter(function(u){return normName(u.out)===normName(x.n)})[0];N.push(outLine258(g,s,x).replace(/\.$/,'')+(sub?'; '+sub.next+' steps in ('+sub.note+').':'.'))})})}catch(e2){}
+  if(g.lg==='nhl'){['a','h'].forEach(function(s){var G=gkFor282(g,s);if(G)N.push(nick282(g,s)+' goalie: '+G.n+' is '+G.st+' to start'+(G.sv!=null?' ('+G.sv.toFixed(3).replace(/^0/,'')+' save percentage)':'')+(G.note?'. '+G.note:'')+'.')})}
+  var seen={};return N.filter(function(t){var k=t.slice(0,60);if(seen[k])return false;seen[k]=1;return true});
+}
+function pred282Html(g){
+  if(kind(g)!=='up')return '';
+  var d=null,X=null,e=null;try{d=ddFor(g)}catch(x){}try{X=simRun276(g)}catch(x){}try{e=expFor(g)}catch(x){}
+  if(!X&&!(d&&d.pred))return '';
+  var na=nick282(g,'a'),nh=nick282(g,'h'),nm=function(s){return s==='a'?na:nh},pct=simPct276;
+  var sa=X?X.sa:d.pred.a,sh=X?X.sh:d.pred.h,dec=g.lg==='nhl'?1:0,fmt=function(v){return dec?v.toFixed(1):String(Math.round(v))};
+  var win=X?(X.wh>=X.wa?'h':'a'):(sh>=sa?'h':'a'),lose=win==='a'?'h':'a',pw=X?(win==='h'?X.wh:X.wa)/X.N:null;
+  var cov=null,pc=null,line='';
+  if(X&&X.cov){cov=X.cov.h>=X.cov.a?'h':'a';pc=cov==='h'?X.cov.h:X.cov.a;var hs=X.cov.hs,num=cov==='h'?hs:-hs;line=(num>0?'+':'')+num}
+  var tot=X&&X.tot?(X.tot.o>=X.tot.u?['Over',X.tot.o]:['Under',X.tot.u]):null;
+  var MM=mism282(g),edge=function(s){return MM.filter(function(m){return m.side===s})};
+  var h='<h2 style="margin:18px 0 8px;font-size:19px">Hitboard’s prediction</h2><div class="card" style="padding:12px">';
+  h+='<div style="font-size:19px;font-weight:800">'+esc(nm(win))+' '+fmt(win==='h'?sh:sa)+', '+esc(nm(lose))+' '+fmt(win==='h'?sa:sh)+'</div>';
+  var chips=[esc(nm(win))+' win'+(pw!=null?' ('+pct(pw)+'%)':'')];
+  if(cov)chips.push(esc(nm(cov))+' '+line+' covers ('+pct(pc)+'%)');
+  if(tot)chips.push(tot[0]+' '+X.tot.tt+' ('+pct(tot[1])+'%)');
+  h+='<div class="src" style="margin-top:2px">'+chips.join(' · ')+'</div>';
+  if(e&&(e.win||e.cov)){var ew=e.win&&e.win!==win?' The experts lean to the '+nm(e.win)+' to win.':'',ec=e.cov&&cov&&e.cov!==cov?' Most experts take the '+nm(e.cov)+' against the spread instead.':'';if(ew||ec)h+='<div class="src" style="margin-top:4px">'+esc((ew+ec).trim())+'</div>'}
+  /* why the winner wins */
+  var W=[];
+  edge(win).slice(0,3).forEach(function(m){W.push(m.txt)});
+  if(e&&e.preview&&e.preview[0])W.push(e.preview[0]);
+  try{(startersOut258(g,lose)||[]).slice(0,2).forEach(function(x){W.push('The '+nm(lose)+' are without '+(x.pos?x.pos+' ':'')+x.n+' ('+x.st+').')})}catch(x){}
+  if(e&&e.form)e.form.filter(function(t){return t.indexOf(nm(win))>=0||(win==='h'?(g.hn||''):(g.an||'')).split(' ').some(function(w){return w.length>4&&t.indexOf(w)>=0})}).slice(0,1).forEach(function(t){W.push(t)});
+  if(W.length<3&&e&&e.form)e.form.filter(function(t){return t.indexOf(nm(win))>=0&&W.indexOf(t)<0}).slice(0,3-W.length).forEach(function(t){W.push(t)});
+  if(W.length<3&&e&&e.why&&e.win===win)e.why.slice(0,3-W.length).forEach(function(t){if(W.indexOf(t)<0)W.push(t)});
+  if(win==='h'&&W.length<4)W.push('Home '+(g.lg==='nhl'?'ice':g.lg==='nba'||g.lg==='ncaamb'?'court':'field')+': the '+nm(win)+' are at home, which is worth '+({nfl:'about 2 points',ncaafb:'about 2.5 points',nba:'about 2.5 points',ncaamb:'about 3.5 points',nhl:'a few percentage points of win chance'})[g.lg]+'.');
+  if(X&&pw!=null&&pw<.58)W.push('This is close: the '+nm(win)+' win only '+pct(pw)+'% of simulated games, so treat it as a lean.');
+  if(!W.length)W.push('The team numbers and the betting market both point to the '+nm(win)+', but there is no single big mismatch, so this is closer than the score suggests.');
+  h+='<div class="dd-h" style="font-size:15px;margin-top:10px">Why the '+esc(nm(win))+' should win</div><ul class="pts" style="margin:4px 0 0">'+W.map(function(t){return '<li>'+esc(t)+'</li>'}).join('')+'</ul>';
+  /* why the cover side covers */
+  if(cov){
+    var C=[],marg=Math.abs(sh-sa),sp=Math.abs(X.cov.hs);
+    if(cov===win&&sp>0&&marg>sp+.5)C.push('Hitboard projects the '+nm(win)+' by about '+fmt(marg)+', more than the '+sp+'-'+(g.lg==='nhl'?'goal':'point')+' spread.');
+    else if(cov===win&&sp>0)C.push('Hitboard projects the '+nm(win)+' by about '+fmt(marg)+', right around the '+sp+'-'+(g.lg==='nhl'?'goal':'point')+' spread, so this is close to a coin flip ('+pct(pc)+'% in the simulation).');
+    else if(cov===win)C.push('The '+nm(win)+' only need to win to cover.');
+    else C.push('Hitboard projects the '+nm(win)+' by only about '+fmt(marg)+', inside the '+sp+(g.lg==='nhl'?' goals':' points')+' the '+nm(cov)+' are getting.');
+    if(cov!==win)edge(cov).slice(0,2).forEach(function(m){C.push(m.txt)});
+    if(e&&e.cov===cov&&e.ag)C.push('Expert view: '+e.ag+'.');
+    if(g.lg==='nfl'&&X){var k3=((X.mg[3]||0)+(X.mg[-3]||0)+(X.mg[7]||0)+(X.mg[-7]||0))/X.N;if(sp>=2.5&&sp<=7.5)C.push('About '+pct(k3)+'% of simulated games end on 3 or 7, the key margins around this number.')}
+    h+='<div class="dd-h" style="font-size:15px;margin-top:10px">Why the '+esc(nm(cov))+' '+line+' should cover</div><ul class="pts" style="margin:4px 0 0">'+C.map(function(t){return '<li>'+esc(t)+'</li>'}).join('')+'</ul>';
+  }
+  /* every mismatch, both directions */
+  if(MM.length)h+='<div class="dd-h" style="font-size:15px;margin-top:10px">Where one team struggles against what the other does well</div><ul class="pts" style="margin:4px 0 0">'+MM.slice(0,6).map(function(m){return '<li><b>'+esc(nm(m.side))+':</b> '+esc(m.txt)+'</li>'}).join('')+'</ul>';
+  var wx=wxLine282(g);if(wx)h+='<div class="dd-h" style="font-size:15px;margin-top:10px">Weather</div><p style="margin:4px 0 0">'+esc(wx)+'</p>';
+  var NW=news282(g,e);if(NW.length)h+='<div class="dd-h" style="font-size:15px;margin-top:10px">News for this game</div><ul class="pts" style="margin:4px 0 0">'+NW.slice(0,8).map(function(t){return '<li>'+esc(t)+'</li>'}).join('')+'</ul>';
+  var R=(e&&(e.watch||e.tr)||[]).slice(0,2);if(R.length)h+='<div class="dd-h" style="font-size:15px;margin-top:10px">What could go wrong</div><ul class="pts" style="margin:4px 0 0">'+R.map(function(t){return '<li>'+esc(t)+'</li>'}).join('')+'</ul>';
+  return h+'<p class="src" style="margin:10px 0 0">The score and chances come from the 10,000-game simulation (team stats blended with the betting line, adjusted for who is out'+(g.lg==='nhl'?' and tonight’s goalies':'')+(g.lg==='nfl'||g.lg==='ncaafb'?' and the weather':'')+'). For reference only.</p></div>';
+}
+(function(){
+  var fs282=feedSheet;
+  feedSheet=function(g){
+    var h=fs282.apply(this,arguments);
+    try{
+      if(kind(g)!=='up')return h;
+      var p=pred282Html(g);if(!p)return h;
+      var i=h.indexOf('<h2 style="margin:18px 0 8px;font-size:19px">Simulation</h2>');
+      if(i<0)i=h.indexOf('<h2 style="margin:22px 0 8px;font-size:19px">1 · ');
+      return i>=0?h.slice(0,i)+p+h.slice(i):h+p;
+    }catch(e){return h}
+  };
+})();
+/* tonight's goalies (Nov 25, 2026; most confirmed after morning skates) */
+gkSet282('2026-11-25',[
+ ['STL','Joel Hofer','expected',.919],['NYI','Ilya Sorokin','confirmed',.917,'Confirmed after the morning skate'],
+ ['PHI','Joseph Woll','confirmed',null,'A change from Dan Vladar, who had been projected'],['WSH','Logan Thompson','confirmed',.879,'Back after a short break since being pulled against Buffalo'],
+ ['WPG','Nico Daws','confirmed',null,'A surprise start over Stuart Skinner'],['BOS','Jeremy Swayman','confirmed',.905],
+ ['NJ','Connor Hellebuyck','likely',null,'First off the ice at the morning skate; 8-1 with a .936 career save percentage against Columbus'],['CBJ','Cam Talbot','confirmed',.906,'His fifth straight start'],
+ ['OTT','Linus Ullmark','confirmed',.941],['FLA','Jacob Markstrom','confirmed',.894],
+ ['CGY','Dustin Wolf','confirmed',.877,'Starts instead of Devin Cooley'],['PIT','Arturs Silovs','confirmed',.878],
+ ['CAR','Brandon Bussi','likely',.879,'Starts instead of Pyotr Kochetkov'],['TB','Andrei Vasilevskiy','expected',.895],
+ ['NYR','Joonas Korpisalo','confirmed',.940,'3-0 since returning'],['BUF','Ukko-Pekka Luukkonen','likely',.878],
+ ['VAN','Leevi Merilainen','likely',.889],['DET','Daniil Tarasov','confirmed',.927],
+ ['UTA','Karel Vejmelka','expected',.872],['MIN','Jesper Wallstedt','confirmed',.924],
+ ['NSH','Juuse Saros','expected',.917],['DAL','Jake Oettinger','confirmed',.909],
+ ['MTL','Jacob Fowler','expected',.918],['COL','Mackenzie Blackwood','confirmed',.904],
+ ['CHI','Spencer Knight','expected',.888],['SEA','Joey Daccord','likely',.877],
+ ['SJ','Alex Nedeljkovic','expected',.902],['ANA','Laurent Brossoit','likely',null,'Starts instead of Lukas Dostal']
+]);
+/* tonight's game news */
+(function(){
+  var N={
+   'nhl|STL@NYI':['St. Louis has won four straight, but the Islanders have Ilya Sorokin confirmed in net.'],
+   'nhl|PHI@WSH':['Philadelphia turns to Joseph Woll instead of Dan Vladar; Washington has lost five straight in regulation and is missing Kyrou and Sandin.'],
+   'nhl|WPG@BOS':['Winnipeg starts Nico Daws, not Stuart Skinner, on the first night of a three-game road trip; Isak Rosen is expected back from injured reserve.'],
+   'nhl|NJ@CBJ':['Second half of a home-and-home after New Jersey won 3-2 on Monday. Columbus gets Sean Monahan back but loses Mathieu Olivier.'],
+   'nhl|OTT@FLA':['Aleksander Barkov and Brad Marchand return for Florida after knee injuries, on short shifts at first; Barkov centers Verhaeghe and Reinhart.'],
+   'nhl|CGY@PIT':['Evgeni Malkin is back for Pittsburgh between Crosby and Rakell; Calgary loses Morgan Frost and starts Dustin Wolf.','Pittsburgh is still without Bryan Rust and Egor Chinakhov.'],
+   'nhl|CAR@TB':['Carolina is expected to start Brandon Bussi instead of Pyotr Kochetkov; Nikolaj Ehlers is out and K’Andre Miller is not skating. Tampa Bay is without Brandon Hagel.'],
+   'nhl|NYR@BUF':['Joonas Korpisalo starts again for the Rangers after three straight wins since his return.'],
+   'nhl|VAN@DET':['Detroit has lost eight of 10 but starts Daniil Tarasov, its best goalie this season, against the league’s worst defense.'],
+   'nhl|UTA@MIN':['Minnesota is 8-0-2 in its last 10. Quinn Hughes was hurt in Calgary; it is not believed to be serious.'],
+   'nhl|NSH@DAL':['Both teams are 8-2 in their last 10, and Jake Oettinger is confirmed for Dallas.'],
+   'nhl|MTL@COL':['Cale Makar returns for Colorado after missing three games; Nathan MacKinnon is still out for about three months. Montreal recently added Dylan Larkin.'],
+   'nhl|CHI@SEA':['Chicago has won two straight but is 2-8-1 on the road.'],
+   'nhl|SJ@ANA':['Anaheim starts Laurent Brossoit instead of Lukas Dostal after four straight losses; Cutter Gauthier has 18 goals in 12 November games.'],
+   'nba|MIA@PHI':['Giannis Antetokounmpo is available for Miami after being questionable with groin tendinitis.','Joel Embiid is out for Philadelphia (illness) for a second straight game; Jabari Walker is expected to start.'],
+   'nba|CLE@NYK':['Karl-Anthony Towns was upgraded to probable, but Jalen Brunson was added as questionable with an illness; Jose Alvarado starts if he sits. OG Anunoby, Miles McBride and Jordan Clarkson are out, and Cleveland is without Evan Mobley.'],
+   'nba|SAS@POR':['Victor Wembanyama (back) and De’Aaron Fox (shin) are game-time decisions; Dylan Harper and Tobias Harris are out. Portland is without Ja Morant, Shaedon Sharpe and Vit Krejci.'],
+   'nba|CHI@CHA':['Chicago is without Norman Powell and Caleb Wilson. Charlotte has Kalkbrenner doubtful, Schroder out and Grayson Allen questionable (concussion).'],
+   'nba|LAC@MEM':['Memphis is without Cameron Boozer, Jerami Grant and Scotty Pippen Jr.; the Clippers have lost five straight.'],
+   'nba|BKN@MIL':['Brooklyn has lost five straight and is without Nolan Traore.'],
+   'nba|MIN@OKC':['Minnesota is 13-5 without Anthony Edwards; Oklahoma City has lost six of eight.'],
+   'nba|SAC@GSW':['Sacramento is 2-15. Golden State lists Yaxel Lendeborg (illness) and Brandon Williams (hamstring) as questionable.'],
+   'nfl|GB@LAR':['Josh Jacobs was still questionable with no final word; his coach called him unlikely to play, so Kaleb Johnson, MarShawn Lloyd and Chris Brooks would share the work.','Micah Parsons is expected to make his season debut on a snap count of roughly 30 to 40 plays.','Both teams are 6-4 and coming off a bye; the winner holds the head-to-head tiebreaker.']
+  };
+  EXPERTS.forEach(function(e){var k=e.lg+'|'+e.a+'@'+e.h;if(N[k])e.news=N[k]});
+  EXPERTS.forEach(function(e){if(e.lg==='nba'&&e.a==='MIA'&&e.h==='PHI')e.tr=['Miami is only 1-6 against the spread on the road.','Philadelphia is 7-3 at home and scored 128 a game during a recent five-game win streak.','With Embiid out, Philadelphia is thin up front, but the line may already reflect it.']});
+})();
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
 setTimeout(function(){doRefresh(true)},600);
