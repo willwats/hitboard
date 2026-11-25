@@ -1957,7 +1957,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v282, Nov 25';
+var BUILD='v283, Nov 25';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -19418,6 +19418,8 @@ EXPERTS=EXPERTS.filter(function(x){return !(x.lg==='nfl'&&((x.a==='GB'&&x.h==='L
    weather, news, and NHL starting goalies that feed the simulation and the saves props ---------- */
 /* starting goalies by NHL team for one date (ET). st: confirmed | likely | expected. sv: season save % reported today when known. */
 var GOALIES={};
+/* game news by 'lg|AWAY@HOME' (filled by the daily goalie and news check) */
+var GNEWS282={};
 function gkSet282(date,list){list.forEach(function(x){GOALIES[x[0]]={n:x[1],st:x[2],sv:x[3]||null,note:x[4]||'',d:date}})}
 function etDate282(ms){try{return new Date(ms).toLocaleDateString('en-CA',{timeZone:'America/New_York'})}catch(e){return ''}}
 function gkFor282(g,side){
@@ -19511,6 +19513,7 @@ function wxLine282(g){
 }
 function news282(g,e){
   var N=[];(e&&e.news||[]).forEach(function(t){N.push(t)});
+  try{var gk=g.lg+'|'+(g.lg==='nhl'?nhlK(g.a)+'@'+nhlK(g.h):g.lg==='nfl'?nt(String(g.a).toUpperCase())+'@'+nt(String(g.h).toUpperCase()):String(g.a).toUpperCase()+'@'+String(g.h).toUpperCase());(GNEWS282[gk]||[]).forEach(function(t){if(N.indexOf(t)<0)N.push(t)})}catch(e3){}
   try{['a','h'].forEach(function(s){(startersOut258(g,s)||[]).slice(0,4).forEach(function(x){var sub=(e&&e.sub||[]).filter(function(u){return normName(u.out)===normName(x.n)})[0];N.push(outLine258(g,s,x).replace(/\.$/,'')+(sub?'; '+sub.next+' steps in ('+sub.note+').':'.'))})})}catch(e2){}
   if(g.lg==='nhl'){['a','h'].forEach(function(s){var G=gkFor282(g,s);if(G)N.push(nick282(g,s)+' goalie: '+G.n+' is '+G.st+' to start'+(G.sv!=null?' ('+G.sv.toFixed(3).replace(/^0/,'')+' save percentage)':'')+(G.note?'. '+G.note:'')+'.')})}
   var seen={};return N.filter(function(t){var k=t.slice(0,60);if(seen[k])return false;seen[k]=1;return true});
