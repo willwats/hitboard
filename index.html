@@ -1957,7 +1957,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v280, Nov 25';
+var BUILD='v281, Nov 25';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -18942,12 +18942,16 @@ function simStats276(v,line){
 function simSide276(g,team){var lg=g.lg,ab=function(x){return lg==='nfl'?nt(String(x||'').toUpperCase()):dlAb(lg,x)},t=ab(team);return t===ab(g.a)?'a':t===ab(g.h)?'h':null}
 function simBox276(g,X){
   var R0=[];try{R0=gpRows(g)}catch(e){}
+  /* v281: biggest roles first (QB, then backs and receivers by projected yards) so a top receiver is never cut off */
+  var PO={pass:0,rush:1,rec:2,crush:1,cpass:0,crec:2,npts:0,hsv:0,hg:1,hp:2,hs:3,recp:3,nreb:2,nast:3,ntpm:4,ha:4},mx={};
+  R0.forEach(function(o){var k=normName((o.r||{}).n||'');if(o.cat!=='recp'&&+o.r.proj>(mx[k]||0))mx[k]=+o.r.proj});
+  R0=R0.slice().sort(function(x,y){var a=PO[x.cat]!=null?PO[x.cat]:5,b=PO[y.cat]!=null?PO[y.cat]:5;return a-b||((+y.r.proj||0)-(+x.r.proj||0))});
   var seen={},cnt={a:0,h:0},rows=[];
   R0.forEach(function(o){
     var r=o.r||{},mu=+r.proj;if(!SIM_CAT276[o.cat]||!(mu>0)||!r.n)return;
     var side=simSide276(g,r.t);if(!side)return;
     var k=normName(r.n)+'|'+o.cat;if(seen[k])return;seen[k]=1;
-    if(cnt[side]>=8)return;cnt[side]++;
+    if(cnt[side]>=10)return;cnt[side]++;
     var line=o.ln&&o.ln.v!=null?+o.ln.v:null,v=simVec276(g,X,side,o.cat,mu,r.n);if(!v)return;
     var S0=simStats276(v,line);
     rows.push({n:r.n,t:r.t,side:side,cat:o.cat,mu:mu,line:line,avg:S0.avg,med:S0.med,p10:S0.p10,p90:S0.p90,pOver:S0.pOver,v:v});
@@ -19351,9 +19355,9 @@ function mu280Rows(g){
     by[side].push(o);
   });
   ['a','h'].forEach(function(s){
-    by[s].sort(function(x,y){var px=ord[x.r.pos]!=null?ord[x.r.pos]:5,py=ord[y.r.pos]!=null?ord[y.r.pos]:5;return px-py||((y.gs||0)-(x.gs||0))});
+    by[s].sort(function(x,y){var px=ord[x.r.pos]!=null?ord[x.r.pos]:5,py=ord[y.r.pos]!=null?ord[y.r.pos]:5;var vx=x.cat==='recp'?0:(+x.r.proj||0),vy=y.cat==='recp'?0:(+y.r.proj||0);return px-py||(vy-vx)});
     var P=[],ix={};by[s].forEach(function(o){var k=normName(o.r.n);if(ix[k]==null){ix[k]=P.length;P.push([o])}else P[ix[k]].push(o)});
-    by[s]=P.slice(0,6);
+    by[s]=P.slice(0,7);
   });
   return by;
 }
@@ -19406,6 +19410,10 @@ function mu280Html(g){
     }catch(e){return h}
   };
 })();
+/* v281: Packers at Rams (Wed Nov 25) expert picks, absences and expert props */
+EXPERTS=EXPERTS.filter(function(x){return !(x.lg==='nfl'&&((x.a==='GB'&&x.h==='LAR')||(x.a==='LAR'&&x.h==='GB')))}).concat([{"lg": "nfl", "a": "GB", "h": "LAR", "win": "h", "cov": "a", "tot": "u", "ln": "Rams -2.5 (-3 at some books), total 43.5 to 44.5", "ag": "About two-thirds of the experts take Green Bay with the points even though slightly more pick the Rams to win; the Under is the clear lean, with one simulation model the main voice for the Over", "why": ["Green Bay runs for a league-low 67 yards a game at about 3.2 yards per carry, and with Josh Jacobs expected to sit, Jordan Love has to carry the offense.", "Love has thrown a league-high 63 passes of 20-plus air yards, but the Rams have allowed only 8 completions on 30 deep throws and about 188 passing yards a game (3rd fewest).", "Green Bay is 4-1 against the spread as an underdog and 4-0 straight up after a loss; Matt LaFleur is 5-0 against Sean McVay.", "Green Bay has forced 20 turnovers (2nd) with a league-high 14 interceptions, and Micah Parsons returns on a limited snap count.", "The total has fallen from as high as 49.5 to 43.5, and Packers games are 7-3 to the Under."], "watch": ["Green Bay’s line has the league’s worst pass-block win rate (31 percent), Love was sacked eight times in the 30-10 loss to Minnesota, and Myles Garrett is coming off three sacks.", "The Rams have won four straight, outrushed opponents 653-175 in that run, and scored 34 on Arizona without Puka Nacua, Davante Adams and Terrance Ferguson.", "Green Bay’s rookie kicker has missed nine kicks in 10 games, a real risk in a close game; one model projects 47 points."], "preview": ["The decisive mismatch is the Rams’ run game against Green Bay’s line problems: Los Angeles averages 4.8 yards per carry with a 52 percent rush success rate, while Green Bay manages 3.2 and 37 percent, and Kyren Williams and Blake Corum have out-rushed the entire Packers offense (1,163 yards to 670).", "Christian Watson and Matthew Golden have combined for a league-best 32 catches of 20-plus yards, and they face backup corners Josh Wallace and Emmanuel Forbes with Jaylen Watson hurt.", "Without Nacua and Adams, Tyler Higbee is Matthew Stafford’s top target and rookie CJ Daniels has a bigger role; Stafford has 10 interceptions in 10 games against a defense with 14.", "Both interior lines are patched: the Rams start a backup center and left guard, and Green Bay has three interior linemen listed questionable."], "form": ["The Rams started 2-4, then won four straight, three on the road, and have held opponents to about 13 points a game over their last five.", "Green Bay is 6-4 but lost 30-10 at home to Minnesota on Nov 15 with eight sacks allowed; Love is at 20 touchdowns and 7 interceptions for the season.", "Both teams come off a bye at 6-4, and the winner takes the head-to-head tiebreaker in the NFC."], "sub": [{"out": "Josh Jacobs", "next": "Kaleb Johnson", "note": "Jacobs is listed questionable but his coach said he is unlikely to play; Johnson has led the team in carries since the injury, with 24 runs for 110 yards over the last two games"}, {"out": "Puka Nacua", "next": "Tyler Higbee", "note": "Higbee is now the top target with 31 catches for 304 yards, and rookie CJ Daniels takes on more snaps"}, {"out": "Davante Adams", "next": "CJ Daniels", "note": "the replacement group produced 436 yards and 34 points against Arizona in Week 10"}]}]);
+(function(){var nmOf=function(x){return x.replace(/:[a-z]$/,'').split(' ').slice(1).join(' ')},rm=function(t,n){var T=KEYOUT.nfl[t];if(T)T.items=T.items.filter(function(x){return nmOf(x)!==n})},add=function(t,s){var T=KEYOUT.nfl[t]||(KEYOUT.nfl[t]={items:[],chg:[]});rm(t,nmOf(s));T.items.push(s)};rm('LAR','Myles Garrett');rm('LAR','Trent McDuffie');add('GB','EDGE Micah Parsons:q');add('GB','C Sean Rhyan:q');add('GB','LB Zaire Franklin:q');add('LAR','G Steve Avila:o');add('LAR','C Coleman Shelton:o');add('LAR','TE Terrance Ferguson:o');add('LAR','WR Puka Nacua:o');add('LAR','WR Davante Adams:o');add('GB','RB Josh Jacobs:q');})();
+(function(){var U=Date.UTC(2026,10,26,15);[["Packers at Rams", "Matthew Golden", "receptions", "Over", "5.5", "He has six or more catches in five of his last six games, on about 10.7 targets a game."], ["Packers at Rams", "Christian Watson", "receiving yards", "Over", "72.5", "He averages about 92 receiving yards a game (916 in 10 games)."], ["Packers at Rams", "Blake Corum", "rushing yards", "Over", "55.5", "He has cleared this in four straight games with 11 or more carries, at 5.3 yards a carry."], ["Packers at Rams", "Blake Corum", "touchdown", "Yes", "anytime", "He has scored in six straight games."], ["Packers at Rams", "Christian Watson", "touchdown", "Yes", "anytime", "He has seven touchdowns, and the Rams have allowed 11 passing touchdowns but only four rushing."], ["Packers at Rams", "Matthew Stafford", "passing yards", "Over", "226.5", "He has cleared this in six of 10 starts and averages 262 passing yards a game."], ["Packers at Rams", "Jordan Love", "passing touchdowns", "Over", "1.5", "He has thrown two or more touchdowns in eight of 10 games."]].forEach(function(x){if(!PROP_X.some(function(y){return y.lg==='nfl'&&y.p===x[1]&&y.m===x[2]&&y.until>=U}))PROP_X.push({lg:'nfl',until:U,game:x[0],p:x[1],m:x[2],s:x[3],l:x[4],why:x[5]})})})();
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
 setTimeout(function(){doRefresh(true)},600);
