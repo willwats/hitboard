@@ -1957,7 +1957,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v276, Nov 25';
+var BUILD='v277, Nov 25';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -18698,8 +18698,18 @@ vPicks=function(){
   return h;
 };
 (function(){var add=function(t,s){var T=KEYOUT.nfl[t]||(KEYOUT.nfl[t]={items:[],chg:[]});if(T.items.indexOf(s)<0)T.items.push(s)};add('CIN','G Dalton Risner:o');add('WAS','CB Amik Robertson:o');})();
-/* ---------- v276: game simulation (10,000 games per matchup, show only) ---------- */
+/* ---------- v276/v277: game simulation (10,000 games per matchup, show only) ---------- */
+/* v277: injuries and weather in the team scores, quarters and halves, game flow, alternate lines, touchdown and goal scorers,
+   kickers, interceptions, sacks, same-game parlays (game sheet and betslip), simulation chances on prop cards and prop sheets,
+   and fair odds (item 5, styled .sim5 so it can be switched off with SIM5_ON). */
 var SIM276={N:10000,c:{}};
+var SIM5_ON=true;
+(function(){var st=document.createElement('style');st.id='sim277';st.textContent=
+  ':root{--sim5:#6D28D9}@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--sim5:#C4B5FD}}:root[data-theme="dark"]{--sim5:#C4B5FD}'+
+  '.sim5{font-family:Georgia,"Times New Roman",serif;font-style:italic;color:var(--sim5);font-weight:600;white-space:nowrap}'+
+  '.simk{color:var(--muted);font-size:12px}.simbar{font-size:12.5px;margin-top:6px;padding:6px 8px;border-radius:8px;background:var(--surface2,rgba(127,127,127,.08))}'+
+  '.simtbl{width:100%;font-size:12px;border-collapse:collapse}.simtbl td,.simtbl th{padding:6px 4px;font-family:inherit}.simtbl tr+tr{border-top:1px solid var(--line)}';
+  document.head.appendChild(st)})();
 function simRng276(seed){var a=seed>>>0;return function(){a=(a+0x6D2B79F5)>>>0;var t=a;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296}}
 function simHash276(s){var h=2166136261;s=String(s);for(var i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0}
 function simTools276(R){
@@ -18709,9 +18719,54 @@ function simTools276(R){
   function mix(cv){if(!(cv>0))return 1;var k=1/(cv*cv);return gam(k)/k}
   function poi(l){if(!(l>0))return 0;if(l>30)return Math.max(0,Math.round(l+Math.sqrt(l)*nrm()));var L=Math.exp(-l),k=0,p=1;do{k++;p*=R()}while(p>L);return k-1}
   function bin(n,p){var c=0;for(var i=0;i<n;i++)if(R()<p)c++;return c}
-  return {n:nrm,g:gam,mix:mix,poi:poi,bin:bin};
+  function pick(w){var s=0,i;for(i=0;i<w.length;i++)s+=w[i];var x=R()*s;for(i=0;i<w.length;i++){x-=w[i];if(x<=0)return i}return w.length-1}
+  return {n:nrm,g:gam,mix:mix,poi:poi,bin:bin,pick:pick};
 }
 var SIM_SD276={nfl:13.5,ncaafb:17,nba:12,ncaamb:10.5,nhl:2.3};
+function simFair276(p){if(!(p>0&&p<1))return '';var o=p>=.5?-Math.round(100*p/(1-p)):Math.round(100*(1-p)/p);return o>0?'+'+o:String(o)}
+function simImp276(o){o=+o;if(!isFinite(o)||o===0)return null;return o<0?-o/(-o+100):100/(o+100)}
+function simOdds5(p,book){
+  if(!SIM5_ON||!(p>0&&p<1))return '';
+  var t='fair '+simFair276(p);
+  if(book!=null){var q=simImp276(book);if(q!=null){var e=(p-q)*100;t+=' · book '+(book>0?'+':'')+book+' · '+(e>=0?'+':'')+e.toFixed(1)+'%'}}
+  return ' <span class="sim5">'+t+'</span>';
+}
+/* who is out, and what that does to each team's stats-based score */
+function simInj276(g){
+  var out={a:0,h:0,txt:[]};
+  ['a','h'].forEach(function(s){
+    var team=s==='a'?g.a:g.h,L=[],adj=0;try{L=startersOut258(g,s)||[]}catch(e){}
+    L.forEach(function(x){
+      var m=x.st==='out'?1:.6,d=0,grp='';try{grp=posGrp189(x.pos)}catch(e){}
+      if(g.lg==='nfl'||g.lg==='ncaafb'){
+        if(x.qb)d=-3.5;else if(/^(RB|WR|TE)$/.test(grp))d=-.7;else if(/^(OL|OT|OG|C|G|T)$/.test(grp)||/^(OL|OT|OG|C|G|T)$/.test(x.pos||''))d=-.5;
+        else{out[s==='a'?'h':'a']+=.4*m;L.length&&out.txt.push(team+' '+(x.pos||'')+' '+x.n+' '+x.st+' (opponent +'+(.4*m).toFixed(1)+')');return}
+      }else{
+        var v=null;try{v=injValue(g.lg,team,x.n)}catch(e){}
+        if(!v)return;
+        d=g.lg==='nhl'?-.15:-3.5;
+      }
+      adj+=d*m;out.txt.push(team+' '+(x.pos?x.pos+' ':'')+x.n+' '+x.st+' ('+(d*m).toFixed(g.lg==='nhl'?2:1)+')');
+    });
+    var cap=g.lg==='nhl'?-.35:/^(nba|ncaamb)$/.test(g.lg)?-7:-6;
+    out[s]+=Math.max(cap,adj);
+  });
+  return out;
+}
+/* outdoor wind for football (backtest on 4,129 games: 15–19 mph −0.9 pts, 20+ mph −2.3 pts versus the total; cold and rain showed no usable edge) */
+function simWx276(g){
+  if(g.lg!=='nfl'&&g.lg!=='ncaafb')return null;
+  var i=null;try{i=wxInfo(g)}catch(e){}
+  if(!i)return null;
+  if(i.roof&&i.roof!=='open')return {adj:0,fg:1,pass:1,rush:1,txt:i.roof==='dome'?'Dome, so no weather effect.':i.roof==='retract'?'Retractable roof, usually closed.':'Covered stadium, wind matters less.',k:'roof'};
+  var w=null;try{w=i.key?wxFor(i.key,g.start):null}catch(e){}
+  if(!w||w==='load')return {adj:0,fg:1,pass:1,rush:1,txt:'Forecast not loaded yet, so no weather effect is applied.',k:'none'};
+  var wa=w.wavg||0,o={adj:0,fg:1,pass:1,rush:1,k:'w'+Math.round(wa),txt:''};
+  if(wa>=20){o.adj=-2.3;o.fg=.8;o.pass=.9;o.rush=1.05}
+  else if(wa>=15){o.adj=-.9;o.fg=.9;o.pass=.95;o.rush=1.03}
+  o.txt='Wind about '+Math.round(wa)+' mph'+(w.t!=null?', '+Math.round(w.t)+'°':'')+(w.pp>=50?', '+Math.round(w.pp)+'% chance of rain':'')+'. '+(o.adj?'Total '+o.adj+' pts, fewer field goals, passing '+Math.round((1-o.pass)*100)+'% lower, rushing '+Math.round((o.rush-1)*100)+'% higher.':'Not windy enough to change the game (cold and rain showed no usable effect in the backtest).');
+  return o;
+}
 function simInputs276(g){
   var lg=g.lg;if(!SIM_SD276[lg])return null;
   var m=null;try{m=pickModel(g)}catch(e){}
@@ -18726,15 +18781,38 @@ function simInputs276(g){
     if(M!=null)mk={a:(ln.tt-M)/2,h:(ln.tt+M)/2,M:M};
   }else if(ln&&ln.pts!=null&&st&&lg!=='nhl'){var M2=ln.fav==='h'?ln.pts:-ln.pts,T2=st.a+st.h;mk={a:(T2-M2)/2,h:(T2+M2)/2,M:M2}}
   if(!st&&!mk)return null;
+  var inj={a:0,h:0,txt:[]};try{inj=simInj276(g)}catch(e){}
+  var wx=null;try{wx=simWx276(g)}catch(e){}
+  var st2=st?{a:st.a+inj.a,h:st.h+inj.h}:null;
   var w=st&&mk?.5:(mk?1:0),lo=lg==='nhl'?.8:/^nba|ncaamb$/.test(lg)?55:3;
-  var ea=Math.max(lo,(mk?w*mk.a:0)+(st?(1-w)*st.a:0)),eh=Math.max(lo,(mk?w*mk.h:0)+(st?(1-w)*st.h:0));
+  var ea=(mk?w*mk.a:0)+(st2?(1-w)*st2.a:0),eh=(mk?w*mk.h:0)+(st2?(1-w)*st2.h:0);
+  if(wx&&wx.adj){ea+=wx.adj/2;eh+=wx.adj/2}
+  ea=Math.max(lo,ea);eh=Math.max(lo,eh);
   var shots=null;
   if(lg==='nhl'){try{var A=NHLT[nhlK(g.a)],H=NHLT[nhlK(g.h)];if(A&&H)shots={a:(A.sf+H.sa)/2,h:(H.sf+A.sa)/2}}catch(e){}if(!shots)shots={a:29,h:29}}
-  return {lg:lg,ea:ea,eh:eh,ln:ln,st:st,mk:mk,w:w,shots:shots};
+  return {lg:lg,ea:ea,eh:eh,ln:ln,st:st,mk:mk,w:w,shots:shots,inj:inj,wx:wx};
 }
-/* football: drive by drive, with a last-chance drive in close games */
-function simFootball276(I,T,R,N,O){
-  var nfl=I.lg==='nfl',D0=nfl?11.2:13.4,dsd=nfl?.9:1.4,bt=nfl?.215:.27,bf=nfl?.16:.13,ret=.006,saf=.003,TDV=6.97;
+/* NFL team context for turnovers, touchdowns by pass or run, and sacks */
+function simTeamCtx276(g,I){
+  var C={a:{},h:{}};if(g.lg!=='nfl')return C;
+  var lgTO=0,lgSk=0,n=0;try{Object.keys(TS).forEach(function(k){var t=TS[k];if(!t.G)return;lgTO+=t.dTO/t.G;lgSk+=t.oSk/t.G;n++})}catch(e){}
+  lgTO=n?lgTO/n:1.2;lgSk=n?lgSk/n:2.5;
+  ['a','h'].forEach(function(s){
+    var k=nt(s==='a'?g.a:g.h),o=nt(s==='a'?g.h:g.a),T=TS[k],O=TS[o],c=C[s];
+    var qb=null;try{qb=DEEP.filter(function(d){return d.kind==='pass'&&nt(d.t)===k&&!out186(k,d.n)}).sort(function(a,b){return b.avgS-a.avgS})[0]}catch(e){}
+    var qf=1;if(qb){var mm=/(\d+)\/(\d+), (\d+) TD, (\d+) INT/.exec(qb.note||'');if(mm){var att=+mm[2],it=+mm[4];qf=((it+150*.021)/(att+150))/.021}}
+    var of=O&&O.G?Math.max(.75,Math.min(1.3,1+.6*((O.dTO/O.G)/lgTO-1))):1;
+    c.qb=qb;c.intF=Math.max(.6,Math.min(1.6,qf*of));
+    c.passTD=T&&(T.oPTD+T.oRTD)>0?(T.oPTD+2)/(T.oPTD+T.oRTD+4):.6;
+    c.tdpg=T&&T.G?(T.oPTD+T.oRTD)/T.G:2.4;
+    c.sk=T&&T.G?.6*(T.oSk/T.G)+.4*lgSk:lgSk;
+  });
+  return C;
+}
+/* football: drives in order, quarters, a last-chance drive in close games, overtime; tracks touchdowns, field goals, extra points, interceptions */
+function simFootball276(I,T,R,N,O,C){
+  var nfl=I.lg==='nfl',D0=nfl?11.2:13.4,dsd=nfl?.9:1.4,bt=nfl?.215:.27,bf=(nfl?.16:.13)*(I.wx?I.wx.fg:1),ret=.006,saf=.003,TDV=6.97;
+  var iA=.063*((C.a&&C.a.intF)||1),iH=.063*((C.h&&C.h.intF)||1),fum=.042;
   function rates(e){
     var ppd=Math.max(.15,e/(D0+.25)-(ret*7+saf*2));
     var f=function(s){return TDV*Math.min(.62,bt*s)+3*Math.min(.3,bf*Math.sqrt(s))},lo=.05,hi=4;
@@ -18742,37 +18820,46 @@ function simFootball276(I,T,R,N,O){
     var s=(lo+hi)/2;return {t:Math.min(.62,bt*s),f:Math.min(.3,bf*Math.sqrt(s))};
   }
   function tdPts(){var r=R();return r<.94?7:r<.97?6:r<.985?8:6}
+  var Z;
   function game(ra,rh,res){
-    var D=Math.max(7,Math.round(D0+dsd*T.n())),da=D,dh=D;if(R()<.5){if(R()<.5)da++;else dh++}
-    var pa=0,ph=0,j,r;
-    for(j=0;j<da;j++){r=R();if(r<ra.t)pa+=tdPts();else if(r<ra.t+ra.f)pa+=3;else if(r<ra.t+ra.f+ret)ph+=7;else if(r<ra.t+ra.f+ret+saf)ph+=2}
-    for(j=0;j<dh;j++){r=R();if(r<rh.t)ph+=tdPts();else if(r<rh.t+rh.f)ph+=3;else if(r<rh.t+rh.f+ret)pa+=7;else if(r<rh.t+rh.f+ret+saf)pa+=2}
-    var df=ph-pa;
-    if(Math.abs(df)<=8&&R()<(df===0?.8:.55)){
-      var tr=df>0?'a':df<0?'h':(R()<.5?'a':'h'),rr=tr==='a'?ra:rh,x=R(),gain=0;
-      if(Math.abs(df)<=3){if(x<rr.t*.7)gain=tdPts();else if(x<rr.t*.7+(df===0?.45:.4))gain=3}
-      else if(x<rr.t*1.1)gain=tdPts();
-      if(tr==='a')pa+=gain;else ph+=gain;
+    var D=Math.max(7,Math.round(D0+dsd*T.n())),da=D,dh=D,first=R()<.5?'a':'h';if(R()<.5){if(first==='a')da++;else dh++}
+    Z={a:0,h:0,q1a:0,q1h:0,h1a:0,h1h:0,tda:0,tdh:0,fga:0,fgh:0,xpa:0,xph:0,ina:0,inh:0,ftd:0,fsc:0,ot:0};
+    var n=da+dh,ka=0,kh=0,side=first;
+    function sc(s,pts,kind){Z[s]+=pts;if(!Z.fsc)Z.fsc=s==='a'?1:2;if(kind==='td'){Z['td'+s]++;if(!Z.ftd)Z.ftd=s==='a'?1:2}if(kind==='fg')Z['fg'+s]++;if(pts===7&&kind!=='fg')Z['xp'+s]++}
+    for(var k=0;k<n;k++){
+      if(side==='a'&&ka>=da)side='h';else if(side==='h'&&kh>=dh)side='a';
+      var rr=side==='a'?ra:rh,op=side==='a'?'h':'a',q=Math.floor(4*k/n),b0a=Z.a,b0h=Z.h,r=R();
+      if(r<rr.t)sc(side,tdPts(),'td');
+      else if(r<rr.t+rr.f)sc(side,3,'fg');
+      else if(r<rr.t+rr.f+ret){sc(op,7,'ret');if(R()<.7)Z['in'+side]++}
+      else if(r<rr.t+rr.f+ret+saf)sc(op,2,'saf');
+      else{var ip=side==='a'?iA:iH,rest=1-rr.t-rr.f-ret-saf,x=R()*rest;if(x<ip)Z['in'+side]++}
+      if(q===0){Z.q1a+=Z.a-b0a;Z.q1h+=Z.h-b0h}
+      if(q<=1){Z.h1a+=Z.a-b0a;Z.h1h+=Z.h-b0h}
+      if(side==='a')ka++;else kh++;
+      side=side==='a'?'h':'a';
     }
-    var ot=0;
-    if(pa===ph){
-      ot=1;
+    var df=Z.h-Z.a;
+    if(Math.abs(df)<=8&&R()<(df===0?.8:.55)){
+      var tr=df>0?'a':df<0?'h':(R()<.5?'a':'h'),r2=tr==='a'?ra:rh,x2=R();
+      if(Math.abs(df)<=3){if(x2<r2.t*.7)sc(tr,tdPts(),'td');else if(x2<r2.t*.7+(df===0?.45:.4)*(I.wx?I.wx.fg:1))sc(tr,3,'fg')}
+      else if(x2<r2.t*1.1)sc(tr,tdPts(),'td');
+    }
+    if(Z.a===Z.h){
+      Z.ot=1;
       if(nfl){
-        var first=R()<.5?'a':'h',sec=first==='a'?'h':'a',sc={a:0,h:0},drv=function(side){var q=side==='a'?ra:rh,y=R();return y<q.t*1.1?7:y<q.t*1.1+q.f*1.2?3:0};
-        sc[first]=drv(first);
-        if(sc[first]!==7){sc[sec]=drv(sec);for(var ps=0;ps<3&&sc.a===sc.h;ps++){var sd=ps%2===0?first:sec,y2=drv(sd);if(y2)sc[sd]+=y2}}
-        pa+=sc.a;ph+=sc.h;
+        var f2=R()<.5?'a':'h',s2=f2==='a'?'h':'a',drv=function(sd){var qq=sd==='a'?ra:rh,y=R();if(y<qq.t*1.1){sc(sd,7,'td');return 7}if(y<qq.t*1.1+qq.f*1.2){sc(sd,3,'fg');return 3}return 0};
+        var p1=drv(f2);
+        if(p1!==7){drv(s2);for(var ps=0;ps<3&&Z.a===Z.h;ps++)drv(ps%2===0?f2:s2)}
       }else{
-        for(var rd=1;rd<=8&&pa===ph;rd++){
-          var v2=rd>=3,gp=function(q){var y=R();return v2?(y<.45?2:0):(y<q.t*1.7?7:y<q.t*1.7+.3?3:0)};
-          pa+=gp(ra);ph+=gp(rh);
+        for(var rd=1;rd<=8&&Z.a===Z.h;rd++){
+          ['a','h'].forEach(function(sd){var qq=sd==='a'?ra:rh,y=R();if(rd>=3){if(y<.45)Z[sd]+=2}else if(y<qq.t*1.7)sc(sd,7,'td');else if(y<qq.t*1.7+.3)sc(sd,3,'fg')});
         }
-        if(pa===ph){if(R()<.5)pa+=2;else ph+=2}
+        if(Z.a===Z.h){if(R()<.5)Z.a+=2;else Z.h+=2}
       }
     }
-    res.a=pa;res.h=ph;res.ot=ot;
+    res.a=Z.a;res.h=Z.h;res.ot=Z.ot;
   }
-  /* calibrate: a short pilot run, then nudge scoring so the average matches the target */
   var ta=I.ea,th=I.eh,res={};
   for(var it=0;it<2;it++){
     var ra=rates(ta),rh=rates(th),sa=0,sh=0,P=3000;
@@ -18780,156 +18867,327 @@ function simFootball276(I,T,R,N,O){
     ta*=I.ea/Math.max(1,sa/P);th*=I.eh/Math.max(1,sh/P);
   }
   ra=rates(ta);rh=rates(th);
-  for(i=0;i<N;i++){game(ra,rh,res);O.a[i]=res.a;O.h[i]=res.h;O.ot[i]=res.ot}
+  ['q1a','q1h','h1a','h1h','tda','tdh','fga','fgh','xpa','xph','ina','inh','ftd','fsc'].forEach(function(k){O[k]=new Int16Array(N)});
+  for(i=0;i<N;i++){game(ra,rh,res);O.a[i]=res.a;O.h[i]=res.h;O.ot[i]=res.ot;for(var kk in Z)if(O[kk]&&kk!=='a'&&kk!=='h'&&kk!=='ot')O[kk][i]=Z[kk]}
 }
-/* basketball: shared pace plus each team's own swing */
+/* basketball: quarter by quarter with a shared pace for both teams */
 function simHoops276(I,T,R,N,O){
-  var nba=I.lg==='nba',sd=nba?10.3:9,pace=nba?.035:.04,len=nba?48:40;
+  var nba=I.lg==='nba',sd=nba?10.3:9,pace=nba?.035:.04,len=nba?48:40,nq=nba?4:2;
+  (nba?['q1a','q1h','h1a','h1h']:['h1a','h1h']).forEach(function(k){O[k]=new Int16Array(N)});
   for(var i=0;i<N;i++){
-    var z0=T.n(),a=Math.round(I.ea*(1+pace*z0)+sd*T.n()),h=Math.round(I.eh*(1+pace*z0)+sd*T.n()),ot=0;
+    var z0=T.n(),a=0,h=0,ot=0;
+    for(var q=0;q<nq;q++){
+      var qa=Math.round(I.ea/nq*(1+pace*z0)+sd/Math.sqrt(nq)*T.n()),qh=Math.round(I.eh/nq*(1+pace*z0)+sd/Math.sqrt(nq)*T.n());
+      a+=qa;h+=qh;if(q===0&&nba){O.q1a[i]=qa;O.q1h[i]=qh}if(q<nq/2||(nq===2&&q===0)){O.h1a[i]+=qa;O.h1h[i]+=qh}
+    }
     while(a===h&&ot<5){ot++;a+=Math.max(0,Math.round(I.ea*5/len+3.2*T.n()));h+=Math.max(0,Math.round(I.eh*5/len+3.2*T.n()))}
     if(a===h){if(R()<.5)a++;else h++}
     O.a[i]=a;O.h[i]=h;O.ot[i]=ot?1:0;
   }
 }
-/* hockey: shots, then goals on those shots, empty nets, overtime and shootouts */
+/* hockey: shots, goals on those shots, periods, first goal, empty nets, overtime and shootouts */
 function simHockey276(I,T,R,N,O){
   var la=I.ea*.955,lh=I.eh*.955,sa=Math.max(la*4,I.shots.a),sh=Math.max(lh*4,I.shots.h);
-  O.sa=new Int16Array(N);O.sh=new Int16Array(N);O.ga=new Int16Array(N);O.gh=new Int16Array(N);
+  ['sa','sh','ga','gh','q1a','q1h','fsc'].forEach(function(k){O[k]=new Int16Array(N)});
   for(var i=0;i<N;i++){
     var na=T.poi(sa*T.mix(.12)),nh=T.poi(sh*T.mix(.12)),ga=T.bin(na,la/sa),gh=T.bin(nh,lh/sh),a=ga,h=gh,ot=0;
-    O.sa[i]=na;O.sh[i]=nh;O.ga[i]=ga;O.gh[i]=gh;
+    O.sa[i]=na;O.sh[i]=nh;O.ga[i]=ga;O.gh[i]=gh;O.q1a[i]=T.bin(ga,.31);O.q1h[i]=T.bin(gh,.31);
+    if(ga+gh>0)O.fsc[i]=R()<ga/(ga+gh)?1:2;
     if(Math.abs(a-h)===1){if(R()<.22){if(a>h)a++;else h++}}
     else if(Math.abs(a-h)===2&&R()<.07){if(a>h)a++;else h++}
     if(a===h){ot=1;var pa=la/(la+lh);if(R()<.62){if(R()<pa)a++;else h++}else{ot=2;if(R()<.5+.1*(pa-.5)*2)a++;else h++}}
+    if(!O.fsc[i])O.fsc[i]=a>h?1:2;
     O.a[i]=a;O.h[i]=h;O.ot[i]=ot;
   }
 }
 var SIM_CAT276={
-  pass:{cv:.25,e:.5,m:-.007},rec:{cv:.55,e:.5,m:-.007},rush:{cv:.45,e:.5,m:.01},recp:{cv:.25,e:.4,m:-.006,cnt:1},
-  cpass:{cv:.3,e:.5,m:-.007},crec:{cv:.6,e:.5,m:-.007},crush:{cv:.5,e:.5,m:.01},
+  pass:{cv:.25,e:.5,m:-.007,wx:'pass'},rec:{cv:.55,e:.5,m:-.007,wx:'pass'},rush:{cv:.45,e:.5,m:.01,wx:'rush'},recp:{cv:.25,e:.4,m:-.006,cnt:1,wx:'pass'},
+  cpass:{cv:.3,e:.5,m:-.007,wx:'pass'},crec:{cv:.6,e:.5,m:-.007,wx:'pass'},crush:{cv:.5,e:.5,m:.01,wx:'rush'},
   npts:{cv:.3,e:1,bl:1},nreb:{cv:.25,e:0,bl:1,cnt:1},nast:{cv:.25,e:.7,bl:1,cnt:1},ntpm:{cv:.35,e:.7,bl:1,cnt:1},
   hg:{nhl:'g'},hp:{nhl:'p'},ha:{nhl:'p'},hs:{nhl:'s'},hsv:{nhl:'sv'}
 };
-function simBox276(g,I,T,O,N){
+var SIM_LAB276={pass:'Pass yds',rush:'Rush yds',rec:'Rec yds',recp:'Receptions',cpass:'Pass yds',crush:'Rush yds',crec:'Rec yds',npts:'Points',nreb:'Rebounds',nast:'Assists',ntpm:'Threes',hg:'Goals',hp:'Points',ha:'Assists',hs:'Shots',hsv:'Saves',td:'Anytime TD',int:'Interceptions',kick:'Kicking pts',sack:'Sacks taken'};
+/* one player's stat in every simulated game: moves with his team's game, then scaled so the average stays on Hitboard's projection */
+function simVec276(g,X,side,cat,mu,name){
+  var key=side+'|'+cat+'|'+normName(name||'')+'|'+(+mu).toFixed(3);X.pv=X.pv||{};if(X.pv[key])return X.pv[key];
+  var C=SIM_CAT276[cat];if(!C||!(mu>0))return null;
+  var I=X.I,O=X.O,N=X.N,T=simTools276(simRng276(simHash276(g.id+'|'+key))),v=new Float32Array(N),e=side==='a'?I.ea:I.eh,eo=side==='a'?I.eh:I.ea,i,x;
+  if(C.nhl){
+    for(i=0;i<N;i++){
+      var gT=side==='a'?O.a[i]:O.h[i],shT=side==='a'?O.sa[i]:O.sh[i],eS=side==='a'?I.shots.a:I.shots.h;
+      if(C.nhl==='g')x=T.bin(gT,Math.min(.6,mu/Math.max(.5,e)));
+      else if(C.nhl==='p')x=T.poi(mu*gT/Math.max(.5,e));
+      else if(C.nhl==='s')x=T.poi(mu*(shT/Math.max(10,eS))*T.mix(.2));
+      else{var os=side==='a'?O.sh[i]:O.sa[i],og=side==='a'?O.gh[i]:O.ga[i],es=(side==='a'?I.shots.h:I.shots.a)-eo*.955;x=Math.max(0,Math.round(mu*(os-og)/Math.max(10,es)))}
+      v[i]=x;
+    }
+  }else{
+    var football=g.lg==='nfl'||g.lg==='ncaafb',kk=football?14:0,F=new Float32Array(N),fs=0,em=e-eo,wf=(C.wx&&I.wx&&I.wx[C.wx])||1;
+    for(i=0;i<N;i++){
+      var pt=side==='a'?O.a[i]:O.h[i],po=side==='a'?O.h[i]:O.a[i],dv=Math.max(-21,Math.min(21,(pt-po)-em));
+      var f=Math.pow(Math.max(.2,(pt+kk)/(e+kk)),C.e)*Math.max(.5,1+(C.m||0)*dv);
+      if(C.bl&&Math.abs(pt-po)>=18)f*=.9;
+      f*=T.mix(C.cv);F[i]=f;fs+=f;
+    }
+    var sc=fs>0?N/fs:1;
+    for(i=0;i<N;i++){x=mu*wf*F[i]*sc;v[i]=C.cnt?T.poi(x):Math.round(x)}
+  }
+  X.pv[key]=v;return v;
+}
+function simStats276(v,line){
+  var N=v.length,s=Array.prototype.slice.call(v).sort(function(a,b){return a-b}),sum=0,ov=0,un=0;
+  for(var j=0;j<N;j++){sum+=v[j];if(line!=null){if(v[j]>line)ov++;else if(v[j]<line)un++}}
+  return {avg:sum/N,med:s[Math.floor(N*.5)],p10:s[Math.floor(N*.1)],p90:s[Math.floor(N*.9)],pOver:line!=null?ov/N:null,pUnder:line!=null?un/N:null,sorted:s};
+}
+function simSide276(g,team){var lg=g.lg,ab=function(x){return lg==='nfl'?nt(String(x||'').toUpperCase()):dlAb(lg,x)},t=ab(team);return t===ab(g.a)?'a':t===ab(g.h)?'h':null}
+function simBox276(g,X){
   var R0=[];try{R0=gpRows(g)}catch(e){}
-  var lg=g.lg,ab=function(x){return lg==='nfl'?nt(String(x||'').toUpperCase()):dlAb(lg,x)},ta=ab(g.a),th=ab(g.h),seen={},cnt={a:0,h:0},rows=[];
+  var seen={},cnt={a:0,h:0},rows=[];
   R0.forEach(function(o){
-    var r=o.r||{},C=SIM_CAT276[o.cat],mu=+r.proj;if(!C||!(mu>0)||!r.n)return;
-    var t=ab(r.t),side=t===ta?'a':t===th?'h':null;if(!side)return;
+    var r=o.r||{},mu=+r.proj;if(!SIM_CAT276[o.cat]||!(mu>0)||!r.n)return;
+    var side=simSide276(g,r.t);if(!side)return;
     var k=normName(r.n)+'|'+o.cat;if(seen[k])return;seen[k]=1;
     if(cnt[side]>=8)return;cnt[side]++;
-    rows.push({n:r.n,t:r.t,side:side,cat:o.cat,mu:mu,line:o.ln&&o.ln.v!=null?+o.ln.v:null,C:C});
-  });
-  var football=lg==='nfl'||lg==='ncaafb',kk=football?14:0;
-  rows.forEach(function(w){
-    var v=new Float32Array(N),C=w.C,e=w.side==='a'?I.ea:I.eh,eo=w.side==='a'?I.eh:I.ea,i,x;
-    if(C.nhl){
-      for(i=0;i<N;i++){
-        var gT=w.side==='a'?O.a[i]:O.h[i],shT=w.side==='a'?O.sa[i]:O.sh[i],eS=w.side==='a'?I.shots.a:I.shots.h;
-        if(C.nhl==='g')x=T.bin(gT,Math.min(.6,w.mu/Math.max(.5,e)));
-        else if(C.nhl==='p')x=T.poi(w.mu*gT/Math.max(.5,e));
-        else if(C.nhl==='s')x=T.poi(w.mu*(shT/Math.max(10,eS))*T.mix(.2));
-        else{var os=w.side==='a'?O.sh[i]:O.sa[i],og=w.side==='a'?O.gh[i]:O.ga[i],es=(w.side==='a'?I.shots.h:I.shots.a)-eo*.955;x=Math.max(0,Math.round(w.mu*(os-og)/Math.max(10,es)))}
-        v[i]=x;
-      }
-    }else{
-      /* the player's line moves with his team's simulated game (points scored, and the score gap compared with what was expected), then is scaled so the average stays on Hitboard's projection */
-      var F=new Float32Array(N),fs=0,em=e-eo;
-      for(i=0;i<N;i++){
-        var pt=w.side==='a'?O.a[i]:O.h[i],po=w.side==='a'?O.h[i]:O.a[i],dv=Math.max(-21,Math.min(21,(pt-po)-em));
-        var f=Math.pow(Math.max(.2,(pt+kk)/(e+kk)),C.e)*Math.max(.5,1+(C.m||0)*dv);
-        if(C.bl&&Math.abs(pt-po)>=18)f*=.9;
-        f*=T.mix(C.cv);F[i]=f;fs+=f;
-      }
-      var sc=fs>0?N/fs:1;
-      for(i=0;i<N;i++){x=w.mu*F[i]*sc;v[i]=C.cnt?T.poi(x):Math.round(x)}
-    }
-    var s=Array.prototype.slice.call(v).sort(function(a,b){return a-b}),sum=0,ov=0;for(var j=0;j<N;j++){sum+=v[j];if(w.line!=null&&v[j]>w.line)ov++}
-    w.avg=sum/N;w.med=s[Math.floor(N*.5)];w.p10=s[Math.floor(N*.1)];w.p90=s[Math.floor(N*.9)];w.pOver=w.line!=null?ov/N:null;
-    delete w.C;
+    var line=o.ln&&o.ln.v!=null?+o.ln.v:null,v=simVec276(g,X,side,o.cat,mu,r.n);if(!v)return;
+    var S0=simStats276(v,line);
+    rows.push({n:r.n,t:r.t,side:side,cat:o.cat,mu:mu,line:line,avg:S0.avg,med:S0.med,p10:S0.p10,p90:S0.p90,pOver:S0.pOver,v:v});
   });
   return rows;
 }
+/* NFL: touchdown scorers, kicker, interceptions, sacks; NHL: first goal */
+function simExtras276(g,X){
+  var E={td:[],kick:[],int:[],sack:[],fg:[]},O=X.O,N=X.N,I=X.I,C=X.C||{a:{},h:{}};
+  if(g.lg==='nfl'){
+    ['a','h'].forEach(function(s){
+      var k=nt(s==='a'?g.a:g.h),c=C[s]||{},T=simTools276(simRng276(simHash276(g.id+'|td|'+s)));
+      var tg=TS[k]&&TS[k].G||1,rushTD=TS[k]?TS[k].oRTD/tg:1,recTD=TS[k]?TS[k].oPTD/tg:1.4;
+      var ppl=DEEP.filter(function(d){return nt(d.t)===k&&(d.kind==='rush'||d.kind==='rec')});
+      var mk=function(kind,base){
+        var L=ppl.filter(function(d){return d.kind===kind&&d.vol>=(kind==='rush'?3:2)}),all=0;
+        L.forEach(function(d){var m=/(\d+) TD/.exec(d.note||''),td=m?+m[1]:0,yshare=0;var tot=L.reduce(function(z,q){return z+q.avgS},0);yshare=tot?d.avgS/tot:0;d._tdr=(td+1.5*yshare*base)/(d.g+1.5);all+=d._tdr});
+        var oth=Math.max(.12*base,base-all),act=L.filter(function(d){var o=false;try{o=out186(k,d.n)}catch(e){}return !o});
+        return {L:act,w:act.map(function(d){return d._tdr}).concat([oth])};
+      };
+      var RU=mk('rush',rushTD),RE=mk('rec',recTD),pp={},first={};
+      var who=function(nm){if(!pp[nm]){pp[nm]=new Uint8Array(N);first[nm]=0}return pp[nm]};
+      var pT=c.passTD||.6;if(I.wx)pT=Math.max(.3,Math.min(.85,pT*I.wx.pass/I.wx.rush));
+      for(var i=0;i<N;i++){
+        var n=s==='a'?O.tda[i]:O.tdh[i],isF=(O.ftd[i]===(s==='a'?1:2));
+        for(var j=0;j<n;j++){
+          var useP=T.pick([pT,1-pT])===0,grp=useP?RE:RU,ix=T.pick(grp.w);
+          if(ix<grp.L.length){var nm=grp.L[ix].n;who(nm)[i]++;if(isF&&j===0)first[nm]++}
+        }
+      }
+      Object.keys(pp).forEach(function(nm){var v=pp[nm],c1=0;for(var i=0;i<N;i++)if(v[i])c1++;E.td.push({n:nm,t:k,side:s,p:c1/N,pf:first[nm]/N,v:v})});
+      /* kicker */
+      var kk=null;try{kk=KICKERS.filter(function(x){return nt(x.t)===k&&!out186(k,x.n)}).sort(function(a,b){return b.g-a.g})[0]}catch(e){}
+      if(kk){var kv=new Float32Array(N),fv=new Float32Array(N);for(i=0;i<N;i++){var fgN=s==='a'?O.fga[i]:O.fgh[i],xp=s==='a'?O.xpa[i]:O.xph[i];fv[i]=fgN;kv[i]=3*fgN+xp}
+        var ks=simStats276(kv,6.5),c2=0;for(i=0;i<N;i++)if(fv[i]>=2)c2++;E.kick.push({n:kk.n,t:k,side:s,med:ks.med,p10:ks.p10,p90:ks.p90,p7:ks.pOver,p2fg:c2/N,v:kv,fv:fv})}
+      /* interceptions */
+      if(c.qb){var iv=new Float32Array(N),c1=0,c2b=0;for(i=0;i<N;i++){iv[i]=s==='a'?O.ina[i]:O.inh[i];if(iv[i]>=1)c1++;if(iv[i]>=2)c2b++}E.int.push({n:c.qb.n,t:k,side:s,p1:c1/N,p2:c2b/N,v:iv})}
+      /* sacks taken */
+      if(c.qb&&c.sk){var sv=new Float32Array(N),em=(s==='a'?I.ea-I.eh:I.eh-I.ea),c3=0,ss=0;
+        for(i=0;i<N;i++){var pt=s==='a'?O.a[i]:O.h[i],po=s==='a'?O.h[i]:O.a[i],dv=Math.max(-21,Math.min(21,(pt-po)-em));sv[i]=T.poi(c.sk*Math.max(.6,1-.015*dv)*T.mix(.3));ss+=sv[i];if(sv[i]>=3)c3++}
+        E.sack.push({n:c.qb.n,t:k,side:s,avg:ss/N,p3:c3/N,v:sv})}
+    });
+    E.td.sort(function(a,b){return b.p-a.p});
+  }
+  if(g.lg==='nhl'){
+    ['a','h'].forEach(function(s){
+      var team=s==='a'?g.a:g.h,L=PROPS.filter(function(x){return x.lg==='nhl'&&x.kind==='hg'&&nhlK(x.team)===nhlK(team)&&x.avg>0});
+      try{L=L.filter(function(x){return !isOutInj({lg:'nhl',t:x.team,n:x.name})})}catch(e){}
+      var tot=L.reduce(function(z,x){return z+x.avg},0),eG=s==='a'?X.I.ea:X.I.eh;if(!tot)return;
+      var pf=0;for(var i=0;i<N;i++)if(O.fsc[i]===(s==='a'?1:2))pf++;pf/=N;
+      L.sort(function(a,b){return b.avg-a.avg}).slice(0,4).forEach(function(x){var v=simVec276(g,X,s,'hg',x.avg,x.name),c1=0;for(var i=0;i<N;i++)if(v[i]>=1)c1++;E.td.push({n:x.name,t:team,side:s,p:c1/N,pf:pf*Math.min(.6,x.avg/Math.max(.5,eG)),v:v,goal:1})});
+    });
+    E.td.sort(function(a,b){return b.p-a.p});
+  }
+  return E;
+}
+function simKey276(g,I){return g.id+'|'+I.ea.toFixed(2)+'|'+I.eh.toFixed(2)+'|'+Math.floor(Date.now()/6e5)+'|'+(S.feedAt||0)+'|'+(I.wx?I.wx.k:'')+'|'+I.inj.txt.length}
 function simRun276(g){
   var I=simInputs276(g);if(!I)return null;
-  var key=g.id+'|'+I.ea.toFixed(2)+'|'+I.eh.toFixed(2)+'|'+Math.floor(Date.now()/6e5)+'|'+(S.feedAt||0);
+  var key=simKey276(g,I);
   if(SIM276.c[g.id]&&SIM276.c[g.id].key===key)return SIM276.c[g.id];
   var t0=Date.now(),N=SIM276.N,R=simRng276(simHash276(g.id+'|'+new Date().toDateString())),T=simTools276(R);
-  var O={a:new Int16Array(N),h:new Int16Array(N),ot:new Int8Array(N)};
-  if(I.lg==='nfl'||I.lg==='ncaafb')simFootball276(I,T,R,N,O);
+  var O={a:new Int16Array(N),h:new Int16Array(N),ot:new Int8Array(N)},C={a:{},h:{}};
+  if(I.lg==='nfl'||I.lg==='ncaafb'){try{C=simTeamCtx276(g,I)}catch(e){}simFootball276(I,T,R,N,O,C)}
   else if(I.lg==='nhl')simHockey276(I,T,R,N,O);
   else simHoops276(I,T,R,N,O);
-  var X={key:key,I:I,N:N,wa:0,wh:0,tie:0,ot:0,sa:0,sh:0,cov:null,tot:null,mg:{},sc:{}};
+  var X={key:key,I:I,N:N,O:O,C:C,wa:0,wh:0,tie:0,ot:0,sa:0,sh:0,cov:null,tot:null,mg:{},sc:{},pv:{}};
   var hs=null,ln=I.ln;if(ln&&ln.pts!=null)hs=ln.fav==='h'?-ln.pts:ln.pts;
-  var cv={h:0,a:0,p:0},tt={o:0,u:0,p:0};
+  var cv={h:0,a:0,p:0},tt={o:0,u:0,p:0},fl={blow:0,one:0,comeA:0,comeH:0,holdN:0,hold:0,h1a:0,h1h:0,h1lead:{a:0,h:0,t:0},q1:{a:0,h:0,t:0},q1a:0,q1h:0};
+  var football=I.lg==='nfl'||I.lg==='ncaafb',bl=football?17:I.lg==='nhl'?3:15,one=football?8:I.lg==='nhl'?1:5;
   for(var i=0;i<N;i++){
     var a=O.a[i],h=O.h[i],d=h-a;X.sa+=a;X.sh+=h;if(O.ot[i])X.ot++;
     if(d>0)X.wh++;else if(d<0)X.wa++;else X.tie++;
     X.mg[d]=(X.mg[d]||0)+1;var sk=a+'-'+h;X.sc[sk]=(X.sc[sk]||0)+1;
     if(hs!=null){var c=d+hs;if(c>0)cv.h++;else if(c<0)cv.a++;else cv.p++}
     if(ln&&ln.tt!=null){var q=a+h-ln.tt;if(q>0)tt.o++;else if(q<0)tt.u++;else tt.p++}
+    if(Math.abs(d)>=bl)fl.blow++;if(Math.abs(d)<=one)fl.one++;
+    if(O.h1a){var ha=O.h1a[i],hh=O.h1h[i];fl.h1a+=ha;fl.h1h+=hh;if(ha>hh){fl.h1lead.a++;if(d>0)fl.comeH++}else if(hh>ha){fl.h1lead.h++;if(d<0)fl.comeA++}else fl.h1lead.t++}
+    if(O.q1a){var qa=O.q1a[i],qh=O.q1h[i];fl.q1a+=qa;fl.q1h+=qh;if(qa>qh)fl.q1.a++;else if(qh>qa)fl.q1.h++;else fl.q1.t++}
   }
   X.sa/=N;X.sh/=N;if(hs!=null)X.cov={hs:hs,h:cv.h/N,a:cv.a/N,p:cv.p/N};if(ln&&ln.tt!=null)X.tot={tt:ln.tt,o:tt.o/N,u:tt.u/N,p:tt.p/N};
+  X.fl=fl;X.hasH1=!!O.h1a;
   X.top=Object.keys(X.sc).map(function(k){return [k,X.sc[k]/N]}).sort(function(a,b){return b[1]-a[1]}).slice(0,5);
   var tots=[];for(i=0;i<N;i++)tots.push(O.a[i]+O.h[i]);tots.sort(function(a,b){return a-b});X.tmed=tots[N>>1];X.t10=tots[Math.floor(N*.1)];X.t90=tots[Math.floor(N*.9)];
-  try{X.box=simBox276(g,I,T,O,N)}catch(e){X.box=[]}
+  try{X.box=simBox276(g,X)}catch(e){X.box=[]}
+  try{X.ex=simExtras276(g,X)}catch(e){X.ex={td:[],kick:[],int:[],sack:[]}}
   X.ms=Date.now()-t0;SIM276.c[g.id]=X;return X;
 }
+/* ---------- shared helpers for chances over the simulated games ---------- */
+function simCover276(X,side,num){var O=X.O,N=X.N,c=0,p=0;for(var i=0;i<N;i++){var m=side==='h'?O.h[i]-O.a[i]:O.a[i]-O.h[i],v=m+num;if(v>0)c++;else if(v===0)p++}return {p:c/N,push:p/N}}
+function simTotal276(X,line,over,which){var O=X.O,N=X.N,c=0,p=0;for(var i=0;i<N;i++){var t=which==='h1'?O.h1a[i]+O.h1h[i]:which==='q1'?O.q1a[i]+O.q1h[i]:O.a[i]+O.h[i];if(t===line)p++;else if(over?t>line:t<line)c++}return {p:c/N,push:p/N}}
+function simHits276(X,fn){var N=X.N,u=new Uint8Array(N);for(var i=0;i<N;i++)u[i]=fn(i)?1:0;return u}
+function simJoint276(arr){if(!arr.length)return 0;var N=arr[0].length,c=0;for(var i=0;i<N;i++){var ok=1;for(var j=0;j<arr.length;j++)if(!arr[j][i]){ok=0;break}c+=ok}return c/N}
+function simMean276(u){var s=0;for(var i=0;i<u.length;i++)s+=u[i];return s/u.length}
+function simGameFor276(lg,team){
+  var best=null,now=Date.now();(S.feed[lg]||[]).forEach(function(g){if(kind(g)!=='up')return;if(!simSide276(g,team))return;if(!best||g.start<best.start)best=g});
+  return best;
+}
+/* background queue so the props tab can show simulation chances without freezing the screen */
+var SIMQ276={q:[],busy:false,dirty:false};
+function simQueue276(g){
+  if(!g||SIMQ276.q.indexOf(g.id)>=0)return;
+  SIMQ276.q.push(g.id);if(!SIMQ276.busy){SIMQ276.busy=true;setTimeout(simTick276,60)}
+}
+function simTick276(){
+  var id=SIMQ276.q.shift();
+  if(id){var g=find(id);if(g){try{var X=simRun276(g);if(X){X._at=Date.now();SIMQ276.dirty=true}}catch(e){}}setTimeout(simTick276,30);return}
+  SIMQ276.busy=false;
+  if(SIMQ276.dirty&&S.tab==='props'&&!S.sheet){SIMQ276.dirty=false;try{var y=window.scrollY;render();window.scrollTo(0,y)}catch(e){}}
+}
+function simReady276(g){var c=SIM276.c[g.id];if(!c){simQueue276(g);return null}try{var I=simInputs276(g);if(I&&c.key!==simKey276(g,I))simQueue276(g)}catch(e){}return c}
+/* ---------- game sheet ---------- */
 function simChart276(g,X){
   var lg=g.lg,rng=lg==='nhl'?5:lg==='nba'||lg==='ncaamb'?30:lg==='ncaafb'?35:28,step=lg==='nba'||lg==='ncaamb'?2:1,bins=[],mx=0;
   for(var m=-rng;m<=rng;m+=step){var c=0;for(var k=0;k<step;k++)c+=X.mg[m+k]||0;bins.push([m,c]);if(c>mx)mx=c}
   var W=300,H=74,bw=W/bins.length,s='<svg viewBox="0 0 '+W+' '+(H+14)+'" width="100%" style="display:block;margin:6px 0 0" role="img" aria-label="How often each final margin happened">';
-  bins.forEach(function(b,i){var hh=mx?Math.max(b[1]?1:0,H*b[1]/mx):0,home=b[0]+(step-1)/2>0,zero=b[0]<=0&&b[0]+step-1>=0&&step===1&&b[0]===0;
+  bins.forEach(function(b,i){var hh=mx?Math.max(b[1]?1:0,H*b[1]/mx):0,home=b[0]+(step-1)/2>0,zero=b[0]===0&&step===1;
     s+='<rect x="'+(i*bw+.4).toFixed(1)+'" y="'+(H-hh).toFixed(1)+'" width="'+Math.max(.6,bw-.8).toFixed(1)+'" height="'+hh.toFixed(1)+'" fill="var(--'+(zero?'amber':home?'ink':'muted')+')" opacity="'+(home?.8:.55)+'"/>'});
   if(X.cov){var lx=((-X.cov.hs+rng+.5)/(2*rng+step))*W;if(lx>0&&lx<W)s+='<line x1="'+lx.toFixed(1)+'" x2="'+lx.toFixed(1)+'" y1="0" y2="'+H+'" stroke="var(--amber)" stroke-width="1.5" stroke-dasharray="3 2"/>'}
   s+='<text x="0" y="'+(H+12)+'" font-size="10" fill="var(--muted)">'+esc(g.a)+' by '+rng+'+</text><text x="'+(W/2)+'" y="'+(H+12)+'" font-size="10" fill="var(--muted)" text-anchor="middle">tied</text><text x="'+W+'" y="'+(H+12)+'" font-size="10" fill="var(--muted)" text-anchor="end">'+esc(g.h)+' by '+rng+'+</text></svg>';
   return s;
 }
-var SIM_LAB276={pass:'Pass yds',rush:'Rush yds',rec:'Rec yds',recp:'Receptions',cpass:'Pass yds',crush:'Rush yds',crec:'Rec yds',npts:'Points',nreb:'Rebounds',nast:'Assists',ntpm:'Threes',hg:'Goals',hp:'Points',ha:'Assists',hs:'Shots',hsv:'Saves'};
+function simPct276(x){var v=x*100;return v>0&&v<10?(Math.round(v*10)/10).toString():String(Math.round(v))}
+function simTwo276(p,q){var A=Math.round(p*100),B=Math.round(q*100);if(A+B>100){if(A>B)A--;else B--}return [A,B]}
+function simSgpCands276(g,X){
+  var C=[],O=X.O,a=g.a,h=g.h,ln=X.I.ln;
+  C.push({lab:(X.wh>=X.wa?h:a)+' to win',u:simHits276(X,X.wh>=X.wa?function(i){return O.h[i]>O.a[i]}:function(i){return O.a[i]>O.h[i]}),grp:'win'});
+  if(X.cov){var hs=X.cov.hs;C.push({lab:h+' '+(hs>0?'+':'')+hs,u:simHits276(X,function(i){return O.h[i]-O.a[i]+hs>0}),grp:'sp'});C.push({lab:a+' '+(-hs>0?'+':'')+(-hs),u:simHits276(X,function(i){return O.a[i]-O.h[i]-hs>0}),grp:'sp'})}
+  if(X.tot){var tl=X.tot.tt;C.push({lab:'Over '+tl,u:simHits276(X,function(i){return O.a[i]+O.h[i]>tl}),grp:'tot'});C.push({lab:'Under '+tl,u:simHits276(X,function(i){return O.a[i]+O.h[i]<tl}),grp:'tot'})}
+  (X.box||[]).forEach(function(w){if(w.line==null)return;C.push({lab:w.n+' over '+w.line+' '+(SIM_LAB276[w.cat]||'').toLowerCase(),u:simHits276(X,function(i){return w.v[i]>w.line}),grp:'p:'+w.n+w.cat})});
+  (X.ex&&X.ex.td||[]).slice(0,4).forEach(function(t){C.push({lab:t.n+(t.goal?' to score a goal':' anytime TD'),u:simHits276(X,function(i){return t.v[i]>=1}),grp:'td:'+t.n})});
+  return C;
+}
+function simSgp276(g,X){
+  var C=simSgpCands276(g,X),P=[];
+  C.forEach(function(c){c.p=simMean276(c.u)});
+  for(var i=0;i<C.length;i++)for(var j=i+1;j<C.length;j++){
+    if(C[i].grp===C[j].grp)continue;
+    var jp=simJoint276([C[i].u,C[j].u]),ind=C[i].p*C[j].p;if(jp<.12||!(ind>0))continue;
+    P.push({a:C[i],b:C[j],p:jp,ind:ind,lift:jp/ind});
+  }
+  P=P.filter(function(x){return x.lift>=1.08}).sort(function(x,y){return y.p*Math.min(1.6,y.lift)-x.p*Math.min(1.6,x.lift)}).slice(0,5);
+  return P;
+}
 function simHtml276(g){
   if(kind(g)!=='up')return '';
   var X=null;try{X=simRun276(g)}catch(e){X=null}
   var h='<h2 style="margin:18px 0 8px;font-size:19px">Simulation</h2>';
   if(!X)return h+'<div class="card"><p class="src" style="margin:0">Not enough data to simulate this game yet. It runs once the app has both teams’ stats or a betting line.</p></div>';
-  var I=X.I,N=X.N,hoops=g.lg==='nba'||g.lg==='ncaamb',pct=function(x){var v=x*100;return v>0&&v<10?(Math.round(v*10)/10).toString():String(Math.round(v))},two=function(p,q){var A=Math.round(p*100),B=Math.round(q*100);if(A+B>100)A>B?A--:B--;return [A,B]},a=esc(g.a),hm=esc(g.h);
+  var I=X.I,N=X.N,hoops=g.lg==='nba'||g.lg==='ncaamb',football=g.lg==='nfl'||g.lg==='ncaafb',pct=simPct276,two=simTwo276,a=esc(g.a),hm=esc(g.h),ln=I.ln,d=g.dk||{};
   var lead=X.sh>=X.sa?hm+' '+X.sh.toFixed(1)+', '+a+' '+X.sa.toFixed(1):a+' '+X.sa.toFixed(1)+', '+hm+' '+X.sh.toFixed(1);
-  var wa=X.wa/N,wh=X.wh/N,ti=X.tie/N;
+  var wa=X.wa/N,wh=X.wh/N,ti=X.tie/N,W=two(wa,wh);
   h+='<div class="card"><div class="src" style="text-transform:uppercase;letter-spacing:.06em;font-size:11px">'+N.toLocaleString()+' simulated games</div>'+
-    '<div style="font-size:17px;font-weight:700;margin:4px 0 2px">Average score: '+lead+'</div>'+
-    '';
+    '<div style="font-size:17px;font-weight:700;margin:4px 0 2px">Average score: '+lead+'</div>';
   if(!hoops)h+='<div class="src">Most common final: '+(function(){var q=X.top[0][0].split('-').map(Number);return q[1]>=q[0]?hm+' '+q[1]+', '+a+' '+q[0]:a+' '+q[0]+', '+hm+' '+q[1]})()+' ('+pct(X.top[0][1])+'% of games)</div>';
+  if(I.inj&&I.inj.txt.length)h+='<div class="src" style="margin-top:4px"><b>Out:</b> '+esc(I.inj.txt.join(' · '))+'</div>';
+  if(I.wx&&I.wx.txt)h+='<div class="src" style="margin-top:2px"><b>Weather:</b> '+esc(I.wx.txt)+'</div>';
   h+='<div style="display:flex;height:22px;border-radius:5px;overflow:hidden;margin:10px 0 4px;font-size:12px;font-weight:700;line-height:22px">'+
-    '<div style="width:'+(wa*100).toFixed(1)+'%;background:var(--muted);color:var(--bg);padding:0 6px;white-space:nowrap;overflow:hidden">'+a+' '+two(wa,wh)[0]+'%</div>'+
+    '<div style="width:'+(wa*100).toFixed(1)+'%;background:var(--muted);color:var(--bg);padding:0 6px;white-space:nowrap;overflow:hidden">'+a+' '+W[0]+'%</div>'+
     (ti>=.003?'<div style="width:'+(ti*100).toFixed(1)+'%;background:var(--amber)"></div>':'')+
-    '<div style="flex:1;background:var(--ink);color:var(--bg);padding:0 6px;text-align:right;white-space:nowrap;overflow:hidden">'+hm+' '+two(wa,wh)[1]+'%</div></div>';
+    '<div style="flex:1;background:var(--ink);color:var(--bg);padding:0 6px;text-align:right;white-space:nowrap;overflow:hidden">'+hm+' '+W[1]+'%</div></div>';
   h+='<div class="src">Win chance'+(ti>=.003?' · tie '+pct(ti)+'%':'')+(X.ot?' · goes to '+(g.lg==='nhl'?'overtime or a shootout':'overtime')+' in '+pct(X.ot/N)+'%':'')+'</div>';
   var L=[];
-  if(X.cov){var hsT=X.cov.hs===0?'PK':(X.cov.hs>0?'+':'')+X.cov.hs,asT=X.cov.hs===0?'PK':(-X.cov.hs>0?'+':'')+(-X.cov.hs);
-    var cv2=two(X.cov.a,X.cov.h);L.push(['Spread',a+' '+asT+' covers <b>'+cv2[0]+'%</b> · '+hm+' '+hsT+' covers <b>'+cv2[1]+'%</b>'+(X.cov.p>=.005?' · push '+pct(X.cov.p)+'%':'')])}
-  if(X.tot){var tt2=two(X.tot.o,X.tot.u);L.push(['Total '+X.tot.tt,'Over <b>'+tt2[0]+'%</b> · Under <b>'+tt2[1]+'%</b>'+(X.tot.p>=.005?' · push '+pct(X.tot.p)+'%':'')])}
+  L.push(['Moneyline',a+' <b>'+W[0]+'%</b>'+simOdds5(wa,d.ml?d.ml.a:null)+' · '+hm+' <b>'+W[1]+'%</b>'+simOdds5(wh,d.ml?d.ml.h:null)]);
+  if(X.cov){var hsT=X.cov.hs===0?'PK':(X.cov.hs>0?'+':'')+X.cov.hs,asT=X.cov.hs===0?'PK':(-X.cov.hs>0?'+':'')+(-X.cov.hs),cv2=two(X.cov.a,X.cov.h);
+    L.push(['Spread',a+' '+asT+' <b>'+cv2[0]+'%</b>'+simOdds5(X.cov.a,-110)+' · '+hm+' '+hsT+' <b>'+cv2[1]+'%</b>'+simOdds5(X.cov.h,-110)+(X.cov.p>=.005?' · push '+pct(X.cov.p)+'%':'')])}
+  if(X.tot){var tt2=two(X.tot.o,X.tot.u);L.push(['Total '+X.tot.tt,'Over <b>'+tt2[0]+'%</b>'+simOdds5(X.tot.o,-110)+' · Under <b>'+tt2[1]+'%</b>'+simOdds5(X.tot.u,-110)+(X.tot.p>=.005?' · push '+pct(X.tot.p)+'%':'')])}
   L.push(['Combined score','Middle '+X.tmed+' · 8 in 10 games land between '+X.t10+' and '+X.t90]);
   h+='<div class="dd-rows" style="margin-top:10px">'+L.map(function(r){return '<div class="dd-row"><span class="src">'+r[0]+'</span><span style="text-align:right">'+r[1]+'</span></div>'}).join('')+'</div>';
+  if(SIM5_ON&&(X.cov||X.tot))h+='<div class="simk" style="margin-top:4px"><span class="sim5">Fair odds</span> = the price that matches the simulated chance. Spread and total prices assume the standard −110; the edge is the simulated chance minus the book’s.</div>';
   h+='<div class="dd-h" style="font-size:15px">How the margin landed</div>'+simChart276(g,X)+(X.cov?'<div class="src">Dashed line: the spread. Bars to the right of it are games '+hm+' covered.</div>':'');
+  /* game flow */
+  var fl=X.fl,FL=[];
+  FL.push(['Blowout ('+(football?'17+ pts':g.lg==='nhl'?'3+ goals':'15+ pts')+')',pct(fl.blow/N)+'%']);
+  FL.push([football?'One-score game (8 or fewer)':g.lg==='nhl'?'One-goal game':'Close game (5 or fewer)',pct(fl.one/N)+'%']);
+  if(X.ot)FL.push(['Overtime'+(g.lg==='nhl'?' or shootout':''),pct(X.ot/N)+'%']);
+  if(X.hasH1&&fl.h1lead.a+fl.h1lead.h>0){
+    FL.push([a+' comes back after trailing at half',fl.h1lead.h?pct(fl.comeA/fl.h1lead.h)+'% of those games':'–']);
+    FL.push([hm+' comes back after trailing at half',fl.h1lead.a?pct(fl.comeH/fl.h1lead.a)+'% of those games':'–']);
+  }
+  h+='<div class="dd-h" style="font-size:15px">Game flow</div><div class="dd-rows">'+FL.map(function(r){return '<div class="dd-row"><span>'+esc(r[0])+'</span><span class="src">'+r[1]+'</span></div>'}).join('')+'</div>';
+  /* halves and quarters */
+  if(X.hasH1||X.O.q1a){
+    var HQ=[],O=X.O;
+    if(X.hasH1){var h1a=fl.h1a/N,h1h=fl.h1h/N,hl=fl.h1lead,hw=two(hl.a/N,hl.h/N),hmid=ln&&ln.tt!=null?Math.round(ln.tt/2*2)/2:null;
+      HQ.push(['1st half',a+' '+h1a.toFixed(1)+', '+hm+' '+h1h.toFixed(1)+' · leads at half: '+a+' '+hw[0]+'%, '+hm+' '+hw[1]+'%'+(hl.t/N>=.01?', tied '+pct(hl.t/N)+'%':'')]);
+      if(hmid!=null){hmid=Math.floor(hmid)+.5;var ho=simTotal276(X,hmid,true,'h1');HQ.push(['1st half total '+hmid,'Over <b>'+pct(ho.p)+'%</b>'+simOdds5(ho.p,null)+' · Under <b>'+pct(1-ho.p-ho.push)+'%</b>'])}
+    }
+    if(O.q1a){var q1=fl.q1,qa=fl.q1a/N,qh=fl.q1h/N,qw=two(q1.a/N,q1.h/N);
+      HQ.push([g.lg==='nhl'?'1st period':'1st quarter',a+' '+qa.toFixed(g.lg==='nhl'?2:1)+', '+hm+' '+qh.toFixed(g.lg==='nhl'?2:1)+' · ahead after it: '+a+' '+qw[0]+'%, '+hm+' '+qw[1]+'%, tied '+pct(q1.t/N)+'%']);
+      var qline=g.lg==='nhl'?1.5:Math.floor(qa+qh)+.5,qo=simTotal276(X,qline,true,'q1');HQ.push([(g.lg==='nhl'?'1st period':'1st quarter')+' total '+qline,'Over <b>'+pct(qo.p)+'%</b>'+simOdds5(qo.p,null)+' · Under <b>'+pct(1-qo.p-qo.push)+'%</b>']);
+      if(g.lg==='nhl'&&O.fsc){var fa=0;for(var i=0;i<N;i++)if(O.fsc[i]===1)fa++;HQ.push(['Scores first',a+' '+pct(fa/N)+'% · '+hm+' '+pct(1-fa/N)+'%'])}
+      if(football&&O.fsc){var fa2=0;for(i=0;i<N;i++)if(O.fsc[i]===1)fa2++;HQ.push(['Scores first',a+' '+pct(fa2/N)+'% · '+hm+' '+pct(1-fa2/N)+'%'])}
+    }
+    h+='<div class="dd-h" style="font-size:15px">'+(g.lg==='nhl'?'First period':'Halves and quarters')+'</div><div class="dd-rows">'+HQ.map(function(r){return '<div class="dd-row"><span class="src">'+r[0]+'</span><span style="text-align:right">'+r[1]+'</span></div>'}).join('')+'</div>'+(X.hasH1&&ln&&ln.tt!=null?'<div class="simk">The half total uses half the game total, since books often post about that.</div>':'');
+  }
+  /* alternate lines */
+  if(X.cov||X.tot){
+    var AL=[],steps=football?[-7,-3,0,3,7]:g.lg==='nhl'?[-1,0,1]:[-6,-3,0,3,6];
+    if(X.cov){var favS=X.cov.hs<0?'h':X.cov.hs>0?'a':(X.wh>=X.wa?'h':'a'),base=X.cov.hs<0?X.cov.hs:X.cov.hs>0?-X.cov.hs:0,fn=favS==='h'?g.h:g.a;
+      steps.forEach(function(sv){var num=base+sv;if(g.lg==='nhl'){num=sv===0?-1.5:sv<0?-2.5:1.5}var c=simCover276(X,favS,num);AL.push([esc(fn)+' '+(num>0?'+':'')+num,pct(c.p)+'%'+simOdds5(c.p,null)])})}
+    if(X.tot){var ts=football?[-7,-3.5,0,3.5,7]:g.lg==='nhl'?[-1,0,1]:[-10,-5,0,5,10];
+      ts.forEach(function(sv){var l=X.tot.tt+sv,c=simTotal276(X,l,true);AL.push(['Over '+l,pct(c.p)+'%'+simOdds5(c.p,null)])})}
+    h+='<div class="dd-h" style="font-size:15px">Alternate lines</div><div class="dd-rows">'+AL.map(function(r){return '<div class="dd-row"><span>'+r[0]+'</span><span class="src" style="text-align:right">'+r[1]+'</span></div>'}).join('')+'</div>';
+  }
   if(hoops){
     var band=function(lo,hi){var c=0;Object.keys(X.mg).forEach(function(k){var m=+k;if(m>=lo&&m<=hi)c+=X.mg[k]});return c/N};
     var B=[[hm+' by 11 or more',11,999],[hm+' by 6 to 10',6,10],[hm+' by 1 to 5',1,5],[a+' by 1 to 5',-5,-1],[a+' by 6 to 10',-10,-6],[a+' by 11 or more',-999,-11]];
     h+='<div class="dd-h" style="font-size:15px">Winning margin</div><div class="dd-rows">'+B.map(function(r){return '<div class="dd-row"><span>'+r[0]+'</span><span class="src">'+pct(band(r[1],r[2]))+'%</span></div>'}).join('')+'</div>';
   }else h+='<div class="dd-h" style="font-size:15px">Most likely final scores</div><div class="dd-rows">'+X.top.map(function(t){var p=t[0].split('-');return '<div class="dd-row"><span>'+a+' '+p[0]+', '+hm+' '+p[1]+'</span><span class="src">'+pct(t[1])+'%</span></div>'}).join('')+'</div>';
+  /* scorers, kickers, interceptions, sacks */
+  var E=X.ex||{};
+  if(E.td&&E.td.length){
+    var goal=g.lg==='nhl';
+    h+='<div class="dd-h" style="font-size:15px">'+(goal?'Goal scorers':'Touchdown scorers')+'</div><div class="tblwrap" style="margin-top:4px"><table class="simtbl"><thead><tr><th align="left">Player</th><th>'+(goal?'Scores':'Anytime')+'</th><th>'+(goal?'First goal':'First TD')+'</th></tr></thead><tbody>'+
+      E.td.slice(0,8).map(function(t){return '<tr><td>'+esc(t.n)+' <span class="src">'+esc(t.t)+'</span></td><td align="center"><b>'+pct(t.p)+'%</b>'+simOdds5(t.p,null)+'</td><td align="center">'+pct(t.pf)+'%'+simOdds5(t.pf,null)+'</td></tr>'}).join('')+'</tbody></table></div>';
+  }
+  if(E.kick&&E.kick.length)h+='<div class="dd-h" style="font-size:15px">Kickers</div><div class="dd-rows">'+E.kick.map(function(k){return '<div class="dd-row"><span>'+esc(k.n)+' <span class="src">'+esc(k.t)+'</span></span><span class="src" style="text-align:right">'+k.med+' pts middle ('+k.p10+'–'+k.p90+') · 7+ pts <b>'+pct(k.p7)+'%</b>'+simOdds5(k.p7,null)+' · 2+ FG <b>'+pct(k.p2fg)+'%</b>'+simOdds5(k.p2fg,null)+'</span></div>'}).join('')+'</div>';
+  if(E.int&&E.int.length)h+='<div class="dd-h" style="font-size:15px">Interceptions and sacks</div><div class="dd-rows">'+E.int.map(function(q){var sk=(E.sack||[]).filter(function(s){return s.side===q.side})[0];return '<div class="dd-row"><span>'+esc(q.n)+' <span class="src">'+esc(q.t)+'</span></span><span class="src" style="text-align:right">Throws an INT <b>'+pct(q.p1)+'%</b>'+simOdds5(q.p1,null)+' · 2+ '+pct(q.p2)+'%'+(sk?' · sacked '+sk.avg.toFixed(1)+' times on average, 3+ <b>'+pct(sk.p3)+'%</b>':'')+'</span></div>'}).join('')+'</div>';
+  /* box score */
   if(X.box&&X.box.length){
     var dg=function(w,v){return /^(recp|nreb|nast|ntpm|hg|hp|ha|hs|hsv)$/.test(w.cat)?(Math.round(v*10)/10).toString():String(Math.round(v))};
-    h+='<div class="dd-h" style="font-size:15px">Simulated box score</div><div class="tblwrap" style="margin-top:4px"><table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr><th align="left" style="padding:6px">Player</th><th style="padding:6px 3px">Median</th><th style="padding:6px 3px">Range</th><th style="padding:6px 3px">Line</th><th style="padding:6px 3px">Over</th></tr></thead><tbody>'+
+    h+='<div class="dd-h" style="font-size:15px">Simulated box score</div><div class="tblwrap" style="margin-top:4px"><table class="simtbl"><thead><tr><th align="left">Player</th><th>Median</th><th>Range</th><th>Line</th><th>Over</th></tr></thead><tbody>'+
       ['a','h'].map(function(sd){return X.box.filter(function(w){return w.side===sd}).map(function(w){
-        return '<tr style="border-top:1px solid var(--line)"><td style="padding:6px;font-family:inherit">'+esc(w.n)+'<div class="src">'+esc(w.t)+' · '+esc(SIM_LAB276[w.cat]||w.cat)+'</div></td><td align="center"><b>'+dg(w,w.med)+'</b></td><td align="center" class="src">'+dg(w,w.p10)+'–'+dg(w,w.p90)+'</td><td align="center">'+(w.line!=null?w.line:'–')+'</td><td align="center">'+(w.pOver!=null?'<b>'+pct(w.pOver)+'%</b>':'–')+'</td></tr>'}).join('')}).join('')+
-      '</tbody></table></div><p class="src" style="margin:4px 0 0">Range: 8 in 10 simulated games fall inside it. Over: how often the player beat the line in the simulations. Player numbers move with each simulated game, so a blowout or a shootout changes everyone’s line together.</p>';
+        return '<tr><td>'+esc(w.n)+'<div class="src">'+esc(w.t)+' · '+esc(SIM_LAB276[w.cat]||w.cat)+'</div></td><td align="center"><b>'+dg(w,w.med)+'</b></td><td align="center" class="src">'+dg(w,w.p10)+'–'+dg(w,w.p90)+'</td><td align="center">'+(w.line!=null?w.line:'–')+'</td><td align="center">'+(w.pOver!=null?'<b>'+pct(w.pOver)+'%</b>'+(SIM5_ON?'<div>'+simOdds5(w.pOver,null)+'</div>':''):'–')+'</td></tr>'}).join('')}).join('')+
+      '</tbody></table></div><p class="src" style="margin:4px 0 0">Range: 8 in 10 simulated games fall inside it. Over: how often the player beat the line. Players who are out are left off, and their share goes to teammates where the app tracks usage.</p>';
   }
-  var how={nfl:'Each simulated game is played drive by drive. Each team gets about 11 drives, and each drive ends in a touchdown, a field goal or nothing, with an occasional return touchdown or safety. Tied games go to overtime and can end in a tie.',
-    ncaafb:'Each simulated game is played drive by drive. Each team gets about 13 drives, and each drive ends in a touchdown, a field goal or nothing. Tied games go to college overtime.',
-    nba:'Each simulated game draws a shared pace for both teams plus each team’s own good or bad night. Tied games go to five-minute overtimes.',
-    ncaamb:'Each simulated game draws a shared pace for both teams plus each team’s own good or bad night. Tied games go to five-minute overtimes.',
-    nhl:'Each simulated game draws each team’s shots, then goals on those shots. Teams protecting a one-goal lead sometimes add an empty-net goal. Tied games go to 3-on-3 overtime and then a shootout.'}[g.lg];
+  /* same-game parlays */
+  var SG=[];try{SG=simSgp276(g,X)}catch(e){}
+  if(SG.length){
+    h+='<div class="dd-h" style="font-size:15px">Same-game parlays</div><div class="dd-rows">'+SG.map(function(x){return '<div class="dd-row"><span>'+esc(x.a.lab)+' <span class="src">+</span> '+esc(x.b.lab)+'</span><span style="text-align:right;flex:none"><b>'+pct(x.p)+'%</b>'+simOdds5(x.p,null)+'<div class="src">separately '+pct(x.ind)+'%</div></span></div>'}).join('')+'</div>'+
+      '<div class="simk">These legs tend to hit together in the simulation, so the real chance is higher than multiplying the two. Add any legs from this game to your betslip and it shows the simulated chance for the whole slip.</div>';
+  }
+  var how={nfl:'Each simulated game is played drive by drive in order. Each team gets about 11 drives, and each drive ends in a touchdown, a field goal, a turnover or a punt, with an occasional return touchdown or safety. A close game gets a last-chance drive, and tied games go to overtime and can end in a tie.',
+    ncaafb:'Each simulated game is played drive by drive in order. Each team gets about 13 drives, and each drive ends in a touchdown, a field goal or nothing. Tied games go to college overtime.',
+    nba:'Each simulated game is played quarter by quarter with a shared pace for both teams plus each team’s own good or bad night. Tied games go to five-minute overtimes.',
+    ncaamb:'Each simulated game is played half by half with a shared pace for both teams plus each team’s own good or bad night. Tied games go to five-minute overtimes.',
+    nhl:'Each simulated game draws each team’s shots, then goals on those shots, and spreads the goals across periods. Teams protecting a one-goal lead sometimes add an empty-net goal. Tied games go to 3-on-3 overtime and then a shootout.'}[g.lg];
   var src=I.st&&I.mk?'half Hitboard’s team-stats score and half the betting market':I.mk?'the betting market (no team stats yet)':'Hitboard’s team-stats score (no betting line yet)';
-  h+='<details style="margin-top:10px"><summary class="src" style="cursor:pointer">How the simulation works</summary><p class="src" style="margin:6px 0 0">'+how+' Scoring is set so the average game matches '+src+': '+a+' '+I.ea.toFixed(1)+', '+hm+' '+I.eh.toFixed(1)+'. The simulation is for reference only. It does not change Hitboard’s picks.</p></details>';
+  h+='<details style="margin-top:10px"><summary class="src" style="cursor:pointer">How the simulation works</summary><p class="src" style="margin:6px 0 0">'+how+' Scoring is set so the average game matches '+src+': '+a+' '+I.ea.toFixed(1)+', '+hm+' '+I.eh.toFixed(1)+'. Starters who are out lower their team’s stats score (the betting line already includes them). '+(football?'Outdoor wind lowers the total, field goals and passing. ':'')+'The simulation is for reference only. It does not change Hitboard’s picks.</p></details>';
   return h+'</div>';
 }
 (function(){
@@ -18943,6 +19201,106 @@ function simHtml276(g){
       if(i<0)i=h.indexOf('<h3');
       return i>=0?h.slice(0,i)+sm+h.slice(i):h+sm;
     }catch(e){return h}
+  };
+})();
+/* ---------- props tab: simulation chance on every prop card ---------- */
+function simPropLine276(lg,r,cat,line,dir){
+  var g=simGameFor276(lg,r.t);if(!g)return '';
+  if(lg==='nfl'||lg==='ncaafb'){try{if(wxLeagueOn(g.lg))wxEnsure(g)}catch(e){}}
+  var X=simReady276(g);if(!X)return '<div class="simbar src">Simulation: running…</div>';
+  var side=simSide276(g,r.t),mu=+r.proj;if(!side||!(mu>0)||line==null)return '';
+  var v=simVec276(g,X,side,cat,mu,r.n);if(!v)return '';
+  var st=simStats276(v,line),under=dir==='Under',p=under?st.pUnder:st.pOver;
+  return '<div class="simbar">Simulation: '+(under?'under':'over')+' '+line+' hits <b>'+simPct276(p)+'%</b> of '+X.N.toLocaleString()+' games'+simOdds5(p,null)+'</div>';
+}
+(function(){
+  var pc0=pbCard;
+  pbCard=function(o){
+    var h=pc0.apply(this,arguments);
+    try{
+      var r=o.r,lg=r.lg||S.sport,line=o.ln&&o.ln.v!=null?+o.ln.v:null;if(!SIM_CAT276[o.cat]||line==null)return h;
+      var dir=/>([A-F][+-]?)<\/b><small>Under</.test(h)?'Under':'Over';
+      var add=simPropLine276(lg,r,o.cat,line,dir);if(!add)return h;
+      var k=h.lastIndexOf('</div>');return k>0?h.slice(0,k)+add+h.slice(k):h+add;
+    }catch(e){return h}
+  };
+})();
+/* ---------- prop sheet: ladder, scorer chance and how the game changes it ---------- */
+(function(){
+  var ps0=pbSheet;
+  pbSheet=function(s){
+    var h=ps0.apply(this,arguments);
+    try{
+      if(!SIM_CAT276[s.cat])return h;
+      var g=simGameFor276(s.lg,s.team);if(!g)return h;
+      var X=simRun276(g);if(!X)return h;
+      var side=simSide276(g,s.team),mu=+s.proj;if(!side||!(mu>0))return h;
+      var v=simVec276(g,X,side,s.cat,mu,s.n);if(!v)return h;
+      var line=s.line!=null?+s.line:null,st=simStats276(v,line),N=X.N,cnt=SIM_CAT276[s.cat].cnt||SIM_CAT276[s.cat].nhl,pct=simPct276;
+      var out='<h3>Simulation</h3><div class="card" style="padding:12px">';
+      if(line!=null)out+='<div style="font-size:16px"><b>Over '+line+': '+pct(st.pOver)+'%</b>'+simOdds5(st.pOver,null)+' · Under: '+pct(st.pUnder)+'%'+simOdds5(st.pUnder,null)+'</div>';
+      out+='<div class="src">Middle '+(cnt?st.med:Math.round(st.med))+' · 8 in 10 games between '+(cnt?st.p10:Math.round(st.p10))+' and '+(cnt?st.p90:Math.round(st.p90))+' · '+N.toLocaleString()+' simulated games of '+esc(g.a)+' @ '+esc(g.h)+'</div>';
+      var stepU=cnt?1:Math.max(5,Math.round(mu*.15/5)*5),base=line!=null?line:Math.floor(mu)+.5,lad=[];
+      for(var k=-2;k<=2;k++){var l=Math.max(cnt?.5:.5,base+k*stepU),c=0;for(var i=0;i<N;i++)if(v[i]>l)c++;lad.push([l,c/N])}
+      out+='<div class="dd-h" style="font-size:15px">Alternate lines</div><div class="dd-rows">'+lad.map(function(x){return '<div class="dd-row"><span>Over '+x[0]+'</span><span class="src">'+pct(x[1])+'%'+simOdds5(x[1],null)+'</span></div>'}).join('')+'</div>';
+      /* how the game script changes his line */
+      if(line!=null){
+        var O=X.O,wins=0,wHit=0,lHit=0;for(i=0;i<N;i++){var won=side==='a'?O.a[i]>O.h[i]:O.h[i]>O.a[i];if(won){wins++;if(v[i]>line)wHit++}else if(v[i]>line)lHit++}
+        var tm=esc(side==='a'?g.a:g.h);
+        if(wins>200&&N-wins>200)out+='<div class="src" style="margin-top:8px">When '+tm+' wins he goes over '+pct(wHit/wins)+'% of the time; when '+tm+' loses, '+pct(lHit/(N-wins))+'%.</div>';
+      }
+      var td=(X.ex&&X.ex.td||[]).filter(function(t){return normName(t.n)===normName(s.n)})[0];
+      if(td)out+='<div style="margin-top:6px">'+(td.goal?'Scores a goal':'Anytime touchdown')+': <b>'+pct(td.p)+'%</b>'+simOdds5(td.p,null)+' · '+(td.goal?'first goal':'first TD')+' '+pct(td.pf)+'%</div>';
+      out+='<p class="src" style="margin:8px 0 0">The simulation starts from Hitboard’s projection for him and moves it with each simulated game, so the average stays the same. It does not change the grade above.</p></div>';
+      var j=h.lastIndexOf('<h3');return j>0?h.slice(0,j)+out+h.slice(j):h+out;
+    }catch(e){return h}
+  };
+})();
+/* ---------- betslip: chance that legs from the same game hit together ---------- */
+function simLegHits276(l){
+  var lg=l.lg,g=null;if(!lg||!SIM_SD276[lg])return null;
+  if(l.gid)g=find(l.gid);if(!g&&l.team)g=simGameFor276(lg,l.team);if(!g||kind(g)!=='up')return null;
+  var X=simRun276(g);if(!X)return null;var O=X.O,mk=String(l.mk||''),m;
+  if(l.kind==='game'){
+    var sd=l.side;
+    if(l.t==='ml'&&sd)return {g:g,u:simHits276(X,function(i){return sd==='h'?O.h[i]>O.a[i]:O.a[i]>O.h[i]})};
+    if(l.t==='sp'&&sd&&l.num!=null){var nm=+l.num;return {g:g,u:simHits276(X,function(i){return (sd==='h'?O.h[i]-O.a[i]:O.a[i]-O.h[i])+nm>0})}}
+    if(l.t==='tot'&&l.num!=null){var tl=+l.num,ov=!!l.over;return {g:g,u:simHits276(X,function(i){var t=O.a[i]+O.h[i];return ov?t>tl:t<tl})}}
+    return null;
+  }
+  var side=simSide276(g,l.team);if(!side)return null;
+  if(/Anytime TD/i.test(mk)){var td=(X.ex.td||[]).filter(function(t){return normName(t.n)===normName(l.name)})[0];return td?{g:g,u:simHits276(X,function(i){return td.v[i]>=1})}:null}
+  if(/interception/i.test(mk)){var q=(X.ex.int||[]).filter(function(t){return t.side===side})[0];return q?{g:g,u:simHits276(X,function(i){return q.v[i]>=1})}:null}
+  if((m=/(\d+)\+ field goals/i.exec(mk))){var kk=(X.ex.kick||[]).filter(function(t){return t.side===side})[0],n0=+m[1];return kk?{g:g,u:simHits276(X,function(i){return kk.fv[i]>=n0})}:null}
+  if((m=/(\d+)\+ kicking points/i.exec(mk))){var k2=(X.ex.kick||[]).filter(function(t){return t.side===side})[0],n1=+m[1];return k2?{g:g,u:simHits276(X,function(i){return k2.v[i]>=n1})}:null}
+  var MAP={nfl:{'pass yds':'pass','rush yds':'rush','rec yds':'rec','receptions':'recp'},ncaafb:{'pass':'cpass','rush':'crush','rec':'crec','passing':'cpass','rushing':'crush','receiving':'crec'},nba:{points:'npts',rebounds:'nreb',assists:'nast',threes:'ntpm'},ncaamb:{points:'npts',rebounds:'nreb',assists:'nast',threes:'ntpm'},nhl:{goals:'hg',points:'hp',assists:'ha',shots:'hs','shots on goal':'hs',saves:'hsv'}}[lg]||{};
+  var low=mk.toLowerCase(),cat=null,thr=null,under=/under/.test(low),strict=false;
+  Object.keys(MAP).sort(function(a,b){return b.length-a.length}).forEach(function(k){if(!cat&&low.indexOf(k)>=0)cat=MAP[k]});
+  if((m=/(\d+(?:\.\d+)?)\+/.exec(mk)))thr=+m[1];else if((m=/(?:over|under)\s*(\d+(?:\.\d+)?)/i.exec(mk))){thr=+m[1];strict=true}
+  if(!cat||thr==null)return null;
+  var mu=null;try{(pbRows(lg,cat)||[]).forEach(function(o){if(mu==null&&normName(o.r.n)===normName(l.name))mu=+o.r.proj})}catch(e){}
+  if(!(mu>0)){var px=PROPS.filter(function(p){return p.lg===lg&&p.kind===cat&&normName(p.name)===normName(l.name)})[0];if(px)mu=px.avg}
+  if(!(mu>0))return null;
+  var v=simVec276(g,X,side,cat,mu,l.name);if(!v)return null;
+  return {g:g,u:simHits276(X,function(i){return under?v[i]<thr:strict?v[i]>thr:v[i]>=thr})};
+}
+function simSlipHtml276(){
+  var legs=S.slip||[];if(legs.length<2)return '';
+  var by={},miss=0;
+  legs.forEach(function(l){var r=null;try{r=simLegHits276(l)}catch(e){r=null}if(!r){miss++;return}(by[r.g.id]=by[r.g.id]||{g:r.g,u:[]}).u.push(r.u)});
+  var rows=Object.keys(by).map(function(k){return by[k]}).filter(function(x){return x.u.length>=2});
+  if(!rows.length)return '';
+  var pct=simPct276,h='<div class="card" style="padding:12px;margin:10px 0"><div class="src" style="text-transform:uppercase;letter-spacing:.06em;font-size:11px">Simulation · same-game legs</div>';
+  rows.forEach(function(x){var jp=simJoint276(x.u),ind=x.u.reduce(function(z,u){return z*simMean276(u)},1);
+    h+='<div style="margin-top:6px"><b>'+esc(x.g.a)+' @ '+esc(x.g.h)+':</b> all '+x.u.length+' legs hit together in <b>'+pct(jp)+'%</b> of simulated games'+simOdds5(jp,null)+'<div class="src">Multiplying them separately gives '+pct(ind)+'%. '+(jp>ind*1.05?'These legs help each other.':jp<ind*.95?'These legs work against each other.':'They barely affect each other.')+'</div></div>'});
+  if(miss)h+='<div class="src" style="margin-top:6px">'+miss+' leg'+(miss>1?'s':'')+' could not be simulated (a different game, a sport without a simulation, or a stat the simulation does not track).</div>';
+  return h+'</div>';
+}
+(function(){
+  var ss0=slipSheet;
+  slipSheet=function(){
+    var h=ss0.apply(this,arguments);
+    try{var add=simSlipHtml276();if(!add)return h;var i=h.indexOf('<div class="actions">');return i>=0?h.slice(0,i)+add+h.slice(i):h+add}catch(e){return h}
   };
 })();
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
