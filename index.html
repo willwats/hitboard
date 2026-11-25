@@ -1957,7 +1957,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v275, Nov 23';
+var BUILD='v276, Nov 25';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -18698,6 +18698,253 @@ vPicks=function(){
   return h;
 };
 (function(){var add=function(t,s){var T=KEYOUT.nfl[t]||(KEYOUT.nfl[t]={items:[],chg:[]});if(T.items.indexOf(s)<0)T.items.push(s)};add('CIN','G Dalton Risner:o');add('WAS','CB Amik Robertson:o');})();
+/* ---------- v276: game simulation (10,000 games per matchup, show only) ---------- */
+var SIM276={N:10000,c:{}};
+function simRng276(seed){var a=seed>>>0;return function(){a=(a+0x6D2B79F5)>>>0;var t=a;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296}}
+function simHash276(s){var h=2166136261;s=String(s);for(var i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0}
+function simTools276(R){
+  var spare=null;
+  function nrm(){if(spare!=null){var s=spare;spare=null;return s}var u=0,v=0;while(u===0)u=R();v=R();var r=Math.sqrt(-2*Math.log(u));spare=r*Math.sin(2*Math.PI*v);return r*Math.cos(2*Math.PI*v)}
+  function gam(k){if(k<1){return gam(k+1)*Math.pow(R()||1e-9,1/k)}var d=k-1/3,c=1/Math.sqrt(9*d);for(;;){var x=nrm(),v=1+c*x;if(v<=0)continue;v=v*v*v;var u=R();if(u<1-.0331*x*x*x*x)return d*v;if(Math.log(u)<.5*x*x+d*(1-v+Math.log(v)))return d*v}}
+  function mix(cv){if(!(cv>0))return 1;var k=1/(cv*cv);return gam(k)/k}
+  function poi(l){if(!(l>0))return 0;if(l>30)return Math.max(0,Math.round(l+Math.sqrt(l)*nrm()));var L=Math.exp(-l),k=0,p=1;do{k++;p*=R()}while(p>L);return k-1}
+  function bin(n,p){var c=0;for(var i=0;i<n;i++)if(R()<p)c++;return c}
+  return {n:nrm,g:gam,mix:mix,poi:poi,bin:bin};
+}
+var SIM_SD276={nfl:13.5,ncaafb:17,nba:12,ncaamb:10.5,nhl:2.3};
+function simInputs276(g){
+  var lg=g.lg;if(!SIM_SD276[lg])return null;
+  var m=null;try{m=pickModel(g)}catch(e){}
+  var ln=null;try{ln=lineFor(g)}catch(e){}
+  var st=(m&&m.sa!=null&&m.sh!=null&&isFinite(m.sa)&&isFinite(m.sh))?{a:m.sa,h:m.sh}:null,mk=null;
+  var clampP=function(p){return Math.max(.03,Math.min(.97,p))};
+  if(ln&&ln.tt!=null){
+    var M=null;
+    if(lg!=='nhl'&&ln.pts!=null)M=ln.fav==='h'?ln.pts:-ln.pts;
+    else if(ln.mlP!=null)M=(lg==='nhl'?Math.sqrt(ln.tt)*.9:SIM_SD276[lg])*invPhi(clampP(ln.mlP));
+    else if(st)M=st.h-st.a;
+    if(M!=null)mk={a:(ln.tt-M)/2,h:(ln.tt+M)/2,M:M};
+  }else if(ln&&ln.pts!=null&&st&&lg!=='nhl'){var M2=ln.fav==='h'?ln.pts:-ln.pts,T2=st.a+st.h;mk={a:(T2-M2)/2,h:(T2+M2)/2,M:M2}}
+  if(!st&&!mk)return null;
+  var w=st&&mk?.5:(mk?1:0),lo=lg==='nhl'?.8:/^nba|ncaamb$/.test(lg)?55:3;
+  var ea=Math.max(lo,(mk?w*mk.a:0)+(st?(1-w)*st.a:0)),eh=Math.max(lo,(mk?w*mk.h:0)+(st?(1-w)*st.h:0));
+  var shots=null;
+  if(lg==='nhl'){try{var A=NHLT[nhlK(g.a)],H=NHLT[nhlK(g.h)];if(A&&H)shots={a:(A.sf+H.sa)/2,h:(H.sf+A.sa)/2}}catch(e){}if(!shots)shots={a:29,h:29}}
+  return {lg:lg,ea:ea,eh:eh,ln:ln,st:st,mk:mk,w:w,shots:shots};
+}
+/* football: drive by drive, with a last-chance drive in close games */
+function simFootball276(I,T,R,N,O){
+  var nfl=I.lg==='nfl',D0=nfl?11.2:13.4,dsd=nfl?.9:1.4,bt=nfl?.215:.27,bf=nfl?.16:.13,ret=.006,saf=.003,TDV=6.97;
+  function rates(e){
+    var ppd=Math.max(.15,e/(D0+.25)-(ret*7+saf*2));
+    var f=function(s){return TDV*Math.min(.62,bt*s)+3*Math.min(.3,bf*Math.sqrt(s))},lo=.05,hi=4;
+    for(var i=0;i<40;i++){var md=(lo+hi)/2;if(f(md)<ppd)lo=md;else hi=md}
+    var s=(lo+hi)/2;return {t:Math.min(.62,bt*s),f:Math.min(.3,bf*Math.sqrt(s))};
+  }
+  function tdPts(){var r=R();return r<.94?7:r<.97?6:r<.985?8:6}
+  function game(ra,rh,res){
+    var D=Math.max(7,Math.round(D0+dsd*T.n())),da=D,dh=D;if(R()<.5){if(R()<.5)da++;else dh++}
+    var pa=0,ph=0,j,r;
+    for(j=0;j<da;j++){r=R();if(r<ra.t)pa+=tdPts();else if(r<ra.t+ra.f)pa+=3;else if(r<ra.t+ra.f+ret)ph+=7;else if(r<ra.t+ra.f+ret+saf)ph+=2}
+    for(j=0;j<dh;j++){r=R();if(r<rh.t)ph+=tdPts();else if(r<rh.t+rh.f)ph+=3;else if(r<rh.t+rh.f+ret)pa+=7;else if(r<rh.t+rh.f+ret+saf)pa+=2}
+    var df=ph-pa;
+    if(Math.abs(df)<=8&&R()<(df===0?.8:.55)){
+      var tr=df>0?'a':df<0?'h':(R()<.5?'a':'h'),rr=tr==='a'?ra:rh,x=R(),gain=0;
+      if(Math.abs(df)<=3){if(x<rr.t*.7)gain=tdPts();else if(x<rr.t*.7+(df===0?.45:.4))gain=3}
+      else if(x<rr.t*1.1)gain=tdPts();
+      if(tr==='a')pa+=gain;else ph+=gain;
+    }
+    var ot=0;
+    if(pa===ph){
+      ot=1;
+      if(nfl){
+        var first=R()<.5?'a':'h',sec=first==='a'?'h':'a',sc={a:0,h:0},drv=function(side){var q=side==='a'?ra:rh,y=R();return y<q.t*1.1?7:y<q.t*1.1+q.f*1.2?3:0};
+        sc[first]=drv(first);
+        if(sc[first]!==7){sc[sec]=drv(sec);for(var ps=0;ps<3&&sc.a===sc.h;ps++){var sd=ps%2===0?first:sec,y2=drv(sd);if(y2)sc[sd]+=y2}}
+        pa+=sc.a;ph+=sc.h;
+      }else{
+        for(var rd=1;rd<=8&&pa===ph;rd++){
+          var v2=rd>=3,gp=function(q){var y=R();return v2?(y<.45?2:0):(y<q.t*1.7?7:y<q.t*1.7+.3?3:0)};
+          pa+=gp(ra);ph+=gp(rh);
+        }
+        if(pa===ph){if(R()<.5)pa+=2;else ph+=2}
+      }
+    }
+    res.a=pa;res.h=ph;res.ot=ot;
+  }
+  /* calibrate: a short pilot run, then nudge scoring so the average matches the target */
+  var ta=I.ea,th=I.eh,res={};
+  for(var it=0;it<2;it++){
+    var ra=rates(ta),rh=rates(th),sa=0,sh=0,P=3000;
+    for(var i=0;i<P;i++){game(ra,rh,res);sa+=res.a;sh+=res.h}
+    ta*=I.ea/Math.max(1,sa/P);th*=I.eh/Math.max(1,sh/P);
+  }
+  ra=rates(ta);rh=rates(th);
+  for(i=0;i<N;i++){game(ra,rh,res);O.a[i]=res.a;O.h[i]=res.h;O.ot[i]=res.ot}
+}
+/* basketball: shared pace plus each team's own swing */
+function simHoops276(I,T,R,N,O){
+  var nba=I.lg==='nba',sd=nba?10.3:9,pace=nba?.035:.04,len=nba?48:40;
+  for(var i=0;i<N;i++){
+    var z0=T.n(),a=Math.round(I.ea*(1+pace*z0)+sd*T.n()),h=Math.round(I.eh*(1+pace*z0)+sd*T.n()),ot=0;
+    while(a===h&&ot<5){ot++;a+=Math.max(0,Math.round(I.ea*5/len+3.2*T.n()));h+=Math.max(0,Math.round(I.eh*5/len+3.2*T.n()))}
+    if(a===h){if(R()<.5)a++;else h++}
+    O.a[i]=a;O.h[i]=h;O.ot[i]=ot?1:0;
+  }
+}
+/* hockey: shots, then goals on those shots, empty nets, overtime and shootouts */
+function simHockey276(I,T,R,N,O){
+  var la=I.ea*.955,lh=I.eh*.955,sa=Math.max(la*4,I.shots.a),sh=Math.max(lh*4,I.shots.h);
+  O.sa=new Int16Array(N);O.sh=new Int16Array(N);O.ga=new Int16Array(N);O.gh=new Int16Array(N);
+  for(var i=0;i<N;i++){
+    var na=T.poi(sa*T.mix(.12)),nh=T.poi(sh*T.mix(.12)),ga=T.bin(na,la/sa),gh=T.bin(nh,lh/sh),a=ga,h=gh,ot=0;
+    O.sa[i]=na;O.sh[i]=nh;O.ga[i]=ga;O.gh[i]=gh;
+    if(Math.abs(a-h)===1){if(R()<.22){if(a>h)a++;else h++}}
+    else if(Math.abs(a-h)===2&&R()<.07){if(a>h)a++;else h++}
+    if(a===h){ot=1;var pa=la/(la+lh);if(R()<.62){if(R()<pa)a++;else h++}else{ot=2;if(R()<.5+.1*(pa-.5)*2)a++;else h++}}
+    O.a[i]=a;O.h[i]=h;O.ot[i]=ot;
+  }
+}
+var SIM_CAT276={
+  pass:{cv:.25,e:.5,m:-.007},rec:{cv:.55,e:.5,m:-.007},rush:{cv:.45,e:.5,m:.01},recp:{cv:.25,e:.4,m:-.006,cnt:1},
+  cpass:{cv:.3,e:.5,m:-.007},crec:{cv:.6,e:.5,m:-.007},crush:{cv:.5,e:.5,m:.01},
+  npts:{cv:.3,e:1,bl:1},nreb:{cv:.25,e:0,bl:1,cnt:1},nast:{cv:.25,e:.7,bl:1,cnt:1},ntpm:{cv:.35,e:.7,bl:1,cnt:1},
+  hg:{nhl:'g'},hp:{nhl:'p'},ha:{nhl:'p'},hs:{nhl:'s'},hsv:{nhl:'sv'}
+};
+function simBox276(g,I,T,O,N){
+  var R0=[];try{R0=gpRows(g)}catch(e){}
+  var lg=g.lg,ab=function(x){return lg==='nfl'?nt(String(x||'').toUpperCase()):dlAb(lg,x)},ta=ab(g.a),th=ab(g.h),seen={},cnt={a:0,h:0},rows=[];
+  R0.forEach(function(o){
+    var r=o.r||{},C=SIM_CAT276[o.cat],mu=+r.proj;if(!C||!(mu>0)||!r.n)return;
+    var t=ab(r.t),side=t===ta?'a':t===th?'h':null;if(!side)return;
+    var k=normName(r.n)+'|'+o.cat;if(seen[k])return;seen[k]=1;
+    if(cnt[side]>=8)return;cnt[side]++;
+    rows.push({n:r.n,t:r.t,side:side,cat:o.cat,mu:mu,line:o.ln&&o.ln.v!=null?+o.ln.v:null,C:C});
+  });
+  var football=lg==='nfl'||lg==='ncaafb',kk=football?14:0;
+  rows.forEach(function(w){
+    var v=new Float32Array(N),C=w.C,e=w.side==='a'?I.ea:I.eh,eo=w.side==='a'?I.eh:I.ea,i,x;
+    if(C.nhl){
+      for(i=0;i<N;i++){
+        var gT=w.side==='a'?O.a[i]:O.h[i],shT=w.side==='a'?O.sa[i]:O.sh[i],eS=w.side==='a'?I.shots.a:I.shots.h;
+        if(C.nhl==='g')x=T.bin(gT,Math.min(.6,w.mu/Math.max(.5,e)));
+        else if(C.nhl==='p')x=T.poi(w.mu*gT/Math.max(.5,e));
+        else if(C.nhl==='s')x=T.poi(w.mu*(shT/Math.max(10,eS))*T.mix(.2));
+        else{var os=w.side==='a'?O.sh[i]:O.sa[i],og=w.side==='a'?O.gh[i]:O.ga[i],es=(w.side==='a'?I.shots.h:I.shots.a)-eo*.955;x=Math.max(0,Math.round(w.mu*(os-og)/Math.max(10,es)))}
+        v[i]=x;
+      }
+    }else{
+      /* the player's line moves with his team's simulated game (points scored, and the score gap compared with what was expected), then is scaled so the average stays on Hitboard's projection */
+      var F=new Float32Array(N),fs=0,em=e-eo;
+      for(i=0;i<N;i++){
+        var pt=w.side==='a'?O.a[i]:O.h[i],po=w.side==='a'?O.h[i]:O.a[i],dv=Math.max(-21,Math.min(21,(pt-po)-em));
+        var f=Math.pow(Math.max(.2,(pt+kk)/(e+kk)),C.e)*Math.max(.5,1+(C.m||0)*dv);
+        if(C.bl&&Math.abs(pt-po)>=18)f*=.9;
+        f*=T.mix(C.cv);F[i]=f;fs+=f;
+      }
+      var sc=fs>0?N/fs:1;
+      for(i=0;i<N;i++){x=w.mu*F[i]*sc;v[i]=C.cnt?T.poi(x):Math.round(x)}
+    }
+    var s=Array.prototype.slice.call(v).sort(function(a,b){return a-b}),sum=0,ov=0;for(var j=0;j<N;j++){sum+=v[j];if(w.line!=null&&v[j]>w.line)ov++}
+    w.avg=sum/N;w.med=s[Math.floor(N*.5)];w.p10=s[Math.floor(N*.1)];w.p90=s[Math.floor(N*.9)];w.pOver=w.line!=null?ov/N:null;
+    delete w.C;
+  });
+  return rows;
+}
+function simRun276(g){
+  var I=simInputs276(g);if(!I)return null;
+  var key=g.id+'|'+I.ea.toFixed(2)+'|'+I.eh.toFixed(2)+'|'+Math.floor(Date.now()/6e5)+'|'+(S.feedAt||0);
+  if(SIM276.c[g.id]&&SIM276.c[g.id].key===key)return SIM276.c[g.id];
+  var t0=Date.now(),N=SIM276.N,R=simRng276(simHash276(g.id+'|'+new Date().toDateString())),T=simTools276(R);
+  var O={a:new Int16Array(N),h:new Int16Array(N),ot:new Int8Array(N)};
+  if(I.lg==='nfl'||I.lg==='ncaafb')simFootball276(I,T,R,N,O);
+  else if(I.lg==='nhl')simHockey276(I,T,R,N,O);
+  else simHoops276(I,T,R,N,O);
+  var X={key:key,I:I,N:N,wa:0,wh:0,tie:0,ot:0,sa:0,sh:0,cov:null,tot:null,mg:{},sc:{}};
+  var hs=null,ln=I.ln;if(ln&&ln.pts!=null)hs=ln.fav==='h'?-ln.pts:ln.pts;
+  var cv={h:0,a:0,p:0},tt={o:0,u:0,p:0};
+  for(var i=0;i<N;i++){
+    var a=O.a[i],h=O.h[i],d=h-a;X.sa+=a;X.sh+=h;if(O.ot[i])X.ot++;
+    if(d>0)X.wh++;else if(d<0)X.wa++;else X.tie++;
+    X.mg[d]=(X.mg[d]||0)+1;var sk=a+'-'+h;X.sc[sk]=(X.sc[sk]||0)+1;
+    if(hs!=null){var c=d+hs;if(c>0)cv.h++;else if(c<0)cv.a++;else cv.p++}
+    if(ln&&ln.tt!=null){var q=a+h-ln.tt;if(q>0)tt.o++;else if(q<0)tt.u++;else tt.p++}
+  }
+  X.sa/=N;X.sh/=N;if(hs!=null)X.cov={hs:hs,h:cv.h/N,a:cv.a/N,p:cv.p/N};if(ln&&ln.tt!=null)X.tot={tt:ln.tt,o:tt.o/N,u:tt.u/N,p:tt.p/N};
+  X.top=Object.keys(X.sc).map(function(k){return [k,X.sc[k]/N]}).sort(function(a,b){return b[1]-a[1]}).slice(0,5);
+  var tots=[];for(i=0;i<N;i++)tots.push(O.a[i]+O.h[i]);tots.sort(function(a,b){return a-b});X.tmed=tots[N>>1];X.t10=tots[Math.floor(N*.1)];X.t90=tots[Math.floor(N*.9)];
+  try{X.box=simBox276(g,I,T,O,N)}catch(e){X.box=[]}
+  X.ms=Date.now()-t0;SIM276.c[g.id]=X;return X;
+}
+function simChart276(g,X){
+  var lg=g.lg,rng=lg==='nhl'?5:lg==='nba'||lg==='ncaamb'?30:lg==='ncaafb'?35:28,step=lg==='nba'||lg==='ncaamb'?2:1,bins=[],mx=0;
+  for(var m=-rng;m<=rng;m+=step){var c=0;for(var k=0;k<step;k++)c+=X.mg[m+k]||0;bins.push([m,c]);if(c>mx)mx=c}
+  var W=300,H=74,bw=W/bins.length,s='<svg viewBox="0 0 '+W+' '+(H+14)+'" width="100%" style="display:block;margin:6px 0 0" role="img" aria-label="How often each final margin happened">';
+  bins.forEach(function(b,i){var hh=mx?Math.max(b[1]?1:0,H*b[1]/mx):0,home=b[0]+(step-1)/2>0,zero=b[0]<=0&&b[0]+step-1>=0&&step===1&&b[0]===0;
+    s+='<rect x="'+(i*bw+.4).toFixed(1)+'" y="'+(H-hh).toFixed(1)+'" width="'+Math.max(.6,bw-.8).toFixed(1)+'" height="'+hh.toFixed(1)+'" fill="var(--'+(zero?'amber':home?'ink':'muted')+')" opacity="'+(home?.8:.55)+'"/>'});
+  if(X.cov){var lx=((-X.cov.hs+rng+.5)/(2*rng+step))*W;if(lx>0&&lx<W)s+='<line x1="'+lx.toFixed(1)+'" x2="'+lx.toFixed(1)+'" y1="0" y2="'+H+'" stroke="var(--amber)" stroke-width="1.5" stroke-dasharray="3 2"/>'}
+  s+='<text x="0" y="'+(H+12)+'" font-size="10" fill="var(--muted)">'+esc(g.a)+' by '+rng+'+</text><text x="'+(W/2)+'" y="'+(H+12)+'" font-size="10" fill="var(--muted)" text-anchor="middle">tied</text><text x="'+W+'" y="'+(H+12)+'" font-size="10" fill="var(--muted)" text-anchor="end">'+esc(g.h)+' by '+rng+'+</text></svg>';
+  return s;
+}
+var SIM_LAB276={pass:'Pass yds',rush:'Rush yds',rec:'Rec yds',recp:'Receptions',cpass:'Pass yds',crush:'Rush yds',crec:'Rec yds',npts:'Points',nreb:'Rebounds',nast:'Assists',ntpm:'Threes',hg:'Goals',hp:'Points',ha:'Assists',hs:'Shots',hsv:'Saves'};
+function simHtml276(g){
+  if(kind(g)!=='up')return '';
+  var X=null;try{X=simRun276(g)}catch(e){X=null}
+  var h='<h2 style="margin:18px 0 8px;font-size:19px">Simulation</h2>';
+  if(!X)return h+'<div class="card"><p class="src" style="margin:0">Not enough data to simulate this game yet. It runs once the app has both teams’ stats or a betting line.</p></div>';
+  var I=X.I,N=X.N,hoops=g.lg==='nba'||g.lg==='ncaamb',pct=function(x){var v=x*100;return v>0&&v<10?(Math.round(v*10)/10).toString():String(Math.round(v))},two=function(p,q){var A=Math.round(p*100),B=Math.round(q*100);if(A+B>100)A>B?A--:B--;return [A,B]},a=esc(g.a),hm=esc(g.h);
+  var lead=X.sh>=X.sa?hm+' '+X.sh.toFixed(1)+', '+a+' '+X.sa.toFixed(1):a+' '+X.sa.toFixed(1)+', '+hm+' '+X.sh.toFixed(1);
+  var wa=X.wa/N,wh=X.wh/N,ti=X.tie/N;
+  h+='<div class="card"><div class="src" style="text-transform:uppercase;letter-spacing:.06em;font-size:11px">'+N.toLocaleString()+' simulated games</div>'+
+    '<div style="font-size:17px;font-weight:700;margin:4px 0 2px">Average score: '+lead+'</div>'+
+    '';
+  if(!hoops)h+='<div class="src">Most common final: '+(function(){var q=X.top[0][0].split('-').map(Number);return q[1]>=q[0]?hm+' '+q[1]+', '+a+' '+q[0]:a+' '+q[0]+', '+hm+' '+q[1]})()+' ('+pct(X.top[0][1])+'% of games)</div>';
+  h+='<div style="display:flex;height:22px;border-radius:5px;overflow:hidden;margin:10px 0 4px;font-size:12px;font-weight:700;line-height:22px">'+
+    '<div style="width:'+(wa*100).toFixed(1)+'%;background:var(--muted);color:var(--bg);padding:0 6px;white-space:nowrap;overflow:hidden">'+a+' '+two(wa,wh)[0]+'%</div>'+
+    (ti>=.003?'<div style="width:'+(ti*100).toFixed(1)+'%;background:var(--amber)"></div>':'')+
+    '<div style="flex:1;background:var(--ink);color:var(--bg);padding:0 6px;text-align:right;white-space:nowrap;overflow:hidden">'+hm+' '+two(wa,wh)[1]+'%</div></div>';
+  h+='<div class="src">Win chance'+(ti>=.003?' · tie '+pct(ti)+'%':'')+(X.ot?' · goes to '+(g.lg==='nhl'?'overtime or a shootout':'overtime')+' in '+pct(X.ot/N)+'%':'')+'</div>';
+  var L=[];
+  if(X.cov){var hsT=X.cov.hs===0?'PK':(X.cov.hs>0?'+':'')+X.cov.hs,asT=X.cov.hs===0?'PK':(-X.cov.hs>0?'+':'')+(-X.cov.hs);
+    var cv2=two(X.cov.a,X.cov.h);L.push(['Spread',a+' '+asT+' covers <b>'+cv2[0]+'%</b> · '+hm+' '+hsT+' covers <b>'+cv2[1]+'%</b>'+(X.cov.p>=.005?' · push '+pct(X.cov.p)+'%':'')])}
+  if(X.tot){var tt2=two(X.tot.o,X.tot.u);L.push(['Total '+X.tot.tt,'Over <b>'+tt2[0]+'%</b> · Under <b>'+tt2[1]+'%</b>'+(X.tot.p>=.005?' · push '+pct(X.tot.p)+'%':'')])}
+  L.push(['Combined score','Middle '+X.tmed+' · 8 in 10 games land between '+X.t10+' and '+X.t90]);
+  h+='<div class="dd-rows" style="margin-top:10px">'+L.map(function(r){return '<div class="dd-row"><span class="src">'+r[0]+'</span><span style="text-align:right">'+r[1]+'</span></div>'}).join('')+'</div>';
+  h+='<div class="dd-h" style="font-size:15px">How the margin landed</div>'+simChart276(g,X)+(X.cov?'<div class="src">Dashed line: the spread. Bars to the right of it are games '+hm+' covered.</div>':'');
+  if(hoops){
+    var band=function(lo,hi){var c=0;Object.keys(X.mg).forEach(function(k){var m=+k;if(m>=lo&&m<=hi)c+=X.mg[k]});return c/N};
+    var B=[[hm+' by 11 or more',11,999],[hm+' by 6 to 10',6,10],[hm+' by 1 to 5',1,5],[a+' by 1 to 5',-5,-1],[a+' by 6 to 10',-10,-6],[a+' by 11 or more',-999,-11]];
+    h+='<div class="dd-h" style="font-size:15px">Winning margin</div><div class="dd-rows">'+B.map(function(r){return '<div class="dd-row"><span>'+r[0]+'</span><span class="src">'+pct(band(r[1],r[2]))+'%</span></div>'}).join('')+'</div>';
+  }else h+='<div class="dd-h" style="font-size:15px">Most likely final scores</div><div class="dd-rows">'+X.top.map(function(t){var p=t[0].split('-');return '<div class="dd-row"><span>'+a+' '+p[0]+', '+hm+' '+p[1]+'</span><span class="src">'+pct(t[1])+'%</span></div>'}).join('')+'</div>';
+  if(X.box&&X.box.length){
+    var dg=function(w,v){return /^(recp|nreb|nast|ntpm|hg|hp|ha|hs|hsv)$/.test(w.cat)?(Math.round(v*10)/10).toString():String(Math.round(v))};
+    h+='<div class="dd-h" style="font-size:15px">Simulated box score</div><div class="tblwrap" style="margin-top:4px"><table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr><th align="left" style="padding:6px">Player</th><th style="padding:6px 3px">Median</th><th style="padding:6px 3px">Range</th><th style="padding:6px 3px">Line</th><th style="padding:6px 3px">Over</th></tr></thead><tbody>'+
+      ['a','h'].map(function(sd){return X.box.filter(function(w){return w.side===sd}).map(function(w){
+        return '<tr style="border-top:1px solid var(--line)"><td style="padding:6px;font-family:inherit">'+esc(w.n)+'<div class="src">'+esc(w.t)+' · '+esc(SIM_LAB276[w.cat]||w.cat)+'</div></td><td align="center"><b>'+dg(w,w.med)+'</b></td><td align="center" class="src">'+dg(w,w.p10)+'–'+dg(w,w.p90)+'</td><td align="center">'+(w.line!=null?w.line:'–')+'</td><td align="center">'+(w.pOver!=null?'<b>'+pct(w.pOver)+'%</b>':'–')+'</td></tr>'}).join('')}).join('')+
+      '</tbody></table></div><p class="src" style="margin:4px 0 0">Range: 8 in 10 simulated games fall inside it. Over: how often the player beat the line in the simulations. Player numbers move with each simulated game, so a blowout or a shootout changes everyone’s line together.</p>';
+  }
+  var how={nfl:'Each simulated game is played drive by drive. Each team gets about 11 drives, and each drive ends in a touchdown, a field goal or nothing, with an occasional return touchdown or safety. Tied games go to overtime and can end in a tie.',
+    ncaafb:'Each simulated game is played drive by drive. Each team gets about 13 drives, and each drive ends in a touchdown, a field goal or nothing. Tied games go to college overtime.',
+    nba:'Each simulated game draws a shared pace for both teams plus each team’s own good or bad night. Tied games go to five-minute overtimes.',
+    ncaamb:'Each simulated game draws a shared pace for both teams plus each team’s own good or bad night. Tied games go to five-minute overtimes.',
+    nhl:'Each simulated game draws each team’s shots, then goals on those shots. Teams protecting a one-goal lead sometimes add an empty-net goal. Tied games go to 3-on-3 overtime and then a shootout.'}[g.lg];
+  var src=I.st&&I.mk?'half Hitboard’s team-stats score and half the betting market':I.mk?'the betting market (no team stats yet)':'Hitboard’s team-stats score (no betting line yet)';
+  h+='<details style="margin-top:10px"><summary class="src" style="cursor:pointer">How the simulation works</summary><p class="src" style="margin:6px 0 0">'+how+' Scoring is set so the average game matches '+src+': '+a+' '+I.ea.toFixed(1)+', '+hm+' '+I.eh.toFixed(1)+'. The simulation is for reference only. It does not change Hitboard’s picks.</p></details>';
+  return h+'</div>';
+}
+(function(){
+  var fs276=feedSheet;
+  feedSheet=function(g){
+    var h=fs276.apply(this,arguments);
+    try{
+      if(kind(g)!=='up')return h;
+      var sm=simHtml276(g);if(!sm)return h;
+      var i=h.indexOf('<h2 style="margin:22px 0 8px;font-size:19px">1 · ');
+      if(i<0)i=h.indexOf('<h3');
+      return i>=0?h.slice(0,i)+sm+h.slice(i):h+sm;
+    }catch(e){return h}
+  };
+})();
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
 setTimeout(function(){doRefresh(true)},600);
