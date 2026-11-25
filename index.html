@@ -1957,7 +1957,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v279, Nov 25';
+var BUILD='v280, Nov 25';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -19340,6 +19340,72 @@ EXPERTS=EXPERTS.filter(function(e){return e.lg!=='ncaamb'}).concat([
  {"lg": "ncaamb", "an": ["wake forest", "demon deacons"], "hn": ["mississippi state"], "win": "h", "cov": null, "tot": null, "ln": "Mississippi State -4.5, total 150.5 (neutral, Atlantis)", "ag": "Experts expect Mississippi State to win, but the spread is split", "why": ["Mississippi State is 10th in offensive rebounding and outrebounded UCF by 20 on the road.", "Wake Forest lost 74-51 at Vanderbilt, scoring 0.77 points per possession and allowing 17 offensive rebounds.", "Wake Forest shoots 30 percent from three and has no win over a top-200 team."], "tr": ["Mississippi State shot only 66 percent from the line last season.", "Wake Forest’s defense has been good in a small sample."]}
 ]);
 EXP_AT='Nov 25';
+/* ---------- v280: Player matchups in each game window: how each key player usually performs (volume, yards, last 5),
+   the defense he faces tonight, usage changes from teammates who are out, Hitboard's projection and the simulation ---------- */
+function mu280Rows(g){
+  var R=[];try{R=gpRows(g)||[]}catch(e){R=[]}
+  var seen={},by={a:[],h:[]},ord={QB:0,RB:1,WR:2,TE:3};
+  R.forEach(function(o){
+    var r=o.r||{};if(!r.n)return;var side=simSide276(g,r.t);if(!side)return;
+    var k=normName(r.n)+'|'+o.cat;if(seen[k])return;seen[k]=1;
+    by[side].push(o);
+  });
+  ['a','h'].forEach(function(s){
+    by[s].sort(function(x,y){var px=ord[x.r.pos]!=null?ord[x.r.pos]:5,py=ord[y.r.pos]!=null?ord[y.r.pos]:5;return px-py||((y.gs||0)-(x.gs||0))});
+    var P=[],ix={};by[s].forEach(function(o){var k=normName(o.r.n);if(ix[k]==null){ix[k]=P.length;P.push([o])}else P[ix[k]].push(o)});
+    by[s]=P.slice(0,6);
+  });
+  return by;
+}
+function mu280Stat(g,o,X){
+  var r=o.r,c=o.c,cat=o.cat,lab=SIM_LAB276[cat]||(r.unit||cat),cnt=SIM_CAT276[cat]&&(SIM_CAT276[cat].cnt||SIM_CAT276[cat].nhl);
+  var f=function(v){return v==null||!isFinite(v)?'–':(cnt||v<20?(Math.round(v*10)/10).toString():String(Math.round(v)))};
+  var season=c&&c.s&&c.s.n?c.s.avg:(r.avgTxt?parseFloat(String(r.avgTxt).replace(/[^0-9.]/g,'')):null);
+  var vol='';
+  if(g.lg==='nfl'){try{var d=uDeep270(r.n,r.t,cat==='recp'?'rec':cat);if(d)vol=cat==='rush'?d.vol.toFixed(1)+' carries':cat==='pass'?Math.round(d.vol)+' attempts':d.vol.toFixed(1)+' targets'}catch(e){}}
+  var l5='';
+  if(c&&c.l5&&c.l5.n){var ch=season>0?c.l5.avg/season-1:0,arr=ch>=.1?' <span style="color:var(--hit)">▲ '+Math.round(ch*100)+'%</span>':ch<=-.1?' <span style="color:var(--miss)">▼ '+Math.round(-ch*100)+'%</span>':' <span class="src">steady</span>';
+    l5='Last '+c.l5.n+': <b>'+f(c.l5.avg)+'</b>'+arr+(o.ln&&o.ln.v!=null?' · over '+o.ln.v+' in '+c.l5.h.o+' of '+c.l5.n:'')}
+  var simTxt='';
+  if(X&&o.ln&&o.ln.v!=null&&+r.proj>0){try{var sd=simSide276(g,r.t),v=simVec276(g,X,sd,cat,+r.proj,r.n);if(v){var st=simStats276(v,+o.ln.v);simTxt='simulation middle '+f(st.med)+', over in <b>'+simPct276(st.pOver)+'%</b>'}}catch(e){}}
+  var gr=o.gr&&o.gr.letter?' <span class="hrpill '+(/^[AB]/.test(o.gr.letter)?'hi':/^C/.test(o.gr.letter)?'mid':'lo')+'" style="display:inline-block">'+esc(o.gr.letter+' '+(o.gr.dir||''))+'</span>':'';
+  return '<div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--line);font-size:13.5px"><b>'+esc(lab)+'</b>'+gr+
+    '<div>Usually <b>'+f(season)+'</b> a game'+(vol?' on '+vol:'')+(l5?' · '+l5:'')+'</div>'+
+    '<div>Projection <b>'+esc(cnt?f(+r.proj):(r.projTxt||f(+r.proj)))+'</b>'+(o.ln&&o.ln.v!=null?' · line '+o.ln.v:'')+(simTxt?' · '+simTxt:'')+'</div></div>';
+}
+function mu280Card(g,G,X){
+  var r=G[0].r,def='',tag='',seenN={},notes=[];
+  G.forEach(function(o){if(!def&&o.r.def&&o.r.def.txt){def=o.r.def.txt;tag=o.r.def.tag?String(o.r.def.tag[1]||'').toLowerCase():''}
+    (o.r.tend&&o.r.tend.txt||[]).forEach(function(x){if(x&&x.t&&!/gets about/.test(x.t)&&!seenN[x.t]&&notes.length<2){seenN[x.t]=1;notes.push(x.t)}})});
+  var pill=tag==='soft'?' <span class="hrpill hi" style="display:inline-block">Soft matchup</span>':tag==='tough'?' <span class="hrpill lo" style="display:inline-block">Tough matchup</span>':'';
+  return '<div class="card" style="padding:10px 12px;margin:0 0 8px"><b>'+esc(r.n)+'</b> <span class="src">'+esc(r.t)+(r.pos?' '+esc(r.pos):'')+'</span>'+
+    (def?'<div style="font-size:13.5px;margin-top:2px">Facing: '+esc(def)+pill+'</div>':'')+
+    G.map(function(o){try{return mu280Stat(g,o,X)}catch(e){return ''}}).join('')+
+    (notes.length?'<ul class="pts" style="margin:6px 0 0;font-size:12.5px">'+notes.map(function(t){return '<li>'+esc(t)+'</li>'}).join('')+'</ul>':'')+'</div>';
+}
+function mu280Html(g){
+  if(kind(g)!=='up')return '';
+  var by=mu280Rows(g);if(!by.a.length&&!by.h.length)return '';
+  var X=SIM276.c[g.id]||null;
+  var h='<h2 style="margin:18px 0 8px;font-size:19px">Player matchups</h2><p class="src" style="margin:0 0 8px">How each key player usually performs, how he has trended over his last five games, and the defense he faces in this game. Players who are out are left off; teammates who pick up their work are noted.</p>';
+  ['a','h'].forEach(function(s){
+    if(!by[s].length)return;
+    h+='<div class="dd-h" style="font-size:15px;margin-top:8px">'+esc(s==='a'?(g.an||g.a):(g.hn||g.h))+'</div>'+by[s].map(function(o){try{return mu280Card(g,o,X)}catch(e){return ''}}).join('');
+  });
+  return h;
+}
+(function(){
+  var fs280=feedSheet;
+  feedSheet=function(g){
+    var h=fs280.apply(this,arguments);
+    try{
+      if(kind(g)!=='up')return h;
+      var m=mu280Html(g);if(!m)return h;
+      var i=h.indexOf('<h2 style="margin:22px 0 8px;font-size:19px">1 · ');
+      return i>=0?h.slice(0,i)+m+h.slice(i):h+m;
+    }catch(e){return h}
+  };
+})();
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
 setTimeout(function(){doRefresh(true)},600);
