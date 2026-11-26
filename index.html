@@ -1957,7 +1957,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v286, Nov 25';
+var BUILD='v287, Nov 25';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -19996,6 +19996,41 @@ add('ARI','QB Carson Beck:d');add('ARI','QB Gardner Minshew:o');add('WAS','WR Te
 add('SF','QB Brock Purdy:q');add('SEA','WR Jaxon Smith-Njigba:q');add('SEA','G Quenton Nelson:o');add('SEA','OT Abraham Lucas:o');
 add('LV','TE Brock Bowers:q');add('CLE','WR Denzel Boston:q');add('CLE','TE Harold Fannin:q');
 }catch(e){}})();
+/* v287: once a game starts, its window keeps the full pre-game breakdown (pick, why, preview, lineups and who replaces
+   injured players, expert picks, players, simulation, tracked props) under the live or final score, plus how the
+   expert picks are doing. Before this, the window dropped to a short layout with an empty Expert picks section. */
+function expResult287(g){
+  var e=null;try{e=expFor(g)}catch(x){}
+  if(!e||g.sa==null||g.sh==null)return '';
+  var fin=kind(g)==='final',na=shortNm(g,'a'),nh=shortNm(g,'h'),nm=function(s){return s==='a'?na:nh},L=[];
+  var lead=g.sa>g.sh?'a':g.sh>g.sa?'h':null;
+  if(e.win)L.push('Experts picked <b>'+esc(nm(e.win))+'</b> to win: '+(lead==null?(fin?'tie':'tied right now'):lead===e.win?(fin?'<b>right</b>':'leading right now'):(fin?'<b>wrong</b>':'trailing right now'))+'.');
+  else L.push('The experts were split on the winner.');
+  var m=String(e.ln||'').match(/^\s*([^,(]+?)\s+([+-]\d+(?:\.\d+)?)/),side=null,pts=null;
+  if(m){pts=parseFloat(m[2]);var t=normName(m[1]);['a','h'].forEach(function(s){if(side)return;var f=normName((s==='a'?g.an:g.hn)||''),sn=normName(nm(s));if(t&&(f.indexOf(t)>=0||sn===t||t.indexOf(sn)>=0))side=s})}
+  if(e.cov&&side&&pts!=null){
+    var my=e.cov==='a'?g.sa:g.sh,op=e.cov==='a'?g.sh:g.sa,ln=e.cov===side?pts:-pts,v=my+ln-op;
+    L.push('Against the spread they took <b>'+esc(nm(e.cov))+' '+(ln>0?'+':'')+ln+'</b>: '+(v>0?(fin?'<b>covered</b>':'covering right now'):v<0?(fin?'<b>did not cover</b>':'not covering right now'):'right on the number')+'.');
+  }else if(!e.cov)L.push('They were split against the spread.');
+  if(e.tot){var tm=String(e.ln||'').match(/total\s+(\d+(?:\.\d+)?)/i);if(tm){var T=parseFloat(tm[1]),sum=g.sa+g.sh;L.push('They leaned <b>'+(e.tot==='o'?'Over':'Under')+' '+T+'</b>: '+(fin?((e.tot==='o'?sum>T:sum<T)?'<b>hit</b>':sum===T?'push':'<b>missed</b>'):sum+' points so far')+'.')}}
+  return '<ul class="pts" style="margin:6px 0 0">'+L.map(function(x){return '<li>'+x+'</li>'}).join('')+'</ul>';
+}
+(function(){
+  var fs287=feedSheet;
+  feedSheet=function(g){
+    var k=kind(g);if(k==='up'||['nfl','ncaafb','nba','ncaamb','nhl'].indexOf(g.lg)<0)return fs287.apply(this,arguments);
+    /* build the pre-game window first (as if the game had not started), then the live one for the score and box score */
+    var real=kind,st=g.start,hp='';
+    try{kind=function(x){return x&&String(x.id)===String(g.id)?'up':real(x)};g.start=Math.max(st||0,Date.now()+6e4);hp=fs287.apply(this,arguments)}catch(err){hp=''}finally{kind=real;g.start=st}
+    var hl=fs287.apply(this,arguments);
+    try{
+      var m1='<h2 style="margin:22px 0 8px;font-size:19px">1 · ',i1=hl.indexOf(m1);if(i1<0)return hl;
+      var iN=hp.indexOf('<div class="chips" role="navigation" aria-label="Sections"');if(iN<0)return hl;
+      var note='<div class="card" style="padding:10px 12px;margin:10px 0"><p style="margin:0"><b>'+(k==='final'?'Final.':'This game is under way.')+'</b> Everything below is the pre-game breakdown as it stood at kickoff, so you can see how the matchup looked going in. The live box score is above.</p>'+expResult287(g)+'</div>';
+      return hl.slice(0,i1)+note+hp.slice(iN);
+    }catch(err){return hl}
+  };
+})();
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
 setTimeout(function(){doRefresh(true)},600);
