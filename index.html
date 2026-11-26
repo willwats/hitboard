@@ -1957,7 +1957,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v288, Nov 25';
+var BUILD='v289, Nov 26';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -20102,6 +20102,104 @@ document.addEventListener('click',function(e){
     return i>=0?h.slice(0,i)+s+h.slice(i):h+s;
   };
 })();
+/* v289: (1) NFL props only for each team's starting quarterback: backups (on the depth chart behind the starter, or with
+   fewer passes than the starter) no longer get passing, rushing or other props. (2) The game window's prop picks use only
+   DraftKings' posted lines, never a season-average stand-in. (3) Hitboard's own tracked prop picks are now Over/Under
+   DraftKings' line (graded on the box score), replacing the low "reach X+" thresholds that sat far below a player's average. */
+(function(){
+  var stC={},stAt=0;
+  var starterOf=function(team){var m=Math.floor(Date.now()/60000);if(m!==stAt){stC={};stAt=m}if(!(team in stC)){var s=null;try{s=intStarter271(team)}catch(e){}stC[team]=s&&s.n?normName(s.n):null}return stC[team]};
+  var isQB=function(team,n){var k=normName(n);
+    try{var D=S.dep&&S.dep[team];if(D&&(D.qb||[]).some(function(x){return normName(x)===k}))return true}catch(e){}
+    try{if(DEEP.some(function(d){return d.kind==='pass'&&nt(d.t)===team&&normName(d.n)===k}))return true}catch(e){}
+    try{var C=DL_LG.nfl,i=C.ix.pass,L=pbIdx('nfl').P[k]||[];if(i!=null&&L.some(function(x){return x.v[i]!=null&&x.v[i]>=40}))return true}catch(e){}
+    return false};
+  var pb0=pbRows;
+  pbRows=function(lg,cat){
+    var R=pb0.apply(this,arguments);if(lg!=='nfl'||!Array.isArray(R))return R;
+    try{R=R.filter(function(o){var t=nt(String(o.r&&o.r.t||'').toUpperCase());if(!t||!isQB(t,o.r.n))return true;var s=starterOf(t);return !s||s===normName(o.r.n)})}catch(e){}
+    return R;
+  };
+  window.qbStarter289=starterOf;
+})();
+/* the game window's prop picks: DraftKings lines only */
+(function(){
+  var p0=props185;
+  props185=function(g){
+    var gp=gpRows,h='';
+    gpRows=function(){var R=gp.apply(this,arguments)||[];return R.filter(function(o){return o&&o.ln&&o.ln.base==='dk'})};
+    try{h=p0.apply(this,arguments)}finally{gpRows=gp}
+    return String(h)
+      .replace('No player props for this game yet. Players appear once the app has read this season’s box scores for both teams.','DraftKings has not posted player prop lines for this game yet. Props appear here once it does; Hitboard only uses DraftKings’ real lines.')
+      .replace('The line is each player’s season average, fixed for this game.','Every line here is DraftKings’ posted line.');
+  };
+})();
+/* Hitboard's own prop picks: Over or Under DraftKings' line */
+var AUTO_STAT289={pass:'pass',rush:'rush',rec:'rec',recp:'recp',cpass:'pass',crush:'rush',crec:'rec',npts:'pts',nreb:'reb',nast:'ast',ntpm:'tpm'};
+var AUTO_NM289={pass:'passing yds',rush:'rushing yds',rec:'receiving yds',recp:'receptions',pts:'points',reb:'rebounds',ast:'assists',tpm:'threes'};
+function boxVal289(j,player,stat){
+  if(stat!=='recp')return boxNum(j,player,stat);
+  var key=normName(player),out=null;
+  ((j.boxscore&&j.boxscore.players)||[]).forEach(function(tm){(tm.statistics||[]).forEach(function(cat){
+    if(cat.name!=='receiving')return;var ix=(cat.labels||[]).indexOf('REC');if(ix<0)return;
+    (cat.athletes||[]).forEach(function(a){if(out==null&&a.athlete&&normName(a.athlete.displayName)===key)out=+(a.stats||[])[ix]})})});
+  return out;
+}
+autoRecordProps=function(){
+  if(window.claude&&window.claude.use)return;
+  var now=Date.now(),have={},ch=false,n0=S.auto.length;
+  /* drop old "reach X+" picks for games that have not started, so they are re-recorded at DraftKings' line */
+  S.auto=S.auto.filter(function(x){if(x.dir||x.res)return true;var g=null;try{g=find(x.gid)}catch(e){}return !(g&&kind(g)==='up'&&g.start>now)});
+  if(S.auto.length!==n0)ch=true;
+  S.auto.forEach(function(x){have[x.k]=1});
+  ['nfl','ncaafb','nba'].forEach(function(lg){
+    var td=[],seenP={};
+    (S.feed[lg]||[]).forEach(function(g){
+      if(kind(g)!=='up'||!(g.start>now)||!isToday(g.start))return;
+      var R=[];try{R=gpRows(g)||[]}catch(e){}
+      R.forEach(function(o){
+        if(!o||!o.ln||o.ln.base!=='dk'||!o.gr||!o.c||!AUTO_STAT289[o.cat])return;
+        try{if(isOutInj({lg:lg,t:o.r.t,n:o.r.n}))return}catch(e){}
+        td.push({g:g,o:o,sc:o.gr.sum});
+      });
+    });
+    td.sort(function(a,b){return b.sc-a.sc});
+    var n=0;
+    td.forEach(function(x){
+      if(n>=7)return;var o=x.o,g=x.g,dir=o.gr.dir,ln=o.ln.v,stat=AUTO_STAT289[o.cat],nk=normName(o.r.n);
+      if(seenP[nk])return;seenP[nk]=1;n++;
+      var k=g.id+'|'+nk+'|'+stat+'|'+ln+'|'+dir;if(have[k])return;have[k]=1;
+      var team=o.r.t,opp=team===g.a?g.h:team===g.h?g.a:null,w=o.c.l10,p=w&&w.n?(dir==='Over'?w.h.o:w.h.u)/w.n:null;
+      S.auto.push({k:k,gid:g.id,lg:lg,name:o.r.n,team:team,opp:opp,home:team===g.h?1:0,stat:stat,cat:o.cat,ln:ln,dir:dir,thr:dir==='Over'?Math.ceil(ln):ln,p:p,kc:calK270(lg,'prop'),rank:n,gr:o.gr.letter,gs:Math.round(o.gr.sum*10)/10,
+        title:o.r.n+' '+dir+' '+ln+' '+(AUTO_NM289[stat]||stat)+' (DraftKings)',at:now,res:null,v:null,src:'dk'});
+      ch=true;
+    });
+  });
+  if(ch)saveAuto();
+};
+gradeAuto=function(){
+  var pend=S.auto.filter(function(x){if(x.res)return false;var g=null;try{g=find(x.gid)}catch(e){}return g&&kind(g)!=='up'});
+  if(!pend.length)return;
+  var ids={};pend.forEach(function(x){ids[x.gid]=1});
+  Promise.all(Object.keys(ids).map(function(id){return boxFetch(find(id))})).then(function(){
+    var ch=false;
+    pend.forEach(function(x){
+      var g=find(x.gid),c=S.box[x.gid];if(!g||!c||!c.j)return;
+      var v=boxVal289(c.j,x.name,x.stat),fin=kind(g)==='final';
+      if(x.dir==='Under'){
+        if(v!=null&&v>x.ln){x.res='L';x.v=v;ch=true}
+        else if(fin){x.res=v==null?'P':'W';x.v=v;ch=true}
+      }else if(x.dir==='Over'){
+        if(v!=null&&v>x.ln){x.res='W';x.v=v;ch=true}
+        else if(fin){x.res=v==null?'P':'L';x.v=v;ch=true}
+      }else{
+        if(v!=null&&v>=x.thr){x.res='W';x.v=v;ch=true}
+        else if(fin){x.res=v==null?'P':'L';x.v=v;ch=true}
+      }
+    });
+    if(ch)saveAuto();
+  }).catch(function(){});
+};
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
 setTimeout(function(){doRefresh(true)},600);
