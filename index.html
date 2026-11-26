@@ -1957,7 +1957,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v284, Nov 25';
+var BUILD='v285, Nov 25';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -19837,14 +19837,34 @@ function simCard284(g,X){
       var d=null,X=null,e=null;try{d=ddFor(g)}catch(x){}try{X=simRun276(g)}catch(x){}try{e=expFor(g)}catch(x){}
       var pl='';try{pl=players284(g,X)}catch(x){}
       var bt='';try{bt=bets284(g,X)}catch(x){}
-      var S1=[['pick','The pick'],['why','Why'],['lineups','Lineups and news']];if(pl)S1.push(['players','Players']);if(bt)S1.push(['bets','More ways to bet']);S1.push(['sim','Simulation']);if(more.replace(/<[^>]+>/g,'').trim())S1.push(['more','More']);
+      var S1=[['pick','The pick'],['why','Why'],['lineups','Lineups and news']];if(pl)S1.push(['players','Players']);if(bt)S1.push(['bets','More ways to bet']);S1.push(['sim','Simulation']);S1.push(['more','Tracked props and more']);
       var nav='<div class="chips" role="navigation" aria-label="Sections" style="padding:6px 0;margin:6px 0 0">'+S1.map(function(s){return '<button class="chip" data-act="hbjump" data-t="'+s[0]+'">'+s[1]+'</button>'}).join('')+'</div>';
-      var o=head+nav,n=0,body={pick:function(){return pick284(g,d,X,e)},why:function(){return why284(g,d,X,e)},lineups:function(){return lineup284(g,e,inj)},players:function(){return pl},bets:function(){return bt},sim:function(){return simCard284(g,X)},more:function(){return more}};
+      var o=head+nav,n=0,body={pick:function(){return pick284(g,d,X,e)},why:function(){return why284(g,d,X,e)},lineups:function(){return lineup284(g,e,inj)},players:function(){return pl},bets:function(){return bt},sim:function(){return simCard284(g,X)},more:function(){var t='';try{t=tracked285(g)}catch(x){}return t+(more.replace(/<[^>]+>/g,'').trim()?more:'')}};
       S1.forEach(function(s){var c='';try{c=body[s[0]]()}catch(x){c='<div class="card empty">This section could not be built.</div>'}o+=H284(s[0],++n,s[1])+c});
       return o;
     }catch(err){return h}
   };
 })();
+/* ---------- v285: "More" in the game window opens with the props being tracked for this game:
+   yours (Track button), Hitboard's own recorded prop picks, and expert prop picks, then every prop pick with a Track button ---------- */
+function tracked285(g){
+  var h='<div class="card" style="padding:12px">',any=false,na=nick282(g,'a'),nh=nick282(g,'h');
+  /* yours */
+  var mine=[];try{Object.keys(TRK185).forEach(function(k){var t=TRK185[k];if(String(t.gid)===String(g.id))mine.push(t)})}catch(e){}
+  if(mine.length){any=true;h+=sub284('You are tracking')+rows284(mine.map(function(t){return [esc(t.n)+' <span class="src">'+esc(t.t||'')+'</span><div class="src">'+esc((SIM_LAB276[t.cat]||t.cat))+'</div>','<b>'+esc(t.dir||'')+' '+esc(t.ln!=null&&!isNaN(t.ln)?t.ln:'')+'</b><div style="margin-top:4px"><button class="btn" style="padding:4px 8px;font-size:12px" data-act="trk185" data-id="'+esc(t.id)+'" data-gid="'+esc(t.gid)+'">Stop tracking</button></div>']}))}
+  /* Hitboard's own prop picks, recorded before the game and graded after */
+  var auto=[];try{(S.auto||[]).forEach(function(x){if(String(x.gid)===String(g.id))auto.push(x)})}catch(e){}
+  if(auto.length){any=true;h+=sub284('Hitboard is tracking')+rows284(auto.map(function(x){return [esc(x.name)+' <span class="src">'+esc(x.team||'')+'</span><div class="src">'+esc(x.title||(x.stat+' '+x.thr+'+'))+'</div>',(x.p!=null?'<b>'+Math.round(x.p*100)+'%</b>':'')+'<div class="src">'+(x.res==='W'||x.res===1||x.res===true?'hit':x.res==='L'||x.res===0||x.res===false?'missed':'pending')+'</div>']}))+'<div class="src" style="margin-top:4px">Saved before kickoff and graded on the final, so they count toward the app’s record.</div>'}
+  /* expert prop picks */
+  var ex=[];try{var now=Date.now(),toks=[na,nh,g.an||'',g.hn||''].map(function(s){return String(s).toLowerCase()}).filter(Boolean);
+    PROP_X.forEach(function(x){if(x.lg!==g.lg||!(now<x.until))return;var gm=String(x.game||'').toLowerCase();var hitA=gm.indexOf(na.toLowerCase())>=0||gm.indexOf(String(g.an||'').toLowerCase())>=0,hitH=gm.indexOf(nh.toLowerCase())>=0||gm.indexOf(String(g.hn||'').toLowerCase())>=0;if(hitA&&hitH)ex.push(x)})}catch(e){}
+  if(ex.length){any=true;h+=sub284('Expert prop picks')+rows284(ex.map(function(x){return [esc(x.p)+'<div class="src">'+esc(x.m)+'</div>'+(x.why?'<div class="src" style="margin-top:2px">'+esc(x.why)+'</div>':''),'<b>'+esc(x.s)+' '+esc(x.l)+'</b>']}))}
+  /* every prop pick for the game, each with a Track button */
+  var all='';try{all=props185(g)}catch(e){}
+  if(all&&all.replace(/<[^>]+>/g,'').trim()){any=true;h+=sub284('Prop picks for this game')+'<div class="src" style="margin:0 0 6px">Tap Track to follow a prop; it moves to the top and shows live progress once the game starts.</div>'+all}
+  if(!any)h+='<p class="src" style="margin:0">No props are being tracked for this game yet.</p>';
+  return h+'</div>';
+}
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
 setTimeout(function(){doRefresh(true)},600);
