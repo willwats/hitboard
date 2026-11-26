@@ -1957,7 +1957,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v289, Nov 26';
+var BUILD='v290, Nov 26';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -20200,6 +20200,46 @@ gradeAuto=function(){
     if(ch)saveAuto();
   }).catch(function(){});
 };
+/* v290: Best matchups shows two grades more clearly. The big letter is Hitboard's overall grade for the prop (hit rate on
+   the line, recent form, matchup, injuries and more) with the side it favors under it. The matchup grade (only the
+   opponent's defense against this stat and the player's history against similar defenses) moves out of the big box into
+   the tags as "Matchup B · leans Over", and says so when it leans the other way from the overall grade. The matchup lean
+   also follows the same soft/tough defense label shown on the card, so a "Soft defense" tag no longer sits beside an Under lean. */
+(function(){
+  var pm0=pbMatch;
+  pbMatch=function(lg,o){
+    var M=pm0.apply(this,arguments);if(!M)return M;
+    try{var tg=o.r&&o.r.def&&o.r.def.tag&&String(o.r.def.tag[1]||'').toLowerCase();
+      if((tg==='soft'&&M.dir==='Under')||(tg==='tough'&&M.dir==='Over')){
+        var lv=null;try{lv=pbLev(lg,o.cat,o.r,o,'Over')}catch(e){}
+        var pts=tg==='soft'?8:-8,sg=pts>=0?1:-1,sum=Math.abs(pts)+(lv&&lv.over?lv.over*sg*2:0);
+        M={sum:sum,letter:grLetter(sum),dir:pts>=0?'Over':'Under'};
+      }}catch(e){}
+    return M;
+  };
+  var vb0=vBoard;
+  vBoard=function(){
+    var h=vb0.apply(this,arguments);
+    if(S.bf!=='match')return h;
+    try{
+      h=h.replace('Players whose matchup grades B or better. The matchup grade comes from how the opponent’s defense ranks against this stat and how the player has done in past games against similar defenses.',
+        'Players whose matchup grades B or better. Each card has two grades. The big letter is Hitboard’s overall grade for the prop, with the side it favors (Over or Under) under it; it weighs the hit rate on the line, recent form, the matchup, injuries and more. The Matchup tag grades only the matchup: how the opponent’s defense ranks against this stat and how the player has done against similar defenses.');
+      var parts=h.split('<div class="card pc"');
+      for(var i=1;i<parts.length;i++){
+        var c=parts[i],re=/<b>([A-F][+-]?)<\/b> <span class="src">Matchup<\/span> <span class="hrpill[^"]*"[^>]*>([A-F][+-]?)\s*(Over|Under)?<\/span>(<small>(Over|Under)<\/small>)?/i,m=re.exec(c);
+        if(!m)continue;
+        var ov=m[5]||'',md=m[3]||'',tag='Matchup '+m[2]+(md?' · leans '+md:'')+(ov&&md&&ov.toLowerCase()!==md.toLowerCase()?' (overall grade leans '+ov+')':'');
+        c=c.replace(m[0],'<b>'+m[1]+'</b>'+(m[4]||''));
+        var t=c.indexOf('<div class="pc-tags">');
+        if(t>=0){var e=c.indexOf('</div>',t);c=c.slice(0,e)+'<span class="pc-tag">'+esc(tag)+'</span>'+c.slice(e)}
+        else{var s2=c.indexOf('<div class="pc-sub">');if(s2>=0){var e2=c.indexOf('</div>',s2)+6;c=c.slice(0,e2)+'<div class="pc-tags"><span class="pc-tag">'+esc(tag)+'</span></div>'+c.slice(e2)}}
+        parts[i]=c;
+      }
+      h=parts.join('<div class="card pc"');
+    }catch(e){}
+    return h;
+  };
+})();
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
 setTimeout(function(){doRefresh(true)},600);
