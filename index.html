@@ -1957,7 +1957,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v287, Nov 25';
+var BUILD='v288, Nov 25';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -20029,6 +20029,77 @@ function expResult287(g){
       var note='<div class="card" style="padding:10px 12px;margin:10px 0"><p style="margin:0"><b>'+(k==='final'?'Final.':'This game is under way.')+'</b> Everything below is the pre-game breakdown as it stood at kickoff, so you can see how the matchup looked going in. The live box score is above.</p>'+expResult287(g)+'</div>';
       return hl.slice(0,i1)+note+hp.slice(iN);
     }catch(err){return hl}
+  };
+})();
+/* v288: Parlays tab opens with "Top graded parlays": Hitboard's best-graded bets from every sport and every start time
+   (one leg per game) combined into 2-, 3- and 4-leg parlays, each with Hitboard's grade for the parlay, the grade of
+   every leg, the chance all legs hit and the approximate payout. Uses the Day choice; the sport chip narrows it. */
+var TP288={},_tp288=null;
+function tpLegs288(){
+  var T=gdTest(),now=Date.now(),budget={n:20,pend:0},L=[];
+  LG.forEach(function(l){if(S.gs&&S.gs!=='all'&&S.gs!==l[0])return;(S.feed[l[0]]||[]).forEach(function(g){
+    if(kind(g)!=='up'||!(g.start>now)||!T.ok(g))return;
+    var d=ddCached(g);if(d===undefined&&budget.n>0){budget.n--;try{d=ddFor(g)}catch(e){d=null}}
+    if(d===undefined){budget.pend++;return}
+    var b=d&&d.best;if(!b||!b.x||b.p==null||b.score<62)return;
+    L.push({g:g,b:b,score:b.score,p:b.p,pr:b.pr!=null?b.pr:-110});
+  })});
+  L.sort(function(a,b){return b.score-a.score||b.p-a.p});
+  return {L:L,pend:budget.pend};
+}
+function tpGrade288(legs){
+  var sc=legs.map(function(o){return o.score}),avg=sc.reduce(function(a,b){return a+b},0)/sc.length,mn=Math.min.apply(null,sc);
+  var s=Math.round(.6*avg+.4*mn-2*(legs.length-2));
+  return {score:Math.max(1,Math.min(99,s)),conf:s>=72?'Strong':s>=62?'Lean':'Small edge'};
+}
+function tpBuild288(L){
+  var top=L.slice(0,9),out=[],seen={};
+  var add=function(idx){var legs=idx.map(function(i){return top[i]}).sort(function(x,y){return x.g.start-y.g.start}),gr=tpGrade288(legs);
+    var p=legs.reduce(function(a,o){return a*o.p},1),dec=legs.reduce(function(a,o){return a*(o.pr<0?1+100/(-o.pr):1+o.pr/100)},1);
+    var k=idx.join(',');if(seen[k])return;seen[k]=1;
+    out.push({legs:legs,gr:gr,p:p,dec:dec,n:legs.length,sports:legs.map(function(o){return o.g.lg}).filter(function(x,i,a){return a.indexOf(x)===i})})};
+  var n=top.length;
+  for(var a=0;a<n;a++)for(var b=a+1;b<n;b++){add([a,b]);for(var c=b+1;c<n;c++){add([a,b,c]);for(var d=c+1;d<n;d++)add([a,b,c,d])}}
+  out.sort(function(x,y){return y.gr.score-x.gr.score||y.p-x.p});
+  /* the best of each size first, then the next best overall, without repeating the same set */
+  var pick=[],used={};
+  [2,3,4].forEach(function(sz){var x=out.filter(function(o){return o.n===sz})[0];if(x){pick.push(x);used[out.indexOf(x)]=1}});
+  out.forEach(function(o,i){if(pick.length<8&&!used[i]){pick.push(o);used[i]=1}});
+  return pick.sort(function(x,y){return y.gr.score-x.gr.score||y.p-x.p});
+}
+function tpSection288(){
+  var R=tpLegs288(),L=R.L,h='<h3 style="margin-top:14px">Top graded parlays</h3><p class="src" style="margin-top:0">Hitboard’s best-graded bets from every sport and start time, one per game, combined into 2-, 3- and 4-leg parlays. The parlay grade (out of 100) is built from its legs’ grades and leans on the weakest leg; Strong is 72+, Lean 62–71. Legs are in different games, so the chance all hit is the legs multiplied together.</p>';
+  TP288={};
+  if(L.length<2){h+='<div class="card empty">'+(R.pend?'Scoring games…':'Fewer than two games have a Strong or Lean bet for this day. Try This week.')+'</div>'}
+  else tpBuild288(L).forEach(function(o,i){
+    var id='tp'+i;TP288[id]=o.legs;
+    var inAll=o.legs.every(function(x){return inSlip(gameLeg(x.g,x.b.x).key)});
+    var am=o.dec>=2?'+'+Math.round((o.dec-1)*100):'-'+Math.round(100/(o.dec-1));
+    var pill='<span class="hrpill '+(o.gr.conf==='Strong'?'hi':o.gr.conf==='Lean'?'':'lo')+'" style="display:inline-block;font-weight:700">'+esc(o.gr.conf)+' · '+o.gr.score+'</span>';
+    h+='<div class="card" style="padding:12px 14px;margin-bottom:10px"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b>'+o.n+'-leg parlay · '+esc(o.sports.map(lgName).join(' + '))+'</b><span style="flex:none;white-space:nowrap">'+pill+'</span></div>'+
+      o.legs.map(function(x){return '<div data-act="fgame" data-id="'+esc(x.g.id)+'" style="padding:8px 0;border-top:1px solid var(--line);cursor:pointer;display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><div style="min-width:0"><b>'+esc(x.b.pick)+'</b><div class="src">'+esc(lgName(x.g.lg))+' · '+esc((x.g.an||x.g.a)+' @ '+(x.g.hn||x.g.h))+' · '+esc(gTime(x.g))+'</div><div class="src">'+esc(MKN256[x.b.t]||'')+' · model '+Math.round(x.p*100)+'%</div></div><span style="flex:none;white-space:nowrap">'+ddConfPill(x.b)+'</span></div>'}).join('')+
+      '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:8px"><span class="src">All '+o.n+' hit: about '+Math.round(o.p*100)+'% · pays about '+am+'</span><button class="btn'+(inAll?'':' primary')+'" style="flex:none;padding:8px 12px" data-act="tp288add" data-k="'+id+'">'+(inAll?'In slip ✓':'+ Add to slip')+'</button></div></div>';
+  });
+  if(R.pend){h+='<p class="src">Scoring '+R.pend+' more game'+(R.pend>1?'s':'')+'…</p>';clearTimeout(_tp288);_tp288=setTimeout(function(){try{if(S.tab==='pl4'&&!S.sheet)render()}catch(e){}},600)}
+  return h;
+}
+document.addEventListener('click',function(e){
+  var el=e.target&&e.target.closest?e.target.closest('[data-act="tp288add"]'):null;if(!el)return;
+  e.stopImmediatePropagation();e.preventDefault();
+  var L=TP288[el.dataset.k];if(!L)return;
+  var legs=L.map(function(o){return gameLeg(o.g,o.b.x)}),allIn=legs.every(function(l){return inSlip(l.key)});
+  if(allIn)S.slip=S.slip.filter(function(q){return !legs.some(function(l){return l.key===q.key})});
+  else legs.forEach(function(l){if(!inSlip(l.key)&&S.slip.length<15)S.slip.push(l)});
+  saveSlip();updateSlipBar();render();
+},true);
+(function(){
+  var v0=vPl4;
+  vPl4=function(){
+    var h=v0.apply(this,arguments),s='';
+    try{s=tpSection288()}catch(e){s=''}
+    if(!s)return h;
+    var i=h.indexOf('<h3 style="margin-top:18px">Hitboard’s parlays</h3>');
+    return i>=0?h.slice(0,i)+s+h.slice(i):h+s;
   };
 })();
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
