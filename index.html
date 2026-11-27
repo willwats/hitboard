@@ -1957,7 +1957,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v292, Nov 27';
+var BUILD='v293, Nov 27';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -13714,7 +13714,7 @@ vBoard=function(){
     h=h.slice(0,e)+'<button class="chip" data-act="set" data-k="bf" data-v="match" aria-pressed="'+(S.bf==='match')+'">Best matchups</button>'+h.slice(e);
     if(S.bf==='match'){h=h.replace(/aria-pressed="true"([^>]*>(?:All|Hot · over|Cold · under)<)/g,'aria-pressed="false"$1');
       var lg=S.sport,rows=[];
-      try{pbRows(lg,S.bc).forEach(function(o){
+      try{pbRows(lg,bcOf293(lg)).forEach(function(o){
         var M=pbMatch(lg,o);if(!M||M.sum<15)return;
         rows.push({o:o,M:M,s:M.sum});
       })}catch(x){}
@@ -13752,7 +13752,7 @@ vBoard=function(){
     var lg=S.sport;
     if(!(S.bf==='hot'||S.bf==='cold'||S.bf==='match')||S.bc==='atd'||!DL_LG[lg]||window.claude)return h;
     var n=Object.keys(S.dlog).filter(function(k){return S.dlog[k].lg===lg}).length,rows=[];
-    try{rows=pbRows(lg,S.bc)}catch(e){}
+    try{rows=pbRows(lg,bcOf293(lg))}catch(e){}
     var withLog=rows.filter(function(o){return o.c}).length;
     var thin=n<12||!rows.length||withLog<rows.length*.6;
     if(thin)loadPrev(lg);
@@ -13941,17 +13941,17 @@ vBoard=function(){
     if(S.bc==='atd'||S.bc==='parl')return h;
     var k=h.indexOf('aria-label="Show"');if(k<0)return h;
     var e=h.indexOf('</div>',k);
-    h=h.slice(0,e)+'<button class="chip" data-act="set" data-k="bf" data-v="grade" aria-pressed="'+(S.bf==='grade')+'">Top graded</button>'+h.slice(e);
+    h=h.slice(0,e)+'<button class="chip" data-act="set" data-k="bf" data-v="grade" aria-pressed="'+(S.bf==='grade')+'">B or better</button>'+h.slice(e);
     if(S.bf!=='grade')return h;
     h=h.replace(/aria-pressed="true"([^>]*>(?:All|Hot · over|Cold · under|Best matchups)<)/g,'aria-pressed="false"$1');
     var lg=S.sport,rows=[];
-    try{pbRows(lg,S.bc).forEach(function(o){var G=gradeBest(lg,o.cat,o.r,o);if(G)rows.push({o:o,G:G})})}catch(x){}
+    try{pbRows(lg,bcOf293(lg)).forEach(function(o){var G=gradeBest(lg,o.cat,o.r,o);if(G&&rcOk292(G.letter))rows.push({o:o,G:G})})}catch(x){}
     rows.sort(function(a,b){return b.G.sum-a.G.sum});
-    var seen={},L=[];rows.forEach(function(r){var n=normName(r.o.r.n);if(seen[n]||L.length>=40)return;seen[n]=1;L.push(r)});
+    var seen={},L=[],more=0;rows.forEach(function(r){var n=normName(r.o.r.n);if(seen[n])return;seen[n]=1;if(L.length>=(S.bgn||40)){more++;return}L.push(r)});
     var a=h.indexOf('</details>',k),b=h.indexOf('<p class="foot">');
     if(a<0){var cs=h.indexOf('<div class="card"',k);a=cs>0?cs-10:-1}
     if(a>0&&b>a){
-      var body='<p class="src" style="margin:4px 0 8px">Every player graded A+ to F on the side the app likes (Over or Under), best first. The grade weighs the projection, the opponent’s defense, past games when loaded, health and weather. Tap a player for the full breakdown.</p>'+(L.length?L.map(function(r){return pbCard(r.o)}).join(''):'<div class="card empty">No players to grade for this stat yet.</div>');
+      var body='<p class="src" style="margin:4px 0 8px">Every player graded B- or better on the side the app likes (Over or Under), best first. The grade weighs the projection, the opponent’s defense, past games when loaded, health and weather. Tap a player for the full breakdown.</p>'+(L.length?L.map(function(r){return pbCard(r.o)}).join('')+(more?'<button class="btn" style="width:100%;margin:4px 0 10px" data-act="set" data-k="bgn" data-v="'+((S.bgn||40)+40)+'">Show more ('+more+' left)</button>':''):'<div class="card empty">No B- or better players for this stat yet.</div>');
       h=h.slice(0,a+10)+body+h.slice(b);
     }
   }catch(x){}
@@ -16849,11 +16849,11 @@ function ddHtml(g){
   if(d.pred)h+='<div class="src">Projected score: '+esc(d.pred.h>=d.pred.a?d.nh+' '+Math.round(d.pred.h)+', '+d.na+' '+Math.round(d.pred.a):d.na+' '+Math.round(d.pred.a)+', '+d.nh+' '+Math.round(d.pred.h))+'</div>';
   h+='<div class="dd-rows">'+d.mk.map(function(o){
       var ex=o.plus.some(function(s){return /expert/i.test(s)})?' · <span class="ok256">experts agree</span>':o.minus.some(function(s){return /expert/i.test(s)})?' · <span class="no256">experts disagree</span>':'';
-      return '<div class="dd-row'+(o===b?' dd-best':'')+'"><div><span class="src">'+esc(MKN256[o.t])+'</span><div><b>'+esc(o.pick)+'</b></div></div><div class="dd-r">'+(o.p!=null?Math.round(o.p*100)+'% chance':'')+'<div><b>'+o.score+'</b>'+(o.grade?' <span class="src">('+esc(o.grade)+')</span>':'')+ex+'</div></div></div>'}).join('')+'</div>';
+      return '<div class="dd-row'+(o===b?' dd-best':'')+'"><div><span class="src">'+esc(MKN256[o.t])+'</span><div><b>'+esc(o.pick)+'</b></div></div><div class="dd-r">'+(o.p!=null?Math.round(o.p*100)+'% chance':'')+'<div>'+grPill(ddLetter293(o))+ex+'</div></div></div>'}).join('')+'</div>';
   if(d.why.length)h+='<div class="dd-h">Why</div><ul class="pts" style="margin:4px 0 0">'+d.why.map(function(s){return '<li>'+esc(s)+'</li>'}).join('')+'</ul>';
   if(d.risk.length)h+='<div class="dd-h">What could go wrong</div><ul class="pts" style="margin:4px 0 0">'+d.risk.map(function(s){return '<li>'+esc(s)+'</li>'}).join('')+'</ul>';
   if(d.e)h+='<p class="src" style="margin:10px 0 0">Expert research entered '+esc(EXP_AT)+': '+esc(d.e.ln||'')+' · '+esc(d.e.ag||'')+'</p>';
-  h+='<p class="src" style="margin:8px 0 0">Score out of 100: Hitboard’s grade for that bet, raised or lowered for the experts, line movement and the other signals. Strong is 72 and up, Lean 62 to 71. A guide, not a guarantee.</p>';
+  h+='<p class="src" style="margin:8px 0 0">Grade A+ to F: Hitboard’s grade for that bet, raised or lowered for the experts, line movement and the other signals. B- and up is a bet worth considering. A guide, not a guarantee.</p>';
   if(b.x){var lg0=gameLeg(g,b.x),on=inSlip(lg0.key);h+='<div style="margin-top:10px"><button class="btn'+(on?'':' primary')+'" data-act="gsadd" data-id="'+esc(g.id)+'" data-pk="'+esc(b.x.pick)+'">'+(on?'In slip ✓':'+ Add best outcome to slip')+'</button></div>'}
   return h+'</div>';
 }
@@ -16909,9 +16909,9 @@ schHtml=function(){
     var list=(S.feed[l[0]]||[]).filter(function(g){var k=kind(g);if(sel==='today')return T.ok(g);return k==='up'&&T.ok(g)}).sort(function(a,b){return a.start-b.start});
     if(!list.length)return;any=true;
     var up=list.filter(function(g){return kind(g)==='up'}),strong=0,lean=0;
-    up.forEach(function(g){var d=ddCached(g);if(d&&d.best){if(d.best.conf==='Strong')strong++;else if(d.best.conf==='Lean')lean++}});
+    up.forEach(function(g){var d=ddCached(g);if(d&&d.best&&d.best.score>=58)strong++});
     var open=!S.sxc[l[0]];
-    h+='<details class="sx256" data-sx="'+l[0]+'"'+(open?' open':'')+'><summary><span class="sx-t">'+esc(l[1])+'</span><span class="sx-s">'+list.length+' game'+(list.length>1?'s':'')+(strong?' · '+strong+' strong':'')+(lean?' · '+lean+' lean':'')+'</span></summary>';
+    h+='<details class="sx256" data-sx="'+l[0]+'"'+(open?' open':'')+'><summary><span class="sx-t">'+esc(l[1])+'</span><span class="sx-s">'+list.length+' game'+(list.length>1?'s':'')+(strong?' · '+strong+' B or better':'')+'</span></summary>';
     var curDay='',curSlot=null;
     list.forEach(function(g){
       var dk=new Date(g.start).toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});
@@ -16925,7 +16925,7 @@ schHtml=function(){
   if(!any)return '';
   if(budget.pend){clearTimeout(_gx256);_gx256=setTimeout(function(){try{if(S.tab==='games'&&!S.sheet)render()}catch(e){}},500)}
   var title=sel==='today'?'Today':sel==='tomorrow'?'Tomorrow':'This week';
-  return '<p class="src" style="margin:12px 0 6px">'+esc(title)+' · tap a game for its deep dive. “Best” is the strongest bet the app finds in that game; Strong is 72+ out of 100, Lean 62–71.</p>'+h;
+  return '<p class="src" style="margin:12px 0 6px">'+esc(title)+' · tap a game for its deep dive. “Best” is the strongest bet the app finds in that game, graded A+ to F; B- and up is a bet worth considering.</p>'+h;
 };
 (function(){
   try{var st=document.createElement('style');st.textContent=
@@ -17186,7 +17186,7 @@ ddHtml=function(g){
     if(d.pred)h+='<div class="src">Projected score: '+esc(d.pred.h>=d.pred.a?d.nh+' '+Math.round(d.pred.h)+', '+d.na+' '+Math.round(d.pred.a):d.na+' '+Math.round(d.pred.a)+', '+d.nh+' '+Math.round(d.pred.h))+(gcLine256(g)?' · Line: '+gcLine256(g):'')+'</div>';
     h+='<div class="dd-rows">'+d.mk.map(function(o){
       var ex=o.plus.some(function(s){return /expert/i.test(s)})?' · <span class="ok256">experts agree</span>':o.minus.some(function(s){return /expert/i.test(s)})?' · <span class="no256">experts disagree</span>':'';
-      return '<div class="dd-row'+(o===b?' dd-best':'')+'"><div><span class="src">'+esc(MKN256[o.t])+'</span><div><b>'+esc(o.pick)+'</b></div></div><div class="dd-r">'+(o.p!=null?Math.round(o.p*100)+'% chance':'')+'<div><b>'+o.score+'</b>'+(o.grade?' <span class="src">('+esc(o.grade)+')</span>':'')+ex+'</div></div></div>'}).join('')+'</div>';
+      return '<div class="dd-row'+(o===b?' dd-best':'')+'"><div><span class="src">'+esc(MKN256[o.t])+'</span><div><b>'+esc(o.pick)+'</b></div></div><div class="dd-r">'+(o.p!=null?Math.round(o.p*100)+'% chance':'')+'<div>'+grPill(ddLetter293(o))+ex+'</div></div></div>'}).join('')+'</div>';
     if(b.x){var lg0=gameLeg(g,b.x),on=inSlip(lg0.key);h+='<div style="margin-top:10px"><button class="btn'+(on?'':' primary')+'" data-act="gsadd" data-id="'+esc(g.id)+'" data-pk="'+esc(b.x.pick)+'">'+(on?'In slip ✓':'+ Add best outcome to slip')+'</button></div>'}
     h+='</div>';
   }else{
@@ -17217,7 +17217,7 @@ ddHtml=function(g){
   h+=blk('How the game could go',hw);
   if(d){h+=blk('Why',ul(d.why.map(esc)));h+=blk('What could go wrong',ul(d.risk.map(esc)))}
   if(e)h+='<p class="src" style="margin:10px 0 0">Experts (research entered '+esc(EXP_AT)+'): '+esc(e.ln||'')+' · '+esc(e.ag||'')+'</p>';
-  if(d&&d.best)h+='<p class="src" style="margin:6px 0 0">Score out of 100: Hitboard’s grade for the bet, raised or lowered for the experts, line movement and the price. Strong is 72 and up, Lean 62 to 71. A guide, not a guarantee.</p>';
+  if(d&&d.best)h+='<p class="src" style="margin:6px 0 0">Grade A+ to F: Hitboard’s grade for the bet, raised or lowered for the experts, line movement and the price. B- and up is a bet worth considering. A guide, not a guarantee.</p>';
   return h;
 };
 
@@ -17359,7 +17359,7 @@ ddHtml=function(g){
     if(qbs.length)h+='<div class="dd-alert">'+qbs.map(function(o){return esc(outLine258(g,o.s,o.x))}).join(' ')+'</div>';
     if(d.mk.length)h+='<div class="dd-rows">'+d.mk.map(function(o){
       var ex=o.plus.some(function(s){return /expert/i.test(s)})?' · <span class="ok256">experts agree</span>':o.minus.some(function(s){return /expert/i.test(s)})?' · <span class="no256">experts disagree</span>':'';
-      return '<div class="dd-row'+(o===d.best?' dd-best':'')+'"><div><span class="src">'+esc(MKN256[o.t])+'</span><div><b>'+esc(o.pick)+'</b></div></div><div class="dd-r">'+(o.p!=null?Math.round(o.p*100)+'% chance':'')+'<div><b>'+o.score+'</b>'+(o.grade?' <span class="src">('+esc(o.grade)+')</span>':'')+ex+'</div></div></div>'}).join('')+'</div>';
+      return '<div class="dd-row'+(o===d.best?' dd-best':'')+'"><div><span class="src">'+esc(MKN256[o.t])+'</span><div><b>'+esc(o.pick)+'</b></div></div><div class="dd-r">'+(o.p!=null?Math.round(o.p*100)+'% chance':'')+'<div>'+grPill(ddLetter293(o))+ex+'</div></div></div>'}).join('')+'</div>';
     if(d.best&&d.best.x){var lg0=gameLeg(g,d.best.x),on=inSlip(lg0.key);h+='<div style="margin-top:10px"><button class="btn'+(on?'':' primary')+'" data-act="gsadd" data-id="'+esc(g.id)+'" data-pk="'+esc(d.best.x.pick)+'">'+(on?'In slip ✓':'+ Add best bet to slip')+'</button></div>'}
     h+='</div>';
   }else h+='<div class="card dd256"><p class="src" style="margin:0">Not enough data yet for Hitboard’s pick. It fills in once the app has read both teams’ results and a line is posted.</p></div>';
@@ -17396,7 +17396,7 @@ ddHtml=function(g){
   h+=blk('How they’re playing',fm);
   if(d){h+=blk('Why',ul(d.why.map(esc)));h+=blk('What could go wrong',ul(d.risk.filter(function(r){return !/ injuries: /.test(r)}).map(esc)))}
   if(e)h+='<p class="src" style="margin:10px 0 0">Experts (research entered '+esc(EXP_AT)+'): '+esc(e.ln||'')+' · '+esc(e.ag||'')+'</p>';
-  if(d&&d.best)h+='<p class="src" style="margin:6px 0 0">Hitboard pick is the app’s predicted score. Best bet score out of 100: Hitboard’s grade for the bet, raised or lowered for the experts, line movement and the price. Strong is 72 and up, Lean 62 to 71.</p>';
+  if(d&&d.best)h+='<p class="src" style="margin:6px 0 0">Hitboard pick is the app’s predicted score. Best bet grade A+ to F: Hitboard’s grade for the bet, raised or lowered for the experts, line movement and the price. B- and up is a bet worth considering.</p>';
   return h;
 };
 
@@ -19677,7 +19677,7 @@ function pick284(g,d,X,e){
       var sd=sideOfPick284(g,o),sim=null;
       try{if(X){if(t==='ml'&&sd)sim=(sd==='h'?X.wh:X.wa)/X.N;else if(t==='sp'&&o.x&&o.x.num!=null&&sd)sim=simCover276(X,sd,+o.x.num).p;else if(t==='tot'&&o.x&&o.x.num!=null)sim=simTotal276(X,+o.x.num,!!o.x.over).p}}catch(err){}
       var ex='';try{ex=o.plus.some(function(s){return /expert/i.test(s)})?'<span class="ok256">experts agree</span>':o.minus.some(function(s){return /expert/i.test(s)})?'<span class="no256">experts disagree</span>':''}catch(err){}
-      return '<div class="dd-row'+(d.best&&o===d.best?' dd-best':'')+'"><div><span class="src">'+esc(MKN256[t])+'</span><div><b>'+esc(o.pick)+'</b></div><div class="src">'+(o.p!=null?'Hitboard '+Math.round(o.p*100)+'%':'')+(sim!=null?' · simulation '+pct(sim)+'%':'')+(ex?' · '+ex:'')+'</div></div><div class="dd-r" style="text-align:right">'+(o.score!=null?'<b>'+o.score+'</b>'+(o.grade?' <span class="src">('+esc(o.grade)+')</span>':''):'')+'<div style="margin-top:4px">'+slipBtn284(g,o.x)+'</div></div></div>'}).join('')+'</div>';
+      return '<div class="dd-row'+(d.best&&o===d.best?' dd-best':'')+'"><div><span class="src">'+esc(MKN256[t])+'</span><div><b>'+esc(o.pick)+'</b></div><div class="src">'+(o.p!=null?'Hitboard '+Math.round(o.p*100)+'%':'')+(sim!=null?' · simulation '+pct(sim)+'%':'')+(ex?' · '+ex:'')+'</div></div><div class="dd-r" style="text-align:right">'+(o.score!=null?grPill(ddLetter293(o)):'')+'<div style="margin-top:4px">'+slipBtn284(g,o.x)+'</div></div></div>'}).join('')+'</div>';
   }
   var fl=[];
   try{var ln=lineFor(g);if(ln){var sp=ln.pts!=null?(ln.fav==='h'?g.h:g.a)+' '+(ln.pts===0?'PK':'-'+ln.pts):'';fl.push('Line: '+[sp,ln.tt!=null?'O/U '+ln.tt:''].filter(Boolean).join(' · '))}}catch(err){}
@@ -19686,7 +19686,7 @@ function pick284(g,d,X,e){
   var wx=wxLine282(g);if(wx&&/mph|rain|snow/i.test(wx)&&!/not windy/i.test(wx))fl.push('Weather: '+esc(wx));
   if(e&&e.ag)fl.push('Experts: '+esc(e.ag));
   if(fl.length)h+='<div class="src" style="margin-top:10px;line-height:1.5">'+fl.join('<br>')+'</div>';
-  if(d&&d.best)h+='<p class="src" style="margin:8px 0 0">Score out of 100 is Hitboard’s grade for the bet after the experts, line movement and price. Strong is 72 and up, Lean 62 to 71. The simulation is a second opinion and does not change the grade.</p>';
+  if(d&&d.best)h+='<p class="src" style="margin:8px 0 0">The grade (A+ to F) is Hitboard’s grade for the bet after the experts, line movement and price; B- and up is a bet worth considering. The simulation is a second opinion and does not change the grade.</p>';
   return h+'</div>';
 }
 /* ---------- 2 · Why ---------- */
@@ -20041,7 +20041,7 @@ function tpLegs288(){
     if(kind(g)!=='up'||!(g.start>now)||!T.ok(g))return;
     var d=ddCached(g);if(d===undefined&&budget.n>0){budget.n--;try{d=ddFor(g)}catch(e){d=null}}
     if(d===undefined){budget.pend++;return}
-    var b=d&&d.best;if(!b||!b.x||b.p==null||b.score<62)return;
+    var b=d&&d.best;if(!b||!b.x||b.p==null||b.score<58)return;
     L.push({g:g,b:b,score:b.score,p:b.p,pr:b.pr!=null?b.pr:-110});
   })});
   L.sort(function(a,b){return b.score-a.score||b.p-a.p});
@@ -20068,14 +20068,14 @@ function tpBuild288(L){
   return pick.sort(function(x,y){return y.gr.score-x.gr.score||y.p-x.p});
 }
 function tpSection288(){
-  var R=tpLegs288(),L=R.L,h='<h3 style="margin-top:14px">Top graded parlays</h3><p class="src" style="margin-top:0">Hitboard’s best-graded bets from every sport and start time, one per game, combined into 2-, 3- and 4-leg parlays. The parlay grade (out of 100) is built from its legs’ grades and leans on the weakest leg; Strong is 72+, Lean 62–71. Legs are in different games, so the chance all hit is the legs multiplied together.</p>';
+  var R=tpLegs288(),L=R.L,h='<h3 style="margin-top:14px">Top graded parlays</h3><p class="src" style="margin-top:0">Hitboard’s best-graded bets from every sport and start time, one per game, combined into 2-, 3- and 4-leg parlays. The parlay grade (A+ to F) is built from its legs’ grades and leans on the weakest leg. Every leg is graded B- or better, and legs are in different games, so the chance all hit is the legs multiplied together.</p>';
   TP288={};
-  if(L.length<2){h+='<div class="card empty">'+(R.pend?'Scoring games…':'Fewer than two games have a Strong or Lean bet for this day. Try This week.')+'</div>'}
+  if(L.length<2){h+='<div class="card empty">'+(R.pend?'Scoring games…':'Fewer than two games have a B- or better bet for this day. Try This week.')+'</div>'}
   else tpBuild288(L).forEach(function(o,i){
     var id='tp'+i;TP288[id]=o.legs;
     var inAll=o.legs.every(function(x){return inSlip(gameLeg(x.g,x.b.x).key)});
     var am=o.dec>=2?'+'+Math.round((o.dec-1)*100):'-'+Math.round(100/(o.dec-1));
-    var pill='<span class="hrpill '+(o.gr.conf==='Strong'?'hi':o.gr.conf==='Lean'?'':'lo')+'" style="display:inline-block;font-weight:700">'+esc(o.gr.conf)+' · '+o.gr.score+'</span>';
+    var pill=grPill(grLetter(o.gr.score-50));
     h+='<div class="card" style="padding:12px 14px;margin-bottom:10px"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b>'+o.n+'-leg parlay · '+esc(o.sports.map(lgName).join(' + '))+'</b><span style="flex:none;white-space:nowrap">'+pill+'</span></div>'+
       o.legs.map(function(x){return '<div data-act="fgame" data-id="'+esc(x.g.id)+'" style="padding:8px 0;border-top:1px solid var(--line);cursor:pointer;display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><div style="min-width:0"><b>'+esc(x.b.pick)+'</b><div class="src">'+esc(lgName(x.g.lg))+' · '+esc((x.g.an||x.g.a)+' @ '+(x.g.hn||x.g.h))+' · '+esc(gTime(x.g))+'</div><div class="src">'+esc(MKN256[x.b.t]||'')+' · model '+Math.round(x.p*100)+'%</div></div><span style="flex:none;white-space:nowrap">'+ddConfPill(x.b)+'</span></div>'}).join('')+
       '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:8px"><span class="src">All '+o.n+' hit: about '+Math.round(o.p*100)+'% · pays about '+am+'</span><button class="btn'+(inAll?'':' primary')+'" style="flex:none;padding:8px 12px" data-act="tp288add" data-k="'+id+'">'+(inAll?'In slip ✓':'+ Add to slip')+'</button></div></div>';
@@ -20241,147 +20241,199 @@ gradeAuto=function(){
   };
 })();
 (function(){var add=function(t,s){var T=KEYOUT.nfl[t]||(KEYOUT.nfl[t]={items:[],chg:[]});var nm=normName(String(s).replace(/:[a-z]$/,'').replace(/^\S+\s+/,''));T.items=T.items.filter(function(x){return normName(String(x).replace(/:[a-z]$/,'').replace(/^\S+\s+/,''))!==nm});T.items.push(s)};add('BUF','CB Christian Benford:o');})();
-/* v292: Report cards tab. Every pick Hitboard grades B- or better, in one list for building parlays: spreads, winners
-   and totals from each game's report card, and player props from the props board. A grades first, then B grades.
-   Uses the sport chips and the Today / Tomorrow / This week choice; each card adds to the betslip. */
-var RC292={},_rc292=null,_rcC292={k:'',v:null},_rcG292={};
-var RC_MIN292='B-';
-function rcOk292(l){try{return gradeRank(l)>=gradeRank(RC_MIN292)}catch(e){return false}}
-function rcGameGrades292(g){
-  var k=g.id+'|'+S.dlV+'|'+S.feedAt+'|'+Math.floor(Date.now()/120000),c=_rcG292[g.id];
-  if(c&&c.k===k)return c.v;
-  var v=null;try{v=hbGradesFor(g)||{}}catch(e){v={}}
-  _rcG292[g.id]={k:k,v:v};return v;
+/* v293: one grading scale and the simulation beside every pick.
+   (1) Game bets are graded A+ to F everywhere, from the same score the Deep dive uses (score 50 = an even bet; B- is 58+).
+   (2) Picks has a "B or better" view listing every spread, winner and total graded B- or better, not just one bet per game.
+   (3) Props' "Top graded" filter is now "B or better".
+   (4) Parlays opens with "Best 3 from different games", taken from B- or better game bets and props.
+   (5) Each game pick shows how often it hit in the 10,000-game simulation of that matchup, and says when the simulation
+       leans the other way; props use the simulation's chance when it has run.
+   (6) The separate Grades tab is gone. */
+var RC_MIN293='B-',RC293={},_simWait293=false,_simTry293={k:'',n:0},_pend293=null;
+function rcOk292(l){try{return gradeRank(l)>=gradeRank(RC_MIN293)}catch(e){return false}}
+function bcOf293(lg){var c=pbCats(lg)||[];return c.some(function(x){return x[0]===S.bc})?S.bc:(c[0]?c[0][0]:S.bc)}
+function ddLetter293(b){return grLetter(((b&&b.score)||0)-50)}
+ddConfPill=function(b){if(!b)return '';return grPill(ddLetter293(b))};
+/* simulation chance for one game bet: undefined while it is still running, null when the game cannot be simulated */
+function simPick293(g,x){
+  if(!g||!x||kind(g)!=='up')return null;
+  if(!SIM276.c[g.id]){var I=null;try{I=simInputs276(g)}catch(e){}if(!I)return null}
+  var X=null;try{X=simReady276(g)}catch(e){}
+  if(!X)return undefined;
+  try{
+    if(x.t==='ml'){var w=x.side==='h'?X.wh:x.side==='a'?X.wa:null;return w==null?null:{p:w/X.N,push:0,N:X.N}}
+    if(x.t==='sp'&&x.num!=null&&x.side){var c=simCover276(X,x.side,+x.num);c.N=X.N;return c}
+    if(x.t==='tot'&&x.num!=null){var t=simTotal276(X,+x.num,!!x.over);t.N=X.N;return t}
+  }catch(e){}
+  return null;
 }
-function rcCached292(g){var c=_rcG292[g.id];return !!(c&&c.k===g.id+'|'+S.dlV+'|'+S.feedAt+'|'+Math.floor(Date.now()/120000))}
+function simTxt293(g,x){
+  var s=simPick293(g,x);
+  if(s===undefined){_simWait293=true;return ''}
+  if(!s||!(s.p>=0))return '';
+  var verb=x.t==='sp'?'covers':x.t==='ml'?'wins':'hits',pc=simPct276(s.p);
+  return '<div class="src" style="margin-top:4px">Simulated '+s.N.toLocaleString()+' games: '+verb+' in <b>'+pc+'%</b>'+(s.push>=.02?' (push '+simPct276(s.push)+'%)':'')+
+    (s.p<.48?' · <span class="no256">the simulation leans the other way</span>':s.p>=.55?' · <span class="ok256">the simulation agrees</span>':'')+'</div>';
+}
+/* simulation chance for a prop, the same way the prop cards compute it */
+function simPropP293(lg,r,cat,line,dir){
+  try{
+    if(!SIM_CAT276[cat]||line==null)return null;
+    var g=simGameFor276(lg,r.t);if(!g)return null;
+    if(!SIM276.c[g.id]&&!simInputs276(g))return null;
+    var X=simReady276(g);if(!X)return undefined;
+    var side=simSide276(g,r.t),mu=+r.proj;if(!side||!(mu>0))return null;
+    var v=simVec276(g,X,side,cat,mu,r.n);if(!v)return null;
+    var st=simStats276(v,line);return dir==='Under'?st.pUnder:st.pOver;
+  }catch(e){return null}
+}
+/* props cards: no "Simulation: running…" bar while it works; the line appears once the simulation is done */
+(function(){var sp0=simPropLine276;simPropLine276=function(){var h=sp0.apply(this,arguments);return /running…/.test(h||'')?'':h}})();
+/* chance for a prop leg: the simulation, then his hit rate on the line, then an estimate from the grade */
 function rcPropP292(lg,cat,o,dir,letter){
-  /* how often he has cleared (or stayed under) this line, last 10 games counting double; with no game log loaded,
-     a conservative chance from the grade */
+  var sp=simPropP293(lg,o.r,cat,o.ln.v,dir);
+  if(sp===undefined)_simWait293=true;
+  if(typeof sp==='number'&&sp>0)return {p:Math.max(.05,Math.min(.95,sp)),src:'sim'};
   try{
     var c=o.c;if(!c){try{c=pbCalc(lg,cat,o.r.n,o.ln.v,o.opp,false)}catch(e){c=null}}
     var f=function(w){return w&&w.n&&w.h?(dir==='Over'?w.h.o:w.h.u):0},n=function(w){return w&&w.n&&w.h?w.n:0};
     var tot=c?2*n(c.l10)+n(c.s):0;
-    if(c&&n(c.l10)>=5&&tot)return {p:Math.max(.3,Math.min(.85,(2*f(c.l10)+f(c.s))/tot)),hr:true};
+    if(c&&n(c.l10)>=5&&tot)return {p:Math.max(.3,Math.min(.85,(2*f(c.l10)+f(c.s))/tot)),src:'hr'};
   }catch(e){}
   var E={'A+':.66,'A':.63,'A-':.6,'B+':.58,'B':.56,'B-':.54};
-  return {p:E[letter]||.55,hr:false};
+  return {p:E[letter]||.55,src:'est'};
 }
-function rcList292(){
-  var T=gdTest(),now=Date.now(),key=[S.gs,T.sel,S.feedAt,S.dlV,Math.floor(now/120000)].join('|');
-  if(_rcC292.k===key&&_rcC292.v&&!_rcC292.v.pend)return _rcC292.v;
-  var out=[],pend=0,budget=14,games={};
-  var sportOn=function(lg){return !S.gs||S.gs==='all'||S.gs===lg};
-  /* game bets */
-  ['nfl','ncaafb','nba','nhl','ncaamb'].forEach(function(lg){if(!sportOn(lg))return;(S.feed[lg]||[]).forEach(function(g){
-    if(kind(g)!=='up'||!(g.start>now)||g.start>now+8*864e5||!T.ok(g))return;
-    games[g.id]=g;
-    if(!rcCached292(g)){if(budget<=0){pend++;return}budget--}
-    var v=rcGameGrades292(g),pk=[];try{pk=picksFor(g)||[]}catch(e){}
-    ['sp','ml','tot'].forEach(function(t){
-      var gr=v[t];if(!gr||!gr.l||!rcOk292(gr.l))return;
-      var x=pk.filter(function(q){return q&&q.t===t&&(!gr.pick||q.pick===gr.pick)})[0]||pk.filter(function(q){return q&&q.t===t})[0];if(!x||x.p==null)return;
-      var why='';try{var it=gmItem(g,x),G=it&&gradeGame(it),W=G&&grWhy(G,1);if(W&&W.pro[0])why=W.pro[0].txt}catch(e){}
-      var leg=gameLeg(g,x);
-      out.push({type:'game',lg:lg,g:g,x:x,l:gr.l,sum:gr.sum||0,p:x.p,pick:x.pick||gr.pick,mk:MKN256[t]||'Game bet',why:why,leg:leg,gid:g.id});
+function rcPTxt293(x){
+  return x.src==='sim'?'Simulation: '+(x.dir==='Under'?'stays under':'goes over')+' in '+simPct276(x.p)+'% of '+SIM276.N.toLocaleString()+' games':
+    x.src==='hr'?'Hit this line in '+Math.round(x.p*100)+'% of recent games':'About '+Math.round(x.p*100)+'% from the grade (game log not loaded yet)';
+}
+/* every game bet graded B- or better (or every game's best bet), scored with the Deep dive */
+function gameBets293(T,mode,budget){
+  var now=Date.now(),out=[];
+  LG.forEach(function(l){var lg=l[0];if(S.gs&&S.gs!=='all'&&S.gs!==lg)return;(S.feed[lg]||[]).forEach(function(g){
+    if(kind(g)!=='up'||!(g.start>now)||!T.ok(g))return;
+    var d=ddCached(g);if(d===undefined&&budget.n>0){budget.n--;try{d=ddFor(g)}catch(e){d=null}}
+    if(d===undefined){budget.pend++;return}
+    if(!d||!d.mk)return;
+    (mode==='best'?(d.best?[d.best]:[]):d.mk).forEach(function(m){
+      var l2=ddLetter293(m);if(mode!=='best'&&(!rcOk292(l2)||!m.x||m.p==null))return;
+      out.push({type:'game',lg:lg,g:g,d:d,b:m,x:m.x,l:l2,sum:(m.score||0)-50,p:m.p,pick:m.pick,mk:MKN256[m.t]||'Game bet',why:(m===d.best?d.why[0]:m.plus[0])||m.plus[0]||'',leg:m.x?gameLeg(g,m.x):null,gid:g.id});
     });
   })});
-  /* player props */
-  ['nfl','nba','ncaafb','ncaamb','nhl'].forEach(function(lg){if(!sportOn(lg))return;
+  out.sort(function(a,b){return gradeRank(b.l)-gradeRank(a.l)||b.sum-a.sum||a.g.start-b.g.start});
+  return out;
+}
+/* every player prop graded B- or better */
+var _pp293={k:'',v:null};
+function propBets293(T){
+  var now=Date.now(),key=[S.gs,T.sel,S.feedAt,S.dlV,Math.floor(now/120000)].join('|');
+  if(_pp293.k===key&&_pp293.v&&!_pp293.wait)return _pp293.v;
+  var out=[],w0=_simWait293;_simWait293=false;
+  ['nfl','nba','ncaafb','ncaamb','nhl'].forEach(function(lg){if(S.gs&&S.gs!=='all'&&S.gs!==lg)return;
     var cats=[];try{cats=pbCats(lg)||[]}catch(e){}
     cats.forEach(function(cc){
       var rows=[];try{rows=pbRows(lg,cc[0])||[]}catch(e){}
       rows.forEach(function(o){
         try{
           if(!o||!o.r||!o.ln||!(o.ln.v>0))return;
-          var gid=feedGidFor(lg,o.r.t);if(!gid)return;var g=games[gid]||find(gid);if(!g||kind(g)!=='up'||!(g.start>now)||!T.ok(g))return;
+          var gid=feedGidFor(lg,o.r.t);if(!gid)return;var g=find(gid);if(!g||kind(g)!=='up'||!(g.start>now)||!T.ok(g))return;
           try{if(isOutInj({lg:lg,n:o.r.n,t:o.r.t}))return}catch(e){}
-          var G=gradeBest(lg,o.cat||cc[0],o.r,o);if(!G||!G.letter||!rcOk292(G.letter))return;
-          var lab=String(cc[1]||o.cat).toLowerCase(),pick=o.r.n+' '+G.dir+' '+o.ln.v+' '+lab,PP=rcPropP292(lg,o.cat||cc[0],o,G.dir,G.letter),p=PP.p;
+          var cat=o.cat||cc[0],G=gradeBest(lg,cat,o.r,o);if(!G||!G.letter||!rcOk292(G.letter))return;
+          var lab=String(cc[1]||cat).toLowerCase(),pick=o.r.n+' '+G.dir+' '+o.ln.v+' '+lab,PP=rcPropP292(lg,cat,o,G.dir,G.letter);
           var W=null;try{W=grWhy(G,1)}catch(e){}
           var sub=lgName(lg)+' · '+(g.a+' @ '+g.h)+' · '+gTime(g);
-          var leg={lg:lg,kind:'rec',name:pick,team:o.r.t,mk:'Report card '+G.letter,p:p,src:PP.hr?'Hit rate on this line':'Estimated from the grade',nx:{txt:sub},gid:gid,rec:null,pro:(W&&W.pro||[]).map(function(f){return f.txt}),con:(W&&W.con||[]).map(function(f){return f.txt})};
-          leg.key='rec|'+pick+'|'+sub;
-          out.push({type:'prop',lg:lg,g:g,o:o,cat:o.cat||cc[0],l:G.letter,sum:G.sum||0,p:p,pick:pick,mk:String(cc[1]||'Prop'),why:W&&W.pro[0]?W.pro[0].txt:'',leg:leg,gid:gid,pn:normName(o.r.n),hr:PP.hr});
+          var x={type:'prop',lg:lg,g:g,o:o,cat:cat,l:G.letter,sum:G.sum||0,p:PP.p,src:PP.src,dir:G.dir,pick:pick,mk:String(cc[1]||'Prop'),why:W&&W.pro[0]?W.pro[0].txt:'',gid:gid,pn:normName(o.r.n)};
+          x.leg={lg:lg,kind:'rec',name:pick,team:o.r.t,mk:'Grade '+G.letter,p:PP.p,src:rcPTxt293(x),nx:{txt:sub},gid:gid,rec:null,pro:(W&&W.pro||[]).map(function(f){return f.txt}),con:(W&&W.con||[]).map(function(f){return f.txt})};
+          x.leg.key='rec|'+pick+'|'+sub;
+          out.push(x);
         }catch(e){}
       });
     });
   });
   out.sort(function(a,b){return gradeRank(b.l)-gradeRank(a.l)||b.sum-a.sum||b.p-a.p});
-  var R={L:out,pend:pend};_rcC292={k:key,v:R};return R;
+  _pp293={k:key,v:out,wait:_simWait293};_simWait293=_simWait293||w0;
+  return out;
 }
-/* three legs from three different games, best grades first */
+/* three legs from three different games, best grades first, never the same player twice */
 function rcTop3292(L){
   var used={},pl={},pick=[];
-  L.forEach(function(x){if(pick.length>=3||used[x.gid])return;if(x.pn&&pl[x.pn])return;used[x.gid]=1;if(x.pn)pl[x.pn]=1;pick.push(x)});
+  L.forEach(function(x){if(pick.length>=3||!x.leg||used[x.gid])return;if(x.pn&&pl[x.pn])return;used[x.gid]=1;if(x.pn)pl[x.pn]=1;pick.push(x)});
   return pick;
 }
-function rcCard292(x,i){
-  var id='rc'+i;RC292[id]=x;
-  var on=inSlip(x.leg.key);
-  var tap=x.type==='game'?'data-act="fgame" data-id="'+esc(x.g.id)+'"':
-    'data-act="pbk" data-n="'+esc(x.o.r.n)+'" data-lg="'+x.lg+'" data-cat="'+esc(x.cat)+'" data-team="'+esc(x.o.r.t)+'" data-opp="'+esc(x.o.opp||'')+'" data-proj="'+(x.o.r.proj||0)+'" data-ptx="'+esc(x.o.r.projTxt||'')+'" data-unit="'+esc(x.o.r.unit||'')+'" data-when="'+esc(x.o.r.when||'')+'" data-def="'+esc(x.o.r.def&&x.o.r.def.txt||'')+'"';
-  return '<div class="card" style="padding:10px 12px;margin-bottom:8px;display:flex;gap:10px;align-items:flex-start">'+
-    '<div style="flex:none;min-width:38px;text-align:center;padding-top:2px">'+grPill(x.l)+'</div>'+
-    '<div '+tap+' style="min-width:0;flex:1;cursor:pointer"><b>'+esc(x.pick)+'</b>'+
-      '<div class="src">'+esc(x.type==='game'?x.mk:'Prop · '+x.mk)+' · '+esc(lgName(x.lg))+' · '+esc(x.g.a+' @ '+x.g.h)+' · '+esc(gTime(x.g))+'</div>'+
-      (x.why?'<div class="src" style="margin-top:2px">'+esc(x.why)+'</div>':'')+
-      '<div class="src" style="margin-top:2px">'+(x.type==='game'?'Model '+Math.round(x.p*100)+'%':x.hr?'Hit this line in '+Math.round(x.p*100)+'% of recent games':'About '+Math.round(x.p*100)+'% from the grade (game log not loaded yet)')+'</div></div>'+
-    '<button class="btn'+(on?'':' primary')+'" style="flex:none;padding:8px 10px" data-act="rc292add" data-k="'+id+'" aria-label="'+(on?'Remove from slip':'Add to slip')+': '+esc(x.pick)+'">'+(on?'In slip ✓':'+ Add')+'</button></div>';
+function addBtn293(x){
+  if(!x.leg)return '';
+  var id='r'+Object.keys(RC293).length;RC293[id]=[x.leg];var on=inSlip(x.leg.key);
+  return '<button class="btn'+(on?'':' primary')+'" style="flex:none;padding:8px 10px" data-act="rc293add" data-k="'+id+'" aria-label="'+(on?'Remove from slip':'Add to slip')+': '+esc(x.pick)+'">'+(on?'In slip ✓':'+ Add')+'</button>';
 }
-function vRc292(){
-  RC292={};
-  var sel=S.gd==='prev'?'week':(S.gd||gdTest().sel),f=S.rcf||'all',R={L:[],pend:0};
-  try{R=rcList292()}catch(e){}
-  var L=R.L.filter(function(x){return f==='all'||x.type===f});
-  var h='<h2>Report cards</h2>'+gsChips()+refreshBar()+
-    '<div class="chips" role="group" aria-label="Day">'+[['today','Today'],['tomorrow','Tomorrow'],['week','This week']].map(function(m){return '<button class="chip" data-act="set" data-k="gd" data-v="'+m[0]+'" aria-pressed="'+(sel===m[0])+'">'+m[1]+'</button>'}).join('')+'</div>'+
-    '<div class="chips" role="group" aria-label="Bet type">'+[['all','All'],['game','Game bets'],['prop','Props']].map(function(m){return '<button class="chip" data-act="set" data-k="rcf" data-v="'+m[0]+'" aria-pressed="'+(f===m[0])+'">'+m[1]+'</button>'}).join('')+'</div>'+
-    '<p class="src">Every pick Hitboard grades B- or better: spreads, winners and totals, and player props. The grade is how likely the pick is to hit, A+ to F. For a parlay, take legs from different games, since bets on the same game tend to win or lose together.</p>';
-  if(!L.length){
-    h+='<div class="card empty">'+(R.pend?'Grading games…':'No B- or better picks for this selection yet. Try This week or another sport.')+'</div>';
-  }else{
-    var top=rcTop3292(L);
-    if(top.length>=2){
-      var p=top.reduce(function(a,x){return a*x.p},1),allIn=top.every(function(x){return inSlip(x.leg.key)});
-      RC292.top=top;
-      h+='<div class="card" style="padding:12px 14px;margin-bottom:12px"><b>Best '+top.length+' from different games</b><ul class="pts" style="margin:6px 0">'+top.map(function(x){return '<li>'+grPill(x.l)+' '+esc(x.pick)+' <span class="src">'+esc(lgName(x.lg))+'</span></li>'}).join('')+'</ul>'+
-        '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span class="src">All '+top.length+' hit: about '+Math.round(p*100)+'%</span><button class="btn'+(allIn?'':' primary')+'" style="flex:none;padding:8px 12px" data-act="rc292top">'+(allIn?'In slip ✓':'+ Add all '+top.length)+'</button></div></div>';
-    }
-    var n=S.rcn||30,shown=0,i=0;
-    [['A','A grades'],['B','B grades']].forEach(function(bd){
-      var B=L.filter(function(x){return x.l[0]===bd[0]});if(!B.length)return;
-      h+='<h3 style="margin-top:14px">'+bd[1]+' <span class="src">('+B.length+')</span></h3>';
-      B.forEach(function(x){if(shown>=n)return;h+=rcCard292(x,i++);shown++});
-    });
-    if(L.length>shown)h+='<button class="btn" style="width:100%;margin:4px 0 10px" data-act="rc292more">Show more ('+(L.length-shown)+' left)</button>';
-  }
-  if(R.pend){h+='<p class="src">Grading '+R.pend+' more game'+(R.pend>1?'s':'')+'…</p>';clearTimeout(_rc292);_rc292=setTimeout(function(){try{if(S.tab==='rc'&&!S.sheet)render()}catch(e){}},500)}
+/* re-draw once more simulations or grades have finished (a few tries at most) */
+function retry293(tab,pend){
+  if(!pend&&!_simWait293)return;
+  var k=tab+'|'+S.gs+'|'+S.gd+'|'+S.pkb;if(_simTry293.k!==k)_simTry293={k:k,n:0};
+  if(_simTry293.n>=10)return;_simTry293.n++;
+  clearTimeout(_pend293);_pend293=setTimeout(function(){try{if(S.tab===tab&&!S.sheet){var y=window.scrollY;render();window.scrollTo(0,y)}}catch(e){}},pend?600:1500);
+}
+/* ---------- Picks ---------- */
+vPicks2=function(){
+  RC293={};_simWait293=false;
+  var T=gdTest(),sel=S.gd==='prev'?'week':(S.gd||T.sel),mode=S.pkb==='b'?'b':'best',budget={n:16,pend:0};
+  var R=[];try{R=gameBets293(T,mode,budget)}catch(e){}
+  var h='<h2>Picks</h2>'+gsChips()+'<div class="chips" role="group" aria-label="Day">'+[['today','Today'],['tomorrow','Tomorrow'],['week','This week']].map(function(m){return '<button class="chip" data-act="set" data-k="gd" data-v="'+m[0]+'" aria-pressed="'+(sel===m[0])+'">'+m[1]+'</button>'}).join('')+'</div>'+
+    '<div class="chips" role="group" aria-label="Show">'+[['best','Best bet per game'],['b','B or better']].map(function(m){return '<button class="chip" data-act="set" data-k="pkb" data-v="'+m[0]+'" aria-pressed="'+(mode===m[0])+'">'+m[1]+'</button>'}).join('')+'</div>';
+  h+='<p class="src" style="margin:4px 0 10px">'+(mode==='best'?'The best bet from every game’s Deep dive, best grade first.':'Every spread, winner and total graded B- or better, best first. A game can have more than one.')+' Grades run A+ to F; B- and up is a bet worth considering. The simulation line is how often the pick hit when the game was played 10,000 times. Tap a game for the full breakdown.</p>';
+  if(!R.length&&!budget.pend)h+='<div class="card empty">'+(mode==='b'?'No B- or better game bets for this selection yet. Try This week or another sport.':'No games with a recommended bet for this selection yet. Try another day or sport, or tap Refresh on Games.')+'</div>';
+  var show=S.pkAll?R:R.slice(0,25);
+  h+=show.map(function(o,i){
+    var g=o.g,d=o.d,b=o.b,why=o.why||'';
+    var ex=d.e&&b.t==='sp'&&d.e.cov&&b.side?(d.e.cov===b.side?'<span class="ok256">experts agree</span>':'<span class="no256">experts disagree</span>'):d.e&&b.t==='ml'&&d.e.win&&b.side?(d.e.win===b.side?'<span class="ok256">experts agree</span>':'<span class="no256">experts disagree</span>'):'';
+    return '<div class="gc256" style="margin:0 0 10px"><div data-act="fgame" data-id="'+esc(g.id)+'" role="button" tabindex="0" style="cursor:pointer"><div class="gc-top"><span>#'+(i+1)+' · '+esc(lgName(g.lg))+' · '+esc(gTime(g))+'</span><span class="gc-line">'+gcLine256(g)+'</span></div>'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><div><div class="dd-pick" style="font-size:22px">'+esc(b.pick)+'</div><div class="src">'+esc(MKN256[b.t])+' · '+esc((g.an||g.a)+' @ '+(g.hn||g.h))+(b.p!=null?' · model '+Math.round(b.p*100)+'%':'')+'</div></div>'+grPill(o.l)+'</div>'+
+      (why?'<div class="src" style="margin-top:6px">'+esc(why)+'</div>':'')+(ex?'<div style="margin-top:4px;font-size:13px">'+ex+'</div>':'')+(b.x?simTxt293(g,b.x):'')+'</div>'+
+      (o.leg?'<div style="display:flex;justify-content:flex-end;margin-top:8px">'+addBtn293(o)+'</div>':'')+'</div>';
+  }).join('');
+  if(R.length>25)h+='<div style="margin:6px 0 12px"><button class="btn" data-act="set" data-k="pkAll" data-v="'+(S.pkAll?'':'1')+'">'+(S.pkAll?'Show top 25':'Show all '+R.length)+'</button></div>';
+  if(budget.pend)h+='<p class="src">Scoring '+budget.pend+' more game'+(budget.pend>1?'s':'')+'…</p>';
+  retry293('picks2',budget.pend);
   return h+foot();
+};
+/* ---------- Parlays: best 3 from different games, first ---------- */
+function best3Html293(){
+  var T=gdTest(),budget={n:16,pend:0},L=[];
+  try{L=gameBets293(T,'b',budget).concat(propBets293(T))}catch(e){}
+  L.sort(function(a,b){return gradeRank(b.l)-gradeRank(a.l)||b.sum-a.sum||b.p-a.p});
+  var top=rcTop3292(L);
+  retry293('pl4',budget.pend);
+  if(top.length<2)return budget.pend?'<p class="src">Grading games for the best 3…</p>':'';
+  var p=top.reduce(function(a,x){return a*x.p},1),allIn=top.every(function(x){return inSlip(x.leg.key)});
+  RC293.top=top.map(function(x){return x.leg});
+  return '<h3 style="margin-top:14px">Best 3 from different games</h3><div class="card" style="padding:12px 14px;margin-bottom:12px">'+
+    '<p class="src" style="margin:0 0 6px">The three highest-graded bets (B- or better) from three different games: spreads, winners, totals and player props.</p>'+
+    top.map(function(x){var sim=x.type==='game'?simTxt293(x.g,x.x):'<div class="src">'+esc(rcPTxt293(x))+'</div>';
+      return '<div data-act="fgame" data-id="'+esc(x.g.id)+'" style="padding:8px 0;border-top:1px solid var(--line);cursor:pointer;display:flex;gap:10px;align-items:flex-start"><div style="flex:none;padding-top:2px">'+grPill(x.l)+'</div><div style="min-width:0"><b>'+esc(x.pick)+'</b><div class="src">'+esc((x.type==='game'?x.mk:'Prop · '+x.mk)+' · '+lgName(x.lg)+' · '+x.g.a+' @ '+x.g.h+' · '+gTime(x.g))+'</div>'+sim+'</div></div>'}).join('')+
+    '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:8px"><span class="src">All '+top.length+' hit: about '+Math.round(p*100)+'%</span><button class="btn'+(allIn?'':' primary')+'" style="flex:none;padding:8px 12px" data-act="rc293add" data-k="top">'+(allIn?'In slip ✓':'+ Add all '+top.length)+'</button></div></div>';
 }
-document.addEventListener('click',function(e){
-  var el=e.target&&e.target.closest?e.target.closest('[data-act="rc292add"],[data-act="rc292top"],[data-act="rc292more"]'):null;if(!el)return;
-  e.stopImmediatePropagation();e.preventDefault();
-  var a=el.dataset.act;
-  if(a==='rc292more'){S.rcn=(S.rcn||30)+30;render();return}
-  var X=a==='rc292top'?(RC292.top||[]):[RC292[el.dataset.k]].filter(Boolean);if(!X.length)return;
-  var legs=X.map(function(x){return x.leg}),allIn=legs.every(function(l){return inSlip(l.key)});
-  if(allIn)S.slip=S.slip.filter(function(q){return !legs.some(function(l){return l.key===q.key})});
-  else legs.forEach(function(l){if(!inSlip(l.key)&&S.slip.length<15)S.slip.push(l)});
-  saveSlip();updateSlipBar();render();
-},true);
 (function(){
-  if(!TABS.some(function(t){return t[0]==='rc'})){
-    var pi=-1;TABS.forEach(function(t,i){if(t[0]==='pl4')pi=i});
-    TABS.splice(pi>=0?pi+1:TABS.length,0,['rc','Grades','<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h3"/>']);
-  }
-  NAVG.rc=['rc'];
-  var r0=render;
-  render=function(){
-    if(S.tab!=='rc')return r0.apply(this,arguments);
-    var sv=vToday;vToday=vRc292;S.tab='today';
-    try{return r0.apply(this,arguments)}finally{S.tab='rc';vToday=sv;try{renderNav()}catch(e){}}
+  var v0=vPl4;
+  vPl4=function(){
+    RC293={};_simWait293=false;
+    var h=v0.apply(this,arguments),s='';
+    try{s=best3Html293()}catch(e){s=''}
+    if(!s)return h;
+    var m=['<h3 style="margin-top:14px">Top graded parlays</h3>','<h3 style="margin-top:18px">Hitboard’s parlays</h3>'],i=-1;
+    m.forEach(function(x){if(i<0)i=h.indexOf(x)});
+    return i>=0?h.slice(0,i)+s+h.slice(i):h+s;
   };
 })();
+document.addEventListener('click',function(e){
+  var el=e.target&&e.target.closest?e.target.closest('[data-act="rc293add"]'):null;if(!el)return;
+  e.stopImmediatePropagation();e.preventDefault();
+  var legs=RC293[el.dataset.k];if(!legs||!legs.length)return;
+  var allIn=legs.every(function(l){return inSlip(l.key)});
+  if(allIn)S.slip=S.slip.filter(function(q){return !legs.some(function(l){return l.key===q.key})});
+  else legs.forEach(function(l){if(!inSlip(l.key)&&S.slip.length<15)S.slip.push(l)});
+  saveSlip();updateSlipBar();var y=window.scrollY;render();window.scrollTo(0,y);
+},true);
+/* the Grades tab is gone; anyone left on it lands on Picks */
+if(S.tab==='rc')S.tab='picks2';
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
 setTimeout(function(){doRefresh(true)},600);
