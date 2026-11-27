@@ -1957,7 +1957,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v293, Nov 27';
+var BUILD='v294, Nov 29';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -2938,6 +2938,8 @@ function feedCalc(g){
   var T=feedTeams(g);if(!T||T.missing)return null;
   var A=T.A,H=T.H;
   var sa=(A.pf+H.pa)/2-T.he/2,sh=(H.pf+A.pa)/2+T.he/2;
+  /* v294: the stats half counts starters who are out, the same way the predicted score does (the market half already prices them) */
+  try{if(g.lg==='nfl'||g.lg==='ncaafb'){var J=injAdj294(g);if(J){sa=Math.max(0,sa+J.a);sh=Math.max(0,sh+J.h)}}}catch(e){}
   var stP=Phi((sh-sa)/T.sdM),fp=(g.pa!=null&&g.ph!=null)?g.ph/(g.pa+g.ph):null;
   var p=fp!=null?0.3*stP+0.7*fp:stP,ln=lineFor(g);
   var pModel=p,mkH=(ln&&ln.mlP!=null)?ln.mlP:null;if(mkH!=null){var wM=mktW(g.lg);p=wM*mkH+(1-wM)*p}
@@ -2958,7 +2960,7 @@ function feedCalc(g){
     var te=total-ln.tt;
     bets.push({t:'tot',over:te>=0,num:ln.tt,mk:'Total',pick:(te>=0?'Over ':'Under ')+ln.tt,p:calibTotal(Phi(Math.abs(te)/T.sdT),te<0,wxa),conf:'low',why:'Blended total '+total.toFixed(1)+' versus the listed '+ln.tt+'.'});
   }
-  bets.forEach(function(b){b.p0=b.p;b.p=(g.lg==='nhl'&&b.t==='sp')?Math.max(.3,Math.min(.8,b.p+(LN.dp.sp||0))):learnP(LN,b.t,b.p);b.rm=rawM;b.rt=rawT;b.pmH=pModel;b.mkH=mkH;b.src=ln&&ln.srcs?ln.srcs.join(', '):null});
+  bets.forEach(function(b){b.p0=b.p;b.p=(g.lg==='nhl'&&b.t==='sp')?Math.max(.3,Math.min(.8,b.p+(LN.dp.sp||0))):learnP(LN,b.t,b.p);b.rm=rawM;b.fm=margin;b.rt=rawT;b.pmH=pModel;b.mkH=mkH;b.src=ln&&ln.srcs?ln.srcs.join(', '):null});
   return {T:T,p:p,fp:fp,ln:ln,total:total,margin:margin,bets:bets,LN:LN};
 }
 function matchupText(g,Ra,Rh){
@@ -19708,11 +19710,18 @@ function why284(g,d,X,e){
   h+=sub284('Why the '+esc(nm(win))+' should win')+ul284(u284(W).slice(0,5));
   /* spread */
   if(oSP){var cs=sideOfPick284(g,oSP),num=oSP.x&&oSP.x.num!=null?+oSP.x.num:null,C=[];
-    if(num!=null){var sp=Math.abs(num),unit=g.lg==='nhl'?'goals':'points';
-      var mt=marg<1?'less than a '+unit.replace(/s$/,''):'about '+fmt(marg)+' '+unit;
-      if(cs===win&&num<0){if(marg>sp+.5)C.push('Hitboard projects the '+esc(nm(win))+' to win by '+mt+', more than the '+sp+' they give.');else if(marg>=sp-.5)C.push('Hitboard projects the '+esc(nm(win))+' to win by '+mt+', right at the '+sp+'-'+unit.replace(/s$/,'')+' line, so this is close to a coin flip.');else C.push('Hitboard projects the '+esc(nm(win))+' to win by '+mt+', short of the '+sp+' they give, so laying the points is a coin flip at best'+(oSP.p!=null?' (Hitboard '+Math.round(oSP.p*100)+'%)':'')+'.')}
-      else if(cs!==win)C.push('Hitboard projects the '+esc(nm(win))+' to win by '+mt+', inside the '+sp+' '+unit+' the '+esc(nm(cs))+' get.');
-      else C.push('The '+esc(nm(cs))+' get '+sp+' '+unit+' and Hitboard has them winning outright.')}
+    if(num!=null){var sp=Math.abs(num),unit=g.lg==='nhl'?'goals':'points',u1=unit.replace(/s$/,'');
+      /* the margin that decided the pick: Hitboard's numbers blended with the betting line (home team's view) */
+      var hmP=oSP.x&&oSP.x.fm!=null&&isFinite(oSP.x.fm)?+oSP.x.fm:oSP.x&&oSP.x.rm!=null&&isFinite(oSP.x.rm)?+oSP.x.rm:(ph-pa),fS=hmP>=0?'h':'a',fm=Math.abs(hmP);
+      var edgeP=(cs==='h'?hmP:-hmP)+num,mtP=fm<1?'less than a '+u1:'about '+fmt(fm)+' '+unit;
+      var lead='Hitboard’s line for this game is the '+esc(nm(fS))+' by '+mtP+' (its numbers blended with the betting market)';
+      if(num>0)C.push(lead+(fS===cs?', so the '+esc(nm(cs))+' getting '+sp+' '+unit+' would also be winning outright.':', inside the '+sp+' '+unit+' the '+esc(nm(cs))+' get.'));
+      else C.push(lead+(fm>sp?', more than the '+sp+' the '+esc(nm(cs))+' give.':', right around the '+sp+' the '+esc(nm(cs))+' give.'));
+      if(Math.abs(edgeP)<1.5)C.push('That is within '+(Math.abs(edgeP)<1?'a '+u1:'a '+u1+' and a half')+' of the line, so treat it as close to a coin flip.');
+      /* the predicted score (team stats and players out only) */
+      var hmS=ph-pa,coverS=(cs==='h'?hmS:-hmS)+num;
+      if(coverS<0)C.push('Hitboard’s predicted score, built only from team stats and players out, has the '+esc(nm(hmS>=0?'h':'a'))+' by '+(Math.abs(hmS)<1?'less than a '+u1:'about '+fmt(Math.abs(hmS))+' '+unit)+', which would cover the other way. The betting line pulls this pick back, so it is a lean at best.');
+    }
     MM.filter(function(m){return m.side===cs}).slice(0,1).forEach(function(m){C.push(esc(m.txt));used[m.txt]=1});
     if(e&&e.cov)C.push(e.cov===cs?'Most experts take the '+esc(nm(cs))+' against the spread too.':'Most experts take the '+esc(nm(e.cov))+' against the spread instead.');
     if(g.lg==='nfl'&&X&&num!=null&&Math.abs(num)>=2.5&&Math.abs(num)<=7.5){var k3=((X.mg[3]||0)+(X.mg[-3]||0)+(X.mg[7]||0)+(X.mg[-7]||0))/X.N;C.push('About '+pct(k3)+'% of simulated games land on 3 or 7, the key numbers near this spread.')}
@@ -19892,7 +19901,7 @@ function tracked285(g){
    {a:'DEN',h:'PIT',win:'a',cov:null,tot:null,ln:'Broncos -3 to -3.5, total 36.5 (opened 41.5)',
     ag:'Twelve of 15 writers take Denver to win, but the spread is split 5 to 4 for the Broncos and both computer models project a margin under a field goal',
     why:['Pittsburgh benched and then released Aaron Rodgers; Mason Rudolph starts after throwing only four passes this season.','Pittsburgh allows 3.1 sacks a game; Denver allows 1.2.','Denver has won six straight and is 15-1 as a favorite over its last 16 games; Bo Nix leads the league with five fourth-quarter comebacks.','Pittsburgh is 4-0 straight up and against the spread at home.','The total dropped five points after the quarterback change, and most bets are on the Under.'],
-    watch:['Writers’ predicted scores cluster between 32 and 43 combined points, so a 3.5-point line is a lot in a game this low.','Pittsburgh is unbeaten at home, and one writer picks the Steelers outright.','Cold but dry, around 33 to 42 degrees with light wind.'],
+    watch:['Writers’ predicted scores cluster between 32 and 43 combined points, so a spread of 3.5 points or more is a lot in a game this low.','Pittsburgh is unbeaten at home, and one writer picks the Steelers outright.','Cold but dry, around 33 to 42 degrees with light wind.'],
     preview:['Quarterback is the gap: Pittsburgh turns to Rudolph, who has not reached 178 passing yards in 11 straight appearances, behind a line allowing 3.1 sacks a game, against a Denver defense riding a six-game win streak.','Denver’s offense runs through rookie Jonah Coleman, who scored three times last week while J.K. Dobbins serves a one-game team suspension; Nix has been efficient but modest at about 196 passing yards a game.','Pittsburgh’s best path is Jaylen Warren (747 yards) and its home defense, but Alex Highsmith is doubtful and DK Metcalf is coming off an ejection.','A 36.5 total means one turnover or a special-teams play can swing the spread.'],
     form:['Denver has won six straight, most recently 38-24 over Las Vegas.','Pittsburgh has lost two straight since its bye, 38-18 to Cincinnati and 19-16 at Philadelphia.','Pittsburgh is changing quarterbacks on a short holiday week.'],
     sub:[{out:'Aaron Rodgers',next:'Mason Rudolph',note:'Rodgers had 16 touchdowns and 6 interceptions before the benching; Rudolph is 1 of 4 for 2 yards this season'},{out:'J.K. Dobbins',next:'Jonah Coleman',note:'he ran for 111 yards and three touchdowns in the 38-24 win over Las Vegas'}]},
@@ -20252,6 +20261,8 @@ gradeAuto=function(){
 var RC_MIN293='B-',RC293={},_simWait293=false,_simTry293={k:'',n:0},_pend293=null;
 function rcOk292(l){try{return gradeRank(l)>=gradeRank(RC_MIN293)}catch(e){return false}}
 function bcOf293(lg){var c=pbCats(lg)||[];return c.some(function(x){return x[0]===S.bc})?S.bc:(c[0]?c[0][0]:S.bc)}
+var _inj294={};
+function injAdj294(g){var key=g.id+'|'+Math.floor(Date.now()/60000)+'|'+(S.feedAt||0),c=_inj294[g.id];if(c&&c.k===key)return c.v;var v=null;try{v=injAdj189(g)}catch(e){}_inj294[g.id]={k:key,v:v};return v}
 function ddLetter293(b){return grLetter(((b&&b.score)||0)-50)}
 ddConfPill=function(b){if(!b)return '';return grPill(ddLetter293(b))};
 /* simulation chance for one game bet: undefined while it is still running, null when the game cannot be simulated */
