@@ -1957,7 +1957,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v295, Nov 27';
+var BUILD='v296, Nov 27';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -16811,7 +16811,7 @@ function ddBuild(g){
         var be=pr<0?(-pr)/(-pr+100):100/(pr+100),val=o.p-be;
         o.be=be;o.pr=pr;
         if(val<0){o.adj-=Math.min(20,Math.round(-val*100));o.minus.push('At '+prc(pr)+' this needs to win '+Math.round(be*100)+'% of the time to break even; the model gives it '+Math.round(o.p*100)+'%.')}
-        else if(val>=.03)o.plus.push('The model gives it '+Math.round(o.p*100)+'%, above the '+Math.round(be*100)+'% the '+prc(pr)+' price needs.');
+        else if(val>=.03)o.plus.push('The model gives it '+Math.round(o.p*100)+'%, above the '+Math.round(be*100)+'% it needs to break even at '+prc(pr)+' odds.');
       }
     }catch(x3){}
     if(o.p!=null&&o.p<.55)o.minus.push('The model’s chance is only '+Math.round(o.p*100)+'%, close to a coin flip.');
@@ -17221,7 +17221,7 @@ ddHtml=function(g){
   h+=blk('How the game could go',hw);
   if(d){h+=blk('Why',ul(d.why.map(esc)));h+=blk('What could go wrong',ul(d.risk.map(esc)))}
   if(e)h+='<p class="src" style="margin:10px 0 0">Experts (research entered '+esc(EXP_AT)+'): '+esc(e.ln||'')+' · '+esc(e.ag||'')+'</p>';
-  if(d&&d.best)h+='<p class="src" style="margin:6px 0 0">Grade A+ to F: Hitboard’s grade for the bet, raised or lowered for the experts, line movement and the price. B- and up is a bet worth considering. A guide, not a guarantee.</p>';
+  if(d&&d.best)h+='<p class="src" style="margin:6px 0 0">Grade A+ to F: Hitboard’s grade for the bet, raised or lowered for the experts, line movement and the odds. B- and up is a bet worth considering. A guide, not a guarantee.</p>';
   return h;
 };
 
@@ -17400,7 +17400,7 @@ ddHtml=function(g){
   h+=blk('How they’re playing',fm);
   if(d){h+=blk('Why',ul(d.why.map(esc)));h+=blk('What could go wrong',ul(d.risk.filter(function(r){return !/ injuries: /.test(r)}).map(esc)))}
   if(e)h+='<p class="src" style="margin:10px 0 0">Experts (research entered '+esc(EXP_AT)+'): '+esc(e.ln||'')+' · '+esc(e.ag||'')+'</p>';
-  if(d&&d.best)h+='<p class="src" style="margin:6px 0 0">Hitboard pick is the app’s predicted score. Best bet grade A+ to F: Hitboard’s grade for the bet, raised or lowered for the experts, line movement and the price. B- and up is a bet worth considering.</p>';
+  if(d&&d.best)h+='<p class="src" style="margin:6px 0 0">Hitboard pick is the app’s predicted score. Best bet grade A+ to F: Hitboard’s grade for the bet, raised or lowered for the experts, line movement and the odds. B- and up is a bet worth considering.</p>';
   return h;
 };
 
@@ -19690,7 +19690,7 @@ function pick284(g,d,X,e){
   var wx=wxLine282(g);if(wx&&/mph|rain|snow/i.test(wx)&&!/not windy/i.test(wx))fl.push('Weather: '+esc(wx));
   if(e&&e.ag)fl.push('Experts: '+esc(e.ag));
   if(fl.length)h+='<div class="src" style="margin-top:10px;line-height:1.5">'+fl.join('<br>')+'</div>';
-  if(d&&d.best)h+='<p class="src" style="margin:8px 0 0">The grade (A+ to F) is Hitboard’s grade for the bet after the experts, line movement and price; B- and up is a bet worth considering. The predicted score is the same number the picks use, and the simulation below plays it out 10,000 times.</p>';
+  if(d&&d.best)h+='<p class="src" style="margin:8px 0 0">The grade (A+ to F) is Hitboard’s grade for the bet after the experts, line movement and the odds; B- and up is a bet worth considering. The predicted score is the same number the picks use, and the simulation below plays it out 10,000 times.</p>';
   return h+'</div>';
 }
 /* ---------- 2 · Why ---------- */
@@ -20523,13 +20523,15 @@ function tag295(p){var c=p>=.65?'ok256':p<=.35?'no256':'';var t=Math.round(p*100
 function story295(g,d,X){
   if(!X||!X.N||!X.O)return '';
   var N=X.N,O=X.O,lg=g.lg,football=lg==='nfl'||lg==='ncaafb',nm=function(s){return nick282(g,s)},pct=simPct276,dec=lg==='nhl'?1:0,f0=function(v){return dec?v.toFixed(1):String(Math.round(v))};
-  var unit=lg==='nhl'?'goals':'points';
+  var unit=lg==='nhl'?'goals':'points',u1=lg==='nhl'?'goal':'point',odds=function(pr){return fmtAm(pr)};
   /* the bets (Hitboard's side of the spread, total and winner) and two props */
   var bets=[];
   (d&&d.mk||[]).forEach(function(o){var x=o.x;if(!x)return;var f=hit295(X,x);if(!f)return;
     var pr=o.pr!=null?o.pr:-110,be=o.be!=null?o.be:amBe(pr);
-    bets.push({lab:o.pick,t:o.t,o:o,u:simHits276(X,f),be:be,p:o.p,best:d.best===o})});
+    bets.push({lab:o.pick,t:o.t,o:o,x:x,u:simHits276(X,f),be:be,pr:pr,p:o.p,best:d.best===o})});
   bets.sort(function(a,b){return (b.best?1:0)-(a.best?1:0)});
+  bets.forEach(function(b){b.sim=mean295(b.u)});
+  var bT=function(t){return bets.filter(function(b){return b.t===t})[0]};
   var props=[];
   try{
     var R=(X.box||[]).filter(function(r){return r.line!=null&&r.pOver!=null&&r.v}).map(function(r){return {r:r,over:r.pOver>=.5,e:Math.abs(r.pOver-.5)}}).sort(function(a,b){return b.e-a.e});
@@ -20537,21 +20539,31 @@ function story295(g,d,X){
       var r=q.r,L=r.line,ov=q.over;props.push({lab:r.n+' '+(ov?'over ':'under ')+L+' '+String(SIM_LAB276[r.cat]||r.cat).toLowerCase(),u:simHits276(X,function(i){return ov?r.v[i]>L:r.v[i]<L}),prop:1})});
   }catch(e){}
   var all=bets.concat(props);
-  /* three ways the game goes */
-  var fav=X.sh>=X.sa?'h':'a',dog=fav==='h'?'a':'h',T=football?9:lg==='nba'?10:lg==='ncaamb'?9:2;
-  var fmv=function(i){return fav==='h'?O.h[i]-O.a[i]:O.a[i]-O.h[i]};
-  var tie=0;for(var i0=0;i0<N;i0++)if(O.a[i0]===O.h[i0])tie++;
-  var SC=[
-    {lab:'The '+nm(fav)+' win by '+T+'+',f:function(i){return fmv(i)>=T}},
-    {lab:'The '+nm(fav)+' win a close one ('+(T===2?'by 1':'by 1 to '+(T-1))+')',f:function(i){var m=fmv(i);return m>0&&m<T}},
-    {lab:'The '+nm(dog)+' win a close one ('+(T===2?'by 1':'by 1 to '+(T-1))+')'+(tie/N>=.005?', or a tie':''),f:function(i){var m=fmv(i);return m<=0&&m>-T}},
-    {lab:'The '+nm(dog)+' win by '+T+'+',f:function(i){return fmv(i)<=-T}}];
-  var favW=0;for(var i1=0;i1<N;i1++)if(fmv(i1)>0)favW++;favW/=N;
+  /* the spread from the betting line: who is favored and by how much */
+  var ln=null;try{ln=lineFor(g)}catch(e){}
+  var mf=ln&&ln.pts!=null&&ln.fav?ln.fav:(X.sh>=X.sa?'h':'a'),md=mf==='h'?'a':'h',sp=ln&&ln.pts!=null?+ln.pts:null;
+  var fmv=function(i){return mf==='h'?O.h[i]-O.a[i]:O.a[i]-O.h[i]};
+  var favW=0,tie=0;for(var i1=0;i1<N;i1++){var m1=fmv(i1);if(m1>0)favW++;else if(m1===0)tie++}favW/=N;tie/=N;
+  var spT=function(s){return sp==null?'':(s===mf?'-':'+')+sp};
+  var SC=[];
+  if(sp!=null&&sp>0){
+    var whole=Math.abs(sp-Math.round(sp))<.01,cov=whole?Math.round(sp)+1:Math.ceil(sp),top=whole?Math.round(sp)-1:Math.floor(sp);
+    SC.push({lab:'The '+nm(mf)+' win and cover',sub:'win by '+cov+'+ '+(cov===1?u1:unit)+', so '+nm(mf)+' '+spT(mf)+' wins',f:function(i){return fmv(i)>sp},k:'cover'});
+    if(whole)SC.push({lab:'Push on the spread',sub:'the '+nm(mf)+' win by exactly '+Math.round(sp)+', so spread bets are refunded',f:function(i){return fmv(i)===sp},k:'push'});
+    if(top>=1)SC.push({lab:'The '+nm(mf)+' win but don’t cover',sub:'win by '+(top===1?'1 '+u1:'1 to '+top+' '+unit)+', so '+nm(md)+' '+spT(md)+' wins',f:function(i){var m=fmv(i);return m>0&&m<sp},k:'nocover'});
+    SC.push({lab:'The '+nm(md)+' win outright'+(tie>=.005?' (or tie)':''),sub:nm(md)+' '+spT(md)+' wins, and so does the '+nm(md)+' moneyline',f:function(i){return fmv(i)<=0},k:'upset'});
+  }else{
+    var T=football?9:lg==='nba'?10:lg==='ncaamb'?9:2;
+    SC=[{lab:'The '+nm(mf)+' win by '+T+'+',f:function(i){return fmv(i)>=T}},
+      {lab:'The '+nm(mf)+' win a close one',f:function(i){var m=fmv(i);return m>0&&m<T}},
+      {lab:'The '+nm(md)+' win a close one'+(tie>=.005?' (or tie)':''),f:function(i){var m=fmv(i);return m<=0&&m>-T}},
+      {lab:'The '+nm(md)+' win by '+T+'+',f:function(i){return fmv(i)<=-T}}];
+  }
   var tt=X.tot?X.tot.tt:null;
   SC.forEach(function(s){var idx=[];for(var i=0;i<N;i++)if(s.f(i))idx.push(i);s.idx=idx;s.p=idx.length/N;
     var sa=0,sh=0,ov=0;idx.forEach(function(i){sa+=O.a[i];sh+=O.h[i];if(tt!=null&&O.a[i]+O.h[i]>tt)ov++});
     s.sa=idx.length?sa/idx.length:0;s.sh=idx.length?sh/idx.length:0;s.ov=idx.length&&tt!=null?ov/idx.length:null});
-  var top=SC.slice().sort(function(a,b){return b.p-a.p})[0];
+  var SCk=function(k){return SC.filter(function(s){return s.k===k})[0]};
   /* what decides it, for the best bet */
   var key=bets[0],dec3=[];
   if(key){
@@ -20572,48 +20584,61 @@ function story295(g,d,X){
       c.h1=mean295(key.u,i1);c.h0=mean295(key.u,i0);c.s=Math.abs(c.h1-c.h0)*Math.sqrt(pc*(1-pc))});
     dec3=C.filter(function(c){return c.s>0}).sort(function(a,b){return b.s-a.s}).slice(0,3);
   }
-  /* odds vs simulation */
-  bets.forEach(function(b){b.sim=mean295(b.u)});
-  var agree=bets.filter(function(b){return b.sim>=b.be+.02&&b.p!=null&&b.p>=b.be+.02}),noSim=bets.filter(function(b){return b.sim<b.be});
-  /* bets that go together */
+  /* bets that go together (only ones the simulation likes) */
   var pair=null,liked=all.filter(function(b){var q=mean295(b.u);return b.be!=null?q>=b.be:q>=.55});
   for(var x1=0;x1<liked.length;x1++)for(var x2=x1+1;x2<liked.length;x2++){
-    var A=liked[x1],B=liked[x2];if(A.t&&B.t&&A.t==='ml'&&B.t==='sp')continue;if(A.t==='sp'&&B.t==='ml')continue;
+    var A=liked[x1],B=liked[x2];if((A.t==='ml'&&B.t==='sp')||(A.t==='sp'&&B.t==='ml'))continue;
     var j=simJoint276([A.u,B.u]),pa=mean295(A.u),pb=mean295(B.u);if(!(pa*pb>0))continue;var lift=j/(pa*pb);
     if(j>=.18&&(!pair||lift>pair.lift))pair={A:A,B:B,j:j,ind:pa*pb,lift:lift};
   }
+  /* one plain sentence per bet: how often it wins, what the odds need, and the verdict */
+  var verdict=function(b){var need=Math.round(b.be*100),got=b.sim;
+    return got>=b.be+.02?'worth it':got>=b.be-.02?'about break-even':'not worth it at these odds'};
+  var sent=function(b){
+    var need=Math.round(b.be*100),o=odds(b.pr);
+    if(b.t==='ml'){var s=b.x.side,ot=s==='h'?'a':'h',ml=g.dk&&g.dk.ml,txt='<b>Moneyline:</b> the '+esc(nm(s))+' win '+pct(b.sim)+'% of the simulated games. At '+o+' odds they need to win '+need+'% to break even, so the '+esc(nm(s))+' moneyline is <b>'+verdict(b)+'</b>.';
+      var po=ml&&ml[ot]!=null&&isFinite(ml[ot])?+ml[ot]:null;
+      if(po!=null){var w=0;for(var i=0;i<N;i++)if(ot==='h'?O.h[i]>O.a[i]:O.a[i]>O.h[i])w++;w/=N;var bo=amBe(po),b2={sim:w,be:bo};
+        txt+=' The '+esc(nm(ot))+' win '+pct(w)+'%; at '+odds(po)+' they need '+Math.round(bo*100)+'%, so the '+esc(nm(ot))+' moneyline is <b>'+verdict(b2)+'</b>.'}
+      return txt}
+    if(b.t==='sp'){return '<b>Spread:</b> '+esc(b.lab)+' covers in '+pct(b.sim)+'% of games. At '+o+' it needs '+need+'% to break even, so it is <b>'+verdict(b)+'</b>.'}
+    return '<b>Total:</b> '+esc(b.lab)+' hits in '+pct(b.sim)+'% of games. At '+o+' it needs '+need+'%, so it is <b>'+verdict(b)+'</b>.';
+  };
   /* ---- render ---- */
   var h='<div class="card" style="padding:12px;margin-top:10px">';
   h+='<div class="src" style="text-transform:uppercase;letter-spacing:.06em;font-size:11px">The simulation · '+N.toLocaleString()+' games</div>';
-  /* in short */
   var S1=[];
-  S1.push('The '+esc(nm(fav))+' win '+pct(favW)+'% of the time. The most common script: '+esc(top.lab.charAt(0).toLowerCase()+top.lab.slice(1))+' ('+pct(top.p)+'% of games).');
-  if(agree.length)S1.push('Hitboard and the simulation both beat the price on <b>'+agree.map(function(b){return esc(b.lab)}).join('</b> and <b>')+'</b>.');
-  if(noSim.length)S1.push('The simulation does not back <b>'+noSim.map(function(b){return esc(b.lab)}).join('</b> or <b>')+'</b> at this price.');
-  var spB=bets.filter(function(b){return b.t==='sp'})[0];if(spB&&Math.abs(spB.sim-.5)<.03)S1.push('The spread is close to a coin flip ('+pct(spB.sim)+'% for '+esc(spB.lab)+').');
-  if(pair&&pair.lift>=1.12)S1.push('<b>'+esc(pair.A.lab)+'</b> and <b>'+esc(pair.B.lab)+'</b> tend to hit together: both hit in '+pct(pair.j)+'% of games, versus '+pct(pair.ind)+'% if they were unrelated.');
+  if(sp!=null&&sp>0){
+    var cv=SCk('cover'),nc=SCk('nocover'),up=SCk('upset'),pu=SCk('push');
+    S1.push('The '+esc(nm(mf))+' win '+pct(favW)+'% of the time: they <b>win and cover '+nm(mf)+' '+spT(mf)+'</b> in '+pct(cv?cv.p:0)+'%'+(nc&&nc.p>0?', and <b>win but don’t cover</b> in '+pct(nc.p)+'%':'')+(pu&&pu.p>=.005?' (push '+pct(pu.p)+'%)':'')+'. The '+esc(nm(md))+' win outright in '+pct(up?up.p:0)+'%, so '+esc(nm(md))+' '+spT(md)+' covers in '+pct((nc?nc.p:0)+(up?up.p:0))+'%.');
+  }else S1.push('The '+esc(nm(mf))+' win '+pct(favW)+'% of the time.');
+  ['ml','sp','tot'].forEach(function(t){var b=bT(t);if(b)S1.push(sent(b))});
+  if(pair&&pair.lift>=1.12)S1.push('<b>'+esc(pair.A.lab)+'</b> and <b>'+esc(pair.B.lab)+'</b> tend to hit together: both hit in '+pct(pair.j)+'% of games, versus '+pct(pair.ind)+'% if they were unrelated. That makes them a better pairing for a parlay.');
   h+='<div class="dd-h" style="font-size:15px;margin-top:6px">In short</div>'+ul284(S1);
   /* how it plays out */
   h+='<div class="dd-h" style="font-size:15px;margin-top:12px">How this game plays out</div>';
+  var rest=all.filter(function(b){return b.t!=='sp'&&b.t!=='ml'});
   SC.forEach(function(s){
+    if(s.k==='push'&&s.p<.005)return;
     var sa=s.sa,sh=s.sh,w=sh>=sa?'h':'a';
     h+='<div style="border-top:1px solid var(--line);padding:8px 0">'+
       '<div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><b>'+esc(s.lab)+'</b><b>'+pct(s.p)+'%</b></div>'+
+      (s.sub?'<div class="src">'+esc(s.sub.charAt(0).toUpperCase()+s.sub.slice(1))+'</div>':'')+
       '<div style="height:6px;border-radius:3px;background:var(--line);margin:4px 0"><div style="height:6px;border-radius:3px;width:'+(s.p*100).toFixed(1)+'%;background:var(--ink)"></div></div>'+
-      (s.idx.length?'<div class="src">Typical score: '+esc(nm(w))+' '+f0(w==='h'?sh:sa)+', '+esc(nm(w==='h'?'a':'h'))+' '+f0(w==='h'?sa:sh)+(s.ov!=null?' · goes over '+tt+' in '+pct(s.ov)+'%':'')+'</div>'+
-      '<div style="font-size:13px;margin-top:3px;line-height:1.6">'+all.map(function(b){return esc(b.lab)+' '+tag295(mean295(b.u,s.idx))}).join(' · ')+'</div>':'')+'</div>';
+      (s.idx.length?'<div class="src">Typical score: '+esc(nm(w))+' '+f0(w==='h'?sh:sa)+', '+esc(nm(w==='h'?'a':'h'))+' '+f0(w==='h'?sa:sh)+'</div>'+
+      ((sp==null?all:rest).length?'<div style="font-size:13px;margin-top:3px;line-height:1.6">'+(sp==null?all:rest).map(function(b){return esc(b.lab)+' '+tag295(mean295(b.u,s.idx))}).join(' · ')+'</div>':''):'')+'</div>';
   });
   /* what decides it */
   if(key&&dec3.length){
-    h+='<div class="dd-h" style="font-size:15px;margin-top:12px">What decides '+esc(key.lab)+'</div><div class="src" style="margin-bottom:2px">Overall it hits in '+pct(mean295(key.u))+'% of simulated games.</div>'+
-      ul284(dec3.map(function(c){return 'When '+esc(c.lab)+' ('+pct(c.pc)+'% of games), it hits <b>'+pct(c.h1)+'%</b>; otherwise '+pct(c.h0)+'%.'}));
+    h+='<div class="dd-h" style="font-size:15px;margin-top:12px">What decides '+esc(key.lab)+'</div><div class="src" style="margin-bottom:2px">Overall it '+(key.t==='sp'?'covers':key.t==='ml'?'wins':'hits')+' in '+pct(mean295(key.u))+'% of simulated games.</div>'+
+      ul284(dec3.map(function(c){return 'When '+esc(c.lab)+' ('+pct(c.pc)+'% of games), it '+(key.t==='sp'?'covers':key.t==='ml'?'wins':'hits')+' <b>'+pct(c.h1)+'%</b> of the time; otherwise '+pct(c.h0)+'%.'}));
   }
   /* odds vs simulation */
   if(bets.length){
     h+='<div class="dd-h" style="font-size:15px;margin-top:12px">Odds vs simulation</div>'+
-      '<table class="simtbl"><tr><th align="left">Bet</th><th>Price needs</th><th>Simulation</th><th>Hitboard</th></tr>'+
-      bets.map(function(b){var good=b.sim>=b.be+.02,bad=b.sim<b.be;return '<tr><td>'+esc(b.lab)+'</td><td align="center">'+Math.round(b.be*100)+'%</td><td align="center"><b class="'+(good?'ok256':bad?'no256':'')+'">'+pct(b.sim)+'%</b></td><td align="center">'+(b.p!=null?Math.round(b.p*100)+'%':'–')+'</td></tr>'}).join('')+'</table>'+
-      '<div class="src" style="margin-top:4px">“Price needs” is how often the bet must win to break even at the current price. Green means the simulation clears it; red means it does not.</div>';
+      '<table class="simtbl"><tr><th align="left">Bet</th><th>Odds</th><th>Needs to win</th><th>Simulation</th><th>Hitboard</th></tr>'+
+      bets.map(function(b){var good=b.sim>=b.be+.02,bad=b.sim<b.be-.02;return '<tr><td>'+esc(b.lab)+'</td><td align="center">'+odds(b.pr)+'</td><td align="center">'+Math.round(b.be*100)+'%</td><td align="center"><b class="'+(good?'ok256':bad?'no256':'')+'">'+pct(b.sim)+'%</b></td><td align="center">'+(b.p!=null?Math.round(b.p*100)+'%':'–')+'</td></tr>'}).join('')+'</table>'+
+      '<div class="src" style="margin-top:4px">“Needs to win” is how often a bet at those odds has to win just to break even over time: about 52% at −110, more for a favorite’s moneyline (−250 needs 71%), less for an underdog (+200 needs 33%). Green means the simulation wins clearly more often than that; red means clearly less; plain means about even.</div>';
   }
   /* built with */
   var B=[];
