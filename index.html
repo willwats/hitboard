@@ -1957,7 +1957,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v291, Nov 26';
+var BUILD='v292, Nov 27';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -20241,6 +20241,147 @@ gradeAuto=function(){
   };
 })();
 (function(){var add=function(t,s){var T=KEYOUT.nfl[t]||(KEYOUT.nfl[t]={items:[],chg:[]});var nm=normName(String(s).replace(/:[a-z]$/,'').replace(/^\S+\s+/,''));T.items=T.items.filter(function(x){return normName(String(x).replace(/:[a-z]$/,'').replace(/^\S+\s+/,''))!==nm});T.items.push(s)};add('BUF','CB Christian Benford:o');})();
+/* v292: Report cards tab. Every pick Hitboard grades B- or better, in one list for building parlays: spreads, winners
+   and totals from each game's report card, and player props from the props board. A grades first, then B grades.
+   Uses the sport chips and the Today / Tomorrow / This week choice; each card adds to the betslip. */
+var RC292={},_rc292=null,_rcC292={k:'',v:null},_rcG292={};
+var RC_MIN292='B-';
+function rcOk292(l){try{return gradeRank(l)>=gradeRank(RC_MIN292)}catch(e){return false}}
+function rcGameGrades292(g){
+  var k=g.id+'|'+S.dlV+'|'+S.feedAt+'|'+Math.floor(Date.now()/120000),c=_rcG292[g.id];
+  if(c&&c.k===k)return c.v;
+  var v=null;try{v=hbGradesFor(g)||{}}catch(e){v={}}
+  _rcG292[g.id]={k:k,v:v};return v;
+}
+function rcCached292(g){var c=_rcG292[g.id];return !!(c&&c.k===g.id+'|'+S.dlV+'|'+S.feedAt+'|'+Math.floor(Date.now()/120000))}
+function rcPropP292(lg,cat,o,dir,letter){
+  /* how often he has cleared (or stayed under) this line, last 10 games counting double; with no game log loaded,
+     a conservative chance from the grade */
+  try{
+    var c=o.c;if(!c){try{c=pbCalc(lg,cat,o.r.n,o.ln.v,o.opp,false)}catch(e){c=null}}
+    var f=function(w){return w&&w.n&&w.h?(dir==='Over'?w.h.o:w.h.u):0},n=function(w){return w&&w.n&&w.h?w.n:0};
+    var tot=c?2*n(c.l10)+n(c.s):0;
+    if(c&&n(c.l10)>=5&&tot)return {p:Math.max(.3,Math.min(.85,(2*f(c.l10)+f(c.s))/tot)),hr:true};
+  }catch(e){}
+  var E={'A+':.66,'A':.63,'A-':.6,'B+':.58,'B':.56,'B-':.54};
+  return {p:E[letter]||.55,hr:false};
+}
+function rcList292(){
+  var T=gdTest(),now=Date.now(),key=[S.gs,T.sel,S.feedAt,S.dlV,Math.floor(now/120000)].join('|');
+  if(_rcC292.k===key&&_rcC292.v&&!_rcC292.v.pend)return _rcC292.v;
+  var out=[],pend=0,budget=14,games={};
+  var sportOn=function(lg){return !S.gs||S.gs==='all'||S.gs===lg};
+  /* game bets */
+  ['nfl','ncaafb','nba','nhl','ncaamb'].forEach(function(lg){if(!sportOn(lg))return;(S.feed[lg]||[]).forEach(function(g){
+    if(kind(g)!=='up'||!(g.start>now)||g.start>now+8*864e5||!T.ok(g))return;
+    games[g.id]=g;
+    if(!rcCached292(g)){if(budget<=0){pend++;return}budget--}
+    var v=rcGameGrades292(g),pk=[];try{pk=picksFor(g)||[]}catch(e){}
+    ['sp','ml','tot'].forEach(function(t){
+      var gr=v[t];if(!gr||!gr.l||!rcOk292(gr.l))return;
+      var x=pk.filter(function(q){return q&&q.t===t&&(!gr.pick||q.pick===gr.pick)})[0]||pk.filter(function(q){return q&&q.t===t})[0];if(!x||x.p==null)return;
+      var why='';try{var it=gmItem(g,x),G=it&&gradeGame(it),W=G&&grWhy(G,1);if(W&&W.pro[0])why=W.pro[0].txt}catch(e){}
+      var leg=gameLeg(g,x);
+      out.push({type:'game',lg:lg,g:g,x:x,l:gr.l,sum:gr.sum||0,p:x.p,pick:x.pick||gr.pick,mk:MKN256[t]||'Game bet',why:why,leg:leg,gid:g.id});
+    });
+  })});
+  /* player props */
+  ['nfl','nba','ncaafb','ncaamb','nhl'].forEach(function(lg){if(!sportOn(lg))return;
+    var cats=[];try{cats=pbCats(lg)||[]}catch(e){}
+    cats.forEach(function(cc){
+      var rows=[];try{rows=pbRows(lg,cc[0])||[]}catch(e){}
+      rows.forEach(function(o){
+        try{
+          if(!o||!o.r||!o.ln||!(o.ln.v>0))return;
+          var gid=feedGidFor(lg,o.r.t);if(!gid)return;var g=games[gid]||find(gid);if(!g||kind(g)!=='up'||!(g.start>now)||!T.ok(g))return;
+          try{if(isOutInj({lg:lg,n:o.r.n,t:o.r.t}))return}catch(e){}
+          var G=gradeBest(lg,o.cat||cc[0],o.r,o);if(!G||!G.letter||!rcOk292(G.letter))return;
+          var lab=String(cc[1]||o.cat).toLowerCase(),pick=o.r.n+' '+G.dir+' '+o.ln.v+' '+lab,PP=rcPropP292(lg,o.cat||cc[0],o,G.dir,G.letter),p=PP.p;
+          var W=null;try{W=grWhy(G,1)}catch(e){}
+          var sub=lgName(lg)+' · '+(g.a+' @ '+g.h)+' · '+gTime(g);
+          var leg={lg:lg,kind:'rec',name:pick,team:o.r.t,mk:'Report card '+G.letter,p:p,src:PP.hr?'Hit rate on this line':'Estimated from the grade',nx:{txt:sub},gid:gid,rec:null,pro:(W&&W.pro||[]).map(function(f){return f.txt}),con:(W&&W.con||[]).map(function(f){return f.txt})};
+          leg.key='rec|'+pick+'|'+sub;
+          out.push({type:'prop',lg:lg,g:g,o:o,cat:o.cat||cc[0],l:G.letter,sum:G.sum||0,p:p,pick:pick,mk:String(cc[1]||'Prop'),why:W&&W.pro[0]?W.pro[0].txt:'',leg:leg,gid:gid,pn:normName(o.r.n),hr:PP.hr});
+        }catch(e){}
+      });
+    });
+  });
+  out.sort(function(a,b){return gradeRank(b.l)-gradeRank(a.l)||b.sum-a.sum||b.p-a.p});
+  var R={L:out,pend:pend};_rcC292={k:key,v:R};return R;
+}
+/* three legs from three different games, best grades first */
+function rcTop3292(L){
+  var used={},pl={},pick=[];
+  L.forEach(function(x){if(pick.length>=3||used[x.gid])return;if(x.pn&&pl[x.pn])return;used[x.gid]=1;if(x.pn)pl[x.pn]=1;pick.push(x)});
+  return pick;
+}
+function rcCard292(x,i){
+  var id='rc'+i;RC292[id]=x;
+  var on=inSlip(x.leg.key);
+  var tap=x.type==='game'?'data-act="fgame" data-id="'+esc(x.g.id)+'"':
+    'data-act="pbk" data-n="'+esc(x.o.r.n)+'" data-lg="'+x.lg+'" data-cat="'+esc(x.cat)+'" data-team="'+esc(x.o.r.t)+'" data-opp="'+esc(x.o.opp||'')+'" data-proj="'+(x.o.r.proj||0)+'" data-ptx="'+esc(x.o.r.projTxt||'')+'" data-unit="'+esc(x.o.r.unit||'')+'" data-when="'+esc(x.o.r.when||'')+'" data-def="'+esc(x.o.r.def&&x.o.r.def.txt||'')+'"';
+  return '<div class="card" style="padding:10px 12px;margin-bottom:8px;display:flex;gap:10px;align-items:flex-start">'+
+    '<div style="flex:none;min-width:38px;text-align:center;padding-top:2px">'+grPill(x.l)+'</div>'+
+    '<div '+tap+' style="min-width:0;flex:1;cursor:pointer"><b>'+esc(x.pick)+'</b>'+
+      '<div class="src">'+esc(x.type==='game'?x.mk:'Prop · '+x.mk)+' · '+esc(lgName(x.lg))+' · '+esc(x.g.a+' @ '+x.g.h)+' · '+esc(gTime(x.g))+'</div>'+
+      (x.why?'<div class="src" style="margin-top:2px">'+esc(x.why)+'</div>':'')+
+      '<div class="src" style="margin-top:2px">'+(x.type==='game'?'Model '+Math.round(x.p*100)+'%':x.hr?'Hit this line in '+Math.round(x.p*100)+'% of recent games':'About '+Math.round(x.p*100)+'% from the grade (game log not loaded yet)')+'</div></div>'+
+    '<button class="btn'+(on?'':' primary')+'" style="flex:none;padding:8px 10px" data-act="rc292add" data-k="'+id+'" aria-label="'+(on?'Remove from slip':'Add to slip')+': '+esc(x.pick)+'">'+(on?'In slip ✓':'+ Add')+'</button></div>';
+}
+function vRc292(){
+  RC292={};
+  var sel=S.gd==='prev'?'week':(S.gd||gdTest().sel),f=S.rcf||'all',R={L:[],pend:0};
+  try{R=rcList292()}catch(e){}
+  var L=R.L.filter(function(x){return f==='all'||x.type===f});
+  var h='<h2>Report cards</h2>'+gsChips()+refreshBar()+
+    '<div class="chips" role="group" aria-label="Day">'+[['today','Today'],['tomorrow','Tomorrow'],['week','This week']].map(function(m){return '<button class="chip" data-act="set" data-k="gd" data-v="'+m[0]+'" aria-pressed="'+(sel===m[0])+'">'+m[1]+'</button>'}).join('')+'</div>'+
+    '<div class="chips" role="group" aria-label="Bet type">'+[['all','All'],['game','Game bets'],['prop','Props']].map(function(m){return '<button class="chip" data-act="set" data-k="rcf" data-v="'+m[0]+'" aria-pressed="'+(f===m[0])+'">'+m[1]+'</button>'}).join('')+'</div>'+
+    '<p class="src">Every pick Hitboard grades B- or better: spreads, winners and totals, and player props. The grade is how likely the pick is to hit, A+ to F. For a parlay, take legs from different games, since bets on the same game tend to win or lose together.</p>';
+  if(!L.length){
+    h+='<div class="card empty">'+(R.pend?'Grading games…':'No B- or better picks for this selection yet. Try This week or another sport.')+'</div>';
+  }else{
+    var top=rcTop3292(L);
+    if(top.length>=2){
+      var p=top.reduce(function(a,x){return a*x.p},1),allIn=top.every(function(x){return inSlip(x.leg.key)});
+      RC292.top=top;
+      h+='<div class="card" style="padding:12px 14px;margin-bottom:12px"><b>Best '+top.length+' from different games</b><ul class="pts" style="margin:6px 0">'+top.map(function(x){return '<li>'+grPill(x.l)+' '+esc(x.pick)+' <span class="src">'+esc(lgName(x.lg))+'</span></li>'}).join('')+'</ul>'+
+        '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span class="src">All '+top.length+' hit: about '+Math.round(p*100)+'%</span><button class="btn'+(allIn?'':' primary')+'" style="flex:none;padding:8px 12px" data-act="rc292top">'+(allIn?'In slip ✓':'+ Add all '+top.length)+'</button></div></div>';
+    }
+    var n=S.rcn||30,shown=0,i=0;
+    [['A','A grades'],['B','B grades']].forEach(function(bd){
+      var B=L.filter(function(x){return x.l[0]===bd[0]});if(!B.length)return;
+      h+='<h3 style="margin-top:14px">'+bd[1]+' <span class="src">('+B.length+')</span></h3>';
+      B.forEach(function(x){if(shown>=n)return;h+=rcCard292(x,i++);shown++});
+    });
+    if(L.length>shown)h+='<button class="btn" style="width:100%;margin:4px 0 10px" data-act="rc292more">Show more ('+(L.length-shown)+' left)</button>';
+  }
+  if(R.pend){h+='<p class="src">Grading '+R.pend+' more game'+(R.pend>1?'s':'')+'…</p>';clearTimeout(_rc292);_rc292=setTimeout(function(){try{if(S.tab==='rc'&&!S.sheet)render()}catch(e){}},500)}
+  return h+foot();
+}
+document.addEventListener('click',function(e){
+  var el=e.target&&e.target.closest?e.target.closest('[data-act="rc292add"],[data-act="rc292top"],[data-act="rc292more"]'):null;if(!el)return;
+  e.stopImmediatePropagation();e.preventDefault();
+  var a=el.dataset.act;
+  if(a==='rc292more'){S.rcn=(S.rcn||30)+30;render();return}
+  var X=a==='rc292top'?(RC292.top||[]):[RC292[el.dataset.k]].filter(Boolean);if(!X.length)return;
+  var legs=X.map(function(x){return x.leg}),allIn=legs.every(function(l){return inSlip(l.key)});
+  if(allIn)S.slip=S.slip.filter(function(q){return !legs.some(function(l){return l.key===q.key})});
+  else legs.forEach(function(l){if(!inSlip(l.key)&&S.slip.length<15)S.slip.push(l)});
+  saveSlip();updateSlipBar();render();
+},true);
+(function(){
+  if(!TABS.some(function(t){return t[0]==='rc'})){
+    var pi=-1;TABS.forEach(function(t,i){if(t[0]==='pl4')pi=i});
+    TABS.splice(pi>=0?pi+1:TABS.length,0,['rc','Grades','<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h3"/>']);
+  }
+  NAVG.rc=['rc'];
+  var r0=render;
+  render=function(){
+    if(S.tab!=='rc')return r0.apply(this,arguments);
+    var sv=vToday;vToday=vRc292;S.tab='today';
+    try{return r0.apply(this,arguments)}finally{S.tab='rc';vToday=sv;try{renderNav()}catch(e){}}
+  };
+})();
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
 setTimeout(function(){doRefresh(true)},600);
