@@ -1957,7 +1957,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v294, Nov 27';
+var BUILD='v295, Nov 27';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -2938,14 +2938,16 @@ function feedCalc(g){
   var T=feedTeams(g);if(!T||T.missing)return null;
   var A=T.A,H=T.H;
   var sa=(A.pf+H.pa)/2-T.he/2,sh=(H.pf+A.pa)/2+T.he/2;
-  /* v294: the stats half counts starters who are out, the same way the predicted score does (the market half already prices them) */
-  try{if(g.lg==='nfl'||g.lg==='ncaafb'){var J=injAdj294(g);if(J){sa=Math.max(0,sa+J.a);sh=Math.max(0,sh+J.h)}}}catch(e){}
+  /* v295: the stats half counts who is actually playing (players out, short-handed defenses, NHL goalies); the market half already prices them */
+  try{var J=statAdj295(g,sa,sh);if(J){sa=J.sa;sh=J.sh}}catch(e){}
   var stP=Phi((sh-sa)/T.sdM),fp=(g.pa!=null&&g.ph!=null)?g.ph/(g.pa+g.ph):null;
   var p=fp!=null?0.3*stP+0.7*fp:stP,ln=lineFor(g);
   var pModel=p,mkH=(ln&&ln.mlP!=null)?ln.mlP:null;if(mkH!=null){var wM=mktW(g.lg);p=wM*mkH+(1-wM)*p}
   if(false)ln={a:g.a,h:g.h,fav:g.dk.sp.fav,pts:g.dk.sp.pts,tt:g.dk.tt,src:g.dk.src||'DraftKings'};
   var wxa=g.lg==='nfl'?wxAdj(T.H.k,g.start):{adj:0,pu:0},mkM=(ln&&ln.pts!=null)?(ln.fav==='h'?ln.pts:-ln.pts):null,total=sa+sh;if(ln&&ln.tt!=null)total=0.1*total+0.9*ln.tt;total+=wxa.adj;
-  var margin=mkM!=null?(0.3*(sh-sa)+0.7*mkM):T.sdM*invPhi(p);
+  /* v295: in hockey the puck line (always 1.5) is not the expected margin; the market's margin comes from the moneyline, as in the simulation */
+  var mkMg=mkM;if(g.lg==='nhl'&&ln&&ln.mlP!=null){mkMg=Math.sqrt(ln.tt||6)*.9*invPhi(Math.max(.03,Math.min(.97,ln.mlP)))}
+  var margin=mkMg!=null?(0.3*(sh-sa)+0.7*mkMg):T.sdM*invPhi(p);
   if(mkM!=null)p=Phi(margin/T.sdM);
   var rawM=margin,rawT=total,LN=learnTm(g);
   if(LN.n){margin+=LN.dm;total+=LN.dt;p=Phi(margin/T.sdM)}
@@ -17003,7 +17005,7 @@ if(S.tab==='picks2'||!S.tab)S.tab='games';
   var vp0=vPicks;
   vPicks=function(){
     var rec=S.mbv==='rec';
-    var sw='<div class="chips" role="group" aria-label="View"><button class="chip" data-act="set" data-k="mbv" data-v="bets" aria-pressed="'+(!rec)+'">My slip and bets</button><button class="chip" data-act="set" data-k="mbv" data-v="rec" aria-pressed="'+rec+'">App’s record</button></div>';
+    var sw='<div class="chips" role="group" aria-label="View"><button class="chip" data-act="set" data-k="mbv" data-v="bets" aria-pressed="'+(!rec)+'">My slip and bets</button><button class="chip" data-act="set" data-k="mbv" data-v="rec" aria-pressed="'+rec+'">How the app is doing</button></div>';
     var h='';
     try{h=rec?vResults():vp0.apply(this,arguments)}catch(e){h='<div class="card empty">This view could not load.</div>'}
     try{
@@ -19688,7 +19690,7 @@ function pick284(g,d,X,e){
   var wx=wxLine282(g);if(wx&&/mph|rain|snow/i.test(wx)&&!/not windy/i.test(wx))fl.push('Weather: '+esc(wx));
   if(e&&e.ag)fl.push('Experts: '+esc(e.ag));
   if(fl.length)h+='<div class="src" style="margin-top:10px;line-height:1.5">'+fl.join('<br>')+'</div>';
-  if(d&&d.best)h+='<p class="src" style="margin:8px 0 0">The grade (A+ to F) is Hitboard’s grade for the bet after the experts, line movement and price; B- and up is a bet worth considering. The simulation is a second opinion and does not change the grade.</p>';
+  if(d&&d.best)h+='<p class="src" style="margin:8px 0 0">The grade (A+ to F) is Hitboard’s grade for the bet after the experts, line movement and price; B- and up is a bet worth considering. The predicted score is the same number the picks use, and the simulation below plays it out 10,000 times.</p>';
   return h+'</div>';
 }
 /* ---------- 2 · Why ---------- */
@@ -19827,7 +19829,7 @@ function simCard284(g,X){
   if(hoops){var band=function(lo,hi){var c=0;Object.keys(X.mg).forEach(function(k){var m=+k;if(m>=lo&&m<=hi)c+=X.mg[k]});return c/N};
     h+=sub284('Winning margin')+rows284([[hm+' by 11+',pct(band(11,999))+'%'],[hm+' by 6 to 10',pct(band(6,10))+'%'],[hm+' by 1 to 5',pct(band(1,5))+'%'],[a+' by 1 to 5',pct(band(-5,-1))+'%'],[a+' by 6 to 10',pct(band(-10,-6))+'%'],[a+' by 11+',pct(band(-999,-11))+'%']])}
   else h+=sub284('Most likely final scores')+rows284(X.top.map(function(t){var p=t[0].split('-');return [a+' '+p[0]+', '+hm+' '+p[1],pct(t[1])+'%']}));
-  var I=X.I,src=I.st&&I.mk?'half Hitboard’s team-stats score and half the betting market':I.mk?'the betting market':'Hitboard’s team-stats score';
+  var I=X.I,src=I.one?'Hitboard’s predicted score (its team numbers, adjusted for who is playing, blended with the betting line)':I.st&&I.mk?'half Hitboard’s team-stats score and half the betting market':I.mk?'the betting market':'Hitboard’s team-stats score';
   h+='<details style="margin-top:10px"><summary class="src" style="cursor:pointer">How the simulation works</summary><p class="src" style="margin:6px 0 0">Each game is played out 10,000 times ('+(football?'drive by drive':g.lg==='nhl'?'shots, then goals on those shots':'quarter by quarter')+'). The average is set to '+src+' ('+a+' '+I.ea.toFixed(1)+', '+hm+' '+I.eh.toFixed(1)+'), adjusted for starters who are out'+(g.lg==='nhl'?' and tonight’s goalies':'')+(football?' and wind':'')+'. It is a second opinion and does not change Hitboard’s grades.</p></details>';
   return h+'</div>';
 }
@@ -19850,7 +19852,7 @@ function simCard284(g,X){
       var nav='<div class="chips" role="navigation" aria-label="Sections" style="padding:6px 0;margin:6px 0 0">'+S1.map(function(s){return '<button class="chip" data-act="hbjump" data-t="'+s[0]+'">'+s[1]+'</button>'}).join('')+'</div>';
       var o=head+nav,n=0,body={pick:function(){return pick284(g,d,X,e)},why:function(){return why284(g,d,X,e)},lineups:function(){return lineup284(g,e,inj)},players:function(){return pl},bets:function(){return bt},sim:function(){return simCard284(g,X)},more:function(){var t='';try{t=tracked285(g)}catch(x){}return t+(more.replace(/<[^>]+>/g,'').trim()?more:'')}};
       S1.forEach(function(s){var c='';try{c=body[s[0]]()}catch(x){c='<div class="card empty">This section could not be built.</div>'}o+=H284(s[0],++n,s[1])+c});
-      return o;
+      return tidy295(o,g);
     }catch(err){return h}
   };
 })();
@@ -20445,6 +20447,233 @@ document.addEventListener('click',function(e){
 },true);
 /* the Grades tab is gone; anyone left on it lands on Picks */
 if(S.tab==='rc')S.tab='picks2';
+/* v295: one prediction per game, built from the latest lineups, and the simulation told as a story.
+   (1) statAdj295: Hitboard's team numbers are adjusted for who is actually playing, in every sport: NFL/college players
+       out (injury feed, game-day inactives, hand-entered reports) and short-handed secondaries and fronts; NBA stars out
+       and NHL top skaters out from the live injury feed; NHL tonight's goalies. feedCalc (the picks) uses it.
+   (2) The predicted score is the same number the picks use, and the simulation is centred on it, so the predicted score,
+       the pick and the 10,000 simulated games always agree (NFL, college football, NBA, NHL). NHL picks now take the
+       market's margin from the moneyline, not the puck line.
+   (3) The game window's "The pick" adds: In short, How this game plays out (the 3 ways it goes and what each does to
+       the bets and two props), What decides it, Odds vs simulation, and Built with the latest lineups.
+   (4) The game window drops from 7 sections to 4: The pick · Why (with lineups and news) · Players and props · More. */
+var _sa295={};
+function statAdj295(g,sa,sh){
+  var key=g.id+'|'+Math.floor(Date.now()/60000)+'|'+(S.feedAt||0)+'|'+(+sa).toFixed(2)+'|'+(+sh).toFixed(2),c=_sa295[g.id];
+  if(c&&c.k===key)return c.v;
+  var lg=g.lg,a=+sa,h=+sh,notes=[],nm=function(s){try{return nick282(g,s)}catch(e){return s==='a'?g.a:g.h}};
+  try{
+    if(lg==='nfl'||lg==='ncaafb'){
+      var J=null;try{J=injAdj189(g)}catch(e){}
+      if(J){a+=J.a;h+=J.h;(J.notes||[]).forEach(function(n){notes.push({s:n.s,who:n.who,pts:-n.pts,kind:'out'})})}
+      if(lg==='nfl'){
+        var TD=null;try{TD=tend187('nfl')}catch(e){}
+        var L2=TD&&TD.L,adj=function(off,def,pts){var R=secRate187(def),me=TD&&TD.T[nt(off)],shr=me&&me.share!=null?me.share:(L2&&L2.share)||.62;return {v:pts*(R.pass/100)*shr*.6+pts*(R.rush/100)*(1-shr)*.5,R:R}};
+        var A1=adj(g.a,g.h,a),H1=adj(g.h,g.a,h);
+        if(A1.v){a+=A1.v;if(A1.v>=.3&&A1.R.names.length)notes.push({s:'h',who:A1.R.names.slice(0,4),pts:-A1.v,kind:'def'})}
+        if(H1.v){h+=H1.v;if(H1.v>=.3&&H1.R.names.length)notes.push({s:'a',who:H1.R.names.slice(0,4),pts:-H1.v,kind:'def'})}
+      }
+    }else if(lg==='nba'||lg==='nhl'){
+      ['a','h'].forEach(function(s){
+        var team=s==='a'?g.a:g.h,L=[],adj=0,who=[];
+        try{L=(S.inj[lg]&&S.inj[lg].by&&S.inj[lg].by[team])||[]}catch(e){}
+        L.forEach(function(x){var m=stMul189(x.st);if(m<.75)return;var v=null;try{v=injValue(lg,team,x.n)}catch(e){}if(!v)return;
+          adj+=(lg==='nhl'?-.15:-3.5)*m;who.push((x.pos?x.pos+' ':'')+x.n+(m<1?' (doubtful)':''))});
+        adj=Math.max(lg==='nhl'?-.35:-7,adj);
+        if(s==='a')a+=adj;else h+=adj;
+        if(who.length)notes.push({s:s,who:who,pts:adj,kind:'out'});
+      });
+      if(lg==='nhl'){var G=null;try{G=simGk282(g)}catch(e){}if(G){a*=G.fa;h*=G.fh;if(G.txt.length)notes.push({s:null,who:G.txt,pts:0,kind:'gk'})}}
+    }
+  }catch(e){}
+  var v={sa:Math.max(0,a),sh:Math.max(0,h),notes:notes};
+  _sa295[g.id]={k:key,v:v};return v;
+}
+/* the predicted score is the pick's own margin and total */
+function one295(g){
+  if(g.lg!=='nfl'&&g.lg!=='ncaafb'&&g.lg!=='nba'&&g.lg!=='nhl')return null;
+  var C=null;try{C=feedCalc(g)}catch(e){}
+  if(!C||!C.ln||C.ln.pts==null||C.total==null||!isFinite(C.margin))return null;
+  return {a:Math.max(0,(C.total-C.margin)/2),h:Math.max(0,(C.total+C.margin)/2),M:C.margin,T:C.total};
+}
+(function(){
+  var ps0=predScore;
+  predScore=function(g,m,L,na,nh){
+    try{var o=one295(g);if(o)return {a:o.a,h:o.h,mine:o.M,one295:1}}catch(e){}
+    return ps0.apply(this,arguments);
+  };
+  var si0=simInputs276;
+  simInputs276=function(g){
+    var I=si0.apply(this,arguments);if(!I)return I;
+    try{var o=one295(g);if(o){var lo=g.lg==='nba'?55:g.lg==='nhl'?.8:3;I.ea=Math.max(lo,o.a);I.eh=Math.max(lo,o.h);I.one=1}}catch(e){}
+    return I;
+  };
+})();
+/* ---------- the simulation as a story ---------- */
+function hit295(X,x){
+  var O=X.O;if(!x||!x.t)return null;
+  if(x.t==='sp'&&x.side&&x.num!=null){var s=x.side,n=+x.num;return function(i){return (s==='h'?O.h[i]-O.a[i]:O.a[i]-O.h[i])+n>0}}
+  if(x.t==='tot'&&x.num!=null){var n2=+x.num,ov=!!x.over;return function(i){var t=O.a[i]+O.h[i];return ov?t>n2:t<n2}}
+  if(x.t==='ml'&&x.side){var s2=x.side;return function(i){return s2==='h'?O.h[i]>O.a[i]:O.a[i]>O.h[i]}}
+  return null;
+}
+function mean295(u,idx){var c=0,n=0;if(idx){for(var k=0;k<idx.length;k++){c+=u[idx[k]];n++}}else{for(var i=0;i<u.length;i++){c+=u[i];n++}}return n?c/n:0}
+function median295(arr){var a=Array.prototype.slice.call(arr).sort(function(x,y){return x-y});return a[a.length>>1]}
+function tag295(p){var c=p>=.65?'ok256':p<=.35?'no256':'';var t=Math.round(p*100)+'%';return c?'<span class="'+c+'">'+(p>=.65?'✓ ':'✗ ')+t+'</span>':'<span class="src">~ '+t+'</span>'}
+function story295(g,d,X){
+  if(!X||!X.N||!X.O)return '';
+  var N=X.N,O=X.O,lg=g.lg,football=lg==='nfl'||lg==='ncaafb',nm=function(s){return nick282(g,s)},pct=simPct276,dec=lg==='nhl'?1:0,f0=function(v){return dec?v.toFixed(1):String(Math.round(v))};
+  var unit=lg==='nhl'?'goals':'points';
+  /* the bets (Hitboard's side of the spread, total and winner) and two props */
+  var bets=[];
+  (d&&d.mk||[]).forEach(function(o){var x=o.x;if(!x)return;var f=hit295(X,x);if(!f)return;
+    var pr=o.pr!=null?o.pr:-110,be=o.be!=null?o.be:amBe(pr);
+    bets.push({lab:o.pick,t:o.t,o:o,u:simHits276(X,f),be:be,p:o.p,best:d.best===o})});
+  bets.sort(function(a,b){return (b.best?1:0)-(a.best?1:0)});
+  var props=[];
+  try{
+    var R=(X.box||[]).filter(function(r){return r.line!=null&&r.pOver!=null&&r.v}).map(function(r){return {r:r,over:r.pOver>=.5,e:Math.abs(r.pOver-.5)}}).sort(function(a,b){return b.e-a.e});
+    var sideUsed={};R.forEach(function(q){if(props.length>=2)return;if(props.length===1&&sideUsed[q.r.side]&&R.some(function(z){return !sideUsed[z.r.side]&&z.e>=.08}))return;sideUsed[q.r.side]=1;
+      var r=q.r,L=r.line,ov=q.over;props.push({lab:r.n+' '+(ov?'over ':'under ')+L+' '+String(SIM_LAB276[r.cat]||r.cat).toLowerCase(),u:simHits276(X,function(i){return ov?r.v[i]>L:r.v[i]<L}),prop:1})});
+  }catch(e){}
+  var all=bets.concat(props);
+  /* three ways the game goes */
+  var fav=X.sh>=X.sa?'h':'a',dog=fav==='h'?'a':'h',T=football?9:lg==='nba'?10:lg==='ncaamb'?9:2;
+  var fmv=function(i){return fav==='h'?O.h[i]-O.a[i]:O.a[i]-O.h[i]};
+  var tie=0;for(var i0=0;i0<N;i0++)if(O.a[i0]===O.h[i0])tie++;
+  var SC=[
+    {lab:'The '+nm(fav)+' win by '+T+'+',f:function(i){return fmv(i)>=T}},
+    {lab:'The '+nm(fav)+' win a close one ('+(T===2?'by 1':'by 1 to '+(T-1))+')',f:function(i){var m=fmv(i);return m>0&&m<T}},
+    {lab:'The '+nm(dog)+' win a close one ('+(T===2?'by 1':'by 1 to '+(T-1))+')'+(tie/N>=.005?', or a tie':''),f:function(i){var m=fmv(i);return m<=0&&m>-T}},
+    {lab:'The '+nm(dog)+' win by '+T+'+',f:function(i){return fmv(i)<=-T}}];
+  var favW=0;for(var i1=0;i1<N;i1++)if(fmv(i1)>0)favW++;favW/=N;
+  var tt=X.tot?X.tot.tt:null;
+  SC.forEach(function(s){var idx=[];for(var i=0;i<N;i++)if(s.f(i))idx.push(i);s.idx=idx;s.p=idx.length/N;
+    var sa=0,sh=0,ov=0;idx.forEach(function(i){sa+=O.a[i];sh+=O.h[i];if(tt!=null&&O.a[i]+O.h[i]>tt)ov++});
+    s.sa=idx.length?sa/idx.length:0;s.sh=idx.length?sh/idx.length:0;s.ov=idx.length&&tt!=null?ov/idx.length:null});
+  var top=SC.slice().sort(function(a,b){return b.p-a.p})[0];
+  /* what decides it, for the best bet */
+  var key=bets[0],dec3=[];
+  if(key){
+    var C=[];
+    ['a','h'].forEach(function(s){
+      var arr=s==='a'?O.a:O.h,k=Math.max(1,Math.round(median295(arr)));C.push({lab:'the '+nm(s)+' score '+k+'+ '+(lg==='nhl'?(k===1?'goal':'goals'):'points'),f:function(i){return arr[i]>=k}});
+      if(O.fsc)C.push({lab:'the '+nm(s)+' score first',f:function(i){return O.fsc[i]===(s==='a'?1:2)}});
+      if(X.hasH1&&O.h1a)C.push({lab:'the '+nm(s)+' lead at halftime',f:function(i){return s==='a'?O.h1a[i]>O.h1h[i]:O.h1h[i]>O.h1a[i]}});
+      if(football&&O.ina&&O.inh){var I2=s==='a'?O.ina:O.inh;C.push({lab:'the '+nm(s)+' throw an interception',f:function(i){return I2[i]>=1}})}
+      if(lg==='nhl'&&O.sa&&O.sh){var SH=s==='a'?O.sa:O.sh,ks=Math.round(median295(SH));C.push({lab:'the '+nm(s)+' get '+ks+'+ shots',f:function(i){return SH[i]>=ks}})}
+    });
+    try{['pass','rush','cpass','crush','npts'].forEach(function(cat){['a','h'].forEach(function(s){
+      var r=(X.box||[]).filter(function(z){return z.cat===cat&&z.side===s&&z.v}).sort(function(x,y){return y.mu-x.mu})[0];if(!r)return;
+      var k=Math.round(median295(r.v)/(cat==='npts'?1:5))*(cat==='npts'?1:5);if(!(k>0))return;
+      C.push({lab:r.n+' '+(cat==='npts'?'scores ':/pass/.test(cat)?'throws for ':'runs for ')+k+'+'+(cat==='npts'?' points':' yards'),f:function(i){return r.v[i]>=k}})})})}catch(e){}
+    C.forEach(function(c){var u=simHits276(X,c.f),pc=mean295(u),i1=[],i0=[];for(var i=0;i<N;i++)(u[i]?i1:i0).push(i);
+      c.pc=pc;if(pc<.15||pc>.85||!i1.length||!i0.length){c.s=-1;return}
+      c.h1=mean295(key.u,i1);c.h0=mean295(key.u,i0);c.s=Math.abs(c.h1-c.h0)*Math.sqrt(pc*(1-pc))});
+    dec3=C.filter(function(c){return c.s>0}).sort(function(a,b){return b.s-a.s}).slice(0,3);
+  }
+  /* odds vs simulation */
+  bets.forEach(function(b){b.sim=mean295(b.u)});
+  var agree=bets.filter(function(b){return b.sim>=b.be+.02&&b.p!=null&&b.p>=b.be+.02}),noSim=bets.filter(function(b){return b.sim<b.be});
+  /* bets that go together */
+  var pair=null,liked=all.filter(function(b){var q=mean295(b.u);return b.be!=null?q>=b.be:q>=.55});
+  for(var x1=0;x1<liked.length;x1++)for(var x2=x1+1;x2<liked.length;x2++){
+    var A=liked[x1],B=liked[x2];if(A.t&&B.t&&A.t==='ml'&&B.t==='sp')continue;if(A.t==='sp'&&B.t==='ml')continue;
+    var j=simJoint276([A.u,B.u]),pa=mean295(A.u),pb=mean295(B.u);if(!(pa*pb>0))continue;var lift=j/(pa*pb);
+    if(j>=.18&&(!pair||lift>pair.lift))pair={A:A,B:B,j:j,ind:pa*pb,lift:lift};
+  }
+  /* ---- render ---- */
+  var h='<div class="card" style="padding:12px;margin-top:10px">';
+  h+='<div class="src" style="text-transform:uppercase;letter-spacing:.06em;font-size:11px">The simulation · '+N.toLocaleString()+' games</div>';
+  /* in short */
+  var S1=[];
+  S1.push('The '+esc(nm(fav))+' win '+pct(favW)+'% of the time. The most common script: '+esc(top.lab.charAt(0).toLowerCase()+top.lab.slice(1))+' ('+pct(top.p)+'% of games).');
+  if(agree.length)S1.push('Hitboard and the simulation both beat the price on <b>'+agree.map(function(b){return esc(b.lab)}).join('</b> and <b>')+'</b>.');
+  if(noSim.length)S1.push('The simulation does not back <b>'+noSim.map(function(b){return esc(b.lab)}).join('</b> or <b>')+'</b> at this price.');
+  var spB=bets.filter(function(b){return b.t==='sp'})[0];if(spB&&Math.abs(spB.sim-.5)<.03)S1.push('The spread is close to a coin flip ('+pct(spB.sim)+'% for '+esc(spB.lab)+').');
+  if(pair&&pair.lift>=1.12)S1.push('<b>'+esc(pair.A.lab)+'</b> and <b>'+esc(pair.B.lab)+'</b> tend to hit together: both hit in '+pct(pair.j)+'% of games, versus '+pct(pair.ind)+'% if they were unrelated.');
+  h+='<div class="dd-h" style="font-size:15px;margin-top:6px">In short</div>'+ul284(S1);
+  /* how it plays out */
+  h+='<div class="dd-h" style="font-size:15px;margin-top:12px">How this game plays out</div>';
+  SC.forEach(function(s){
+    var sa=s.sa,sh=s.sh,w=sh>=sa?'h':'a';
+    h+='<div style="border-top:1px solid var(--line);padding:8px 0">'+
+      '<div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><b>'+esc(s.lab)+'</b><b>'+pct(s.p)+'%</b></div>'+
+      '<div style="height:6px;border-radius:3px;background:var(--line);margin:4px 0"><div style="height:6px;border-radius:3px;width:'+(s.p*100).toFixed(1)+'%;background:var(--ink)"></div></div>'+
+      (s.idx.length?'<div class="src">Typical score: '+esc(nm(w))+' '+f0(w==='h'?sh:sa)+', '+esc(nm(w==='h'?'a':'h'))+' '+f0(w==='h'?sa:sh)+(s.ov!=null?' · goes over '+tt+' in '+pct(s.ov)+'%':'')+'</div>'+
+      '<div style="font-size:13px;margin-top:3px;line-height:1.6">'+all.map(function(b){return esc(b.lab)+' '+tag295(mean295(b.u,s.idx))}).join(' · ')+'</div>':'')+'</div>';
+  });
+  /* what decides it */
+  if(key&&dec3.length){
+    h+='<div class="dd-h" style="font-size:15px;margin-top:12px">What decides '+esc(key.lab)+'</div><div class="src" style="margin-bottom:2px">Overall it hits in '+pct(mean295(key.u))+'% of simulated games.</div>'+
+      ul284(dec3.map(function(c){return 'When '+esc(c.lab)+' ('+pct(c.pc)+'% of games), it hits <b>'+pct(c.h1)+'%</b>; otherwise '+pct(c.h0)+'%.'}));
+  }
+  /* odds vs simulation */
+  if(bets.length){
+    h+='<div class="dd-h" style="font-size:15px;margin-top:12px">Odds vs simulation</div>'+
+      '<table class="simtbl"><tr><th align="left">Bet</th><th>Price needs</th><th>Simulation</th><th>Hitboard</th></tr>'+
+      bets.map(function(b){var good=b.sim>=b.be+.02,bad=b.sim<b.be;return '<tr><td>'+esc(b.lab)+'</td><td align="center">'+Math.round(b.be*100)+'%</td><td align="center"><b class="'+(good?'ok256':bad?'no256':'')+'">'+pct(b.sim)+'%</b></td><td align="center">'+(b.p!=null?Math.round(b.p*100)+'%':'–')+'</td></tr>'}).join('')+'</table>'+
+      '<div class="src" style="margin-top:4px">“Price needs” is how often the bet must win to break even at the current price. Green means the simulation clears it; red means it does not.</div>';
+  }
+  /* built with */
+  var B=[];
+  try{
+    var st=null;try{var C0=feedTeams(g);if(C0&&!C0.missing){st=statAdj295(g,(C0.A.pf+C0.H.pa)/2-C0.he/2,(C0.H.pf+C0.A.pa)/2+C0.he/2)}}catch(e){}
+    if(st)st.notes.forEach(function(n){
+      if(n.kind==='gk'){B.push('Goalies: '+esc(n.who.join(' vs ')));return}
+      B.push('<b>'+esc(nm(n.s))+'</b> '+(n.kind==='def'?'defense short-handed: ':'without ')+esc(n.who.slice(0,5).join(', '))+(n.pts?' (about '+Math.abs(n.pts).toFixed(dec?2:1)+' '+unit+(n.kind==='def'?' to the other side':' off')+')':''));
+    });
+    var at=S.inj&&S.inj[lg]&&S.inj[lg].at;
+    var inact=lg==='nfl'?['a','h'].map(function(s){var Xi=S.inact&&S.inact[nt(s==='a'?g.a:g.h)];return Xi&&Xi.at?nm(s)+' inactives posted '+new Date(Xi.at).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}):''}).filter(Boolean):[];
+    B.push('Injury report '+(at?'checked '+new Date(at).toLocaleString([],{weekday:'short',hour:'numeric',minute:'2-digit'}):'not loaded yet (tap Refresh on Games)')+(inact.length?' · '+inact.join(' · '):'')+'.');
+  }catch(e){}
+  if(B.length)h+='<div class="dd-h" style="font-size:15px;margin-top:12px">Built with the latest lineups</div>'+ul284(B)+
+    '<div class="src" style="margin-top:2px">The predicted score, the picks and the simulation all use these. The betting line already reflects news, so players out move Hitboard’s side of the number, not the whole line.</div>';
+  return h+'</div>';
+}
+/* ---------- the game window: 4 sections ---------- */
+function tidy295(h,g){
+  try{
+    var re=/<h2 id="hb-([a-z]+)"[^>]*>[\s\S]*?<\/h2>/g,m,pos=[];
+    while((m=re.exec(h)))pos.push({id:m[1],i:m.index,j:re.lastIndex});
+    if(!pos.length)return h;
+    var head=h.slice(0,pos[0].i),sec={};
+    pos.forEach(function(p,k){sec[p.id]=h.slice(p.j,k+1<pos.length?pos[k+1].i:h.length)});
+    var d=null,X=null;try{d=ddFor(g)}catch(e){}try{X=simRun276(g)}catch(e){}
+    var story='';try{story=story295(g,d,X)}catch(e){story=''}
+    var h3=function(t){return '<h3 style="margin:18px 0 6px">'+t+'</h3>'};
+    var S4=[['pick','The pick',(sec.pick||'')+story],
+      ['why','Why',(sec.why||'')+(sec.lineups?h3('Lineups and news')+sec.lineups:'')],
+      ['players','Players and props',(sec.players||'')+(sec.more?h3('Tracked props and more')+sec.more:'')],
+      ['more','More',(sec.bets?h3('More ways to bet')+sec.bets:'')+(sec.sim?h3('Full simulation')+sec.sim:'')]];
+    var nav='<div class="chips" role="navigation" aria-label="Sections" style="padding:6px 0;margin:6px 0 0">'+S4.map(function(s){return '<button class="chip" data-act="hbjump" data-t="'+s[0]+'">'+s[1]+'</button>'}).join('')+'</div>';
+    head=head.replace(/<div class="chips" role="navigation" aria-label="Sections"[\s\S]*?<\/div>/,nav);
+    if(head.indexOf('aria-label="Sections"')<0)head+=nav;
+    var o=head,n=0;S4.forEach(function(s){if(!s[2].replace(/<[^>]+>/g,'').trim())return;o+=H284(s[0],++n,s[1])+s[2]});
+    return o;
+  }catch(e){return h}
+}
+/* ---------- Props: fewer chips ---------- */
+(function(){
+  var vb0=vBoard;
+  vBoard=function(){
+    if(S.bf==='hot'||S.bf==='cold')S.bf='all';
+    var h=vb0.apply(this,arguments);
+    try{
+      h=h.replace(/<button class="chip" data-act="set" data-k="bf" data-v="(hot|cold|over)"[^>]*>[\s\S]*?<\/button>/g,'');
+      var ex=[],more=/^(parl|kick|int)$/.test(S.bc||'')||S.bmore==='1';
+      h=h.replace(/<button class="chip" data-act="set" data-k="bc" data-v="(parl|kick|int)"[^>]*>[\s\S]*?<\/button>/g,function(x){ex.push(x);return ''});
+      if(ex.length){
+        var k=h.indexOf('aria-label="Stat"'),e=k>=0?h.indexOf('</div>',k):-1;
+        if(e>0){
+          var btn='<button class="chip" data-act="set" data-k="bmore" data-v="'+(more?'':'1')+'" aria-pressed="'+more+'">More '+(more?'▴':'▾')+'</button>';
+          h=h.slice(0,e)+btn+'</div>'+(more?'<div class="chips" role="group" aria-label="More stats">'+ex.join('')+'</div>':'')+h.slice(e+6);
+        }
+      }
+    }catch(e){}
+    return h;
+  };
+})();
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
 setTimeout(function(){doRefresh(true)},600);
