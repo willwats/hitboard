@@ -1957,7 +1957,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v309, Nov 28';
+var BUILD='v310, Nov 28';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -21823,6 +21823,100 @@ feedCalc=function(g){
       var i=h.indexOf('<div style="font-size:21px;font-weight:800">');if(i<0)return h;var j=h.indexOf('</div>',i)+6;
       return h.slice(0,j)+line+h.slice(j);
     }catch(x){return h}
+  };
+})();
+
+/* v310 (user): strength of schedule throughout Hitboard's score. Every game in a team's sample is adjusted for the
+   opponent, using the learned team ratings (each team's offense and defense in points, fitted from every finished game):
+   - matchup model: yards, points, shots and goals gained against a strong defense count for more, and against a weak one
+     for less; what a defense allowed to a strong offense counts for less, to a weak one for more;
+   - scoring averages: every game this season is adjusted the same way (points scored plus the opponent's defensive rating,
+     points allowed minus the opponent's offensive rating), in all five sports.
+   An opponent with few games behind its rating is trusted less (shrunk toward average); if the ratings have not loaded yet,
+   nothing is adjusted. Team profiles saved before this build are reloaded so each game's opponent is known. */
+function mxFresh(k){var p=MX.p[k];return p&&p.v===2&&Date.now()-p.t<10*36e5}
+function mxLoadTeam(lg,id){
+  var key=lg+'|'+id;
+  return tmSched(lg,id).then(function(v){
+    var last=v.slice(-10),base='https://site.api.espn.com/apis/site/v2/sports/'+ESPN[lg]+'/summary?event=';
+    var oid=function(e){var o=e.opp||{};return o.id!=null?String(o.id):''};
+    var P={v:2,t:Date.now(),lg:lg,id:String(id),G:v.length,pf:0,pa:0,n:0,s:{},sch:v.map(function(e){return [oid(e),e.pf,e.pa,e.home?1:0]}),gm:[]};
+    v.forEach(function(e){P.pf+=e.pf;P.pa+=e.pa});if(P.G){P.pf/=P.G;P.pa/=P.G}
+    var i=0;
+    var step=function(){
+      if(i>=last.length)return Promise.resolve();
+      var e=last[i++],cj=S.tbox&&S.tbox[e.id];
+      var pr=cj!==undefined&&cj!==null?Promise.resolve(cj):fetch(base+encodeURIComponent(e.id)).then(function(r){return r.ok?r.json():null}).catch(function(){return null});
+      return pr.then(function(j){var b=null;try{b=mxBox(lg,j,id)}catch(x){}if(b)P.gm.push({op:oid(e),pf:e.pf,pa:e.pa,o:b.o,d:b.d})}).then(step);
+    };
+    return step().then(function(){
+      var s=P.s,add=function(k,x){s[k]=(s[k]||0)+(x||0)};
+      P.gm.forEach(function(b){P.n++;add('pf',b.pf);add('pa',b.pa);Object.keys(b.o).forEach(function(k){add('o_'+k,b.o[k])});Object.keys(b.d).forEach(function(k){add('d_'+k,b.d[k])})});
+      MX.p[key]=P;mxSave();return P;
+    });
+  });
+}
+/* an opponent's learned ratings, shrunk by how many games stand behind them */
+var _mxR={};
+function mxRat(lg){
+  var k=Math.floor(Date.now()/6e5),c=_mxR[lg];if(c&&c.k===k)return c.v;
+  var M=null;try{M=hblModel(lg)}catch(e){M=null}
+  var v=M&&M.mu>0?{mu:M.mu,get:function(id){if(!id)return null;var n=(M.cnt&&M.cnt[id])||0;if(!n||M.off[id]==null||M.def[id]==null)return null;var w=n/(n+4);return {o:w*M.off[id],d:w*M.def[id]}}}:null;
+  _mxR[lg]={k:k,v:v};return v;
+}
+function mxClamp(f){return Math.max(.75,Math.min(1.33,f))}
+/* opponent-adjusted sums for the matchup model */
+function mxAdjSums(P){
+  var R=mxRat(P.lg);if(!R||!P.gm||!P.gm.length)return null;
+  var lg=P.lg,s={},add=function(k,x){s[k]=(s[k]||0)+(x||0)},used=0;
+  var OFFK=lg==='nfl'||lg==='ncaafb'?['rush','pass']:lg==='nhl'?['sh']:[],DEFK=OFFK;
+  P.gm.forEach(function(b){
+    var r=R.get(b.op),fo=1,fd=1;
+    if(r){used++;fo=mxClamp(R.mu/Math.max(R.mu*.5,R.mu-r.d));fd=mxClamp(R.mu/Math.max(R.mu*.5,R.mu+r.o))}
+    add('pf',b.pf*fo);add('pa',b.pa*fd);
+    Object.keys(b.o).forEach(function(k){add('o_'+k,OFFK.indexOf(k)>=0?b.o[k]*fo:b.o[k])});
+    Object.keys(b.d).forEach(function(k){add('d_'+k,DEFK.indexOf(k)>=0?b.d[k]*fd:b.d[k])});
+  });
+  return used?s:null;
+}
+var mxRates0=mxRates;
+mxRates=function(P){
+  var s2=null;try{s2=mxAdjSums(P)}catch(e){s2=null}
+  if(!s2)return mxRates0(P);
+  var Q={};Object.keys(P).forEach(function(k){Q[k]=P[k]});Q.s=s2;var r=mxRates0(Q);if(r)r.sos=1;return r;
+};
+/* season scoring adjusted for schedule */
+function mxSeasonSOS(P){
+  var R=mxRat(P.lg);if(!R||!P.sch||P.sch.length<3)return null;
+  var pf=0,pa=0,rf=0,ra=0,used=0;
+  P.sch.forEach(function(x){var r=R.get(x[0]);rf+=x[1];ra+=x[2];if(r){used++;pf+=x[1]+r.d;pa+=x[2]-r.o}else{pf+=x[1];pa+=x[2]}});
+  if(!used)return null;var n=P.sch.length;
+  return {pf:pf/n,pa:pa/n,rpf:rf/n,rpa:ra/n,n:n};
+}
+mxSeasonBase=function(g,T){
+  var I=mxIds(g),PA=I.a&&MX.p[g.lg+'|'+I.a],PH=I.h&&MX.p[g.lg+'|'+I.h];if(!PA||!PH||PA.G<3||PH.G<3)return;
+  var L=mxLg(g.lg),lgp=g.lg==='nfl'||g.lg==='ncaafb'?L.pts:g.lg==='nhl'?L.gf:null,k=3;
+  var sa=mxSeasonSOS(PA),sh=mxSeasonSOS(PH);
+  if(g.lg==='nfl'||g.lg==='nhl'){
+    var lp=lgp!=null?lgp:(PA.pf+PH.pf)/2,shr=function(v,G){return (v*G+lp*k)/(G+k)};
+    var a=sa||{pf:PA.pf,pa:PA.pa},h=sh||{pf:PH.pf,pa:PH.pa};
+    T.A=Object.assign({},T.A,{pf:shr(a.pf,PA.G),pa:shr(a.pa,PA.G)});T.H=Object.assign({},T.H,{pf:shr(h.pf,PH.G),pa:shr(h.pa,PH.G)});T.season309=1;
+  }else if(sa&&sh){
+    /* college football, NBA, college basketball: keep their scoring tables and add the schedule adjustment */
+    T.A=Object.assign({},T.A,{pf:T.A.pf+(sa.pf-sa.rpf),pa:T.A.pa+(sa.pa-sa.rpa)});T.H=Object.assign({},T.H,{pf:T.H.pf+(sh.pf-sh.rpf),pa:T.H.pa+(sh.pa-sh.rpa)});
+  }
+  if(sa&&sh)T.sos310=1;
+};
+/* the pick card notes when the schedule adjustment is in */
+(function(){
+  var pk=pick284;
+  pick284=function(g,d,X,e){
+    var h=pk.apply(this,arguments);
+    try{var C=feedCalc(g);var on=C&&C.T&&C.T.sos310;var mx=C&&C.parts309&&C.parts309.mx;
+      if(on||(mx&&mxRat(g.lg)))h=h.replace('then players out and weather.','all adjusted for strength of schedule, then players out and weather.');
+      else h=h.replace('then players out and weather.','then players out and weather. Strength of schedule is added once the learned ratings have loaded.');
+    }catch(x){}
+    return h;
   };
 })();
 
