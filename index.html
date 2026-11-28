@@ -1957,7 +1957,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v306, Nov 27';
+var BUILD='v307, Nov 28';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -21519,6 +21519,61 @@ if(S.pkb==='hbl'||S.pkb==='b'||S.pkb==='best')S.pkb='sp';
     try{h=h.replace('(each team’s offense against the other’s defense, home field, who is playing and weather), never from the sportsbook line.','(each team’s offense against the other’s defense, home field, who is playing, weather, and what Hitboard has learned from every finished game this season and last), never from the sportsbook line.')}catch(x){}
     return h;
   };
+})();
+
+/* v307 (user): (1) "How this game plays out" shows only the game bets (winner, spread, total) under each outcome; player
+   numbers are left out there. (2) Players and props opens with "Props for this game": the same player cards as the Props
+   screen, only for the two teams in this game, with a chip for each stat (points, rebounds, assists and the rest for basketball). */
+S.gpc=S.gpc||{};
+function gameProps307(g){
+  var lg=g.lg,cats=[];try{cats=pbCats(lg)||[]}catch(e){}
+  if(!cats.length)return '';
+  var cur=S.gpc[lg];if(!cats.some(function(c){return c[0]===cur}))cur=cats[0][0];
+  var rows=[];try{rows=pbRows(lg,cur)||[]}catch(e){rows=[]}
+  var mine=function(t){try{return sameTm(t,g.a)?'a':sameTm(t,g.h)?'h':null}catch(e){return null}};
+  rows=rows.filter(function(o){
+    if(!o||!o.r)return false;var s=mine(o.r.t);if(!s)return false;
+    if(o.opp){var os=mine(o.opp);if(os&&os===s)return false;if(!os)return false}
+    try{if(isOutInj({lg:lg,n:o.r.n,t:o.r.t}))return false}catch(e){}
+    return true;
+  }).sort(function(a,b){return (b.r.proj||0)-(a.r.proj||0)}).slice(0,16);
+  var h='<div class="dd-h" style="font-size:15px;margin-top:4px">Props for this game</div><div class="chips" role="group" aria-label="Stat" style="margin:6px 0 8px">'+
+    cats.map(function(c){return '<button class="chip" data-act="gpc307" data-lg="'+lg+'" data-v="'+esc(c[0])+'" aria-pressed="'+(c[0]===cur)+'">'+esc(c[1])+'</button>'}).join('')+'</div>';
+  if(!rows.length)return h+'<div class="card empty">No players with this stat for this game yet. Try another stat, or tap Refresh on Games.</div>';
+  return h+rows.map(function(o){var c='';try{c=pbCard(o)}catch(e){c=''}return c}).join('')+'<p class="src" style="margin:4px 0 12px">Tap a player for the full breakdown. Players ruled out are left off.</p>';
+}
+(function(){
+  var s0=story295;
+  story295=function(g,d,X){
+    var h=s0.apply(this,arguments);
+    try{
+      h=h.replace(/(<div style="font-size:13px;margin-top:3px;line-height:1\.6">)([\s\S]*?)(<\/div>)/g,function(m,a,body,c){
+        var parts=body.split(' · ').filter(function(p){return !/ (over|under) [\d.]+ /.test(p.replace(/<[^>]+>/g,''))});
+        return parts.length?a+parts.join(' · ')+c:'';
+      });
+    }catch(e){}
+    return h;
+  };
+  var t0=tidy295;
+  tidy295=function(h,g){
+    var o=t0.apply(this,arguments);
+    try{
+      if(kind(g)==='final')return o;
+      var sec=gameProps307(g);if(!sec)return o;
+      var i=o.indexOf('<h2 id="hb-players"');
+      if(i>=0){var j=o.indexOf('</h2>',i)+5;return o.slice(0,j)+sec+o.slice(j)}
+      var k=o.indexOf('<h2 id="hb-more"');var hd='<h2 id="hb-players" style="margin:22px 0 8px;font-size:19px;scroll-margin-top:70px">Players and props</h2>';
+      return k>=0?o.slice(0,k)+hd+sec+o.slice(k):o+hd+sec;
+    }catch(e){return o}
+  };
+  document.addEventListener('click',function(e){
+    var el=e.target&&e.target.closest?e.target.closest('[data-act="gpc307"]'):null;if(!el)return;
+    e.stopImmediatePropagation();e.preventDefault();
+    S.gpc[el.dataset.lg]=el.dataset.v;
+    var sh=document.querySelector('#sheetRoot .sheet'),y=sh?sh.scrollTop:0;
+    try{renderSheet()}catch(x){render()}
+    var nw=document.querySelector('#sheetRoot .sheet');if(nw)nw.scrollTop=y;
+  },true);
 })();
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
