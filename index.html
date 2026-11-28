@@ -1957,7 +1957,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v310, Nov 28';
+var BUILD='v311, Nov 28';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -12292,8 +12292,8 @@ document.addEventListener('click',function(e){
   var busy=false;
   function check(){
     if(busy)return;busy=true;
-    fetch(location.pathname+'?v='+Date.now(),{cache:'no-store'}).then(function(r){return r.ok?r.text():''}).then(function(t){
-      var m=t.match(/var BUILD='(v\d+)/),mine=String(BUILD).match(/^(v\d+)/);
+    fetch('sw.js?v='+Date.now(),{cache:'no-store'}).then(function(r){return r.ok?r.text():''}).then(function(t){
+      var m=t.match(/hitboard-(v\d+)/),mine=String(BUILD).match(/^(v\d+)/);
       if(m&&mine&&m[1]!==mine[1]&&!document.getElementById('upd')){
         var d=document.createElement('div');d.id='upd';d.setAttribute('role','alert');
         d.style.cssText='position:fixed;left:12px;right:12px;top:max(10px,env(safe-area-inset-top));z-index:90;background:#1f6f43;color:#fff;border-radius:12px;padding:12px 14px;display:flex;gap:10px;align-items:center;justify-content:space-between;box-shadow:0 6px 24px rgba(0,0,0,.4);font:600 15px system-ui';
@@ -21918,6 +21918,130 @@ mxSeasonBase=function(g,T){
     }catch(x){}
     return h;
   };
+})();
+
+/* v311 (user): saved bets and tracked picks were being lost because the phone's small app storage (localStorage, about
+   5 MB) filled up with downloaded data: the past games behind the learned ratings and the team box-score profiles. When it
+   is full, every save fails silently, including your slip, bets and tracked picks.
+   (1) The big downloaded data moves to IndexedDB, the phone's large app database, and leaves the small storage for your
+       own data. (2) If the small storage is ever full again, downloaded caches are cleared first and the save is retried,
+       so your bets and picks always win. (3) Your slip, bets and tracked picks are saved the moment the app is closed or
+       put in the background. (4) The last scores, odds and lineups are kept and shown instantly when the app opens, then
+       refreshed in the background. */
+var IDB311={db:null,q:[]};
+function idbOpen311(){
+  if(IDB311.db)return Promise.resolve(IDB311.db);
+  if(IDB311.p)return IDB311.p;
+  IDB311.p=new Promise(function(res,rej){
+    try{var r=indexedDB.open('hitboard',1);r.onupgradeneeded=function(){try{r.result.createObjectStore('kv')}catch(e){}};
+      r.onsuccess=function(){IDB311.db=r.result;res(r.result)};r.onerror=function(){rej(r.error)};r.onblocked=function(){rej('blocked')}}catch(e){rej(e)}
+  });
+  return IDB311.p;
+}
+function idbGet311(k){return idbOpen311().then(function(db){return new Promise(function(res){try{var t=db.transaction('kv','readonly').objectStore('kv').get(k);t.onsuccess=function(){res(t.result)};t.onerror=function(){res(undefined)}}catch(e){res(undefined)}})}).catch(function(){return undefined})}
+function idbSet311(k,v){return idbOpen311().then(function(db){return new Promise(function(res){try{var tx=db.transaction('kv','readwrite');tx.objectStore('kv').put(v,k);tx.oncomplete=function(){res(true)};tx.onerror=function(){res(false)};tx.onabort=function(){res(false)}}catch(e){res(false)}})}).catch(function(){return false})}
+var IDB_OK311=(function(){try{return typeof indexedDB!=='undefined'&&!!indexedDB}catch(e){return false}})();
+/* ---- (2) the safety net: a full storage clears downloaded caches, never your data ---- */
+var LS_CACHE311=['hb.mx1.t','hb.hbl1.nfl','hb.hbl1.ncaafb','hb.hbl1.nba','hb.hbl1.nhl','hb.hbl1.ncaamb','hb.hbl1.wx','hitboard.dlog.v1','hb.dvp.v1','hb.pj179','hitboard.cbb.v1','hitboard.rs.v2','hitboard.cfbt.v1','hb.live270','hitboard.ros.v2','hb.injo.v1','hb.pbl182','hitboard.snap.v1'];
+(function(){
+  try{
+    var P=Storage.prototype,set0=P.setItem;
+    P.setItem=function(k,v){
+      try{return set0.call(this,k,v)}catch(e){
+        if(this!==window.localStorage)throw e;
+        for(var i=0;i<LS_CACHE311.length;i++){
+          var c=LS_CACHE311[i];if(c===k)continue;
+          try{if(this.getItem(c)==null)continue;this.removeItem(c)}catch(x){continue}
+          if(/^hb\.hbl1\./.test(c)){try{this.removeItem('hb.hbl1.at')}catch(x){}}
+          try{return set0.call(this,k,v)}catch(e2){}
+        }
+        throw e;
+      }
+    };
+  }catch(e){}
+})();
+/* ---- (1) team box-score profiles live in IndexedDB ---- */
+(function(){
+  if(!IDB_OK311)return;
+  MX.idb=0;
+  var lsP=null;try{lsP=JSON.parse(localStorage.getItem('hb.mx1.t')||'null')}catch(e){}
+  try{localStorage.removeItem('hb.mx1.t')}catch(e){}
+  idbGet311('mx1.t').then(function(o){
+    var base=o&&typeof o==='object'?o:{};
+    if(lsP&&typeof lsP==='object')Object.keys(lsP).forEach(function(k){if(!base[k]||(lsP[k].t||0)>(base[k].t||0))base[k]=lsP[k]});
+    Object.keys(MX.p).forEach(function(k){if(!base[k]||(MX.p[k].t||0)>(base[k].t||0))base[k]=MX.p[k]});
+    MX.p=base;MX.idb=1;_mxLg={};mxSave();
+  });
+  var tm=null;
+  mxSave=function(){
+    clearTimeout(tm);tm=setTimeout(function(){
+      try{var ks=Object.keys(MX.p).sort(function(a,b){return MX.p[b].t-MX.p[a].t});if(ks.length>700)ks.slice(700).forEach(function(k){delete MX.p[k]})}catch(e){}
+      if(MX.idb)idbSet311('mx1.t',MX.p);
+    },1500);
+  };
+})();
+/* ---- (1) the past games behind the learned ratings live in IndexedDB (set up once the whole script has run) ---- */
+setTimeout(function(){
+  if(!IDB_OK311)return;
+  HBL.idbReady=false;
+  var lgs=HBL_LGS.slice(),pending=lgs.length;
+  var lsStores={};lgs.forEach(function(lg){try{var raw=localStorage.getItem(hblKey(lg));if(raw)lsStores[lg]=JSON.parse(raw)}catch(e){}});
+  var lsWx=null;try{lsWx=JSON.parse(localStorage.getItem('hb.hbl1.wx')||'null')}catch(e){}
+  var reset=function(){HBL.m={};HBL.bt={};HBL.cal=null;try{_hblP={}}catch(e){}try{_mxR={}}catch(e){}};
+  var hs0=hblSave;
+  hblSave=function(lg){if(!HBL.idbReady)return;var s=HBL.st[lg];if(!s)return;idbSet311('hbl1.'+lg,s);try{localStorage.removeItem(hblKey(lg))}catch(e){}};
+  var hws0=hblWxSave;
+  hblWxSave=function(){if(!HBL.idbReady)return;idbSet311('hbl1.wx',hblWx());try{localStorage.removeItem('hb.hbl1.wx')}catch(e){}};
+  var hl0=hblLoad;
+  hblLoad=function(force){if(!HBL.idbReady){setTimeout(function(){try{hblLoad(force)}catch(e){}},3000);return}return hl0.apply(this,arguments)};
+  var merge=function(a,b){if(!a)return b;if(!b)return a;['g','w','ab','nm','ta'].forEach(function(k){a[k]=a[k]||{};Object.keys(b[k]||{}).forEach(function(x){if(!(x in a[k]))a[k][x]=b[k][x]})});return a};
+  lgs.forEach(function(lg){
+    idbGet311('hbl1.'+lg).then(function(s){
+      var st=merge(s&&s.g?s:null,lsStores[lg]&&lsStores[lg].g?lsStores[lg]:null);
+      if(HBL.st[lg]&&HBL.st[lg].g&&Object.keys(HBL.st[lg].g).length)st=merge(st,HBL.st[lg]);
+      if(st)HBL.st[lg]=st;else delete HBL.st[lg];
+    }).then(function(){
+      if(--pending>0)return;
+      idbGet311('hbl1.wx').then(function(w){
+        if(w&&w.g)HBL.wx=w;else if(lsWx&&lsWx.g)HBL.wx=lsWx;
+        HBL.idbReady=true;reset();
+        lgs.forEach(function(lg){if(HBL.st[lg])hblSave(lg)});hblWxSave();
+        try{render()}catch(e){}
+      });
+    });
+  });
+},0);
+/* ---- (3) save your data the moment the app is hidden or closed ---- */
+(function(){
+  var flush=function(){
+    try{if(typeof saveMine==='function')saveMine()}catch(e){}
+    try{if(typeof saveSlip==='function')saveSlip()}catch(e){}
+    try{if(typeof save==='function')save()}catch(e){}
+    try{if(typeof trkSave==='function')trkSave()}catch(e){}
+    try{if(typeof trk185Save==='function')trk185Save()}catch(e){}
+    try{if(typeof saveLog==='function')saveLog()}catch(e){}
+    try{if(typeof mxLogSave==='function')mxLogSave()}catch(e){}
+    try{feedSave311()}catch(e){}
+  };
+  document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')flush()});
+  window.addEventListener('pagehide',flush);
+})();
+/* ---- (4) the last scores, odds and lineups open instantly ---- */
+var FEED311={at:0};
+function feedSave311(){
+  if(!IDB_OK311||!S.live||!S.feedAt||S.feedAt===FEED311.at)return;
+  var o=null;try{o=JSON.parse(JSON.stringify({at:S.feedAt,feed:S.feed}))}catch(e){return}
+  FEED311.at=S.feedAt;idbSet311('feed.last',o);
+}
+setInterval(function(){try{feedSave311()}catch(e){}},20000);
+(function(){
+  if(!IDB_OK311||window.claude)return;
+  idbGet311('feed.last').then(function(o){
+    if(!o||!o.feed||!o.at||S.live||o.at<=(S.feedAt||0)||Date.now()-o.at>36*36e5)return;
+    var ok=true;LG.forEach(function(l){if(!Array.isArray(o.feed[l[0]]))ok=false});if(!ok)return;
+    LG.forEach(function(l){S.feed[l[0]]=o.feed[l[0]]});S.feedAt=o.at;FEED311.at=o.at;
+    try{render()}catch(e){}
+  });
 })();
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
