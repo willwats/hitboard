@@ -1957,7 +1957,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v301, Nov 27';
+var BUILD='v302, Nov 27';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -21301,6 +21301,69 @@ try{
   [{"t":"PIT","n":"Nick Herbig"},{"t":"PIT","n":"Michael Pittman Jr."},{"t":"BAL","n":"Marlon Humphrey"}].forEach(function(r){rm(r.t,r.n)});
   [{"t":"DEN","item":"S Taylor Rapp:o"},{"t":"DEN","item":"RB J.K. Dobbins:o"},{"t":"PIT","item":"QB Aaron Rodgers:o"},{"t":"PIT","item":"LB Alex Highsmith:o"},{"t":"PIT","item":"LB Cole Holcomb:q"},{"t":"NO","item":"TE Juwan Johnson:q"},{"t":"NO","item":"C Erik McCoy:q"},{"t":"NO","item":"T Taliese Fuaga:q"},{"t":"NO","item":"OT Asim Richards:q"},{"t":"CIN","item":"G Dalton Risner:q"},{"t":"BAL","item":"QB Lamar Jackson:o"},{"t":"BAL","item":"QB Tyler Huntley:o"},{"t":"BAL","item":"RB Derrick Henry:q"},{"t":"BAL","item":"DT Nnamdi Madubuike:q"},{"t":"BAL","item":"S Jaylinn Hawkins:q"},{"t":"HOU","item":"RB Woody Marks:q"},{"t":"HOU","item":"WR Marvin Harrison Jr.:q"},{"t":"HOU","item":"DE Danielle Hunter:q"},{"t":"HOU","item":"WR Kayshon Boutte:q"},{"t":"NYG","item":"QB Jaxson Dart:o"},{"t":"NYG","item":"TE Isaiah Likely:q"},{"t":"NYG","item":"LB Abdul Carter:q"},{"t":"NYG","item":"LB Arvell Reese:q"},{"t":"IND","item":"QB Daniel Jones:o"},{"t":"IND","item":"WR Alec Pierce:o"},{"t":"IND","item":"CB Charvarius Ward:q"},{"t":"IND","item":"T Jalen Travis:q"},{"t":"NYJ","item":"WR Omar Cooper Jr.:o"},{"t":"MIA","item":"QB Malik Willis:o"},{"t":"MIA","item":"RB De'Von Achane:o"},{"t":"MIN","item":"QB Kyler Murray:q"},{"t":"MIN","item":"WR Jordan Addison:d"},{"t":"MIN","item":"T Christian Darrisaw:q"},{"t":"ATL","item":"WR Jahan Dotson:q"},{"t":"ATL","item":"G Matthew Bergeron:q"},{"t":"JAX","item":"RB Bhayshul Tuten:q"},{"t":"JAX","item":"WR Jakobi Meyers:q"},{"t":"NE","item":"QB Drake Maye:o"},{"t":"NE","item":"WR A.J. Brown:d"},{"t":"NE","item":"CB Carlton Davis III:q"},{"t":"LAC","item":"QB Justin Herbert:d"},{"t":"LAC","item":"TE David Njoku:q"},{"t":"LAC","item":"LB Tuli Tuipulotu:q"},{"t":"LAC","item":"LB Daiyan Henley:q"},{"t":"LAC","item":"CB Tarheeb Still:q"},{"t":"WAS","item":"WR Terry McLaurin:o"},{"t":"WAS","item":"CB Amik Robertson:o"},{"t":"ARI","item":"QB Carson Beck:o"},{"t":"ARI","item":"QB Gardner Minshew:o"},{"t":"ARI","item":"TE Hunter Long:q"},{"t":"SF","item":"QB Brock Purdy:q"},{"t":"SF","item":"WR Mike Evans:q"},{"t":"SEA","item":"WR Jaxon Smith-Njigba:q"},{"t":"SEA","item":"G Quenton Nelson:o"},{"t":"SEA","item":"OT Abraham Lucas:o"},{"t":"LV","item":"TE Brock Bowers:q"},{"t":"CLE","item":"WR Denzel Boston:q"},{"t":"CLE","item":"TE Harold Fannin:q"},{"t":"CAR","item":"WR Tetairoa McMillan:q"},{"t":"CAR","item":"LB Bobby Okereke:q"},{"t":"CAR","item":"TE Darren Waller:q"},{"t":"TB","item":"S Antoine Winfield Jr.:q"},{"t":"TB","item":"CB Jacob Parrish:q"}].forEach(function(k){add(k.t,k.item)});
 }catch(e){}})();
+/* v302: Hitboard's pick and the simulation no longer use the betting line (user). The predicted score, win chance and
+   simulated games come only from Hitboard's own numbers: team scoring and defense, home edge, who is playing, weather and
+   what it has learned from past results. The line is used only afterwards, to say which side of the spread and total
+   Hitboard's score lands on and how often each bet hits in the simulation. */
+feedCalc=function(g){
+  var T=feedTeams(g);if(!T||T.missing)return null;
+  var A=T.A,H=T.H;
+  var sa=(A.pf+H.pa)/2-T.he/2,sh=(H.pf+A.pa)/2+T.he/2;
+  try{var J=statAdj295(g,sa,sh);if(J){sa=J.sa;sh=J.sh}}catch(e){}
+  var ln=lineFor(g),mkH=(ln&&ln.mlP!=null)?ln.mlP:null;
+  var wxa=g.lg==='nfl'?wxAdj(T.H.k,g.start):{adj:0,pu:0};
+  var mkM=(ln&&ln.pts!=null)?(ln.fav==='h'?ln.pts:-ln.pts):null;
+  var margin=sh-sa,total=sa+sh+wxa.adj;
+  var rawM=margin,rawT=total,LN=learnTm(g);
+  if(LN.n){margin+=LN.dm;total+=LN.dt}
+  var p=Phi(margin/T.sdM),pModel=p;
+  var bets=[],ws=p>=.5?g.h:g.a,wpp=p>=.5?p:1-p;
+  bets.push({t:'ml',side:p>=.5?'h':'a',mk:'Moneyline',pick:ws+' to win',p:wpp,conf:wpp>=.7?'high':wpp>=.6?'medium':'low',why:'Hitboard’s own win chance '+pc(wpp)+'%, from its projected score (the betting line is not used).'});
+  if(ln&&ln.pts!=null){
+    var edge=margin-mkM,side=edge>=0?g.h:g.a,mm=Math.abs(mkM);
+    var lineTxt=edge>=0?(mkM>=0?'-':'+')+mm.toFixed(1):(mkM>=0?'+':'-')+mm.toFixed(1);
+    bets.push({t:'sp',side:edge>=0?'h':'a',num:parseFloat(lineTxt),mk:g.lg==='nhl'?'Puck line':'Spread',pick:side+' '+lineTxt,p:calibCover(Phi(Math.abs(edge)/T.sdM)),conf:confOf(edge/(T.sdM/13.5)),why:'Hitboard’s own margin is '+(margin>=0?g.h:g.a)+' by '+Math.abs(margin).toFixed(1)+'; the line is '+(mkM>=0?g.h:g.a)+' by '+mm.toFixed(1)+'.'});
+  }
+  if(ln&&ln.tt!=null){
+    var te=total-ln.tt;
+    bets.push({t:'tot',over:te>=0,num:ln.tt,mk:'Total',pick:(te>=0?'Over ':'Under ')+ln.tt,p:calibTotal(Phi(Math.abs(te)/T.sdT),te<0,wxa),conf:'low',why:'Hitboard’s own total is '+total.toFixed(1)+'; the listed total is '+ln.tt+'.'});
+  }
+  bets.forEach(function(b){b.p0=b.p;b.p=(g.lg==='nhl'&&b.t==='sp')?Math.max(.3,Math.min(.8,b.p+(LN.dp.sp||0))):learnP(LN,b.t,b.p);b.rm=rawM;b.fm=margin;b.rt=rawT;b.pmH=pModel;b.mkH=mkH;b.src=ln&&ln.srcs?ln.srcs.join(', '):null});
+  return {T:T,p:p,fp:null,ln:ln,total:total,margin:margin,bets:bets,LN:LN,noLine302:1};
+};
+/* one projected score per game even when no spread is posted yet */
+one295=function(g){
+  if(g.lg!=='nfl'&&g.lg!=='ncaafb'&&g.lg!=='nba'&&g.lg!=='nhl')return null;
+  var C=null;try{C=feedCalc(g)}catch(e){}
+  if(!C||C.total==null||!isFinite(C.margin)||!isFinite(C.total))return null;
+  return {a:Math.max(0,(C.total-C.margin)/2),h:Math.max(0,(C.total+C.margin)/2),M:C.margin,T:C.total};
+};
+/* the simulation: Hitboard's own scores only; the market half is dropped */
+(function(){
+  var si=simInputs276;
+  simInputs276=function(g){
+    var I=si.apply(this,arguments);if(!I)return I;
+    try{
+      if(!I.one&&I.st){var lo=I.lg==='nhl'?.8:/^nba|ncaamb$/.test(I.lg)?55:3,ea=I.st.a+(I.inj?I.inj.a:0),eh=I.st.h+(I.inj?I.inj.h:0);
+        if(I.wx&&I.wx.adj){ea+=I.wx.adj/2;eh+=I.wx.adj/2}I.ea=Math.max(lo,ea);I.eh=Math.max(lo,eh)}
+      else if(!I.one&&!I.st)return null;
+      I.mk=null;I.w=0;I.noLine302=1;
+    }catch(e){}
+    return I;
+  };
+})();
+/* the older NFL board model: stats only */
+(function(){
+  var m0=model;
+  model=function(g){
+    var m=m0.apply(this,arguments);if(!m)return m;
+    try{var LN=m.LN||{dm:0,dt:0};m.rmargin=m.smargin;m.rtotal=m.stotal+(m.wadj||0);m.margin=m.rmargin+(LN.dm||0);m.total=m.rtotal+(LN.dt||0);m.ba=(m.total-m.margin)/2;m.bh=(m.total+m.margin)/2}catch(e){}
+    return m;
+  };
+  var sb=straightBets;
+  straightBets=function(g,m){var o=sb.apply(this,arguments);try{o.forEach(function(b){if(b.why)b.why=b.why.replace(/^Blended (margin|total|win chance) is/,'Hitboard’s own $1 is').replace(/^Blended win chance/,'Hitboard’s own win chance')})}catch(e){}return o};
+})();
+
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
 setTimeout(function(){doRefresh(true)},600);
