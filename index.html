@@ -1957,7 +1957,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v302, Nov 27';
+var BUILD='v303, Nov 27';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -21362,6 +21362,20 @@ one295=function(g){
   };
   var sb=straightBets;
   straightBets=function(g,m){var o=sb.apply(this,arguments);try{o.forEach(function(b){if(b.why)b.why=b.why.replace(/^Blended (margin|total|win chance) is/,'Hitboard’s own $1 is').replace(/^Blended win chance/,'Hitboard’s own win chance')})}catch(e){}return o};
+})();
+
+/* v303: nothing from the sportsbooks shapes Hitboard's score. The learned margin and total shifts were measured against the
+   old market-anchored score (they pulled the score back toward the line), so they are no longer applied; only the
+   calibration of how often its stated chances hit is kept. The pick card says plainly that the score is built from the matchup. */
+(function(){
+  var lt=learnTm;
+  learnTm=function(g){var o=lt.apply(this,arguments);try{o.dm=0;o.dt=0}catch(e){}return o};
+  var pk=pick284;
+  pick284=function(g,d,X,e){
+    var h=pk.apply(this,arguments);
+    try{h=h.replace('The predicted score is the same number the picks use, and the simulation below plays it out 10,000 times.','The predicted score is built only from the matchup (each team’s offense against the other’s defense, home field, who is playing and weather), never from the sportsbook line. The picks and the simulation below use that same score; the line is shown only to say which side of it Hitboard’s score lands on.')}catch(x){}
+    return h;
+  };
 })();
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
