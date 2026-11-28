@@ -1957,7 +1957,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v299, Nov 27';
+var BUILD='v300, Nov 27';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -20931,6 +20931,362 @@ function recLine298(R,what){
     }catch(err){return e}
   };
 })();
+/* ======================================================================================================
+   v300: Hitboard Learner — a prediction model built from scratch that never looks at the betting line.
+   For each sport it learns, from every finished game this season and last season (last season counts less,
+   because rosters change), an offense rating and a defense rating for every team, the home edge, and for
+   football the effect of wind. Each team's points = league average + home edge + its offense − the opponent's
+   defense + wind. It is refit as new games finish, so its mistakes feed the next prediction, and each week of
+   this season is replayed using only the games before it to show how it would have done.
+   Players out (injury report, inactives, NHL goalies) adjust the learned score for the game in front of it.
+   The betting line is used only at the end: to say how often each team covers and whether the total goes over.
+   Shown next to the main picks (user chose "show both"); it does not change the main picks or grades.
+   ====================================================================================================== */
+var HBL_CFG={
+  nfl:{sm:8,sd:1,em:1,ed:15,win:7,q:'&limit=200',hl:70,lam:3,h0:1.8,min:3},
+  ncaafb:{sm:7,sd:20,em:0,ed:25,win:7,q:'&groups=80&limit=400',hl:60,lam:3,h0:2.5,min:3},
+  nba:{sm:9,sd:15,em:5,ed:25,win:4,q:'&limit=300',hl:45,lam:8,h0:2.4,min:4},
+  nhl:{sm:9,sd:1,em:5,ed:25,win:4,q:'&limit=300',hl:45,lam:10,h0:.2,min:4},
+  ncaamb:{sm:10,sd:1,em:3,ed:10,win:2,q:'&groups=50&limit=500',hl:40,lam:4,h0:3.2,min:4}
+};
+var HBL_LGS=['nfl','ncaafb','nba','nhl','ncaamb'],HBL_LAST_W=.4,HBL_WIND0={a:-.45,b:-1.15};
+var HBL={st:{},m:{},bt:{},busy:false,msg:'',prog:{},log:null,wx:null};
+function hblKey(lg){return 'hb.hbl1.'+lg}
+function hblStore(lg){
+  if(HBL.st[lg])return HBL.st[lg];
+  var s=null;try{s=JSON.parse(localStorage.getItem(hblKey(lg))||'null')}catch(e){}
+  if(!s||!s.g)s={w:{},g:{},ab:{},nm:{},ta:{}};
+  HBL.st[lg]=s;return s;
+}
+function hblSave(lg){
+  var s=HBL.st[lg];if(!s)return;
+  try{localStorage.setItem(hblKey(lg),JSON.stringify(s))}catch(e){
+    /* full: keep this season only for this sport */
+    try{var cs=hblSeason(lg).cur.start/1000,g={};Object.keys(s.g).forEach(function(k){if(s.g[k][0]>=cs)g[k]=s.g[k]});s.g=g;s.w={};s.trim=1;localStorage.setItem(hblKey(lg),JSON.stringify(s))}catch(e2){}
+  }
+}
+function hblWx(){if(HBL.wx)return HBL.wx;try{HBL.wx=JSON.parse(localStorage.getItem('hb.hbl1.wx')||'null')}catch(e){}if(!HBL.wx||!HBL.wx.g)HBL.wx={g:{},done:{}};return HBL.wx}
+function hblWxSave(){try{localStorage.setItem('hb.hbl1.wx',JSON.stringify(hblWx()))}catch(e){}}
+/* seasons: last season and this season */
+function hblSeason(lg){
+  var C=HBL_CFG[lg],now=new Date(),y=now.getFullYear();
+  var st=function(Y){return new Date(Y,C.sm,C.sd)},en=function(Y){return new Date(C.em<C.sm?Y+1:Y,C.em,C.ed)};
+  var Y=now>=st(y)?y:y-1;
+  return {cur:{y:Y,start:st(Y).getTime(),end:en(Y).getTime()},last:{y:Y-1,start:st(Y-1).getTime(),end:en(Y-1).getTime()}};
+}
+function hblFd(d){return d.getFullYear()+('0'+(d.getMonth()+1)).slice(-2)+('0'+d.getDate()).slice(-2)}
+function hblWindows(lg){
+  var C=HBL_CFG[lg],S2=hblSeason(lg),now=Date.now(),out=[];
+  [S2.last,S2.cur].forEach(function(se){
+    var a=se.start,end=Math.min(se.end,now);
+    while(a<=end){var b=Math.min(a+(C.win-1)*864e5,end);out.push({w:hblFd(new Date(a))+'-'+hblFd(new Date(b)),end:b});a=b+864e5}
+  });
+  return out;
+}
+var HBL_NBAX={NY:'NYK',GS:'GSW',SA:'SAS',NO:'NOP',UTAH:'UTA',WSH:'WAS'};
+function hblAb(lg,a){a=String(a||'');if(lg==='nba')return HBL_NBAX[a]||a;if(lg==='nhl'){try{return nhlK(a)}catch(e){return a}}if(lg==='nfl')return nt(a);return a}
+function hblParse(lg,j){
+  var s=hblStore(lg),n=0;
+  ((j&&j.events)||[]).forEach(function(e){
+    try{
+      var c=(e.competitions||[])[0]||{},st=(c.status&&c.status.type)||(e.status&&e.status.type)||{};
+      if(!(st.completed===true||st.state==='post'))return;
+      var hm=(c.competitors||[]).filter(function(x){return x.homeAway==='home'})[0],aw=(c.competitors||[]).filter(function(x){return x.homeAway==='away'})[0];
+      if(!hm||!aw||!hm.team||!aw.team)return;
+      var sc=function(x){var v=x.score;if(v&&typeof v==='object')v=v.value!=null?v.value:v.displayValue;v=parseFloat(v);return isFinite(v)?v:null};
+      var hs=sc(hm),as=sc(aw);if(hs==null||as==null)return;
+      var hid=String(hm.team.id),aid=String(aw.team.id),dk=null;try{dk=parseDK(c.odds,aw.team.abbreviation,hm.team.abbreviation)}catch(x){}
+      var spH=dk&&dk.sp?(dk.sp.fav==='h'?-dk.sp.pts:dk.sp.pts):null,tt=dk&&dk.tt!=null?dk.tt:null;
+      s.g[e.id]=[Math.round((Date.parse(e.date)||0)/1000),hid,aid,hs,as,c.neutralSite?1:0,c.venue&&c.venue.indoor?1:0,spH,tt];
+      [[hm,hid],[aw,aid]].forEach(function(p){var t=p[0].team,ab=hblAb(lg,t.abbreviation);if(t.abbreviation){s.ab[t.abbreviation]=p[1];s.ab[ab]=p[1];s.ta[p[1]]=ab}s.nm[p[1]]=t.shortDisplayName||t.displayName||ab});
+      n++;
+    }catch(x){}
+  });
+  return n;
+}
+/* load (and keep current) every finished game for every sport; one-time for old windows, recent ones refreshed */
+function hblLoad(force){
+  if(HBL.busy||window.claude||typeof fetch!=='function')return Promise.resolve();
+  HBL.busy=true;
+  var jobs=[];
+  HBL_LGS.forEach(function(lg){var s=hblStore(lg),C=HBL_CFG[lg],recent=Date.now()-3*864e5;
+    hblWindows(lg).forEach(function(w){if(s.w[w.w]&&!force)return;jobs.push({lg:lg,w:w,done:w.end<recent})})});
+  HBL.prog={todo:jobs.length,done:0};
+  var i=0;
+  var one=function(){
+    var J=jobs[i++];if(!J)return Promise.resolve();
+    var C=HBL_CFG[J.lg];
+    return fetch('https://site.api.espn.com/apis/site/v2/sports/'+ESPN[J.lg]+'/scoreboard?dates='+J.w.w+C.q,{cache:'no-store'}).then(function(r){return r.ok?r.json():null}).then(function(j){
+      if(j){hblParse(J.lg,j);if(J.done)hblStore(J.lg).w[J.w.w]=1}
+    }).catch(function(){}).then(function(){HBL.prog.done++;if(HBL.prog.done%8===0)HBL_LGS.forEach(hblSave);return one()});
+  };
+  return Promise.all([one(),one(),one()]).then(function(){HBL_LGS.forEach(hblSave);return hblWind()}).catch(function(){}).then(function(){
+    HBL.busy=false;HBL.m={};HBL.bt={};HBL.at=Date.now();try{localStorage.setItem('hb.hbl1.at',String(HBL.at))}catch(e){}
+    try{if(!S.sheet)render()}catch(e){}
+  });
+}
+/* kickoff wind for past NFL games at open stadiums (Open-Meteo history), so the model can learn what wind does */
+function hblWind(){
+  var s=hblStore('nfl'),W=hblWx(),groups={},now=Date.now()/1000;
+  Object.keys(s.g).forEach(function(id){var x=s.g[id];if(W.g[id]!=null||x[5]||x[6])return;if(now-x[0]<7*86400)return;
+    var ab=s.ta[x[1]],sd=STAD[ab];if(!sd||sd[2]!=='open')return;
+    var d=new Date(x[0]*1000),k=ab+'|'+d.getFullYear()+'-'+(d.getMonth()<6?'a':'b');(groups[k]=groups[k]||{ab:ab,ids:[],lo:x[0],hi:x[0]});var G=groups[k];G.ids.push(id);G.lo=Math.min(G.lo,x[0]);G.hi=Math.max(G.hi,x[0])});
+  var ks=Object.keys(groups).filter(function(k){return !W.done[k+'|'+groups[k].hi]}),i=0;
+  var iso=function(t){return new Date(t*1000).toISOString().slice(0,10)};
+  var one=function(){
+    var k=ks[i++];if(!k)return Promise.resolve();var G=groups[k],sd=STAD[G.ab];
+    return fetch('https://archive-api.open-meteo.com/v1/archive?latitude='+sd[0]+'&longitude='+sd[1]+'&start_date='+iso(G.lo)+'&end_date='+iso(G.hi+86400)+'&hourly=wind_speed_10m&wind_speed_unit=mph&timezone=GMT').then(function(r){return r.ok?r.json():null}).then(function(j){
+      if(!j||!j.hourly||!j.hourly.time)return;
+      var T={};j.hourly.time.forEach(function(t,ix){T[t]=j.hourly.wind_speed_10m[ix]});
+      G.ids.forEach(function(id){var t0=s.g[id][0],sum=0,n=0;for(var h=0;h<3;h++){var key=new Date((t0+h*3600)*1000).toISOString().slice(0,13)+':00';if(T[key]!=null){sum+=T[key];n++}}if(n)W.g[id]=Math.round(sum/n*10)/10});
+      W.done[k+'|'+G.hi]=1;
+    }).catch(function(){}).then(one);
+  };
+  return Promise.all([one(),one()]).then(hblWxSave);
+}
+/* ---------- the model ---------- */
+function hblFit(lg,before){
+  var s=hblStore(lg),C=HBL_CFG[lg],S2=hblSeason(lg),W=hblWx(),ref=before||Date.now()/1000,cs=S2.cur.start/1000,ls=S2.last.start/1000;
+  var football=lg==='nfl'||lg==='ncaafb',learnWind=lg==='nfl';
+  var obs=[],teams={},gN=0,curN=0;
+  Object.keys(s.g).forEach(function(id){
+    var x=s.g[id];if(x[0]>=ref||x[0]<ls)return;
+    var w=x[0]>=cs?Math.pow(.5,((ref-x[0])/86400)/C.hl):HBL_LAST_W*Math.pow(.5,((S2.last.end/1000-x[0])/86400)/150);if(w<.005)return;
+    var wind=learnWind&&W.g[id]!=null?W.g[id]:null,wb=wind==null?0:wind>=20?2:wind>=15?1:0,home=x[5]?0:1;
+    obs.push({t:x[1],o:x[2],y:x[3],h:home,w:w,wb:wb,r:0});obs.push({t:x[2],o:x[1],y:x[4],h:0,w:w,wb:wb,r:0});
+    teams[x[1]]=(teams[x[1]]||0)+w;teams[x[2]]=(teams[x[2]]||0)+w;gN++;if(x[0]>=cs)curN++;
+  });
+  if(gN<20)return null;
+  var mu=0,sw=0;obs.forEach(function(o){mu+=o.w*o.y;sw+=o.w});mu/=sw;
+  var off={},def={},hfa=C.h0,wA=HBL_WIND0.a,wB=HBL_WIND0.b,lam=C.lam,lamW=25,lamH=20;
+  Object.keys(teams).forEach(function(t){off[t]=0;def[t]=0});
+  var pred=function(o){return mu+hfa*o.h+off[o.t]-def[o.o]+(o.wb===1?wA:o.wb===2?wB:0)};
+  var resid=function(){obs.forEach(function(o){o.r=o.y-pred(o)})};
+  for(var pass=0;pass<30;pass++){
+    resid();var a={},b={};obs.forEach(function(o){var q=a[o.t]||(a[o.t]=[0,0]);q[0]+=o.w*(o.r+off[o.t]);q[1]+=o.w});
+    Object.keys(a).forEach(function(t){off[t]=a[t][0]/(a[t][1]+lam)});
+    resid();obs.forEach(function(o){var q=b[o.o]||(b[o.o]=[0,0]);q[0]+=o.w*(def[o.o]-o.r);q[1]+=o.w});
+    Object.keys(b).forEach(function(t){def[t]=b[t][0]/(b[t][1]+lam)});
+    /* keep the ratings centred so the league average stays in mu */
+    var mo=0,md=0,nt2=0;Object.keys(off).forEach(function(t){mo+=off[t];md+=def[t];nt2++});mo/=nt2;md/=nt2;Object.keys(off).forEach(function(t){off[t]-=mo;def[t]-=md});
+    resid();var hs=0,hw=0;obs.forEach(function(o){if(o.h){hs+=o.w*(o.r+hfa);hw+=o.w}});hfa=(hs+lamH*C.h0)/(hw+lamH);
+    if(learnWind){resid();var A=[0,0],B=[0,0];obs.forEach(function(o){if(o.wb===1){A[0]+=o.w*(o.r+wA);A[1]+=o.w}else if(o.wb===2){B[0]+=o.w*(o.r+wB);B[1]+=o.w}});
+      wA=(A[0]+lamW*HBL_WIND0.a)/(A[1]+lamW);wB=(B[0]+lamW*HBL_WIND0.b)/(B[1]+lamW);}
+    resid();var m2=0;obs.forEach(function(o){m2+=o.w*o.r});mu+=m2/sw;
+  }
+  /* how far off it usually is: margin and total, from the same games */
+  var em=0,et=0,ew=0;
+  for(var k=0;k<obs.length;k+=2){var A2=obs[k],B2=obs[k+1],pm=pred(A2)-pred(B2),pt=pred(A2)+pred(B2);em+=A2.w*Math.pow(A2.y-B2.y-pm,2);et+=A2.w*Math.pow(A2.y+B2.y-pt,2);ew+=A2.w}
+  var floor={nfl:[12,11],ncaafb:[14,13],nba:[11,16],nhl:[2.2,2.1],ncaamb:[10,14]}[lg];
+  var cnt={};obs.forEach(function(o){cnt[o.t]=(cnt[o.t]||0)+1});
+  return {lg:lg,mu:mu,hfa:hfa,off:off,def:def,wA:wA,wB:wB,windN:obs.filter(function(o){return o.wb}).length/2,sdM:Math.max(floor[0],Math.sqrt(em/ew)*1.05),sdT:Math.max(floor[1],Math.sqrt(et/ew)*1.05),n:gN,cur:curN,cnt:cnt,at:Date.now()};
+}
+function hblModel(lg){
+  var s=hblStore(lg),k=Object.keys(s.g).length+'|'+Math.floor(Date.now()/36e5)+'|'+Object.keys(hblWx().g).length,c=HBL.m[lg];
+  if(c&&c.k===k)return c.v;
+  var v=null;try{v=hblFit(lg)}catch(e){v=null}
+  HBL.m[lg]={k:k,v:v};return v;
+}
+function hblTeam(lg,g,side){
+  var s=hblStore(lg),id=side==='a'?g.aid:g.hid,ab=side==='a'?g.a:g.h;
+  if(id&&s.nm[String(id)])return String(id);
+  try{var m=S.tmIdMap&&S.tmIdMap[lg+'|'+ab];if(m&&s.nm[String(m)])return String(m)}catch(e){}
+  return s.ab[ab]||s.ab[hblAb(lg,ab)]||null;
+}
+function hblRank(M,id,kind){var v=M[kind][id],c=1;Object.keys(M[kind]).forEach(function(t){if((M.cnt[t]||0)>=4&&M[kind][t]>v)c++});return c}
+var _hblP={};
+function hblPredict(g){
+  if(!g||HBL_LGS.indexOf(g.lg)<0)return null;
+  var key=g.id+'|'+Math.floor(Date.now()/6e4)+'|'+(S.feedAt||0);if(_hblP[g.id]&&_hblP[g.id].k===key)return _hblP[g.id].v;
+  var v=null;
+  try{
+    var lg=g.lg,M=hblModel(lg),C=HBL_CFG[lg];if(!M)throw 0;
+    var ha=hblTeam(lg,g,'a'),hh=hblTeam(lg,g,'h');if(!ha||!hh||(M.cnt[ha]||0)<C.min||(M.cnt[hh]||0)<C.min)throw 0;
+    var football=lg==='nfl'||lg==='ncaafb',wind=null,wt=0,MW=lg==='ncaafb'?(hblModel('nfl')||M):M;
+    if(football){try{var w=grWind(lg,g.h);if(w&&w.wavg!=null){wind=w.wavg;wt=wind>=20?MW.wB:wind>=15?MW.wA:0}}catch(e){}}
+    var neutral=!!g.neutral;
+    var b0h=M.mu+(neutral?0:M.hfa)+M.off[hh]-M.def[ha]+wt,b0a=M.mu+M.off[ha]-M.def[hh]+wt;
+    var st=null;try{st=statAdj295(g,b0a,b0h)}catch(e){}
+    var pa=st?st.sa:b0a,ph=st?st.sh:b0h,lo=lg==='nhl'?.5:0;pa=Math.max(lo,pa);ph=Math.max(lo,ph);
+    var mg=ph-pa,tot=ph+pa,ln=null;try{ln=lineFor(g)}catch(e){}
+    var o={a:pa,h:ph,base:{a:b0a,h:b0h},mg:mg,tot:tot,sdM:M.sdM,sdT:M.sdT,wind:wind,wt:wt,M:M,ia:ha,ih:hh,notes:st?st.notes:[]};
+    o.winH=Phi(mg/M.sdM);o.winA=1-o.winH;
+    var cal=null;try{cal=hblCal(lg)}catch(e){}o.cal=cal;
+    if(ln&&ln.pts!=null){var hl=ln.fav==='h'?-ln.pts:ln.pts;o.hl=hl;o.covH0=Phi((mg+hl)/M.sdM);o.covH=cal?.5+cal.sp.k*(o.covH0-.5):o.covH0;o.covA=1-o.covH}
+    if(ln&&ln.tt!=null){o.tt=ln.tt;o.over0=Phi((tot-ln.tt)/M.sdT);o.over=cal?.5+cal.tot.k*(o.over0-.5):o.over0;o.under=1-o.over}
+    v=o;
+  }catch(e){v=null}
+  _hblP[g.id]={k:key,v:v};return v;
+}
+function hblLetter(p){return grLetter((p-.5)*200)}
+/* how much to trust its own edge against the line: fitted from how its past picks did (replayed games and live picks).
+   k = 1 means its percentages held up; k near 0 means its edges did not, so its cover/total chances move toward 50%. */
+var HBL_K0=.35;
+function hblCal(lg){
+  var c=HBL.cal&&HBL.cal[lg];var B=null;try{B=hblBacktest(lg)}catch(e){}
+  var key=(B?B.ps.length+'|'+B.pt.length:'0')+'|'+hblLog().length;if(c&&c.key===key)return c;
+  var pairs={sp:(B?B.ps:[]).slice(),tot:(B?B.pt:[]).slice()};
+  hblLog().forEach(function(x){if(x.lg!==lg||!x.res)return;if(x.sp&&(x.res.sp==='W'||x.res.sp==='L'))pairs.sp.push([x.sp.p0||x.sp.p,x.res.sp==='W'?1:0]);if(x.tot&&(x.res.tot==='W'||x.res.tot==='L'))pairs.tot.push([x.tot.p0||x.tot.p,x.res.tot==='W'?1:0])});
+  var fit=function(P){var num=0,den=0;P.forEach(function(q){num+=(q[1]-.5)*(q[0]-.5);den+=(q[0]-.5)*(q[0]-.5)});var n=P.length,kh=den>0?num/den:HBL_K0;return {k:Math.max(.05,Math.min(1,(n*kh+50*HBL_K0)/(n+50))),n:n,hit:n?P.reduce(function(a,q){return a+q[1]},0)/n:null}};
+  c={key:key,sp:fit(pairs.sp),tot:fit(pairs.tot)};HBL.cal=HBL.cal||{};HBL.cal[lg]=c;return c;
+}
+function hblLine(v){return (v>0?'+':v<0?'-':'+')+Math.abs(v).toFixed(1)}
+function hblPicks(g,P){
+  var out=[];if(!P)return out;
+  if(P.hl!=null){var s=P.covH>=P.covA?'h':'a',num=s==='h'?P.hl:-P.hl,p=s==='h'?P.covH:P.covA;
+    out.push({t:'sp',side:s,num:+num.toFixed(1),pick:(s==='h'?g.h:g.a)+' '+hblLine(num),mk:'Spread',p:p})}
+  if(P.tt!=null){var ov=P.over>=P.under;out.push({t:'tot',over:ov,num:P.tt,pick:(ov?'Over ':'Under ')+P.tt,mk:'Total',p:ov?P.over:P.under})}
+  var ws=P.winH>=P.winA?'h':'a';out.push({t:'ml',side:ws,pick:(ws==='h'?g.h:g.a)+' to win',mk:'Moneyline',p:ws==='h'?P.winH:P.winA});
+  return out;
+}
+/* ---------- replay this season week by week, using only earlier games each time ---------- */
+function hblBacktest(lg){
+  var s=hblStore(lg),key=Object.keys(s.g).length+'|'+Object.keys(hblWx().g).length;if(HBL.bt[lg]&&HBL.bt[lg].k===key)return HBL.bt[lg].v;
+  var S2=hblSeason(lg),cs=S2.cur.start/1000,now=Date.now()/1000,W=hblWx(),R={n:0,win:0,mae:0,ats:[0,0],tot:[0,0],big:[0,0],weeks:0,ps:[],pt:[]};
+  try{
+    var G=Object.keys(s.g).map(function(id){return [id].concat(s.g[id])}).filter(function(x){return x[1]>=cs}).sort(function(a,b){return a[1]-b[1]});
+    for(var t=cs+21*86400;t<now;t+=7*86400){
+      var M=hblFit(lg,t);if(!M)continue;R.weeks++;
+      G.forEach(function(x){
+        if(x[1]<t||x[1]>=t+7*86400)return;var hh=x[2],aa=x[3];if((M.cnt[hh]||0)<3||(M.cnt[aa]||0)<3)return;
+        var wind=lg==='nfl'&&W.g[x[0]]!=null?W.g[x[0]]:null,wt=wind==null?0:wind>=20?M.wB:wind>=15?M.wA:0;
+        var ph=M.mu+(x[6]?0:M.hfa)+M.off[hh]-M.def[aa]+wt,pa=M.mu+M.off[aa]-M.def[hh]+wt,mg=ph-pa,am=x[4]-x[5];
+        R.n++;if((mg>0)===(am>0)&&am!==0)R.win++;R.mae+=Math.abs(am-mg);
+        if(x[8]!=null){var ch=Phi((mg+x[8])/M.sdM),pick=ch>=.5?1:-1,res=am+x[8];if(res!==0){var ok=(res>0)===(pick>0);R.ats[ok?0:1]++;R.ps.push([Math.max(ch,1-ch),ok?1:0]);if(Math.max(ch,1-ch)>=.56)R.big[ok?0:1]++}}
+        if(x[9]!=null){var po=Phi((ph+pa-x[9])/M.sdT),ov=po>=.5,at=x[4]+x[5];if(at!==x[9]){var ok2=(at>x[9])===ov;R.tot[ok2?0:1]++;R.pt.push([Math.max(po,1-po),ok2?1:0])}}
+      });
+    }
+  }catch(e){}
+  if(R.n)R.mae/=R.n;
+  HBL.bt[lg]={k:key,v:R};return R;
+}
+/* ---------- its own picks, saved before each game and graded after ---------- */
+function hblLog(){if(HBL.log)return HBL.log;try{HBL.log=JSON.parse(localStorage.getItem('hb.hbl1.log')||'[]')}catch(e){}if(!Array.isArray(HBL.log))HBL.log=[];return HBL.log}
+function hblLogTick(){
+  try{
+    var L=hblLog(),have={},ch=false,now=Date.now();L.forEach(function(x){have[x.gid]=x});
+    HBL_LGS.forEach(function(lg){(S.feed[lg]||[]).forEach(function(g){
+      var k=kind(g),x=have[g.id];
+      if(k==='up'&&!x&&g.start>now&&g.start<now+36*36e5){var P=hblPredict(g);if(!P||P.hl==null)return;
+        var pk=hblPicks(g,P);pk.forEach(function(q){if(q.t==='sp')q.p0=Math.max(P.covH0,1-P.covH0);if(q.t==='tot')q.p0=Math.max(P.over0,1-P.over0)});L.push({gid:g.id,lg:lg,st:g.start,a:g.a,h:g.h,pa:+P.a.toFixed(1),ph:+P.h.toFixed(1),sp:pk.filter(function(q){return q.t==='sp'})[0]||null,tot:pk.filter(function(q){return q.t==='tot'})[0]||null,ml:pk.filter(function(q){return q.t==='ml'})[0]||null,res:null});ch=true}
+      if(k==='final'&&x&&!x.res&&g.sa!=null){var mh=g.sh-g.sa,r={};
+        if(x.sp){var v=(x.sp.side==='h'?mh:-mh)+x.sp.num;r.sp=v>0?'W':v<0?'L':'P'}
+        if(x.tot){var t=g.sa+g.sh;r.tot=t===x.tot.num?'P':((t>x.tot.num)===x.tot.over?'W':'L')}
+        if(x.ml)r.ml=mh===0?'P':((x.ml.side==='h')===(mh>0)?'W':'L');
+        r.miss=Math.abs((g.sh-g.sa)-(x.ph-x.pa));x.res=r;ch=true}
+    })});
+    if(ch){if(L.length>1500)L.splice(0,L.length-1500);localStorage.setItem('hb.hbl1.log',JSON.stringify(L))}
+  }catch(e){}
+}
+/* ---------- in the game window ---------- */
+function hblCard(g){
+  var P=hblPredict(g),pct=simPct276,nm=function(s){return nick282(g,s)},lg=g.lg,dec=lg==='nhl'?1:0,f0=function(v){return dec?v.toFixed(1):String(Math.round(v))};
+  var h='<div class="card" style="padding:12px;margin-top:10px"><div class="src" style="text-transform:uppercase;letter-spacing:.06em;font-size:11px">Hitboard Learner · no betting line</div>';
+  if(!P){
+    var s=hblStore(lg),n=Object.keys(s.g).length;
+    return h+'<p class="src" style="margin:6px 0 0">'+(window.claude?'The Learner runs in the installed app, which can read past games.':HBL.busy?'Learning from past games… ('+(HBL.prog.done||0)+' of '+(HBL.prog.todo||0)+' pages read)':n<20?'Not enough past games loaded yet. They load in the background the first time the app opens.':'One of these teams has too few games for the Learner to rate yet.')+'</p></div>';
+  }
+  var w=P.h>=P.a?'h':'a',M=P.M;
+  h+='<div style="font-size:19px;font-weight:800;margin-top:4px">'+esc(nm(w))+' '+f0(w==='h'?P.h:P.a)+', '+esc(nm(w==='h'?'a':'h'))+' '+f0(w==='h'?P.a:P.h)+'</div>';
+  var tr=function(lab,va,vh){return '<tr><td>'+lab+'</td><td align="center"><b>'+va+'</b></td><td align="center"><b>'+vh+'</b></td></tr>'};
+  h+='<table class="simtbl" style="margin-top:6px"><tr><th align="left"></th><th>'+esc(nm('a'))+'</th><th>'+esc(nm('h'))+'</th></tr>'+tr('Win',pct(P.winA)+'%',pct(P.winH)+'%')+
+    (P.hl!=null?tr('Cover ('+hblLine(-P.hl)+' / '+hblLine(P.hl)+')',pct(P.covA)+'%',pct(P.covH)+'%'):'')+'</table>';
+  if(P.tt!=null)h+='<div style="margin-top:6px">Total '+P.tt+': <b>Over '+pct(P.over)+'%</b> · <b>Under '+pct(P.under)+'%</b> <span class="src">(Learner total '+f0(P.tot)+')</span></div>';
+  /* its picks, and whether they match the main pick */
+  var pk=hblPicks(g,P).filter(function(q){return q.t!=='ml'}),main={};try{var d=ddFor(g);(d.mk||[]).forEach(function(o){main[o.t]=o})}catch(e){}
+  if(pk.length)h+='<div class="dd-rows" style="margin-top:8px">'+pk.map(function(q){var m=main[q.t],ms=m&&m.x?(q.t==='tot'?(m.x.over===q.over):(m.x.side===q.side)):null;
+    return '<div class="dd-row"><div><b>'+esc(q.pick)+'</b><div class="src">'+(q.t==='sp'?'covers':'hits')+' '+pct(q.p)+'% · '+(ms==null?'':ms?'<span class="ok256">same as the main pick</span>':'<span class="no256">main pick is '+esc(m.pick)+'</span>')+'</div></div><div class="dd-r">'+grPill(hblLetter(q.p))+'</div></div>'}).join('')+'</div>';
+  /* why: the ratings it learned */
+  var R=function(id,k){var r=hblRank(M,id,k),n=Object.keys(M[k]).filter(function(t){return (M.cnt[t]||0)>=4}).length;return r+' of '+n};
+  var L=[];
+  L.push(esc(nm('a'))+': offense '+R(P.ia,'off')+', defense '+R(P.ia,'def')+'. '+esc(nm('h'))+': offense '+R(P.ih,'off')+', defense '+R(P.ih,'def')+'.');
+  L.push('Home edge it learned: '+(M.hfa>=0?'+':'')+M.hfa.toFixed(dec?2:1)+' '+(lg==='nhl'?'goals':'points')+'.'+(g.neutral?' Neutral site, so not used.':''));
+  if(P.wind!=null)L.push('Wind about '+Math.round(P.wind)+' mph: '+(P.wt?(P.wt>0?'+':'')+P.wt.toFixed(1)+' points per team (learned from past windy games).':'not strong enough to matter.'));
+  (P.notes||[]).forEach(function(n){if(n.kind==='gk')L.push('Goalies: '+esc(n.who.join(' vs ')));else if(n.who&&n.who.length)L.push(esc(nm(n.s))+' '+(n.kind==='def'?'defense short-handed':'without')+' '+esc(n.who.slice(0,4).join(', '))+(n.pts?' ('+Math.abs(n.pts).toFixed(dec?2:1)+' '+(lg==='nhl'?'goals':'pts')+')':''))});
+  if(P.cal&&P.cal.sp.n)L.push('Confidence against the line is tuned by its own record: '+(P.cal.sp.k>=.8?'its past edges held up, so it keeps them':P.cal.sp.k>=.4?'its past edges held up only partly, so it trims them':'its past edges mostly did not hold up, so its percentages stay close to 50%')+' (from '+P.cal.sp.n+' past spread picks).');
+  h+='<div class="dd-h" style="font-size:15px;margin-top:10px">What it learned</div>'+ul284(L);
+  h+='<div class="src" style="margin-top:4px">Built only from '+M.n.toLocaleString()+' finished games ('+M.cur+' this season; last season counts less because rosters change), players out and weather. The betting line is used only for the cover and total percentages. Shown next to the main pick; it does not change the main pick or grade.</div>';
+  return h+'</div>';
+}
+(function(){
+  var t0=tidy295;
+  tidy295=function(h,g){
+    var o=t0.apply(this,arguments);
+    try{if(kind(g)!=='up')return o;
+      var c=hblCard(g),i=o.indexOf('<h2 id="hb-why"');if(i<0)return o+c;
+      return o.slice(0,i)+c+o.slice(i);
+    }catch(e){return o}
+  };
+})();
+/* ---------- Picks: a third view, the Learner's picks ---------- */
+function hblRec(t){var w=0,l=0;hblLog().forEach(function(x){if(!x.res||!x.res[t])return;if(x.res[t]==='W')w++;else if(x.res[t]==='L')l++});return [w,l]}
+(function(){
+  var vp=vPicks2;
+  vPicks2=function(){
+    var chip=function(mode){return '<div class="chips" role="group" aria-label="Show">'+[['best','Best bet per game'],['b','B or better'],['hbl','Learner (no line)']].map(function(m){return '<button class="chip" data-act="set" data-k="pkb" data-v="'+m[0]+'" aria-pressed="'+(mode===m[0])+'">'+m[1]+'</button>'}).join('')+'</div>'};
+    if(S.pkb!=='hbl'){
+      var h=vp.apply(this,arguments);
+      try{h=h.replace(/<div class="chips" role="group" aria-label="Show">[\s\S]*?<\/div>/,chip(S.pkb==='b'?'b':'best'))}catch(e){}
+      return h;
+    }
+    RC293={};
+    var T=gdTest(),sel=S.gd==='prev'?'week':(S.gd||T.sel),now=Date.now(),items=[];
+    LG.forEach(function(l){var lg=l[0];if(HBL_LGS.indexOf(lg)<0||(S.gs&&S.gs!=='all'&&S.gs!==lg))return;(S.feed[lg]||[]).forEach(function(g){
+      if(kind(g)!=='up'||!(g.start>now)||!T.ok(g))return;var P=hblPredict(g);if(!P)return;
+      hblPicks(g,P).forEach(function(q){if(q.t==='ml'||q.p<.53)return;items.push({g:g,P:P,q:q})})})});
+    items.sort(function(a,b){return b.q.p-a.q.p});
+    var h2='<h2>Picks</h2>'+gsChips()+'<div class="chips" role="group" aria-label="Day">'+[['today','Today'],['tomorrow','Tomorrow'],['week','This week']].map(function(m){return '<button class="chip" data-act="set" data-k="gd" data-v="'+m[0]+'" aria-pressed="'+(sel===m[0])+'">'+m[1]+'</button>'}).join('')+'</div>'+chip('hbl');
+    h2+='<p class="src" style="margin:4px 0 10px">Hitboard Learner’s spread and total picks. Its score is built only from what it learned from past games (team offense and defense, home edge, weather) and players out, without the betting line; the line is used only to say how often each pick hits. Best first.</p>';
+    var rs=hblRec('sp'),rt=hblRec('tot');
+    if(rs[0]+rs[1]+rt[0]+rt[1])h2+='<div class="card" style="padding:8px 12px;margin:0 0 10px"><b>Learner’s record on this phone</b><div>Spreads '+rs[0]+'–'+rs[1]+' · Totals '+rt[0]+'–'+rt[1]+'</div></div>';
+    if(!items.length)h2+='<div class="card empty">'+(window.claude?'The Learner runs in the installed app.':HBL.busy?'Learning from past games… ('+(HBL.prog.done||0)+' of '+(HBL.prog.todo||0)+' pages read)':'No Learner picks for this selection yet. Try This week, or wait for past games to finish loading.')+'</div>';
+    h2+=items.slice(0,S.pkAll?200:30).map(function(it,i){
+      var g=it.g,q=it.q,P=it.P,nm=function(s){return nick282(g,s)},w=P.h>=P.a?'h':'a',f0=function(v){return g.lg==='nhl'?v.toFixed(1):String(Math.round(v))};
+      var leg=null;try{leg=gameLeg(g,{t:q.t,side:q.side||null,num:q.num,over:q.t==='tot'?q.over:null,pick:q.pick,mk:q.mk,p:q.p})}catch(e){}
+      var main='';try{var d=ddFor(g),m=(d.mk||[]).filter(function(o){return o.t===q.t})[0];if(m&&m.x){var same=q.t==='tot'?m.x.over===q.over:m.x.side===q.side;main=same?'<span class="ok256">same as the main pick</span>':'<span class="no256">main pick is '+esc(m.pick)+'</span>'}}catch(e){}
+      return '<div class="gc256" style="margin:0 0 10px"><div data-act="fgame" data-id="'+esc(g.id)+'" role="button" tabindex="0" style="cursor:pointer"><div class="gc-top"><span>#'+(i+1)+' · '+esc(lgName(g.lg))+' · '+esc(gTime(g))+'</span></div>'+
+        '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><div><div class="dd-pick" style="font-size:22px">'+esc(q.pick)+'</div><div class="src">'+esc(q.mk)+' · '+esc((g.an||g.a)+' @ '+(g.hn||g.h))+'</div></div>'+grPill(hblLetter(q.p))+'</div>'+
+        '<div class="src" style="margin-top:6px">Learner: '+esc(nm(w))+' '+f0(w==='h'?P.h:P.a)+', '+esc(nm(w==='h'?'a':'h'))+' '+f0(w==='h'?P.a:P.h)+' · '+(q.t==='sp'?'covers ':'hits ')+simPct276(q.p)+'%</div>'+(main?'<div style="margin-top:4px;font-size:13px">'+main+'</div>':'')+'</div>'+
+        (leg?'<div style="display:flex;justify-content:flex-end;margin-top:8px">'+addBtn293({leg:leg,pick:q.pick})+'</div>':'')+'</div>';
+    }).join('');
+    if(items.length>30)h2+='<div style="margin:6px 0 12px"><button class="btn" data-act="set" data-k="pkAll" data-v="'+(S.pkAll?'':'1')+'">'+(S.pkAll?'Show top 30':'Show all '+items.length)+'</button></div>';
+    return h2+foot();
+  };
+})();
+/* ---------- How the app is doing: what the Learner learned and how it has done ---------- */
+function hblPanel(){
+  var h='<div class="card" style="padding:12px;margin:10px 0"><b>Hitboard Learner</b><p class="src" style="margin:4px 0 6px">A model built from scratch that learns from every finished game (this season, and last season at '+Math.round(HBL_LAST_W*100)+'% weight because rosters change) and never looks at the betting line. It is refit as games finish, so each mistake changes the next prediction. “Replayed this season” predicts every week using only the games before it, so it shows how the Learner would really have done.</p>';
+  if(window.claude)return h+'<p class="src">Runs in the installed app.</p></div>';
+  if(HBL.busy)h+='<p class="src">Reading past games: '+(HBL.prog.done||0)+' of '+(HBL.prog.todo||0)+' pages…</p>';
+  HBL_LGS.forEach(function(lg){
+    var M=hblModel(lg);
+    if(!M){h+='<div style="border-top:1px solid var(--line);padding:6px 0"><b>'+esc(lgName(lg))+'</b> <span class="src">· not enough games loaded yet</span></div>';return}
+    var top=function(k){return Object.keys(M[k]).filter(function(t){return (M.cnt[t]||0)>=4}).sort(function(a,b){return M[k][b]-M[k][a]}).slice(0,5).map(function(t){return hblStore(lg).nm[t]||t}).join(', ')};
+    var B=hblBacktest(lg),pc=function(a,b){return a+b?' ('+Math.round(a/(a+b)*100)+'%)':''};
+    var rs=[0,0],rt=[0,0];hblLog().forEach(function(x){if(x.lg!==lg||!x.res)return;if(x.res.sp==='W')rs[0]++;else if(x.res.sp==='L')rs[1]++;if(x.res.tot==='W')rt[0]++;else if(x.res.tot==='L')rt[1]++});
+    h+='<div style="border-top:1px solid var(--line);padding:8px 0"><b>'+esc(lgName(lg))+'</b> <span class="src">· '+M.n.toLocaleString()+' games ('+M.cur+' this season)</span>'+
+      '<div class="src" style="margin-top:2px">Home edge '+(M.hfa>=0?'+':'')+M.hfa.toFixed(lg==='nhl'?2:1)+(lg==='nhl'?' goals':' pts')+(lg==='nfl'?' · Wind 15–19 mph '+M.wA.toFixed(1)+', 20+ mph '+M.wB.toFixed(1)+' pts per team (from '+Math.round(M.windN)+' windy games)':'')+'</div>'+
+      '<div class="src">Best defenses: '+esc(top('def'))+'</div><div class="src">Best offenses: '+esc(top('off'))+'</div>'+
+      (B.n?'<div style="margin-top:4px">Replayed this season: winners '+Math.round(B.win/B.n*100)+'% of '+B.n+' games · off by '+B.mae.toFixed(lg==='nhl'?1:0)+(lg==='nhl'?' goals':' pts')+' on average'+(B.ats[0]+B.ats[1]?' · spreads '+B.ats[0]+'–'+B.ats[1]+pc(B.ats[0],B.ats[1]):'')+(B.tot[0]+B.tot[1]?' · totals '+B.tot[0]+'–'+B.tot[1]+pc(B.tot[0],B.tot[1]):'')+(B.big[0]+B.big[1]?' · strongest spread picks (56%+) '+B.big[0]+'–'+B.big[1]+pc(B.big[0],B.big[1]):'')+'</div>':'')+
+      (function(){try{var c=hblCal(lg);return c.sp.n?'<div class="src">Confidence tuning: it keeps '+Math.round(c.sp.k*100)+'% of its spread edge and '+Math.round(c.tot.k*100)+'% of its total edge, learned from '+c.sp.n+' spread and '+c.tot.n+' total picks.</div>':''}catch(e){return ''}})()+
+      (rs[0]+rs[1]+rt[0]+rt[1]?'<div>Since it started picking on this phone: spreads '+rs[0]+'–'+rs[1]+' · totals '+rt[0]+'–'+rt[1]+'</div>':'')+'</div>';
+  });
+  h+='<div style="margin-top:6px"><button class="btn" data-act="hblreload">Reload past games</button></div><p class="src" style="margin:6px 0 0">About 52.4% against the spread is break-even at standard odds, so a long run above that is the test of whether the Learner has an edge.</p>';
+  return h+'</div>';
+}
+(function(){
+  var vp=vPicks;
+  vPicks=function(){
+    var h=vp.apply(this,arguments);
+    if(S.mbv!=='rec')return h;
+    try{var k=h.indexOf('aria-label="View"');if(k>=0){var e=h.indexOf('</div>',k)+6;h=h.slice(0,e)+hblPanel()+h.slice(e)}else h=hblPanel()+h}catch(e){}
+    return h;
+  };
+})();
+document.addEventListener('click',function(e){var el=e.target&&e.target.closest?e.target.closest('[data-act="hblreload"]'):null;if(!el)return;e.stopImmediatePropagation();e.preventDefault();hblLoad(true);render()},true);
+/* start: load past games in the background (old pages once, recent ones every few hours), and log the Learner's picks */
+setTimeout(function(){try{var at=+(localStorage.getItem('hb.hbl1.at')||0);if(Date.now()-at>3*36e5)hblLoad(false)}catch(e){}},9000);
+setInterval(function(){try{if(!HBL.busy){var at=+(localStorage.getItem('hb.hbl1.at')||0);if(Date.now()-at>3*36e5)hblLoad(false)}hblLogTick()}catch(e){}},60000);
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
 render();
 setTimeout(function(){doRefresh(true)},600);
