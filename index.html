@@ -1957,7 +1957,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v304, Nov 27';
+var BUILD='v305, Nov 27';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -21418,6 +21418,55 @@ one295=function(g){
     var r=sh.getBoundingClientRect();if(e.clientY>=r.top)return;
     e.stopImmediatePropagation();e.preventDefault();toTop(sh);
   },true);
+})();
+
+/* v305 (user): Picks lists every game by the spread. Each card is Hitboard's side of the spread from its own predicted
+   score (built without the line), sorted by how far that score is from the line, with the winner, spread and total
+   underneath. Tapping a card opens the game. "Best bet per game" and "B or better" are folded into this list; the Learner view stays. */
+(function(){
+  var vp=vPicks2;
+  var chips=function(mode){return '<div class="chips" role="group" aria-label="Show">'+[['sp','By the spread'],['hbl','Learner (no line)']].map(function(m){return '<button class="chip" data-act="set" data-k="pkb" data-v="'+m[0]+'" aria-pressed="'+(mode===m[0])+'">'+m[1]+'</button>'}).join('')+'</div>'};
+  var f1=function(v){return (Math.round(v*2)/2).toFixed(1).replace(/\.0$/,'')};
+  vPicks2=function(){
+    if(S.pkb==='hbl'){var h0=vp.apply(this,arguments);try{h0=h0.replace(/<div class="chips" role="group" aria-label="Show">[\s\S]*?<\/div>/,chips('hbl'))}catch(e){}return h0}
+    RC293={};_simWait293=false;
+    var T=gdTest(),sel=S.gd==='prev'?'week':(S.gd||T.sel),now=Date.now(),budget={n:16,pend:0},R=[],noLine=[];
+    LG.forEach(function(l){var lg=l[0];if(S.gs&&S.gs!=='all'&&S.gs!==lg)return;(S.feed[lg]||[]).forEach(function(g){
+      if(kind(g)!=='up'||!(g.start>now)||!T.ok(g))return;
+      var d=ddCached(g);if(d===undefined&&budget.n>0){budget.n--;try{d=ddFor(g)}catch(e){d=null}}
+      if(d===undefined){budget.pend++;return}
+      if(!d||!d.pred)return;
+      var mk=d.mk||[],sp=mk.filter(function(m){return m.t==='sp'})[0],ml=mk.filter(function(m){return m.t==='ml'})[0],tt=mk.filter(function(m){return m.t==='tot'})[0];
+      var ln=null;try{ln=lineFor(g)}catch(e){}
+      var M=d.pred.h-d.pred.a,Lm=ln&&ln.pts!=null?(ln.fav==='h'?ln.pts:-ln.pts):null;
+      var o={g:g,d:d,sp:sp,ml:ml,tt:tt,M:M,Lm:Lm,edge:Lm!=null?Math.abs(M-Lm):-1};
+      if(sp&&Lm!=null){o.b=sp;o.l=ddLetter293(sp);o.leg=sp.x?gameLeg(g,sp.x):null;o.x=sp.x;o.p=sp.p;o.pick=sp.pick;o.type='game';o.gid=g.id;o.mk='Spread';R.push(o)}else noLine.push(o);
+    })});
+    R.sort(function(a,b){return b.edge-a.edge||a.g.start-b.g.start});
+    var h='<h2>Picks</h2>'+gsChips()+'<div class="chips" role="group" aria-label="Day">'+[['today','Today'],['tomorrow','Tomorrow'],['week','This week']].map(function(m){return '<button class="chip" data-act="set" data-k="gd" data-v="'+m[0]+'" aria-pressed="'+(sel===m[0])+'">'+m[1]+'</button>'}).join('')+'</div>'+chips('sp');
+    h+='<p class="src" style="margin:4px 0 10px">Every game’s spread pick from Hitboard’s own predicted score, which is built from the matchup and never from the sportsbook line. The line is used only to see which side Hitboard’s score lands on. Biggest gap between Hitboard’s margin and the line first. Tap a game for the full breakdown.</p>';
+    if(!R.length&&!noLine.length&&!budget.pend)h+='<div class="card empty">No games for this selection yet. Try another day or sport, or tap Refresh on Games.</div>';
+    var row=function(m){return m?'<div style="display:flex;justify-content:space-between;gap:8px"><span>'+esc(MKN256[m.t]||'')+': <b>'+esc(m.pick)+'</b></span><span class="src">'+(m.p!=null?Math.round(m.p*100)+'%':'')+'</span></div>':''};
+    var card=function(o,i){
+      var g=o.g,d=o.d,na=nick282(g,'a'),nh=nick282(g,'h'),w=o.M>=0?'h':'a',nm=function(s){return s==='a'?na:nh};
+      var dec=g.lg==='nhl'?1:0,fs=function(v){return dec?v.toFixed(1):String(Math.round(v))};
+      var score=nm(w)+' '+fs(w==='h'?d.pred.h:d.pred.a)+', '+nm(w==='h'?'a':'h')+' '+fs(w==='h'?d.pred.a:d.pred.h);
+      var cmp=o.Lm!=null?'Hitboard: '+nm(w)+' by '+f1(Math.abs(o.M))+' · line: '+(o.Lm===0?'pick’em':nm(o.Lm>0?'h':'a')+' by '+f1(Math.abs(o.Lm)))+' · gap '+f1(o.edge):'No spread posted yet';
+      return '<div class="gc256" style="margin:0 0 10px"><div data-act="fgame" data-id="'+esc(g.id)+'" role="button" tabindex="0" style="cursor:pointer"><div class="gc-top"><span>'+(i!=null?'#'+(i+1)+' · ':'')+esc(lgName(g.lg))+' · '+esc(gTime(g))+'</span><span class="gc-line">'+gcLine256(g)+'</span></div>'+
+        '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><div><div class="dd-pick" style="font-size:22px">'+esc(o.sp&&o.Lm!=null?o.sp.pick:score)+'</div><div class="src">'+esc((g.an||g.a)+' @ '+(g.hn||g.h))+'</div></div>'+(o.l?grPill(o.l):'')+'</div>'+
+        '<div class="src" style="margin-top:6px">Predicted score: <b>'+esc(score)+'</b> · '+esc(cmp)+'</div>'+
+        '<div style="margin-top:8px;font-size:13.5px;line-height:1.7;border-top:1px solid var(--line);padding-top:6px">'+row(o.ml)+row(o.sp)+row(o.tt)+'</div>'+
+        (o.x?simTxt293(g,o.x):'')+'</div>'+
+        (o.leg?'<div style="display:flex;justify-content:flex-end;margin-top:8px">'+addBtn293(o)+'</div>':'')+'</div>';
+    };
+    var show=S.pkAll?R:R.slice(0,25);
+    h+=show.map(card).join('');
+    if(R.length>25)h+='<div style="margin:6px 0 12px"><button class="btn" data-act="set" data-k="pkAll" data-v="'+(S.pkAll?'':'1')+'">'+(S.pkAll?'Show top 25':'Show all '+R.length)+'</button></div>';
+    if(noLine.length)h+='<h3 style="margin-top:16px">No spread posted yet</h3>'+noLine.slice(0,15).map(function(o){return card(o,null)}).join('');
+    if(budget.pend)h+='<p class="src">Scoring '+budget.pend+' more game'+(budget.pend>1?'s':'')+'…</p>';
+    retry293('picks2',budget.pend);
+    return h+foot();
+  };
 })();
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
