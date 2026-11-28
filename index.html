@@ -1957,7 +1957,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v305, Nov 27';
+var BUILD='v306, Nov 27';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -21466,6 +21466,58 @@ one295=function(g){
     if(budget.pend)h+='<p class="src">Scoring '+budget.pend+' more game'+(budget.pend>1?'s':'')+'…</p>';
     retry293('picks2',budget.pend);
     return h+foot();
+  };
+})();
+
+/* v306 (user): the Learner is folded into Hitboard's own pick and no longer has its own tab or card. It keeps loading past
+   games, refitting team offense and defense after every result, and grading itself in the background; once it has replayed
+   enough games its predicted score is blended into Hitboard's matchup score (up to half the weight). Neither uses the line. */
+function hblW306(g){
+  try{var B=hblBacktest(g.lg);if(!B||!(B.n>=20))return 0;return .5*Math.min(1,B.n/150)}catch(e){return 0}
+}
+feedCalc=function(g){
+  var T=feedTeams(g);if(!T||T.missing)return null;
+  var A=T.A,H=T.H;
+  var sa=(A.pf+H.pa)/2-T.he/2,sh=(H.pf+A.pa)/2+T.he/2;
+  try{var J=statAdj295(g,sa,sh);if(J){sa=J.sa;sh=J.sh}}catch(e){}
+  var lw=0,LP=null;try{LP=hblPredict(g);if(LP&&isFinite(LP.a)&&isFinite(LP.h)){lw=hblW306(g);if(lw>0){sa=(1-lw)*sa+lw*LP.a;sh=(1-lw)*sh+lw*LP.h}}}catch(e){lw=0}
+  var ln=lineFor(g),mkH=(ln&&ln.mlP!=null)?ln.mlP:null;
+  var wxa=g.lg==='nfl'?wxAdj(T.H.k,g.start):{adj:0,pu:0};
+  if(lw>0&&LP&&LP.wt)wxa={adj:wxa.adj*(1-lw),pu:wxa.pu};
+  var mkM=(ln&&ln.pts!=null)?(ln.fav==='h'?ln.pts:-ln.pts):null;
+  var margin=sh-sa,total=sa+sh+wxa.adj;
+  var rawM=margin,rawT=total,LN=learnTm(g);
+  if(LN.n){margin+=LN.dm;total+=LN.dt}
+  var p=Phi(margin/T.sdM),pModel=p;
+  var bets=[],ws=p>=.5?g.h:g.a,wpp=p>=.5?p:1-p,lrn=lw>0?' Includes what Hitboard has learned from past results ('+Math.round(lw*100)+'% weight).':'';
+  bets.push({t:'ml',side:p>=.5?'h':'a',mk:'Moneyline',pick:ws+' to win',p:wpp,conf:wpp>=.7?'high':wpp>=.6?'medium':'low',why:'Hitboard’s own win chance '+pc(wpp)+'%, from its projected score (the betting line is not used).'+lrn});
+  if(ln&&ln.pts!=null){
+    var edge=margin-mkM,side=edge>=0?g.h:g.a,mm=Math.abs(mkM);
+    var lineTxt=edge>=0?(mkM>=0?'-':'+')+mm.toFixed(1):(mkM>=0?'+':'-')+mm.toFixed(1);
+    bets.push({t:'sp',side:edge>=0?'h':'a',num:parseFloat(lineTxt),mk:g.lg==='nhl'?'Puck line':'Spread',pick:side+' '+lineTxt,p:calibCover(Phi(Math.abs(edge)/T.sdM)),conf:confOf(edge/(T.sdM/13.5)),why:'Hitboard’s own margin is '+(margin>=0?g.h:g.a)+' by '+Math.abs(margin).toFixed(1)+'; the line is '+(mkM>=0?g.h:g.a)+' by '+mm.toFixed(1)+'.'});
+  }
+  if(ln&&ln.tt!=null){
+    var te=total-ln.tt;
+    bets.push({t:'tot',over:te>=0,num:ln.tt,mk:'Total',pick:(te>=0?'Over ':'Under ')+ln.tt,p:calibTotal(Phi(Math.abs(te)/T.sdT),te<0,wxa),conf:'low',why:'Hitboard’s own total is '+total.toFixed(1)+'; the listed total is '+ln.tt+'.'});
+  }
+  bets.forEach(function(b){b.p0=b.p;b.p=(g.lg==='nhl'&&b.t==='sp')?Math.max(.3,Math.min(.8,b.p+(LN.dp.sp||0))):learnP(LN,b.t,b.p);b.rm=rawM;b.fm=margin;b.rt=rawT;b.pmH=pModel;b.mkH=mkH;b.src=ln&&ln.srcs?ln.srcs.join(', '):null});
+  return {T:T,p:p,fp:null,ln:ln,total:total,margin:margin,bets:bets,LN:LN,noLine302:1,lw306:lw};
+};
+hblCard=function(){return ''};
+if(S.pkb==='hbl'||S.pkb==='b'||S.pkb==='best')S.pkb='sp';
+(function(){
+  var vp=vPicks2;
+  vPicks2=function(){
+    if(S.pkb==='hbl')S.pkb='sp';
+    var h=vp.apply(this,arguments);
+    try{h=h.replace(/<div class="chips" role="group" aria-label="Show">[\s\S]*?<\/div>/,'')}catch(e){}
+    return h;
+  };
+  var pk=pick284;
+  pick284=function(g,d,X,e){
+    var h=pk.apply(this,arguments);
+    try{h=h.replace('(each team’s offense against the other’s defense, home field, who is playing and weather), never from the sportsbook line.','(each team’s offense against the other’s defense, home field, who is playing, weather, and what Hitboard has learned from every finished game this season and last), never from the sportsbook line.')}catch(x){}
+    return h;
   };
 })();
 
