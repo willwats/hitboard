@@ -1957,7 +1957,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v303, Nov 27';
+var BUILD='v304, Nov 27';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -21376,6 +21376,48 @@ one295=function(g){
     try{h=h.replace('The predicted score is the same number the picks use, and the simulation below plays it out 10,000 times.','The predicted score is built only from the matchup (each team’s offense against the other’s defense, home field, who is playing and weather), never from the sportsbook line. The picks and the simulation below use that same score; the line is shown only to say which side of it Hitboard’s score lands on.')}catch(x){}
     return h;
   };
+})();
+
+/* v304 (user): (1) "What decides" reads as two separate win rates (when it happens / when it doesn't), so nobody expects
+   them to add to 100%. The "Built with the latest lineups" note no longer talks about the betting line. (2) Props drops the
+   "B or better" chip; Best matchups stays. (3) Tapping the top of the screen scrolls back to the top: the bar with Close in a
+   game window (or the dark strip above the window), and the app header on the main screens. */
+(function(){
+  var s0=story295;
+  story295=function(g,d,X){
+    var h=s0.apply(this,arguments);
+    try{
+      var cap=function(t){return t.charAt(0).toUpperCase()+t.slice(1)};
+      h=h.replace(/<li>If ([^<]*?): (covers|wins|hits) <b>(\d+)%<\/b> \(otherwise (\d+)%\)<\/li>/g,function(m,c,v,a,b){
+        return '<li>'+cap('when '+c)+', it '+v+' in <b>'+a+'%</b> of those games. When that does not happen, it '+v+' in '+b+'%.</li>'});
+      h=h.replace(/(of simulated games\.)(<\/div>)/,'$1 Each line splits the simulated games into two groups, so the two numbers are separate rates and do not add up to 100%.$2');
+      h=h.replace('The predicted score, the picks and the simulation all use these. The betting line already reflects news, so players out move Hitboard’s side of the number, not the whole line.','The predicted score, the picks and the simulation all use these. Players out lower their team’s projected points directly; the betting line is not used.');
+    }catch(e){}
+    return h;
+  };
+  var vb=vBoard;
+  vBoard=function(){
+    if(S.bf==='grade')S.bf='match';
+    var h=vb.apply(this,arguments);
+    try{h=h.replace(/<button class="chip" data-act="set" data-k="bf" data-v="grade"[^>]*>[\s\S]*?<\/button>/g,'')}catch(e){}
+    return h;
+  };
+  var st=document.createElement('style');st.textContent='.sheet .shclose{cursor:pointer}header{cursor:pointer}';document.head.appendChild(st);
+  var toTop=function(el){try{el.scrollTo({top:0,behavior:'smooth'})}catch(e){el.scrollTop=0}};
+  document.addEventListener('click',function(e){
+    var t=e.target;if(!t||!t.closest)return;
+    if(t.closest('button,a,input,select,textarea,[data-act]:not(.scrim)'))return;
+    var sh=document.querySelector('#sheetRoot .sheet');
+    if(sh&&t.closest('.shclose')){toTop(sh);e.stopPropagation();return}
+    if(!sh&&t.closest('body > .wrap > header')){try{window.scrollTo({top:0,behavior:'smooth'})}catch(x){window.scrollTo(0,0)}}
+  },true);
+  /* the dark strip above an open window: if the window is scrolled down, the first tap takes it to the top; otherwise it closes as before */
+  document.addEventListener('click',function(e){
+    var el=e.target;if(!el||!el.classList||!el.classList.contains('scrim')||el.dataset.act!=='scrim')return;
+    var sh=el.querySelector('.sheet');if(!sh||sh.scrollTop<40)return;
+    var r=sh.getBoundingClientRect();if(e.clientY>=r.top)return;
+    e.stopImmediatePropagation();e.preventDefault();toTop(sh);
+  },true);
 })();
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
