@@ -1,4 +1,4 @@
-const V='hitboard-v311';
+const V='hitboard-v312';
 const SHELL=['./','index.html','manifest.webmanifest','icon-192.png','icon-512.png','icon-maskable-512.png'];
 /* v311: the app opens from the copy saved on the phone (instant, no 2 MB download each time). A new version is picked up
    when this file changes: the new copy is saved in the background and used from the next open (or the Update banner). */

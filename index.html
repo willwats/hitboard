@@ -1957,7 +1957,7 @@ function vAbout(){
   '<h3>What is missing</h3><ul class="pts"><li><b>NHL:</b> player rates are season totals from the NHL stats API after only 8 to 11 games, steadied toward typical rates. Game logs, hit-rate tables and sportsbook lines were not available, and goalie starts are not confirmed.</li><li>Posted sportsbook prop lines and game-by-game logs are not in free public sources, so you enter the line you see.</li><li>Matchup deep dives and the prop calculator exist for NFL games only. Injury lists for the generated deep dives are partial. NFL touchdown hit rates cover today’s slate only. NBA and NCAAF have hit-rate tables and schedules.</li><li>Hit rates are old or thin. NFL covers Weeks 1 to 4. NBA is the last 10 games of last season until the Oct 20 opener. NCAAF is the last 5 games, and the source does not say whether its yards column is a season total or a per-game figure.</li><li>Sportsbook prop lines (DraftKings and others) are login-gated, so every threshold shown is the source’s own mark.</li><li>The feed has no NCAAB games or hit-rate data yet.</li></ul>'+
   '<h3>Sources</h3><ul class="pts">'+DATA.sources.map(function(s){return '<li><a href="'+s[1]+'" target="_blank" rel="noopener">'+esc(s[0])+'</a></li>'}).join('')+'</ul>'+foot();
 }
-var BUILD='v311, Nov 28';
+var BUILD='v312, Nov 28';
 function dispInfo(){
   try{
     var st=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
@@ -22042,6 +22042,115 @@ setInterval(function(){try{feedSave311()}catch(e){}},20000);
     LG.forEach(function(l){S.feed[l[0]]=o.feed[l[0]]});S.feedAt=o.at;FEED311.at=o.at;
     try{render()}catch(e){}
   });
+})();
+
+/* v312 (user): rest and back-to-backs in Hitboard's score for the NBA, college basketball and the NHL. Each team's recent
+   games come from the scores feed and its saved schedule. A team on the second night of a back-to-back, playing its third
+   game in four nights, or on a road back-to-back loses points (some of the cost shows up on defense, so the opponent
+   gains a little); a rest edge (2+ days off against a tired opponent) adds to it. A team already missing a star loses less,
+   since its projection is already lowered. The size of the effect is learned: every game's rest effect is saved before
+   tip-off and compared with the result, and the effect is scaled up or down (0x to 2x) to match how tired teams really do. */
+var REST312={c:{},k:{},log:null};
+var REST_BASE312={
+  nba:{b2b:1.6,road:.6,t34:.8,edge:.5,cap:3.5,own:.6,star:3},
+  ncaamb:{b2b:1.2,road:.4,t34:.8,edge:.4,cap:2.6,own:.6,star:3},
+  nhl:{b2b:.12,road:.05,t34:.06,edge:.04,cap:.26,own:.6,star:.25}
+};
+/* the schedule's dates are saved with each team profile from now on */
+(function(){
+  var L0=mxLoadTeam;
+  mxLoadTeam=function(lg,id){return L0.apply(this,arguments).then(function(P){
+    try{var c=S.tmS[lg+'|'+id];if(P&&c&&c.v){P.dates=c.v.map(function(e){return [Date.parse(e.date)||0,e.home?1:0]}).filter(function(x){return x[0]>0});mxSave()}}catch(e){}
+    return P})};
+})();
+function restDay312(ts){var d=new Date(ts);return Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())/864e5}
+/* a team's games (start time, home?) before this game, from the feed and its saved schedule */
+function restPrior312(g,side){
+  var lg=g.lg,ab=side==='a'?g.a:g.h,out={};
+  (S.feed[lg]||[]).forEach(function(x){if(x.id===g.id||!x.start||x.start>=g.start-3*36e5||x.start<g.start-6*864e5)return;
+    if(x.a===ab)out[restDay312(x.start)]={t:x.start,home:0};else if(x.h===ab)out[restDay312(x.start)]={t:x.start,home:1}});
+  try{var I=mxIds(g),id=side==='a'?I.a:I.h,P=id&&MX.p[lg+'|'+id];
+    if(P&&P.dates)P.dates.forEach(function(x){if(x[0]>=g.start-3*36e5||x[0]<g.start-6*864e5)return;var d=restDay312(x[0]);if(!out[d])out[d]={t:x[0],home:x[1]}})}catch(e){}
+  return out;
+}
+function restSide312(g,side){
+  var pr=restPrior312(g,side),d0=restDay312(g.start),days=Object.keys(pr).map(Number).filter(function(d){return d<d0}).sort(function(a,b){return b-a});
+  var last=days.length?d0-days[0]:null,in3=days.filter(function(d){return d>=d0-3}).length;
+  var away=side==='a'&&!g.neutral;
+  return {rest:last,b2b:last===1,t34:in3>=2,road:last===1&&away,prevHome:last===1?pr[days[0]].home:null,known:days.length>0||null};
+}
+/* the learned scale for each sport */
+function restLog312(){if(REST312.log)return REST312.log;try{REST312.log=JSON.parse(localStorage.getItem('hb.rest1.log')||'{}')}catch(e){}if(!REST312.log||typeof REST312.log!=='object')REST312.log={};return REST312.log}
+function restLogSave312(){try{var L=restLog312(),ks=Object.keys(L).sort(function(a,b){return L[b].t-L[a].t});ks.slice(800).forEach(function(k){delete L[k]});localStorage.setItem('hb.rest1.log',JSON.stringify(L))}catch(e){}}
+function restK312(lg){
+  if(REST312.k[lg]!=null)return REST312.k[lg];
+  var L=restLog312(),sxy=0,sxx=0,n=0;
+  Object.keys(L).forEach(function(id){var e=L[id];if(e.lg!==lg||e.res==null||!e.xb)return;var r0=e.res-(e.pm-e.xa);sxy+=r0*e.xb;sxx+=e.xb*e.xb;n++});
+  var k=1;if(n>=10&&sxx>0){var kh=sxy/sxx;k=(n*kh+30*1)/(n+30)}
+  k=Math.max(0,Math.min(2,k));REST312.k[lg]=k;REST312.n=REST312.n||{};REST312.n[lg]=n;return k;
+}
+/* the rest effect for one game: points off each side's score, plus words for the pick card */
+function rest312(g){
+  var B=REST_BASE312[g.lg];if(!B||!g.start)return null;
+  var key=g.id+'|'+Math.floor(Date.now()/3e5)+'|'+(S.feedAt||0),c=REST312.c[g.id];if(c&&c.key===key)return c.v;
+  var v=null;
+  try{
+    var A=restSide312(g,'a'),H=restSide312(g,'h'),k=restK312(g.lg);
+    var cost=function(me,op){var e=0,why=[];if(me.b2b){e+=B.b2b;why.push(me.road?'second night of a back-to-back on the road':'second night of a back-to-back')}if(me.road)e+=B.road;if(me.t34){e+=B.t34;if(!me.b2b)why.push('third game in four nights');else why[why.length-1]+=', third game in four nights'}if((me.b2b||me.t34)&&op.rest!=null&&op.rest>=2){e+=B.edge;why.push('the opponent is rested')}return {e:Math.min(B.cap,e),why:why}};
+    var ca=cost(A,H),ch=cost(H,A);
+    /* a team already missing a star loses less */
+    var star=function(s){try{var J=_sa295[g.id]&&_sa295[g.id].v;if(!J||!J.notes)return 0;var t=0;J.notes.forEach(function(n){if(n.s===s&&n.kind==='out')t+=Math.abs(n.pts||0)});return t}catch(e){return 0}};
+    if(ca.e&&star('a')>=B.star)ca.e*=.5;if(ch.e&&star('h')>=B.star)ch.e*=.5;
+    if(ca.e||ch.e){
+      var ea=ca.e*k,eh=ch.e*k;
+      v={a:-ea*B.own+eh*(1-B.own),h:-eh*B.own+ea*(1-B.own),ea:ea,eh:eh,xb:(ca.e-ch.e),k:k,A:A,H:H,wa:ca.why,wh:ch.why};
+    }else v={a:0,h:0,ea:0,eh:0,xb:0,k:k,A:A,H:H,wa:[],wh:[]};
+  }catch(e){v=null}
+  REST312.c[g.id]={key:key,v:v};return v;
+}
+/* applied with the other lineup adjustments, so the matchup score, the learned ratings and the simulation all see it */
+(function(){
+  var s0=statAdj295;
+  statAdj295=function(g,sa,sh){
+    var r=s0.apply(this,arguments);
+    try{
+      if(!r||!REST_BASE312[g.lg])return r;var R=rest312(g);if(!R||(!R.a&&!R.h))return r;
+      var lo=g.lg==='nhl'?.3:40;
+      return {sa:Math.max(lo,r.sa+R.a),sh:Math.max(lo,r.sh+R.h),notes:r.notes||[],rest:R};
+    }catch(e){return r}
+  };
+  /* save each game's rest effect and Hitboard's margin before tip-off; graded after */
+  var fc=feedCalc;
+  feedCalc=function(g){
+    var C=fc.apply(this,arguments);
+    try{if(C&&REST_BASE312[g.lg]&&kind(g)==='up'&&g.start>Date.now()&&g.start<Date.now()+3*864e5){var R=rest312(g);if(R&&R.xb){var L=restLog312(),e=L[g.id];var xa=(R.h-R.a);if(!e||e.res==null){var ch=!e||Math.abs((e.pm||0)-C.margin)>.05;L[g.id]={lg:g.lg,t:g.start,pm:C.margin,xa:xa,xb:R.xb};if(ch){clearTimeout(REST312.st);REST312.st=setTimeout(restLogSave312,3000)}}}}}catch(e){}
+    return C;
+  };
+})();
+function restGrade312(){
+  var L=restLog312(),ch=false;
+  Object.keys(L).forEach(function(id){var e=L[id];if(e.res!=null||e.t>Date.now()-2*36e5)return;var g=null;try{g=find(id)}catch(x){}if(!g||kind(g)!=='final'||g.sa==null||g.sh==null)return;e.res=g.sh-g.sa;ch=true});
+  if(ch){REST312.k={};restLogSave312()}
+}
+setTimeout(function(){try{restGrade312()}catch(e){}},8000);
+setInterval(function(){try{restGrade312()}catch(e){}},120000);
+/* the pick card says who is tired */
+(function(){
+  var pk=pick284;
+  pick284=function(g,d,X,e){
+    var h=pk.apply(this,arguments);
+    try{
+      if(!REST_BASE312[g.lg])return h;var R=rest312(g);if(!R)return h;
+      var na=nick282(g,'a'),nh=nick282(g,'h'),u=g.lg==='nhl'?' goals':' points',f=function(v){return g.lg==='nhl'?v.toFixed(2):v.toFixed(1)};
+      var L=[];
+      if(R.wa.length)L.push('the '+esc(na)+' are on the '+esc(R.wa.join(', and '))+' (about −'+f(R.ea)+u+' to the margin)');
+      if(R.wh.length)L.push('the '+esc(nh)+' are on the '+esc(R.wh.join(', and '))+' (about −'+f(R.eh)+u+' to the margin)');
+      if(!L.length){var ra=R.A.rest,rh=R.H.rest;if(ra==null&&rh==null)return h;L.push('no back-to-back for either team'+(ra!=null&&rh!=null?' ('+esc(na)+' '+ra+' day'+(ra===1?'':'s')+' since the last game, '+esc(nh)+' '+rh+')':''))}
+      var line='<div class="src" style="margin:0 0 6px">Rest: '+L.join('; ')+'.'+(R.k!==1&&REST312.n&&REST312.n[g.lg]>=10?' Scaled '+R.k.toFixed(1)+'× from how tired teams have actually done.':'')+'</div>';
+      var i=h.indexOf('<div class="src" style="margin:4px 0 6px">Built from:');if(i<0){i=h.indexOf('<div style="font-size:21px;font-weight:800">');if(i<0)return h;i=h.indexOf('</div>',i)+6}else{i=h.indexOf('</div>',i)+6;var j=h.indexOf('<div class="src" style="margin:0 0 6px">Key matchups:',i);if(j===i)i=h.indexOf('</div>',j)+6}
+      return h.slice(0,i)+line+h.slice(i);
+    }catch(x){return h}
+  };
 })();
 
 setTimeout(kalLoad,1500);setTimeout(loadStatAvgs,400);setTimeout(glogSync,900);setTimeout(wxPreload,600);
